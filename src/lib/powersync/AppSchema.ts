@@ -336,6 +336,17 @@ const DriverUnavailability = new Table(DriverUnavailabilityCols, {
   indexes: { driver_uuid: ["driver_uuid"] },
 });
 
+const InspectionQuestionsCols = {
+  question_text: column.text,
+  required: column.integer,
+  question_type: column.text,
+  is_active: column.integer,
+  sort_order: column.integer,
+} satisfies PowerSyncColsFor<"InspectionQuestions">;
+const InspectionQuestions = new Table(InspectionQuestionsCols, {
+  indexes: { sort_order: ["sort_order"] },
+});
+
 export const AppSchema = new Schema({
   Addresses,
   AccountManagers,
@@ -350,6 +361,7 @@ export const AppSchema = new Schema({
   Events,
   HomeBases,
   Drivers,
+  InspectionQuestions,
   ScorecardTargets,
   Users,
   UserStatuses,
@@ -377,3 +389,4 @@ export type VendorRecord = PowerSyncDB["Vendors"];
 export type WorkTrackerRecord = PowerSyncDB["WorkTrackers"];
 export type WorkTrackerGroupRecord = PowerSyncDB["WorkTrackerGroups"];
 export type DriverUnavailabilityRecord = PowerSyncDB["DriverUnavailability"];
+export type InspectionQuestionsRecord = PowerSyncDB["InspectionQuestions"];

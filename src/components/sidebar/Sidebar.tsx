@@ -1,5 +1,7 @@
 "use client";
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import { usePathname } from "next/navigation";
 import { useUsersStore } from "@/state/userStore";
 import { USER_ROLES } from "@/types/Constants";
 import {
@@ -11,8 +13,11 @@ import {
   BarChart3,
   FileText,
   Trophy,
-  MapPinned,
   CalendarDays,
+  ClipboardCheck,
+  MapPinned,
+  Settings,
+  ChevronDown,
 } from "lucide-react";
 import { SideNavButton } from "./SideNavButton";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
@@ -23,6 +28,10 @@ const SideBar = () => {
   const users = useUsersStore((s) => s.users);
   const currentUser = users.find((u) => u.clerk_user_id === user?.id);
   const openModal = useCurrentEventStore((s) => s.openModal);
+  const pathname = usePathname();
+  const [configOpen, setConfigOpen] = useState(() =>
+    ["/zones", "/inspection-questions", "/quickbooks"].some((p) => pathname.startsWith(p)),
+  );
 
   if (!currentUser) return null;
 
@@ -43,7 +52,7 @@ const SideBar = () => {
         </button>
       </div>
 
-      <nav className="flex-1 overflow-hidden">
+      <nav className="flex-1 overflow-auto">
         <SideNavButton
           label="Dashboard"
           href="/dashboard"
@@ -77,23 +86,47 @@ const SideBar = () => {
           roles={[USER_ROLES.ACCOUNT_MANAGER, USER_ROLES.ADMIN]}
         />
         <SideNavButton
-          label="Zone Manager"
-          href="/zones"
-          icon={MapPinned}
-          roles={[USER_ROLES.ACCOUNT_MANAGER, USER_ROLES.ADMIN]}
-        />
-        <SideNavButton
           label="Driver Calendar"
           href="/driver-calendar"
           icon={CalendarDays}
           roles={[USER_ROLES.ADMIN]}
         />
-        <SideNavButton
-          label="QuickBooks"
-          href="/quickbooks"
-          icon={QuickBooksIcon}
-          roles={[USER_ROLES.ACCOUNT_MANAGER, USER_ROLES.ADMIN]}
-        />
+
+        {/* Configuration section */}
+        <div className="mt-2 border-t border-gray-200 pt-2">
+          <button
+            onClick={() => setConfigOpen((o) => !o)}
+            className="flex items-center w-full px-4 py-1 m-1 text-xs font-semibold uppercase tracking-wider text-gray-400 hover:text-gray-600 cursor-pointer"
+          >
+            <Settings className="h-3.5 w-3.5 mr-2" />
+            <span>Configuration</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 ml-auto transition-transform ${configOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {configOpen && (
+            <div>
+              <SideNavButton
+                label="Zone Manager"
+                href="/zones"
+                icon={MapPinned}
+                roles={[USER_ROLES.ACCOUNT_MANAGER, USER_ROLES.ADMIN]}
+              />
+              <SideNavButton
+                label="Inspection Form"
+                href="/inspection-questions"
+                icon={ClipboardCheck}
+                roles={[USER_ROLES.ADMIN]}
+              />
+              <SideNavButton
+                label="QuickBooks"
+                href="/quickbooks"
+                icon={QuickBooksIcon}
+                roles={[USER_ROLES.ACCOUNT_MANAGER, USER_ROLES.ADMIN]}
+              />
+            </div>
+          )}
+        </div>
       </nav>
     </div>
   );
