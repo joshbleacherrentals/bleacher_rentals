@@ -28,3 +28,10 @@ create policy "Allow All for Auth"
   for all
   to authenticated
 using (true);
+
+-- Remove the separate answers table (if you already ran that migration)
+DROP TABLE IF EXISTS "InspectionAnswers";
+
+-- Add a JSON column to the inspections table
+ALTER TABLE "WorkTrackerInspections"
+  ADD COLUMN IF NOT EXISTS answers_json TEXT; -- TEXT works for PowerSync/SQLite compat

@@ -1104,6 +1104,7 @@ export type Database = {
       }
       WorkTrackerInspections: {
         Row: {
+          answers_json: string | null
           created_at: string
           id: string
           issue_description: string | null
@@ -1111,6 +1112,7 @@ export type Database = {
           walk_around_complete: boolean
         }
         Insert: {
+          answers_json?: string | null
           created_at?: string
           id?: string
           issue_description?: string | null
@@ -1118,6 +1120,7 @@ export type Database = {
           walk_around_complete?: boolean
         }
         Update: {
+          answers_json?: string | null
           created_at?: string
           id?: string
           issue_description?: string | null
