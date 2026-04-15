@@ -673,6 +673,33 @@ export type Database = {
           },
         ]
       }
+      InspectionQuestions: {
+        Row: {
+          id: string
+          is_active: boolean
+          question_text: string
+          question_type: Database["public"]["Enums"]["question_type"]
+          required: boolean
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          question_text: string
+          question_type?: Database["public"]["Enums"]["question_type"]
+          required?: boolean
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          question_text?: string
+          question_type?: Database["public"]["Enums"]["question_type"]
+          required?: boolean
+          sort_order?: number
+        }
+        Relationships: []
+      }
       Notifications: {
         Row: {
           body: string
@@ -1437,6 +1464,7 @@ export type Database = {
       event_status: "quoted" | "booked" | "lost"
       pay_currency_type: "CAD" | "USD"
       pay_per_unit_type: "KM" | "MI" | "HR"
+      question_type: "text" | "checkbox" | "photo"
       task_status:
         | "in_progress"
         | "backlog"
@@ -1593,6 +1621,7 @@ export const Constants = {
       event_status: ["quoted", "booked", "lost"],
       pay_currency_type: ["CAD", "USD"],
       pay_per_unit_type: ["KM", "MI", "HR"],
+      question_type: ["text", "checkbox", "photo"],
       task_status: [
         "in_progress",
         "backlog",
