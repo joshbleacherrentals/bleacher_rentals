@@ -1,17 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  fetchTakenBleacherNumbers,
-  updateBleacher,
-  useBleacherQuery,
-} from "../../db";
+import { fetchTakenBleacherNumbers, updateBleacher, useBleacherQuery } from "../../db";
 import SelectRowsDropDown from "../dropdowns/selectRowsDropDown";
 import SelectHomeBaseDropDown from "../dropdowns/selectHomeBaseDropDown";
 import SelectLinxupDeviceDropDown from "../dropdowns/selectLinxupDeviceDropDown";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCheck, CircleAlert, LoaderCircle, Trash2 } from "lucide-react";
+import { CheckCheck, CircleAlert, LoaderCircle, Trash2, ShieldAlert } from "lucide-react";
 import { checkInsertBleacherFormRules, feetAndInchesToInches } from "../../functions";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { SelectAccountManager } from "@/features/manageTeam/components/inputs/SelectAccountManager";
@@ -410,63 +407,83 @@ export function SheetEditBleacher() {
                 </div>
                 {/* Trailer Height */}
                 <div className="grid grid-cols-5 items-center gap-4">
-                <label className="text-right text-sm font-medium col-span-2">Trailer Height</label>
-                <div className="col-span-3 flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="ft"
-                      value={trailerHeightFt ?? ""}
-                      onChange={(e) => setTrailerHeightFt(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">ft</span>
-                  </div>
-                  <div className="relative flex-1">
-                    <input
-                      type="number"
-                      min={0}
-                      max={11}
-                      placeholder="in"
-                      value={trailerHeightIn ?? ""}
-                      onChange={(e) => setTrailerHeightIn(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">in</span>
+                  <label className="text-right text-sm font-medium col-span-2">
+                    Trailer Height
+                  </label>
+                  <div className="col-span-3 flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="ft"
+                        value={trailerHeightFt ?? ""}
+                        onChange={(e) =>
+                          setTrailerHeightFt(e.target.value ? Number(e.target.value) : null)
+                        }
+                        className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                        ft
+                      </span>
+                    </div>
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={11}
+                        placeholder="in"
+                        value={trailerHeightIn ?? ""}
+                        onChange={(e) =>
+                          setTrailerHeightIn(e.target.value ? Number(e.target.value) : null)
+                        }
+                        className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                        in
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Trailer Length */}
-              <div className="grid grid-cols-5 items-center gap-4">
-                <label className="text-right text-sm font-medium col-span-2">Trailer Length</label>
-                <div className="col-span-3 flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="ft"
-                      value={trailerLengthFt ?? ""}
-                      onChange={(e) => setTrailerLengthFt(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">ft</span>
-                  </div>
-                  <div className="relative flex-1">
-                    <input
-                      type="number"
-                      min={0}
-                      max={11}
-                      placeholder="in"
-                      value={trailerLengthIn ?? ""}
-                      onChange={(e) => setTrailerLengthIn(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">in</span>
+                {/* Trailer Length */}
+                <div className="grid grid-cols-5 items-center gap-4">
+                  <label className="text-right text-sm font-medium col-span-2">
+                    Trailer Length
+                  </label>
+                  <div className="col-span-3 flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="ft"
+                        value={trailerLengthFt ?? ""}
+                        onChange={(e) =>
+                          setTrailerLengthFt(e.target.value ? Number(e.target.value) : null)
+                        }
+                        className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                        ft
+                      </span>
+                    </div>
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={11}
+                        placeholder="in"
+                        value={trailerLengthIn ?? ""}
+                        onChange={(e) =>
+                          setTrailerLengthIn(e.target.value ? Number(e.target.value) : null)
+                        }
+                        className="w-full px-3 py-2 border rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                        in
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
                 <div className="grid grid-cols-5 items-center gap-4">
                   <label className="text-right text-sm font-medium col-span-2">
                     Opening Direction
@@ -531,6 +548,13 @@ export function SheetEditBleacher() {
                   Delete
                 </button>
               )}
+              <Link
+                href={`/damage-reports?bleacher_uuid=${id}`}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-2 text-sm"
+              >
+                <ShieldAlert className="h-4 w-4" />
+                Damage Reports
+              </Link>
               <button
                 type="submit"
                 onClick={handleSave}

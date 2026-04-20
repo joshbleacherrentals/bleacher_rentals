@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
+import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { Database } from "../../../../../database.types";
 
 /**
@@ -9,7 +10,7 @@ import { Database } from "../../../../../database.types";
  */
 export async function loadEventById(
   eventUuid: string,
-  supabase: SupabaseClient<Database>
+  supabase: SupabaseClient<Database>,
 ): Promise<void> {
   if (!supabase) {
     console.warn("No Supabase client available");
@@ -25,7 +26,7 @@ export async function loadEventById(
         *,
         address:Addresses!Events_address_uuid_fkey(*),
         bleacher_events:BleacherEvents!BleacherEvents_event_uuid_fkey(bleacher_uuid)
-      `
+      `,
       )
       .eq("id", eventUuid)
       .single();
@@ -39,6 +40,9 @@ export async function loadEventById(
     const eventBleacherUuids = eventData.bleacher_events?.map((be: any) => be.bleacher_uuid) ?? [];
 
     // Load all event data into the store
+    // Close the maintenance event form if open
+    useMaintenanceEventStore.getState().resetForm();
+
     const store = useCurrentEventStore.getState();
     const { setField } = store;
 
@@ -54,7 +58,7 @@ export async function loadEventById(
             state: eventData.address.state_province,
             postalCode: eventData.address.zip_postal ?? undefined,
           }
-        : null
+        : null,
     );
     setField("seats", eventData.total_seats);
     setField("sevenRow", eventData.seven_row);

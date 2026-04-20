@@ -30,6 +30,8 @@ export type Bleacher = {
   bleacherEvents: BleacherEvent[];
   blocks: BleacherBlock[];
   workTrackers: BleacherWorkTracker[];
+  maintenanceEvents: BleacherMaintenanceEvent[];
+  damageReports: BleacherDamageReport[];
   linxupDeviceId: string | null;
 
   summerAccountManagerUuid: string | null;
@@ -46,6 +48,8 @@ export type BleacherEvent = {
   hslHue: number | null;
   booked: boolean;
   goodshuffleUrl: string | null;
+  isMaintenance?: boolean;
+  hasDamageAlert?: boolean;
   // Mark spans injected from current selection (not yet persisted)
   isSelected?: boolean;
 };
@@ -123,4 +127,28 @@ export type DashboardEvent = {
   bleacherUuids: string[];
   goodshuffleUrl: string | null;
   ownerUserUuid: string | null;
+};
+
+export type BleacherMaintenanceEvent = {
+  maintenanceEventUuid: string;
+  bleacherMaintEventUuid: string;
+  eventName: string;
+  eventStart: string;
+  eventEnd: string;
+  costCents: number | null;
+  address: string;
+};
+
+export type BleacherDamageReport = {
+  damageReportUuid: string;
+  bleacherUuid: string;
+  inspectionUuid: string;
+  isSafeToSit: boolean;
+  isSafeToHaul: boolean;
+  note: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  maintenanceEventUuid: string | null;
+  /** Date of the associated work tracker (resolved at mapping time) */
+  workTrackerDate: string | null;
 };

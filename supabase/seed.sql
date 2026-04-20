@@ -180,7 +180,8 @@ INSERT INTO "public"."Users" ("created_at", "first_name", "last_name", "email", 
 	('2025-12-18 17:40:29.213111+00', 'Matthew', 'Nauss', 'matt@hussaryachts.com', NULL, NULL, 3, NULL, false, '75dfeb9e-6c28-4839-a91c-a7333b0921c6', '51177a55-31dd-4c94-a263-332512f51bed'),
 	('2025-12-18 17:43:41.804843+00', 'Kevin', 'Harrison', 'abs.tktransport@gmail.com', NULL, NULL, 3, NULL, false, '75dfeb9e-6c28-4839-a91c-a7333b0921c6', '9a21116c-adfb-4750-a3a2-0b857ba1d9ce'),
 	('2025-10-10 16:45:42.896319+00', 'Devin', '- Dk Ferrier', 'dkfarrierservice@gmail.com', NULL, NULL, 3, NULL, false, '5d314da7-0a1e-4294-b012-ab74f6e07cd6', 'ab7a8616-f42d-43a9-ae88-ae61c37e8aa1'),
-	('2026-01-14 15:35:06.935722+00', 'Sarah', 'Joo', 'sarahjoo8888@gmail.com', NULL, 'user_37qEDkzrCMtsUuNPnVUjPiLMitC', 2, NULL, true, '5d314da7-0a1e-4294-b012-ab74f6e07cd6', '15597d9e-7a32-44df-a02f-bce4c39dfdee');
+	('2026-01-14 15:35:06.935722+00', 'Sarah', 'Joo', 'sarahjoo8888@gmail.com', NULL, 'user_37qEDkzrCMtsUuNPnVUjPiLMitC', 2, NULL, true, '5d314da7-0a1e-4294-b012-ab74f6e07cd6', '15597d9e-7a32-44df-a02f-bce4c39dfdee'),
+	('2026-01-14 15:35:06.935722+00', 'Josh', 'Redgrift', 'josh@bleacherrentals.com', NULL, 'user_3COnMJPaCrpWMNet2dnreN6Hdko', 2, NULL, true, '5d314da7-0a1e-4294-b012-ab74f6e07cd6', 'f09fcb39-4bdc-4000-b758-6171ea89b2eb');
 
 
 --
@@ -201,7 +202,8 @@ INSERT INTO "public"."AccountManagers" ("created_at", "is_active", "id", "user_u
 	('2025-11-28 15:49:12.942723+00', true, '0f5a4794-d521-47ec-8e50-9b7f6bebcda6', '35a4c266-1197-46b4-af4d-d4b805f57d9a'),
 	('2025-12-02 13:36:50.40714+00', true, '11d5e426-c1ed-4e1d-aef8-aea5f7194766', 'ba661483-ea76-40eb-9adc-65cca26390e8'),
 	('2025-12-02 13:38:19.481959+00', true, '6b2f41dc-7efc-400c-98e6-4bf6f8bef573', '55c1253d-6460-456d-91c9-e97290e8e599'),
-	('2026-01-14 15:35:39.430255+00', true, 'b5557f16-b67f-4aaf-a47e-1a2c8680db55', '15597d9e-7a32-44df-a02f-bce4c39dfdee');
+	('2026-01-14 15:35:39.430255+00', true, 'b5557f16-b67f-4aaf-a47e-1a2c8680db55', '15597d9e-7a32-44df-a02f-bce4c39dfdee'),
+	('2026-01-14 15:35:39.430255+00', true, 'd9fac195-5481-4818-8e15-17f87d1a5094', 'f09fcb39-4bdc-4000-b758-6171ea89b2eb');
 
 
 --

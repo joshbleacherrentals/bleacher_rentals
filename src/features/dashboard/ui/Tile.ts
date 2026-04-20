@@ -15,14 +15,20 @@ export class Tile extends Container {
     baker: Baker,
     row: number,
     col: number,
-    isClickable?: boolean
+    isClickable?: boolean,
+    isDamage?: boolean,
   ) {
     super();
     this.row = row;
     this.col = col;
     this.dimensions = dimensions;
-    const texture = baker.getTexture("TestTile", dimensions, (c) => {
-      this.buildTile(c);
+    const textureKey = isDamage ? "DamageTile" : "TestTile";
+    const texture = baker.getTexture(textureKey, dimensions, (c) => {
+      if (isDamage) {
+        this.buildDamageTile(c);
+      } else {
+        this.buildTile(c);
+      }
     });
 
     // Create baked sprite
@@ -61,6 +67,37 @@ export class Tile extends Container {
 
     c.addChild(fill, cellObj);
     // console.log("tile baked");
+  }
+
+  private buildDamageTile(c: Container) {
+    const w = this.dimensions.width;
+    const h = this.dimensions.height;
+
+    // Same white background
+    const fill = new Graphics().rect(0, 0, w, h).fill(0xffffff);
+
+    // Faint red diagonal stripes
+    const stripes = new Graphics();
+    stripes.setStrokeStyle({ width: 1, color: 0xdc2626, alpha: 0.15 });
+    const step = 10;
+    for (let offset = -h; offset < w; offset += step) {
+      const x1 = Math.max(0, offset);
+      const y1 = Math.max(0, -offset);
+      const x2 = Math.min(w, offset + h);
+      const y2 = x2 - offset;
+      stripes.moveTo(x1, y1).lineTo(x2, y2);
+    }
+    stripes.stroke();
+
+    // Same border as regular tile
+    const border = new Graphics()
+      .moveTo(w, 0)
+      .lineTo(w, h - 1)
+      .moveTo(0, h - 1)
+      .lineTo(w, h - 1)
+      .stroke({ width: 1, color: 0x000000, alpha: 0.15, alignment: 0 });
+
+    c.addChild(fill, stripes, border);
   }
 
   private onHoverStart() {

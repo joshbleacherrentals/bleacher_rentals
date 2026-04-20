@@ -4,6 +4,7 @@ import { CELL_HEIGHT, CELL_WIDTH } from "@/features/dashboard/values/constants";
 import { Baker } from "../../util/Baker";
 import { BleacherEvent } from "../../types";
 import { loadEventById } from "../../db/client/loadEventById";
+import { loadMaintenanceEventById } from "../../db/client/loadMaintenanceEventById";
 import { supabaseClientRegistry } from "../../util/supabaseClientRegistry";
 
 export class EventBody extends Sprite {
@@ -40,15 +41,18 @@ export class EventBody extends Sprite {
     this.on("pointerdown", this.handleClick.bind(this));
 
     const isBooked = !!eventInfo.span?.ev.booked;
-    const eventColor =
-      eventInfo.span && eventInfo.span.ev.hslHue != null
+    const isMaintenance = !!eventInfo.span?.ev.isMaintenance;
+    const hasDamageAlert = !!eventInfo.span?.ev.hasDamageAlert;
+    const eventColor = isMaintenance
+      ? 0xff0000
+      : eventInfo.span && eventInfo.span.ev.hslHue != null
         ? EventsUtil.hslToRgbInt(eventInfo.span.ev.hslHue, 60, 60)
         : 0x808080;
 
     const texture = baker.getTexture(
-      `EventBody:${eventInfo.span?.ev.eventUuid}:${isBooked ? "booked" : "quoted"}:${
+      `EventBody:${eventInfo.span?.ev.eventUuid}:${isMaintenance ? "maint" : isBooked ? "booked" : "quoted"}:${
         eventInfo.isStart ? "start" : eventInfo.isEnd ? "end" : "middle"
-      }:top${topOffset}`,
+      }:top${topOffset}${hasDamageAlert ? ":dmg" : ""}`,
       { width: CELL_WIDTH + 2, height: CELL_HEIGHT + 2 },
       // null,
       (c) => {
@@ -162,6 +166,20 @@ export class EventBody extends Sprite {
         }
 
         c.addChild(fill, g);
+
+        // Damage alert indicator: small warning triangle on start cell
+        if (hasDamageAlert && eventInfo.isStart) {
+          const triSize = 8;
+          const tx = W - triSize - 2;
+          const ty = Math.max(2, topOffset + 2);
+          const tri = new Graphics();
+          tri.moveTo(tx + triSize / 2, ty);
+          tri.lineTo(tx + triSize, ty + triSize);
+          tri.lineTo(tx, ty + triSize);
+          tri.closePath();
+          tri.fill(0xdc2626); // red-600
+          c.addChild(tri);
+        }
         // console.log(
         //   "EventBody",
         //   isBooked ? "booked" : "quoted",
@@ -187,6 +205,10 @@ export class EventBody extends Sprite {
       return;
     }
 
-    await loadEventById(bleacherEvent.eventUuid, supabase);
+    if (bleacherEvent.isMaintenance) {
+      await loadMaintenanceEventById(bleacherEvent.eventUuid, supabase);
+    } else {
+      await loadEventById(bleacherEvent.eventUuid, supabase);
+    }
   }
 }

@@ -16,6 +16,10 @@ import { useDashboardBleachersStore } from "../state/useDashboardBleachersStore"
 import { useSelectedBlockStore } from "../state/useSelectedBlock";
 import { useWorkTrackerSelectionStore } from "@/features/workTrackers/state/useWorkTrackerSelectionStore";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
+import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
+
+/** Column range where the damage overlay should be drawn */
+type DamageOverlayRange = { startCol: number; endCol: number };
 
 /**
  * CellRenderer for the main scrollable grid area
@@ -44,6 +48,8 @@ export class MainGridCellRenderer implements ICellRenderer {
   private rowBleacherUuids: string[];
   // Always-up-to-date bleacher snapshot from the store, keyed by id
   private latestBleachersByUuid: Map<string, Bleacher>;
+  // Pre-computed damage overlay column ranges per row
+  private damageOverlaysByRow: Map<number, DamageOverlayRange[]> = new Map();
 
   // No external callback; selection is pushed to a zustand store
 
@@ -82,10 +88,30 @@ export class MainGridCellRenderer implements ICellRenderer {
               goodshuffleUrl: sel.goodshuffleUrl ?? null,
             }
           : undefined;
-      const { spansByRow } = EventsUtil.calculateEventSpans(bleachers, dates, { selected });
+      const mt = useMaintenanceEventStore.getState();
+      const selectedMaintenance =
+        mt.isFormExpanded && mt.eventStart && mt.eventEnd
+          ? {
+              maintenanceEventUuid: mt.maintenanceEventUuid ?? null,
+              bleacherUuids: mt.bleacherUuids ?? [],
+              eventStart: mt.eventStart,
+              eventEnd: mt.eventEnd,
+              eventName: mt.eventName || undefined,
+              address: mt.addressData?.address || undefined,
+            }
+          : undefined;
+      const { spansByRow } = EventsUtil.calculateEventSpans(bleachers, dates, {
+        selected,
+        selectedMaintenance,
+      });
       this.spansByRow = spansByRow;
     } else {
       this.spansByRow = this.calculateSpansByEvents(events, dates);
+    }
+
+    // Compute damage overlay ranges
+    if (yAxis === "Bleachers") {
+      this.damageOverlaysByRow = this.computeDamageOverlays(bleachers, dates);
     }
 
     // Subscribe to dashboard bleachers store to update block text dynamically
@@ -183,10 +209,32 @@ export class MainGridCellRenderer implements ICellRenderer {
               goodshuffleUrl: sel.goodshuffleUrl ?? null,
             }
           : undefined;
-      const { spansByRow } = EventsUtil.calculateEventSpans(bleachers, this.dates, { selected });
+      const mt = useMaintenanceEventStore.getState();
+      const selectedMaintenance =
+        mt.isFormExpanded && mt.eventStart && mt.eventEnd
+          ? {
+              maintenanceEventUuid: mt.maintenanceEventUuid ?? null,
+              bleacherUuids: mt.bleacherUuids ?? [],
+              eventStart: mt.eventStart,
+              eventEnd: mt.eventEnd,
+              eventName: mt.eventName || undefined,
+              address: mt.addressData?.address || undefined,
+            }
+          : undefined;
+      const { spansByRow } = EventsUtil.calculateEventSpans(bleachers, this.dates, {
+        selected,
+        selectedMaintenance,
+      });
       this.spansByRow = spansByRow;
     } else {
       this.spansByRow = this.calculateSpansByEvents(events, this.dates);
+    }
+
+    // Recompute damage overlays
+    if (yAxis === "Bleachers") {
+      this.damageOverlaysByRow = this.computeDamageOverlays(bleachers, this.dates);
+    } else {
+      this.damageOverlaysByRow.clear();
     }
   }
 
@@ -223,6 +271,88 @@ export class MainGridCellRenderer implements ICellRenderer {
       spans.push({ start: startCol, end: endCol, ev: be, rowIndex });
       return spans;
     });
+  }
+
+  /**
+   * Compute damage overlay column ranges for each bleacher row.
+   *
+   * For each unresolved damage report where the bleacher is NOT safe:
+   * - Overlay starts the day AFTER the associated work tracker's date
+   * - Overlay ends the day BEFORE the earliest maintenance event that starts
+   *   on or after the work tracker date (for the same bleacher)
+   * - If no maintenance event exists, overlay extends to the end of the grid
+   */
+  private computeDamageOverlays(
+    bleachers: Bleacher[],
+    dates: string[],
+  ): Map<number, DamageOverlayRange[]> {
+    const result = new Map<number, DamageOverlayRange[]>();
+    const dateToIndex = new Map(dates.map((d, i) => [d, i]));
+    const lastCol = dates.length - 1;
+
+    for (let row = 0; row < bleachers.length; row++) {
+      const bleacher = bleachers[row];
+      const unsafeReports = (bleacher.damageReports ?? []).filter(
+        (dr) => !dr.isSafeToSit || !dr.isSafeToHaul,
+      );
+      if (unsafeReports.length === 0) continue;
+
+      // Sort maintenance events by start date ascending
+      const maintEvents = [...(bleacher.maintenanceEvents ?? [])].sort((a, b) =>
+        a.eventStart.localeCompare(b.eventStart),
+      );
+
+      const ranges: DamageOverlayRange[] = [];
+
+      for (const dr of unsafeReports) {
+        if (!dr.workTrackerDate) continue;
+
+        const wtDateISO = DateTime.fromISO(dr.workTrackerDate).toISODate();
+        if (!wtDateISO) continue;
+
+        const wtCol = dateToIndex.get(wtDateISO);
+        if (wtCol === undefined) continue;
+
+        // Overlay starts the day after the work tracker
+        const startCol = wtCol + 1;
+        if (startCol > lastCol) continue;
+
+        // Find the earliest maintenance event for this bleacher
+        // that starts on or after the work tracker date
+        let endCol = lastCol;
+        for (const me of maintEvents) {
+          const meStartISO = DateTime.fromISO(me.eventStart).toISODate();
+          if (!meStartISO) continue;
+          if (meStartISO >= wtDateISO) {
+            const meCol = dateToIndex.get(meStartISO);
+            if (meCol !== undefined && meCol > wtCol) {
+              // Last overlay tile is the day before maintenance starts
+              endCol = meCol - 1;
+              break;
+            }
+          }
+        }
+
+        if (startCol <= endCol) {
+          ranges.push({ startCol, endCol });
+        }
+      }
+
+      if (ranges.length > 0) {
+        result.set(row, ranges);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Check whether a given column falls within a damage overlay range for a row.
+   */
+  private isInDamageOverlay(row: number, col: number): boolean {
+    const ranges = this.damageOverlaysByRow.get(row);
+    if (!ranges) return false;
+    return ranges.some((r) => col >= r.startCol && col <= r.endCol);
   }
 
   /**
@@ -276,6 +406,7 @@ export class MainGridCellRenderer implements ICellRenderer {
 
     // Get all events at this cell (handles overlapping spans)
     const allEventInfos = EventsUtil.getAllCellEventInfos(row, col, this.spansByRow);
+    const isDamageCell = this.yAxis === "Bleachers" && this.isInDamageOverlay(row, col);
 
     if (allEventInfos.length > 1) {
       // --- OVERLAPPING EVENTS ---
@@ -284,6 +415,13 @@ export class MainGridCellRenderer implements ICellRenderer {
         firstVisibleColumn ?? Math.floor(this.currentScrollX / (this.cellWidth || 1));
       const hasStartCell = allEventInfos.some((e) => e.isStart);
       parent.zIndex = (row + 1) * Z_ROW - col * 2 + (hasStartCell ? 1 : 0);
+
+      // Add damage tile behind events if applicable
+      if (isDamageCell) {
+        const dmgTile = new Tile(dimensions, this.baker, row, col, false, true);
+        dmgTile.zIndex = -1;
+        parent.addChild(dmgTile);
+      }
 
       for (const eventInfo of allEventInfos) {
         const ov = eventInfo.overlapInfo;
@@ -335,6 +473,14 @@ export class MainGridCellRenderer implements ICellRenderer {
         // UNPINNED EVENT: Cache the entire container for maximum performance
         parent.zIndex = (row + 1) * Z_ROW - col * 2 + 1;
 
+        // Add damage tile behind event if applicable
+        if (isDamageCell) {
+          parent.sortableChildren = true;
+          const dmgTile = new Tile(dimensions, this.baker, row, col, false, true);
+          dmgTile.zIndex = -1;
+          parent.addChild(dmgTile);
+        }
+
         const firstCell = new FirstCellNotPinned(
           eventInfo,
           currentFirstVisibleColumn,
@@ -349,12 +495,28 @@ export class MainGridCellRenderer implements ICellRenderer {
         parent.addChild(firstCell);
       } else {
         parent.zIndex = (row + 1) * Z_ROW - col * 2;
+
+        // Add damage tile behind event if applicable
+        if (isDamageCell) {
+          parent.sortableChildren = true;
+          const dmgTile = new Tile(dimensions, this.baker, row, col, false, true);
+          dmgTile.zIndex = -1;
+          parent.addChild(dmgTile);
+        }
+
         const eventSprite = new EventBody(eventInfo, this.baker, dimensions, topOffset);
         eventSprite.position.set(-1, -1);
         parent.addChild(eventSprite);
       }
     } else {
-      const tile = new Tile(dimensions, this.baker, row, col, this.yAxis === "Bleachers");
+      const tile = new Tile(
+        dimensions,
+        this.baker,
+        row,
+        col,
+        this.yAxis === "Bleachers",
+        isDamageCell,
+      );
       parent.addChild(tile);
 
       // Attempt to find a block (bleachers mode only) using the latest store snapshot by bleacherUuid

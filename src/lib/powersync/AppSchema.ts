@@ -347,6 +347,43 @@ const InspectionQuestions = new Table(InspectionQuestionsCols, {
   indexes: { sort_order: ["sort_order"] },
 });
 
+const DamageReportsCols = {
+  inspection_uuid: column.text,
+  bleacher_uuid: column.text,
+  is_safe_to_sit: column.integer,
+  is_safe_to_haul: column.integer,
+  note: column.text,
+  created_at: column.text,
+  resolved_at: column.text,
+  maintenance_event_uuid: column.text,
+} satisfies PowerSyncColsFor<"DamageReports">;
+const DamageReports = new Table(DamageReportsCols, {
+  indexes: { bleacher_uuid: ["bleacher_uuid"], maintenance_event_uuid: ["maintenance_event_uuid"] },
+});
+
+const MaintenanceEventsCols = {
+  event_name: column.text,
+  event_start: column.text,
+  event_end: column.text,
+  cost_cents: column.integer,
+  address_uuid: column.text,
+  notes: column.text,
+  created_by_user_uuid: column.text,
+  created_at: column.text,
+} satisfies PowerSyncColsFor<"MaintenanceEvents">;
+const MaintenanceEvents = new Table(MaintenanceEventsCols, {
+  indexes: { address_uuid: ["address_uuid"], created_by_user_uuid: ["created_by_user_uuid"] },
+});
+
+const BleacherMaintEventsCols = {
+  bleacher_uuid: column.text,
+  maintenance_event_uuid: column.text,
+  created_at: column.text,
+} satisfies PowerSyncColsFor<"BleacherMaintEvents">;
+const BleacherMaintEvents = new Table(BleacherMaintEventsCols, {
+  indexes: { bleacher_uuid: ["bleacher_uuid"], maintenance_event_uuid: ["maintenance_event_uuid"] },
+});
+
 export const AppSchema = new Schema({
   Addresses,
   AccountManagers,
@@ -361,7 +398,10 @@ export const AppSchema = new Schema({
   Events,
   HomeBases,
   Drivers,
+  DamageReports,
   InspectionQuestions,
+  MaintenanceEvents,
+  BleacherMaintEvents,
   ScorecardTargets,
   Users,
   UserStatuses,
@@ -390,3 +430,6 @@ export type WorkTrackerRecord = PowerSyncDB["WorkTrackers"];
 export type WorkTrackerGroupRecord = PowerSyncDB["WorkTrackerGroups"];
 export type DriverUnavailabilityRecord = PowerSyncDB["DriverUnavailability"];
 export type InspectionQuestionsRecord = PowerSyncDB["InspectionQuestions"];
+export type DamageReportsRecord = PowerSyncDB["DamageReports"];
+export type MaintenanceEventsRecord = PowerSyncDB["MaintenanceEvents"];
+export type BleacherMaintEventsRecord = PowerSyncDB["BleacherMaintEvents"];
