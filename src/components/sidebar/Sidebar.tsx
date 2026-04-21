@@ -22,6 +22,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { SideNavButton } from "./SideNavButton";
+import { SideNavDropdown } from "./SideNavDropdown";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { QuickBooksIcon } from "@/components/Icons";
@@ -123,11 +124,13 @@ const SideBar = () => {
           icon={ClipboardList}
           roles={[USER_ROLES.ADMIN, USER_ROLES.ACCOUNT_MANAGER]}
         />
-        <SideNavButton
+        <SideNavDropdown
           label="Scorecard"
-          href="/scorecard"
           icon={BarChart3}
-          roles={[USER_ROLES.ACCOUNT_MANAGER, USER_ROLES.ADMIN]}
+          children={[
+            { label: "Sales Scorecard", href: "/scorecard" },
+            { label: "Driver Scorecard", href: "/driver-scorecard" },
+          ]}
         />
         <SideNavButton
           label="Leaderboard"
