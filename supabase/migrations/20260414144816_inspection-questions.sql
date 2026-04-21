@@ -119,6 +119,23 @@ ALTER TABLE "DamageReports"
   ADD CONSTRAINT "DamageReports_maintenance_event_uuid_fkey"
   FOREIGN KEY (maintenance_event_uuid) REFERENCES "MaintenanceEvents"(id);
 
+-- Maintenance Event Photos
+CREATE TABLE "MaintenancePhotos" (
+  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  maintenance_event_uuid   UUID NOT NULL REFERENCES "MaintenanceEvents"(id) ON DELETE CASCADE,
+  photo_path               TEXT NOT NULL,
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+alter table public."MaintenancePhotos" enable row level security;
+
+create policy "Allow All for Auth"
+  on public."MaintenancePhotos"
+  as permissive
+  for all
+  to authenticated
+using (true);
+
 -- Create storage bucket for damage report photos
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
@@ -150,3 +167,34 @@ CREATE POLICY "damage-report-photos: delete"
 ON storage.objects FOR DELETE
 TO authenticated
 USING (bucket_id = 'damage-report-photos');
+
+-- Create storage bucket for maintenance photos
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'maintenance-photos',
+  'maintenance-photos',
+  true,
+  10485760,  -- 10MB
+  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain', 'text/csv']
+)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "maintenance-photos: select"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (bucket_id = 'maintenance-photos');
+
+CREATE POLICY "maintenance-photos: insert"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'maintenance-photos');
+
+CREATE POLICY "maintenance-photos: update"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'maintenance-photos');
+
+CREATE POLICY "maintenance-photos: delete"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'maintenance-photos');

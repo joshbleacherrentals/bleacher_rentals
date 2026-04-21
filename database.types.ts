@@ -874,6 +874,35 @@ export type Database = {
           },
         ]
       }
+      MaintenancePhotos: {
+        Row: {
+          created_at: string
+          id: string
+          maintenance_event_uuid: string
+          photo_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          maintenance_event_uuid: string
+          photo_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          maintenance_event_uuid?: string
+          photo_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "MaintenancePhotos_maintenance_event_uuid_fkey"
+            columns: ["maintenance_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "MaintenanceEvents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Notifications: {
         Row: {
           body: string

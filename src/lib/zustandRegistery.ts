@@ -54,4 +54,5 @@ export const setStaleByTable: Record<TableName, SetStaleFn> = {
   BleacherMaintEvents: () => {},
   DamageReportPhotos: () => {},
   InspectionQuestions: () => {},
+  MaintenancePhotos: () => {},
 };

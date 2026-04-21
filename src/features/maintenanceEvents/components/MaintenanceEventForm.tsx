@@ -1,17 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useMaintenanceEventStore } from "../state/useMaintenanceEventStore";
 import { createMaintenanceEvent } from "../db/createMaintenanceEvent";
 import { updateMaintenanceEvent } from "../db/updateMaintenanceEvent";
 import { deleteMaintenanceEvent } from "../db/deleteMaintenanceEvent";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
-import { MultiSelect } from "@/components/MultiSelect";
-import { Textarea } from "@/components/TextArea";
 import { MaintenanceCoreTab } from "./tabs/CoreTab";
-import { db } from "@/components/providers/SystemProvider";
-import { useTypedQuery, expect } from "@/lib/powersync/typedQuery";
+import { MaintenanceFilesTab } from "./tabs/FilesTab";
 import { FetchDashboardBleachers } from "@/features/dashboard/db/client/bleachers";
 import { FetchDashboardEvents } from "@/features/dashboard/db/client/events";
 import { useDashboardFilterSettings } from "@/features/dashboardOptions/useDashboardFilterSettings";
@@ -27,19 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-type BleacherOption = {
-  id: string;
-  bleacher_number: number | null;
-  bleacher_rows: number | null;
-};
-
-const bleacherQuery = db
-  .selectFrom("Bleachers")
-  .select(["id", "bleacher_number", "bleacher_rows"])
-  .orderBy("bleacher_number", "asc")
-  .compile();
-
-const tabs = ["Core", "Details"] as const;
+const tabs = ["Core", "Files"] as const;
 type Tab = (typeof tabs)[number];
 
 type MaintenanceEventFormProps = {
@@ -56,18 +41,6 @@ export const MaintenanceEventForm = ({ onCancel }: MaintenanceEventFormProps) =>
   const onlyShowMyEvents = dashboardFilters?.onlyShowMyEvents ?? true;
 
   const store = useMaintenanceEventStore();
-
-  // Query bleachers from PowerSync for the multi-select
-  const { data: bleacherRows } = useTypedQuery(bleacherQuery, expect<BleacherOption>());
-
-  const bleacherOptions = useMemo(
-    () =>
-      (bleacherRows ?? []).map((b) => ({
-        label: `#${b.bleacher_number} (${b.bleacher_rows}row)`,
-        value: b.id,
-      })),
-    [bleacherRows],
-  );
 
   const refreshDashboardStores = async () => {
     if (!supabase || !isLoaded || !userId) return;
@@ -239,33 +212,7 @@ export const MaintenanceEventForm = ({ onCancel }: MaintenanceEventFormProps) =>
 
       {/* Tab content */}
       {activeTab === "Core" && <MaintenanceCoreTab />}
-      {activeTab === "Details" && (
-        <div className="grid grid-cols-[1fr_1fr_1fr] gap-4">
-          <div>
-            <label className="block text-sm font-medium text-black/70 mb-1">Bleachers</label>
-            <MultiSelect
-              options={bleacherOptions}
-              onValueChange={(values) => store.setField("bleacherUuids", values)}
-              forceSelectedValues={store.bleacherUuids}
-              placeholder="Select bleachers..."
-              maxCount={5}
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-black/70 mb-1">Notes</label>
-            <Textarea
-              className="bg-white"
-              placeholder="Describe the maintenance work..."
-              value={store.notes}
-              onChange={(e) => store.setField("notes", e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Creating a maintenance event will automatically resolve any open damage reports for
-              the selected bleachers.
-            </p>
-          </div>
-        </div>
-      )}
+      {activeTab === "Files" && <MaintenanceFilesTab />}
     </div>
   );
 };

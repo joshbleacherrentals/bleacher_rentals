@@ -78,7 +78,7 @@ export class Tile extends Container {
 
     // Faint red diagonal stripes
     const stripes = new Graphics();
-    stripes.setStrokeStyle({ width: 1, color: 0xdc2626, alpha: 0.15 });
+    stripes.setStrokeStyle({ width: 1, color: 0xdc2626, alpha: 0.5 });
     const step = 10;
     for (let offset = -h; offset < w; offset += step) {
       const x1 = Math.max(0, offset);

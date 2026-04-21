@@ -2,13 +2,13 @@
 
 import { useState, useMemo, useEffect } from "react";
 import React from "react";
-import { X } from "lucide-react";
+import { Trash2, Plus, Loader2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
-import { FileUploadInput } from "@/features/manageTeam/components/inputs/FileUploadInput";
 import { ErrorToast } from "@/components/toasts/ErrorToast";
 import { SuccessToast } from "@/components/toasts/SuccessToast";
+import { createErrorToast } from "@/components/toasts/ErrorToast";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+
+const PHOTO_BUCKET = "damage-report-photos";
+const ACCEPTED_PHOTO_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+];
+const MAX_PHOTO_SIZE_MB = 10;
+
+const isImagePath = (path: string) => {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return ["jpg", "jpeg", "png", "heic", "heif", "webp"].includes(ext);
+};
 
 type WorkTrackerRow = {
   id: string;
@@ -67,6 +84,8 @@ export function DamageReportModal({
   const [existingPhotos, setExistingPhotos] = useState<{ id: string; photo_path: string }[]>([]);
   const [removedPhotoIds, setRemovedPhotoIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Populate form when editing
   useEffect(() => {
@@ -139,8 +158,41 @@ export function DamageReportModal({
     ? editReport.bleacher_uuid
     : (selectedWt?.bleacher_uuid ?? null);
 
-  const handleAddPhoto = (path: string | null) => {
-    if (path) setPhotoPaths((prev) => [...prev, path]);
+  const getPhotoUrl = (path: string) => {
+    const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+      createErrorToast(["Invalid file type", `Please upload: ${ACCEPTED_PHOTO_TYPES.join(", ")}`]);
+      return;
+    }
+    if (file.size / (1024 * 1024) > MAX_PHOTO_SIZE_MB) {
+      createErrorToast(["File too large", `Maximum size is ${MAX_PHOTO_SIZE_MB}MB`]);
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const storagePath = `bleacher-${resolvedBleacherUuid || "unknown"}/${crypto.randomUUID()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .upload(storagePath, file, { upsert: false });
+      if (uploadError) throw uploadError;
+
+      setPhotoPaths((prev) => [...prev, storagePath]);
+    } catch (err: any) {
+      createErrorToast(["Upload failed", err?.message ?? ""]);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   };
 
   const handleRemoveNewPhoto = (index: number) => {
@@ -441,57 +493,97 @@ export function DamageReportModal({
           {/* Photos */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Photos</label>
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
               {/* Existing photos (edit mode) */}
-              {existingPhotos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="flex items-center gap-2 bg-gray-50 border rounded-md px-3 py-2 text-sm"
-                >
-                  <span className="truncate flex-1 text-gray-600">
-                    {photo.photo_path.split("/").pop()}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveExistingPhoto(photo.id)}
-                    className="text-red-500 hover:text-red-700 cursor-pointer"
+              {existingPhotos.map((photo) => {
+                const url = getPhotoUrl(photo.photo_path);
+                const isImage = isImagePath(photo.photo_path);
+                const fileName = photo.photo_path.split("/").pop() ?? "file";
+                return (
+                  <div
+                    key={photo.id}
+                    className="relative group w-20 h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 cursor-pointer flex-shrink-0"
+                    onClick={() => (isImage ? setLightboxUrl(url) : window.open(url, "_blank"))}
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+                    {isImage ? (
+                      <img src={url} alt="Damage photo" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center w-full h-full p-1">
+                        <FileText className="h-6 w-6 text-gray-400" />
+                        <span className="text-[8px] text-gray-500 mt-0.5 text-center leading-tight line-clamp-2 break-all">
+                          {fileName}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveExistingPhoto(photo.id);
+                      }}
+                      className="absolute top-0.5 right-0.5 p-0.5 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-red-600"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
               {/* New photos */}
-              {photoPaths.map((path, i) => (
-                <div
-                  key={`new-${i}`}
-                  className="flex items-center gap-2 bg-gray-50 border rounded-md px-3 py-2 text-sm"
-                >
-                  <span className="truncate flex-1 text-gray-600">{path.split("/").pop()}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveNewPhoto(i)}
-                    className="text-red-500 hover:text-red-700 cursor-pointer"
+              {photoPaths.map((path, i) => {
+                const url = getPhotoUrl(path);
+                const isImage = isImagePath(path);
+                const fileName = path.split("/").pop() ?? "file";
+                return (
+                  <div
+                    key={`new-${i}`}
+                    className="relative group w-20 h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 cursor-pointer flex-shrink-0"
+                    onClick={() => (isImage ? setLightboxUrl(url) : window.open(url, "_blank"))}
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <FileUploadInput
-                label=""
-                bucket="damage-report-photos"
-                storagePath={`bleacher-${resolvedBleacherUuid || "unknown"}/damage-${Date.now()}`}
-                value={null}
-                onChange={handleAddPhoto}
-                acceptedTypes={[
-                  "image/jpeg",
-                  "image/jpg",
-                  "image/png",
-                  "image/heic",
-                  "image/heif",
-                  "image/webp",
-                ]}
-                maxSizeMB={10}
-              />
+                    {isImage ? (
+                      <img src={url} alt="Damage photo" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center w-full h-full p-1">
+                        <FileText className="h-6 w-6 text-gray-400" />
+                        <span className="text-[8px] text-gray-500 mt-0.5 text-center leading-tight line-clamp-2 break-all">
+                          {fileName}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveNewPhoto(i);
+                      }}
+                      className="absolute top-0.5 right-0.5 p-0.5 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-red-600"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+              {/* Upload button */}
+              <label
+                className={`flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 hover:border-darkBlue hover:bg-gray-50 transition cursor-pointer flex-shrink-0 ${
+                  uploading ? "opacity-50 pointer-events-none" : ""
+                }`}
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 text-gray-400" />
+                    <span className="text-[9px] text-gray-400 mt-0.5">Add Photo</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept={ACCEPTED_PHOTO_TYPES.join(",")}
+                  onChange={handlePhotoUpload}
+                  disabled={uploading}
+                />
+              </label>
             </div>
           </div>
         </div>
@@ -514,6 +606,27 @@ export function DamageReportModal({
           </button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Lightbox */}
+      <Dialog
+        open={!!lightboxUrl}
+        onOpenChange={(open) => {
+          if (!open) setLightboxUrl(null);
+        }}
+      >
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-2 flex items-center justify-center bg-black/90 border-none">
+          <VisuallyHidden>
+            <DialogTitle>Photo preview</DialogTitle>
+          </VisuallyHidden>
+          {lightboxUrl && (
+            <img
+              src={lightboxUrl}
+              alt="Damage photo"
+              className="max-w-full max-h-[85vh] object-contain rounded"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

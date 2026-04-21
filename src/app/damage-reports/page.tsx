@@ -5,8 +5,10 @@ import { useEffect, useState, useMemo, Suspense } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Plus, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Plus, X, ClipboardCheck, FileText } from "lucide-react";
 import { DamageReportModal, EditDamageReport } from "./DamageReportModal";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 type DamageReport = {
   id: string;
@@ -23,6 +25,39 @@ type DamageReport = {
   photos: { id: string; photo_path: string }[];
 };
 
+type InspectionAnswer = {
+  question_text: string;
+  question_type: "text" | "checkbox" | "photo";
+  required: boolean;
+  value?: string | boolean;
+  photos?: { storage_path: string }[];
+};
+
+type InspectionRow = {
+  id: string;
+  created_at: string;
+  answers_json: string | null;
+  walk_around_complete: boolean;
+  issues_found: boolean;
+  issue_description: string | null;
+};
+
+type WorkTrackerWithInspection = {
+  id: string;
+  date: string | null;
+  bleacher_uuid: string | null;
+  pre_inspection_uuid: string | null;
+  post_inspection_uuid: string | null;
+  bleacher: { bleacher_number: number } | null;
+  work_tracker_type: { display_name: string } | null;
+  driver: { first_name: string; last_name: string } | null;
+  pre_inspection: InspectionRow | null;
+  post_inspection: InspectionRow | null;
+};
+
+const pageTabs = ["Damage Reports", "Inspections"] as const;
+type PageTab = (typeof pageTabs)[number];
+
 function DamageReportsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -30,8 +65,12 @@ function DamageReportsContent() {
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingReport, setEditingReport] = useState<DamageReport | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const bleacherUuid = searchParams.get("bleacher_uuid");
+  const workTrackerIdParam = searchParams.get("work_tracker_id");
+  const tabParam = searchParams.get("tab");
+  const activeTab: PageTab = tabParam === "inspections" ? "Inspections" : "Damage Reports";
 
   // Fetch all bleachers for the filter dropdown
   const { data: bleachers = [] } = useQuery({
@@ -75,6 +114,42 @@ function DamageReportsContent() {
     enabled: !!supabase,
   });
 
+  // Fetch work trackers with inspections
+  const { data: inspectionTrackers = [], isLoading: loadingInspections } = useQuery({
+    queryKey: ["inspections-list", bleacherUuid, workTrackerIdParam],
+    queryFn: async () => {
+      let query = supabase
+        .from("WorkTrackers")
+        .select(
+          `
+          id,
+          date,
+          bleacher_uuid,
+          pre_inspection_uuid,
+          post_inspection_uuid,
+          bleacher:Bleachers!WorkTrackers_bleacher_uuid_fkey(bleacher_number),
+          work_tracker_type:WorkTrackerTypes!worktrackers_work_tracker_type_uuid_fkey(display_name),
+          driver:Drivers!WorkTrackers_driver_uuid_fkey(first_name, last_name),
+          pre_inspection:WorkTrackerInspections!WorkTrackers_pre_inspection_uuid_fkey(id, created_at, answers_json, walk_around_complete, issues_found, issue_description),
+          post_inspection:WorkTrackerInspections!WorkTrackers_post_inspection_uuid_fkey(id, created_at, answers_json, walk_around_complete, issues_found, issue_description)
+        `,
+        )
+        .or("pre_inspection_uuid.not.is.null,post_inspection_uuid.not.is.null")
+        .order("date", { ascending: false });
+
+      if (workTrackerIdParam) {
+        query = query.eq("id", workTrackerIdParam);
+      } else if (bleacherUuid) {
+        query = query.eq("bleacher_uuid", bleacherUuid);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as WorkTrackerWithInspection[];
+    },
+    enabled: !!supabase && activeTab === "Inspections",
+  });
+
   const selectedBleacherNumber = useMemo(() => {
     if (!bleacherUuid) return null;
     return bleachers.find((b) => b.id === bleacherUuid)?.bleacher_number ?? null;
@@ -87,31 +162,63 @@ function DamageReportsContent() {
     } else {
       params.delete("bleacher_uuid");
     }
+    params.delete("work_tracker_id");
+    router.push(`/damage-reports?${params.toString()}`);
+  };
+
+  const handleTabChange = (tab: PageTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "Inspections") {
+      params.set("tab", "inspections");
+    } else {
+      params.delete("tab");
+    }
+    params.delete("work_tracker_id");
     router.push(`/damage-reports?${params.toString()}`);
   };
 
   return (
     <>
       <PageHeader
-        title="Damage Reports"
+        title="Damage Reports & Inspections"
         subtitle={
           selectedBleacherNumber
-            ? `Showing reports for Bleacher #${selectedBleacherNumber}`
-            : "All damage reports across the fleet"
+            ? `Showing for Bleacher #${selectedBleacherNumber}`
+            : "All damage reports and inspections across the fleet"
         }
         action={
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-darkBlue text-white text-sm font-semibold rounded-md shadow-md hover:bg-lightBlue transition cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            Create Damage Report
-          </button>
+          activeTab === "Damage Reports" ? (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-darkBlue text-white text-sm font-semibold rounded-md shadow-md hover:bg-lightBlue transition cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              Create Damage Report
+            </button>
+          ) : undefined
         }
       />
 
-      {/* Filter bar */}
-      <div className="flex items-center gap-3 mb-6">
+      {/* Tabs + Filter bar */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex gap-1">
+          {pageTabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md cursor-pointer transition ${
+                activeTab === tab
+                  ? "bg-darkBlue text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="h-6 w-px bg-gray-300" />
+
         <label className="text-sm font-medium text-gray-600">Filter by bleacher:</label>
         <select
           value={bleacherUuid ?? ""}
@@ -136,26 +243,52 @@ function DamageReportsContent() {
         )}
       </div>
 
-      {/* Reports list */}
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-darkBlue" />
-        </div>
-      ) : reports.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          <AlertTriangle className="h-10 w-10 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No damage reports found.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {reports.map((report) => (
-            <DamageReportCard
-              key={report.id}
-              report={report}
-              onClick={() => setEditingReport(report)}
-            />
-          ))}
-        </div>
+      {/* Damage Reports tab */}
+      {activeTab === "Damage Reports" && (
+        <>
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-darkBlue" />
+            </div>
+          ) : reports.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <AlertTriangle className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No damage reports found.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reports.map((report) => (
+                <DamageReportCard
+                  key={report.id}
+                  report={report}
+                  onClick={() => setEditingReport(report)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Inspections tab */}
+      {activeTab === "Inspections" && (
+        <>
+          {loadingInspections ? (
+            <div className="flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-darkBlue" />
+            </div>
+          ) : inspectionTrackers.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <ClipboardCheck className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No inspections found.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {inspectionTrackers.map((wt) => (
+                <InspectionCard key={wt.id} workTracker={wt} onPhotoClick={setLightboxUrl} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Create modal */}
@@ -184,7 +317,185 @@ function DamageReportsContent() {
           editReport={editingReport as EditDamageReport}
         />
       )}
+
+      {/* Lightbox */}
+      <Dialog
+        open={!!lightboxUrl}
+        onOpenChange={(open) => {
+          if (!open) setLightboxUrl(null);
+        }}
+      >
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-2 flex items-center justify-center bg-black/90 border-none">
+          <VisuallyHidden>
+            <DialogTitle>Photo preview</DialogTitle>
+          </VisuallyHidden>
+          {lightboxUrl && (
+            <img
+              src={lightboxUrl}
+              alt="Inspection photo"
+              className="max-w-full max-h-[85vh] object-contain rounded"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
+  );
+}
+
+// ─── Inspection Card ──────────────────────────────────────────────────────────
+
+function parseAnswers(json: string | null): Record<string, InspectionAnswer> {
+  if (!json) return {};
+  try {
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
+function InspectionSection({
+  label,
+  inspection,
+  onPhotoClick,
+}: {
+  label: string;
+  inspection: InspectionRow;
+  onPhotoClick: (url: string) => void;
+}) {
+  const supabase = useClerkSupabaseClient();
+  const answers = useMemo(() => parseAnswers(inspection.answers_json), [inspection.answers_json]);
+  const answerEntries = Object.entries(answers);
+
+  const getPhotoUrl = (path: string) => {
+    const { data } = supabase.storage.from("inspection-photos").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  return (
+    <div className="mt-3">
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</h4>
+
+      <div className="flex gap-4 text-xs mb-2">
+        <span
+          className={`font-medium ${inspection.walk_around_complete ? "text-green-700" : "text-gray-500"}`}
+        >
+          Walk-around: {inspection.walk_around_complete ? "Complete" : "Incomplete"}
+        </span>
+        <span
+          className={`font-medium ${inspection.issues_found ? "text-red-700" : "text-green-700"}`}
+        >
+          Issues: {inspection.issues_found ? "Yes" : "None"}
+        </span>
+      </div>
+
+      {inspection.issue_description && (
+        <p className="text-sm text-gray-700 mb-2">{inspection.issue_description}</p>
+      )}
+
+      {answerEntries.length > 0 && (
+        <div className="space-y-2">
+          {answerEntries.map(([questionId, answer]) => (
+            <div key={questionId} className="bg-gray-50 rounded-md px-3 py-2">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-gray-700">{answer.question_text}</span>
+                <span className="text-[10px] text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">
+                  {answer.question_type}
+                </span>
+              </div>
+
+              {answer.question_type === "text" && answer.value != null && (
+                <p className="text-sm text-gray-600">{String(answer.value)}</p>
+              )}
+
+              {answer.question_type === "checkbox" && (
+                <span
+                  className={`text-xs font-medium ${answer.value ? "text-green-700" : "text-red-700"}`}
+                >
+                  {answer.value ? "Yes" : "No"}
+                </span>
+              )}
+
+              {answer.question_type === "photo" && answer.photos && answer.photos.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {answer.photos.map((photo, i) => {
+                    const url = getPhotoUrl(photo.storage_path);
+                    return (
+                      <div
+                        key={i}
+                        className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-white cursor-pointer hover:opacity-80 transition"
+                        onClick={() => onPhotoClick(url)}
+                      >
+                        <img
+                          src={url}
+                          alt={`${answer.question_text} photo`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {answerEntries.length === 0 && !inspection.issues_found && (
+        <p className="text-xs text-gray-400 italic">No question answers recorded.</p>
+      )}
+    </div>
+  );
+}
+
+function InspectionCard({
+  workTracker,
+  onPhotoClick,
+}: {
+  workTracker: WorkTrackerWithInspection;
+  onPhotoClick: (url: string) => void;
+}) {
+  const wt = workTracker;
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="font-semibold text-sm text-gray-900">
+          Bleacher #{wt.bleacher?.bleacher_number ?? "?"}
+        </span>
+        <span className="text-xs text-gray-400">•</span>
+        <span className="text-xs text-gray-500">
+          {wt.work_tracker_type?.display_name ?? "Unknown type"}
+        </span>
+        {wt.driver && (
+          <>
+            <span className="text-xs text-gray-400">•</span>
+            <span className="text-xs text-gray-500">
+              {wt.driver.first_name} {wt.driver.last_name}
+            </span>
+          </>
+        )}
+      </div>
+
+      <div className="text-xs text-gray-500 mb-1">
+        {wt.date ? new Date(wt.date).toLocaleDateString() : "No date"}
+      </div>
+
+      {wt.pre_inspection && (
+        <InspectionSection
+          label="Pre-Trip Inspection (Pickup)"
+          inspection={wt.pre_inspection}
+          onPhotoClick={onPhotoClick}
+        />
+      )}
+
+      {wt.post_inspection && (
+        <InspectionSection
+          label="Post-Trip Inspection (Dropoff)"
+          inspection={wt.post_inspection}
+          onPhotoClick={onPhotoClick}
+        />
+      )}
+    </div>
   );
 }
 

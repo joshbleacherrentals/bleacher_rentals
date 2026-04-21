@@ -5,6 +5,7 @@
   "scripts": {
     "generate-types-staging": "supabase gen types typescript --project-id \"sycrvbdpdbaczyfdwcnc\" --schema public > database.types.ts",
     "generate-types-local": "supabase gen types typescript --local --schema public > database.types.ts",
+    "gtl": "npm run generate-types-local",
     "generate:events": "tsx scripts/generate-sample-events.mts",
     "postinstall": "powersync-web copy-assets -o public",
     "dev": "concurrently \"next dev\" \"ngrok http --url=up-marmot-tops.ngrok-free.app 3000\"",
@@ -18,7 +19,8 @@
     "test:e2e": "set -a && source .env.local && set +a && playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:auth": "playwright test src/features/manageTeam/e2e/auth.setup.ts --headed --project=chromium",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "tc": "npm run type-check"
   },
   "dependencies": {
     "@clerk/backend": "^2.30.0",
