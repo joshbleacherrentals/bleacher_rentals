@@ -384,6 +384,29 @@ const BleacherMaintEvents = new Table(BleacherMaintEventsCols, {
   indexes: { bleacher_uuid: ["bleacher_uuid"], maintenance_event_uuid: ["maintenance_event_uuid"] },
 });
 
+const DriverScorecardStatsPerDriverCols = {
+  driver_uuid: column.text,
+  year: column.integer,
+  distance_meters: column.integer,
+  drive_minutes: column.integer,
+  pay_cents: column.integer,
+  trip_count: column.integer,
+  last_updated: column.text,
+} satisfies PowerSyncColsFor<"DriverScorecardStatsPerDriver">;
+const DriverScorecardStatsPerDriver = new Table(DriverScorecardStatsPerDriverCols, {
+  indexes: { driver_uuid: ["driver_uuid"], year: ["year"] },
+});
+
+const DriverScoreCardStatsCols = {
+  year: column.integer,
+  key: column.text,
+  value: column.integer,
+  last_updated: column.text,
+} satisfies PowerSyncColsFor<"DriverScoreCardStats">;
+const DriverScoreCardStats = new Table(DriverScoreCardStatsCols, {
+  indexes: { key: ["key"], year: ["year"] },
+});
+
 export const AppSchema = new Schema({
   Addresses,
   AccountManagers,
@@ -408,6 +431,8 @@ export const AppSchema = new Schema({
   Vendors,
   WorkTrackers,
   WorkTrackerGroups,
+  DriverScorecardStatsPerDriver,
+  DriverScoreCardStats,
 });
 
 export type PowerSyncDB = (typeof AppSchema)["types"];
@@ -433,3 +458,5 @@ export type InspectionQuestionsRecord = PowerSyncDB["InspectionQuestions"];
 export type DamageReportsRecord = PowerSyncDB["DamageReports"];
 export type MaintenanceEventsRecord = PowerSyncDB["MaintenanceEvents"];
 export type BleacherMaintEventsRecord = PowerSyncDB["BleacherMaintEvents"];
+export type DriverScorecardStatsPerDriverRecord = PowerSyncDB["DriverScorecardStatsPerDriver"];
+export type DriverScoreCardStatsRecord = PowerSyncDB["DriverScoreCardStats"];

@@ -3281,3 +3281,46 @@ INSERT INTO "public"."Bleachers" (
     2,
     1
 );
+
+
+-- ============================================================================
+-- Backfill existing data
+-- ============================================================================
+
+-- Populate random distance_meters on WorkTrackers before backfilling the aggregate
+-- drive_minutes = distance_meters * 0.00063 (rounded)
+-- pay_cents     = $4 per km = distance_meters / 1000 * 4 * 100 = distance_meters * 0.4 (rounded)
+WITH rand_distances AS (
+  SELECT id, floor(random() * (10000000 - 1000 + 1) + 1000)::integer AS dist
+  FROM public."WorkTrackers"
+)
+UPDATE public."WorkTrackers" wt
+SET distance_meters = d.dist,
+    drive_minutes   = round(d.dist * 0.00063)::integer,
+    pay_cents       = round(d.dist * 0.4)::integer
+FROM rand_distances d
+WHERE wt.id = d.id;
+
+-- The seed runs WorkTracker INSERTs with session_replication_role = replica,
+-- which bypasses sync_driver_scorecard_stats_per_driver. The UPDATE above runs
+-- with triggers re-enabled, so it inserts skewed rows (each (driver, year)
+-- ends up with trip_count = 1). Wipe and rebuild from scratch so the backfill
+-- below produces correct totals.
+TRUNCATE public."DriverScorecardStatsPerDriver";
+
+INSERT INTO public."DriverScorecardStatsPerDriver" (
+  driver_uuid, year, distance_meters, drive_minutes, pay_cents, trip_count
+)
+SELECT
+  driver_uuid,
+  EXTRACT(YEAR FROM date)::SMALLINT AS year,
+  COALESCE(SUM(distance_meters), 0)::BIGINT AS distance_meters,
+  COALESCE(SUM(drive_minutes), 0)::BIGINT   AS drive_minutes,
+  COALESCE(SUM(pay_cents), 0)::BIGINT       AS pay_cents,
+  COUNT(*)::INTEGER                         AS trip_count
+FROM public."WorkTrackers"
+WHERE driver_uuid IS NOT NULL
+  AND date IS NOT NULL
+GROUP BY driver_uuid, EXTRACT(YEAR FROM date)
+ON CONFLICT (driver_uuid, year) DO NOTHING;
+

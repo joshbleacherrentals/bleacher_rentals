@@ -627,6 +627,71 @@ export type Database = {
           },
         ]
       }
+      DriverScoreCardStats: {
+        Row: {
+          id: string
+          key: string
+          last_updated: string
+          value: number
+          year: number
+        }
+        Insert: {
+          id?: string
+          key: string
+          last_updated?: string
+          value?: number
+          year: number
+        }
+        Update: {
+          id?: string
+          key?: string
+          last_updated?: string
+          value?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      DriverScorecardStatsPerDriver: {
+        Row: {
+          distance_meters: number
+          drive_minutes: number
+          driver_uuid: string
+          id: string
+          last_updated: string
+          pay_cents: number
+          trip_count: number
+          year: number
+        }
+        Insert: {
+          distance_meters?: number
+          drive_minutes?: number
+          driver_uuid: string
+          id?: string
+          last_updated?: string
+          pay_cents?: number
+          trip_count?: number
+          year: number
+        }
+        Update: {
+          distance_meters?: number
+          drive_minutes?: number
+          driver_uuid?: string
+          id?: string
+          last_updated?: string
+          pay_cents?: number
+          trip_count?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "DriverScorecardStatsPerDriver_driver_uuid_fkey"
+            columns: ["driver_uuid"]
+            isOneToOne: false
+            referencedRelation: "Drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       DriverUnavailability: {
         Row: {
           date_unavailable: string

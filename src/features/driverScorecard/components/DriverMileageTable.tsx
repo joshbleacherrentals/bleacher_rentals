@@ -1,78 +1,62 @@
 "use client";
 
-import { DriverMileageData, DriverMileageRow } from "../types";
-import { formatDistance, formatDriveTime } from "../util";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { DriverDistanceRow } from "../types";
 
 type Props = {
-  currentData: DriverMileageData;
-  previousData: DriverMileageData | null;
-  periodLabel: string;
+  rows: DriverDistanceRow[];
 };
 
-function ChangeIndicator({ current, previous }: { current: number; previous: number }) {
-  if (previous === 0 && current === 0) {
-    return <span className="text-gray-400 text-sm">—</span>;
-  }
-  if (previous === 0) {
-    return (
-      <span className="text-green-600 text-sm flex items-center gap-0.5">
-        <TrendingUp className="w-3.5 h-3.5" />
-        New
-      </span>
-    );
-  }
-
-  const pctChange = ((current - previous) / previous) * 100;
-
-  if (Math.abs(pctChange) < 1) {
-    return (
-      <span className="text-gray-400 text-sm flex items-center gap-0.5">
-        <Minus className="w-3.5 h-3.5" />
-        0%
-      </span>
-    );
-  }
-
-  if (pctChange > 0) {
-    return (
-      <span className="text-green-600 text-sm flex items-center gap-0.5">
-        <TrendingUp className="w-3.5 h-3.5" />+{pctChange.toFixed(0)}%
-      </span>
-    );
-  }
-
-  return (
-    <span className="text-red-500 text-sm flex items-center gap-0.5">
-      <TrendingDown className="w-3.5 h-3.5" />
-      {pctChange.toFixed(0)}%
-    </span>
-  );
+function formatKm(meters: number): string {
+  return `${(meters / 1000).toLocaleString(undefined, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })} km`;
 }
 
-function DistanceBar({ meters, maxMeters }: { meters: number; maxMeters: number }) {
-  const pct = maxMeters > 0 ? (meters / maxMeters) * 100 : 0;
-  return (
-    <div className="w-full bg-gray-100 rounded-full h-2.5">
-      <div
-        className="bg-darkBlue h-2.5 rounded-full transition-all duration-500"
-        style={{ width: `${Math.max(pct, 1)}%` }}
-      />
-    </div>
-  );
+function formatDriveTime(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
-export default function DriverMileageTable({ currentData, previousData, periodLabel }: Props) {
-  const maxDistance =
-    currentData.drivers.length > 0
-      ? Math.max(...currentData.drivers.map((d) => d.totalDistanceMeters))
-      : 0;
+function formatPay(cents: number): string {
+  return `$${(cents / 100).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
-  const previousByDriver = new Map<string, DriverMileageRow>();
-  if (previousData) {
-    previousData.drivers.forEach((d) => previousByDriver.set(d.driverUuid, d));
+const BONUS_THRESHOLD_KM = 20_000;
+const BONUS_DOLLARS_PER_KM = 0.02;
+
+/**
+ * Year-end bonus: $0.02 per km, only earned after driving 20,000 km.
+ * Returns either the qualified bonus amount or how many more km are needed.
+ */
+function calculateBonus(meters: number): { qualified: boolean; label: string } {
+  const km = meters / 1000;
+  if (km >= BONUS_THRESHOLD_KM) {
+    const bonus = km * BONUS_DOLLARS_PER_KM;
+    return {
+      qualified: true,
+      label: `$${bonus.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`,
+    };
   }
+  const remainingKm = BONUS_THRESHOLD_KM - km;
+  return {
+    qualified: false,
+    label: `${remainingKm.toLocaleString(undefined, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })} km to qualify`,
+  };
+}
 
+export default function DriverMileageTable({ rows }: Props) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <table className="min-w-full">
@@ -87,9 +71,6 @@ export default function DriverMileageTable({ currentData, previousData, periodLa
             <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Distance
             </th>
-            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[200px]">
-              {/* Bar */}
-            </th>
             <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Drive Time
             </th>
@@ -97,51 +78,50 @@ export default function DriverMileageTable({ currentData, previousData, periodLa
               Trips
             </th>
             <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              vs Last {periodLabel}
+              Pay
+            </th>
+            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Bonus
             </th>
           </tr>
         </thead>
         <tbody>
-          {currentData.drivers.map((driver, index) => {
-            const prev = previousByDriver.get(driver.driverUuid);
+          {rows.map((row, index) => {
             const name =
-              [driver.firstName, driver.lastName].filter(Boolean).join(" ") || "Unknown Driver";
+              [row.firstName, row.lastName].filter(Boolean).join(" ") || "Unknown Driver";
+            const bonus = calculateBonus(row.distanceMeters);
 
             return (
               <tr
-                key={driver.driverUuid}
+                key={row.driverUuid}
                 className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
               >
                 <td className="px-5 py-4 text-sm text-gray-400 font-medium">{index + 1}</td>
-                <td className="px-5 py-4">
-                  <div className="font-semibold text-darkBlue">{name}</div>
-                  <div className="text-xs text-gray-400">
-                    Paid per {driver.payPerUnit.toLowerCase()}
-                  </div>
-                </td>
+                <td className="px-5 py-4 font-semibold text-darkBlue">{name}</td>
                 <td className="px-5 py-4 font-semibold text-darkBlue whitespace-nowrap">
-                  {formatDistance(driver.totalDistanceMeters, driver.payPerUnit)}
-                </td>
-                <td className="px-5 py-4">
-                  <DistanceBar meters={driver.totalDistanceMeters} maxMeters={maxDistance} />
+                  {formatKm(row.distanceMeters)}
                 </td>
                 <td className="px-5 py-4 text-sm text-gray-600 whitespace-nowrap">
-                  {driver.totalDriveMinutes > 0 ? formatDriveTime(driver.totalDriveMinutes) : "—"}
+                  {row.driveMinutes > 0 ? formatDriveTime(row.driveMinutes) : "—"}
                 </td>
-                <td className="px-5 py-4 text-sm text-gray-600">{driver.tripCount}</td>
-                <td className="px-5 py-4">
-                  <ChangeIndicator
-                    current={driver.totalDistanceMeters}
-                    previous={prev?.totalDistanceMeters ?? 0}
-                  />
+                <td className="px-5 py-4 text-sm text-gray-600">{row.tripCount}</td>
+                <td className="px-5 py-4 text-sm text-gray-600 whitespace-nowrap">
+                  {formatPay(row.payCents)}
+                </td>
+                <td
+                  className={`px-5 py-4 text-sm whitespace-nowrap font-semibold ${
+                    bonus.qualified ? "text-green-600" : "text-gray-400"
+                  }`}
+                >
+                  {bonus.label}
                 </td>
               </tr>
             );
           })}
-          {currentData.drivers.length === 0 && (
+          {rows.length === 0 && (
             <tr>
               <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
-                No driver data for this period.
+                No driver data for this year.
               </td>
             </tr>
           )}

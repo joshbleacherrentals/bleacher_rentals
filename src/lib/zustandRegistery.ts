@@ -55,4 +55,6 @@ export const setStaleByTable: Record<TableName, SetStaleFn> = {
   DamageReportPhotos: () => {},
   InspectionQuestions: () => {},
   MaintenancePhotos: () => {},
+  DriverScorecardStatsPerDriver: () => {},
+  DriverScoreCardStats: () => {},
 };

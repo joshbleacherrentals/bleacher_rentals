@@ -1,3 +1,12 @@
+export type DriverDistanceRow = {
+  driverUuid: string;
+  firstName: string | null;
+  lastName: string | null;
+  distanceMeters: number;
+  driveMinutes: number;
+  payCents: number;
+  tripCount: number;
+};
 export type TimeRange = "weekly" | "quarterly" | "annually";
 
 export type DriverMileageRow = {
