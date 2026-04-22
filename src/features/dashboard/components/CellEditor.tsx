@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Trash, Truck, X, CalendarPlus } from "lucide-react";
+import { Check, Trash, Truck, X, CalendarPlus, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSelectedBlockStore } from "../state/useSelectedBlock";
 import { Tables } from "../../../../database.types";
@@ -9,8 +9,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { deleteBlock, saveBlock } from "../db/client/db";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
+import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useUser } from "@clerk/nextjs";
 import { useUsersStore } from "@/state/userStore";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type CellEditorProps = {
   onWorkTrackerOpen?: (workTracker: Tables<"WorkTrackers">) => void;
@@ -167,6 +169,40 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
     handleClose();
   };
 
+  const handleCreateMaintenance = () => {
+    if (!date || !bleacherUuid) {
+      createErrorToast(["Failed to create maintenance event. Missing date or bleacher id."]);
+      return;
+    }
+
+    const maintenanceStore = useMaintenanceEventStore.getState();
+
+    // Calculate end date (7 days after start date)
+    const startDate = new Date(date);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 7);
+
+    // Format dates as YYYY-MM-DD
+    const formatDate = (d: Date) => d.toISOString().split("T")[0];
+
+    // Open the maintenance form (resets to initial state) then prefill
+    maintenanceStore.openForm();
+    const ms = useMaintenanceEventStore.getState();
+    ms.setField("eventStart", formatDate(startDate));
+    ms.setField("eventEnd", formatDate(endDate));
+    ms.setField("bleacherUuids", [bleacherUuid]);
+
+    // Set current user as owner
+    const clerkId = user?.id;
+    if (clerkId) {
+      const match = users.find((u) => u.clerk_user_id === clerkId);
+      if (match) ms.setField("ownerUserUuid", match.id);
+    }
+
+    // Close the cell editor
+    handleClose();
+  };
+
   // Track whether the initial mousedown began on the backdrop so we only close when both down & up occur there
   const mouseDownOnBackdrop = useRef(false);
 
@@ -228,22 +264,52 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
         />
 
         <div className="flex justify-between gap-2">
-          <div className="flex gap-2">
-            <button
-              className="flex items-center gap-1 text-xs underline text-gray-500 cursor-pointer hover:text-black transition-all duration-200"
-              onClick={handleOpenWorkTracker}
-            >
-              <Truck className="h-4 w-4" />
-              Work Tracker
-            </button>
-            <button
-              className="flex items-center gap-1 text-xs underline text-gray-500 cursor-pointer hover:text-black transition-all duration-200"
-              onClick={handleCreateEvent}
-            >
-              <CalendarPlus className="h-4 w-4" />
-              Create Event
-            </button>
-          </div>
+          <TooltipProvider delayDuration={0}>
+            <div className="flex gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    aria-label="Work Tracker"
+                    className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-black hover:bg-gray-100 transition-all duration-200"
+                    onClick={handleOpenWorkTracker}
+                  >
+                    <Truck className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="z-[1100]">
+                  Work Tracker
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    aria-label="Create Event"
+                    className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-black hover:bg-gray-100 transition-all duration-200"
+                    onClick={handleCreateEvent}
+                  >
+                    <CalendarPlus className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="z-[1100]">
+                  Create Event
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    aria-label="Maintenance"
+                    className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-red-700 hover:bg-gray-100 transition-all duration-200"
+                    onClick={handleCreateMaintenance}
+                  >
+                    <Wrench className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="z-[1100]">
+                  Maintenance
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
 
           <div className="flex gap-2">
             {blockUuid && (
