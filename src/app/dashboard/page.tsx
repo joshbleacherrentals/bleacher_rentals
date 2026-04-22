@@ -17,6 +17,7 @@ import { DashboardOptions } from "@/features/dashboardOptions/DashboardOptions";
 import { SeasonToggle } from "@/features/dashboardOptions/SeasonToggle";
 import { CreateEventButton } from "@/features/eventConfiguration/components/CreateEventButton";
 import { EventConfiguration } from "@/features/eventConfiguration/components/EventConfiguration";
+import { MaintenanceEventPanel } from "@/features/maintenanceEvents/components/MaintenanceEventPanel";
 import BleacherLocationModal from "@/features/dashboard/components/BleacherLocationModal";
 import SwapConfirmationModal from "@/features/dashboard/components/SwapConfirmationModal";
 import { useBleacherLocationModalStore } from "@/features/dashboard/state/useBleacherLocationModalStore";
@@ -143,6 +144,7 @@ export default function Page() {
           <CreateEventButton />
         </div>
         <EventConfiguration showSetupTeardown={false} />
+        <MaintenanceEventPanel />
       </div>
       <div className="min-h-0 min-w-0 overflow-hidden">
         <DashboardApp />

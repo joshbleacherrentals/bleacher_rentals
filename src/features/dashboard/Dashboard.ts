@@ -20,6 +20,7 @@ import { useDashboardEventsStore } from "./state/useDashboardEventsStore";
 import type { DashboardFilterState } from "../dashboardOptions/types";
 import { filterEvents, filterSortPixiBleachers } from "../dashboardOptions/util";
 import { useCurrentEventStore } from "../eventConfiguration/state/useCurrentEventStore";
+import { useMaintenanceEventStore } from "../maintenanceEvents/state/useMaintenanceEventStore";
 import { WorkTrackerDragManager } from "./util/WorkTrackerDragManager";
 import { useAddressTooltipStore } from "./state/useAddressTooltipStore";
 import { resolveAddress } from "./util/resolveAddress";
@@ -52,6 +53,7 @@ export class Dashboard {
   private unsubBleachers?: () => void;
   private unsubEvents?: () => void;
   private unsubCurrentEvent?: () => void;
+  private unsubMaintenance?: () => void;
   private bleachers: Bleacher[] = [];
   private events: DashboardEvent[] = [];
   private dates: string[] = [];
@@ -170,6 +172,7 @@ export class Dashboard {
 
     // Subscribe once and coalesce recomputes
     this.unsubCurrentEvent = useCurrentEventStore.subscribe(() => scheduleRecompute());
+    this.unsubMaintenance = useMaintenanceEventStore.subscribe(() => scheduleRecompute());
     this.unsubEvents = useDashboardEventsStore.subscribe(() => scheduleRecompute());
     this.unsubBleachers = useDashboardBleachersStore.subscribe(() => scheduleRecompute());
 
@@ -282,6 +285,13 @@ export class Dashboard {
     const allBleachers = useDashboardBleachersStore.getState().data;
     const allEvents = useDashboardEventsStore.getState().data;
     const currentEvent = useCurrentEventStore.getState();
+    const maintenanceEvent = useMaintenanceEventStore.getState();
+
+    // Combine bleacher UUIDs from both event and maintenance forms so they stay visible
+    const alwaysInclude = [
+      ...(currentEvent.bleacherUuids ?? []),
+      ...(maintenanceEvent.isFormExpanded ? maintenanceEvent.bleacherUuids : []),
+    ];
 
     const filteredBleachers = filterSortPixiBleachers(allBleachers, {
       summerHomeBaseUuids: filters.summerHomeBaseUuids,
@@ -289,8 +299,8 @@ export class Dashboard {
       rows: filters.rows,
       season: filters.season,
       accountManagerUuid: filters.accountManagerUuid,
-      alwaysIncludeBleacherUuids: currentEvent.bleacherUuids ?? [],
-      isFormExpanded: currentEvent.isFormExpanded,
+      alwaysIncludeBleacherUuids: alwaysInclude,
+      isFormExpanded: currentEvent.isFormExpanded || maintenanceEvent.isFormExpanded,
       optimizationMode: filters.optimizationMode,
     });
 
@@ -647,6 +657,9 @@ export class Dashboard {
     } catch {}
     try {
       this.unsubCurrentEvent?.();
+    } catch {}
+    try {
+      this.unsubMaintenance?.();
     } catch {}
     try {
       this.unsubBleachers?.();

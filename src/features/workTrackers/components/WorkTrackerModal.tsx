@@ -537,6 +537,7 @@ export default function WorkTrackerModal({
                       }));
                     }}
                     canEdit={true}
+                    workTrackerId={workTracker?.id !== "-1" ? workTracker?.id : undefined}
                   />
                 </div>
                 <label className={labelClassName}>Driver Notes</label>

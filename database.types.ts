@@ -113,6 +113,42 @@ export type Database = {
           },
         ]
       }
+      BleacherMaintEvents: {
+        Row: {
+          bleacher_uuid: string
+          created_at: string
+          id: string
+          maintenance_event_uuid: string
+        }
+        Insert: {
+          bleacher_uuid: string
+          created_at?: string
+          id?: string
+          maintenance_event_uuid: string
+        }
+        Update: {
+          bleacher_uuid?: string
+          created_at?: string
+          id?: string
+          maintenance_event_uuid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "BleacherMaintEvents_bleacher_uuid_fkey"
+            columns: ["bleacher_uuid"]
+            isOneToOne: false
+            referencedRelation: "Bleachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "BleacherMaintEvents_maintenance_event_uuid_fkey"
+            columns: ["maintenance_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "MaintenanceEvents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Bleachers: {
         Row: {
           bleacher_number: number
@@ -342,6 +378,93 @@ export type Database = {
         }
         Relationships: []
       }
+      DamageReportPhotos: {
+        Row: {
+          created_at: string
+          damage_report_uuid: string
+          id: string
+          photo_path: string
+        }
+        Insert: {
+          created_at?: string
+          damage_report_uuid: string
+          id?: string
+          photo_path: string
+        }
+        Update: {
+          created_at?: string
+          damage_report_uuid?: string
+          id?: string
+          photo_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "DamageReportPhotos_damage_report_uuid_fkey"
+            columns: ["damage_report_uuid"]
+            isOneToOne: false
+            referencedRelation: "DamageReports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      DamageReports: {
+        Row: {
+          bleacher_uuid: string
+          created_at: string
+          id: string
+          inspection_uuid: string
+          is_safe_to_haul: boolean
+          is_safe_to_sit: boolean
+          maintenance_event_uuid: string | null
+          note: string | null
+          resolved_at: string | null
+        }
+        Insert: {
+          bleacher_uuid: string
+          created_at?: string
+          id?: string
+          inspection_uuid: string
+          is_safe_to_haul?: boolean
+          is_safe_to_sit?: boolean
+          maintenance_event_uuid?: string | null
+          note?: string | null
+          resolved_at?: string | null
+        }
+        Update: {
+          bleacher_uuid?: string
+          created_at?: string
+          id?: string
+          inspection_uuid?: string
+          is_safe_to_haul?: boolean
+          is_safe_to_sit?: boolean
+          maintenance_event_uuid?: string | null
+          note?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "DamageReports_bleacher_uuid_fkey"
+            columns: ["bleacher_uuid"]
+            isOneToOne: false
+            referencedRelation: "Bleachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "DamageReports_inspection_uuid_fkey"
+            columns: ["inspection_uuid"]
+            isOneToOne: false
+            referencedRelation: "WorkTrackerInspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "DamageReports_maintenance_event_uuid_fkey"
+            columns: ["maintenance_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "MaintenanceEvents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       DashboardFilterSettings: {
         Row: {
           account_manager_uuid: string | null
@@ -500,6 +623,71 @@ export type Database = {
             columns: ["vendor_uuid"]
             isOneToOne: false
             referencedRelation: "Vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      DriverScoreCardStats: {
+        Row: {
+          id: string
+          key: string
+          last_updated: string
+          value: number
+          year: number
+        }
+        Insert: {
+          id?: string
+          key: string
+          last_updated?: string
+          value?: number
+          year: number
+        }
+        Update: {
+          id?: string
+          key?: string
+          last_updated?: string
+          value?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      DriverScorecardStatsPerDriver: {
+        Row: {
+          distance_meters: number
+          drive_minutes: number
+          driver_uuid: string
+          id: string
+          last_updated: string
+          pay_cents: number
+          trip_count: number
+          year: number
+        }
+        Insert: {
+          distance_meters?: number
+          drive_minutes?: number
+          driver_uuid: string
+          id?: string
+          last_updated?: string
+          pay_cents?: number
+          trip_count?: number
+          year: number
+        }
+        Update: {
+          distance_meters?: number
+          drive_minutes?: number
+          driver_uuid?: string
+          id?: string
+          last_updated?: string
+          pay_cents?: number
+          trip_count?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "DriverScorecardStatsPerDriver_driver_uuid_fkey"
+            columns: ["driver_uuid"]
+            isOneToOne: false
+            referencedRelation: "Drivers"
             referencedColumns: ["id"]
           },
         ]
@@ -699,6 +887,86 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      MaintenanceEvents: {
+        Row: {
+          address_uuid: string | null
+          cost_cents: number | null
+          created_at: string
+          created_by_user_uuid: string | null
+          event_end: string
+          event_name: string
+          event_start: string
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          address_uuid?: string | null
+          cost_cents?: number | null
+          created_at?: string
+          created_by_user_uuid?: string | null
+          event_end: string
+          event_name?: string
+          event_start: string
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          address_uuid?: string | null
+          cost_cents?: number | null
+          created_at?: string
+          created_by_user_uuid?: string | null
+          event_end?: string
+          event_name?: string
+          event_start?: string
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "MaintenanceEvents_address_uuid_fkey"
+            columns: ["address_uuid"]
+            isOneToOne: false
+            referencedRelation: "Addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "MaintenanceEvents_created_by_user_uuid_fkey"
+            columns: ["created_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      MaintenancePhotos: {
+        Row: {
+          created_at: string
+          id: string
+          maintenance_event_uuid: string
+          photo_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          maintenance_event_uuid: string
+          photo_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          maintenance_event_uuid?: string
+          photo_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "MaintenancePhotos_maintenance_event_uuid_fkey"
+            columns: ["maintenance_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "MaintenanceEvents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       Notifications: {
         Row: {
@@ -1104,6 +1372,7 @@ export type Database = {
       }
       WorkTrackerInspections: {
         Row: {
+          answers_json: string | null
           created_at: string
           id: string
           issue_description: string | null
@@ -1111,6 +1380,7 @@ export type Database = {
           walk_around_complete: boolean
         }
         Insert: {
+          answers_json?: string | null
           created_at?: string
           id?: string
           issue_description?: string | null
@@ -1118,6 +1388,7 @@ export type Database = {
           walk_around_complete?: boolean
         }
         Update: {
+          answers_json?: string | null
           created_at?: string
           id?: string
           issue_description?: string | null
@@ -1457,6 +1728,14 @@ export type Database = {
     Functions: {
       get_week_end: { Args: { input_date: string }; Returns: string }
       get_week_start: { Args: { input_date: string }; Returns: string }
+      recompute_driver_scorecard_bucket: {
+        Args: { p_driver: string; p_year: number }
+        Returns: undefined
+      }
+      recompute_maintenance_cost_per_year_bucket: {
+        Args: { p_year: number }
+        Returns: undefined
+      }
     }
     Enums: {
       bleacher_opening_dir: "driver" | "passenger"

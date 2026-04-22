@@ -2,7 +2,7 @@
 import Header from "@/components/Header";
 import SideBar from "@/components/sidebar/Sidebar";
 import useSupabaseSubscriptions from "@/hooks/useSupabaseSubscriptions";
-import { SignOutButton, useSession, useUser } from "@clerk/nextjs";
+import { SignOutButton } from "@clerk/nextjs";
 import { Button } from "./ui/button";
 import { useRef } from "react";
 import { LayoutProvider } from "@/contexts/LayoutContexts";

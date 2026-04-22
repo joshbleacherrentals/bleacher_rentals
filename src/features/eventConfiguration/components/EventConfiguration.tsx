@@ -14,11 +14,11 @@ export const EventConfiguration = ({ showSetupTeardown }: Props) => {
 
   return (
     <div
-      className={`overflow-hidden transition-all duration-1000 ease-in-out ml-2 ${
+      className={`overflow-hidden transition-all duration-1000 ease-in-out mt-0 ml-2 ${
         showPanel ? "max-h-[500px]" : "-mt-2 max-h-0"
       }`}
     >
-      <div className="shadow-lg border border-gray-200 bg-white">
+      <div className="shadow-lg border-x border-t border-gray-300 bg-white">
         <EventConfigurationForm showSetupTeardown={showSetupTeardown} />
       </div>
     </div>
