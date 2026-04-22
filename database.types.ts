@@ -1728,6 +1728,14 @@ export type Database = {
     Functions: {
       get_week_end: { Args: { input_date: string }; Returns: string }
       get_week_start: { Args: { input_date: string }; Returns: string }
+      recompute_driver_scorecard_bucket: {
+        Args: { p_driver: string; p_year: number }
+        Returns: undefined
+      }
+      recompute_maintenance_cost_per_year_bucket: {
+        Args: { p_year: number }
+        Returns: undefined
+      }
     }
     Enums: {
       bleacher_opening_dir: "driver" | "passenger"
