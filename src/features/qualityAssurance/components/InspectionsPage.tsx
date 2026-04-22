@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { useInspections, type InspectionListRow } from "../hooks/useInspections";
 import { useBleacherOptions, useDriverOptions } from "../hooks/useFilterOptions";
 import { CheckCircle2, AlertTriangle, ClipboardCheck } from "lucide-react";
+import InspectionDetailModal from "./InspectionDetailModal";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -30,6 +31,7 @@ export default function InspectionsPage() {
   const bleachers = useBleacherOptions();
   const drivers = useDriverOptions();
   const rows = useInspections({ bleacherUuid, driverUuid });
+  const [selectedRow, setSelectedRow] = useState<InspectionListRow | null>(null);
 
   const updateFilter = (key: "bleacher_uuid" | "driver_uuid", value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -123,7 +125,8 @@ export default function InspectionsPage() {
             {rows.map((row) => (
               <tr
                 key={`${row.workTrackerId}-${row.inspectionKind}`}
-                className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                onClick={() => setSelectedRow(row)}
+                className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 <td className="px-5 py-4 text-sm text-gray-700 whitespace-nowrap">
                   {formatDate(row.createdAt ?? row.workTrackerDate)}
@@ -171,6 +174,8 @@ export default function InspectionsPage() {
           </tbody>
         </table>
       </div>
+
+      <InspectionDetailModal row={selectedRow} onClose={() => setSelectedRow(null)} />
     </>
   );
 }

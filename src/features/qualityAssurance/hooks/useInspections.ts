@@ -13,6 +13,7 @@ export type InspectionListRow = {
   walkAroundComplete: number | null;
   issuesFound: number | null;
   issueDescription: string | null;
+  answersJson: string | null;
   bleacherUuid: string | null;
   bleacherNumber: number | null;
   driverUuid: string | null;
@@ -29,10 +30,12 @@ type RawInspectionRow = {
   preWalkAroundComplete: number | null;
   preIssuesFound: number | null;
   preIssueDescription: string | null;
+  preAnswersJson: string | null;
   postCreatedAt: string | null;
   postWalkAroundComplete: number | null;
   postIssuesFound: number | null;
   postIssueDescription: string | null;
+  postAnswersJson: string | null;
   bleacherUuid: string | null;
   bleacherNumber: number | null;
   driverUuid: string | null;
@@ -71,10 +74,12 @@ export function useInspections(filters: {
         "pre.walk_around_complete as preWalkAroundComplete",
         "pre.issues_found as preIssuesFound",
         "pre.issue_description as preIssueDescription",
+        "pre.answers_json as preAnswersJson",
         "post.created_at as postCreatedAt",
         "post.walk_around_complete as postWalkAroundComplete",
         "post.issues_found as postIssuesFound",
         "post.issue_description as postIssueDescription",
+        "post.answers_json as postAnswersJson",
         "wt.bleacher_uuid as bleacherUuid",
         "b.bleacher_number as bleacherNumber",
         "wt.driver_uuid as driverUuid",
@@ -109,6 +114,7 @@ export function useInspections(filters: {
           walkAroundComplete: r.preWalkAroundComplete,
           issuesFound: r.preIssuesFound,
           issueDescription: r.preIssueDescription,
+          answersJson: r.preAnswersJson,
           bleacherUuid: r.bleacherUuid,
           bleacherNumber: r.bleacherNumber,
           driverUuid: r.driverUuid,
@@ -126,6 +132,7 @@ export function useInspections(filters: {
           walkAroundComplete: r.postWalkAroundComplete,
           issuesFound: r.postIssuesFound,
           issueDescription: r.postIssueDescription,
+          answersJson: r.postAnswersJson,
           bleacherUuid: r.bleacherUuid,
           bleacherNumber: r.bleacherNumber,
           driverUuid: r.driverUuid,
