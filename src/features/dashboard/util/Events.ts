@@ -98,6 +98,15 @@ export class EventsUtil {
         selectedStatus?: string;
         goodshuffleUrl?: string | null;
       } | null;
+      // Optional injection of a currently selected maintenance event to preview
+      selectedMaintenance?: {
+        maintenanceEventUuid?: string | null;
+        bleacherUuids: string[];
+        eventStart: string;
+        eventEnd: string;
+        eventName?: string;
+        address?: string;
+      } | null;
     },
   ): { spansByRow: EventSpanType[][]; dateToIndex: Map<string, number> } {
     const dateToIndex = new Map(dates.map((d, i) => [d, i]));
@@ -112,8 +121,23 @@ export class EventsUtil {
       selectedStartISO != null ? dateToIndex.get(selectedStartISO) : undefined;
     const selectedEndCol = selectedEndISO != null ? dateToIndex.get(selectedEndISO) : undefined;
 
+    const selMaint = opts?.selectedMaintenance;
+    const selMaintStartISO = selMaint?.eventStart
+      ? DateTime.fromISO(selMaint.eventStart).toISODate()
+      : null;
+    const selMaintEndISO = selMaint?.eventEnd
+      ? DateTime.fromISO(selMaint.eventEnd).toISODate()
+      : null;
+    const selMaintStartCol =
+      selMaintStartISO != null ? dateToIndex.get(selMaintStartISO) : undefined;
+    const selMaintEndCol = selMaintEndISO != null ? dateToIndex.get(selMaintEndISO) : undefined;
+
     const spansByRow = bleachers.map((bleacher, rowIndex) => {
       const spans: EventSpanType[] = [];
+
+      // Check for unresolved damage reports on this bleacher
+      const unresolvedDamage = (bleacher.damageReports ?? []).filter((r) => !r.resolvedAt);
+      const hasDamage = unresolvedDamage.length > 0;
 
       for (const ev of bleacher.bleacherEvents ?? []) {
         // If editing an existing event, exclude persisted spans for that eventUuid
@@ -149,7 +173,42 @@ export class EventsUtil {
           spans.push({
             start: startCol,
             end: endCol,
-            ev,
+            ev: hasDamage ? { ...ev, hasDamageAlert: true } : ev,
+            rowIndex,
+          });
+        }
+      }
+
+      // Add maintenance events as spans
+      for (const me of bleacher.maintenanceEvents ?? []) {
+        // If editing an existing maintenance event, exclude its persisted spans
+        if (
+          selMaint?.maintenanceEventUuid != null &&
+          me.maintenanceEventUuid === selMaint.maintenanceEventUuid
+        ) {
+          continue;
+        }
+        const startISO = DateTime.fromISO(me.eventStart).toISODate();
+        const endISO = DateTime.fromISO(me.eventEnd).toISODate();
+        if (!startISO || !endISO) continue;
+        const startCol = dateToIndex.get(startISO);
+        const endCol = dateToIndex.get(endISO);
+        if (startCol !== undefined && endCol !== undefined) {
+          spans.push({
+            start: startCol,
+            end: endCol,
+            ev: {
+              eventUuid: me.maintenanceEventUuid,
+              bleacherEventUuid: me.bleacherMaintEventUuid,
+              eventName: me.eventName,
+              address: me.address,
+              eventStart: me.eventStart,
+              eventEnd: me.eventEnd,
+              hslHue: null,
+              booked: true,
+              goodshuffleUrl: null,
+              isMaintenance: true,
+            },
             rowIndex,
           });
         }
@@ -176,6 +235,30 @@ export class EventsUtil {
           isSelected: true,
         } as any; // BleacherEvent compatible
         spans.push({ start: selectedStartCol, end: selectedEndCol, ev, rowIndex });
+      }
+
+      // Inject a synthetic maintenance preview span
+      if (
+        selMaint &&
+        Array.isArray(selMaint.bleacherUuids) &&
+        selMaint.bleacherUuids.includes(bleacher.bleacherUuid) &&
+        selMaintStartCol !== undefined &&
+        selMaintEndCol !== undefined
+      ) {
+        const ev = {
+          eventUuid: selMaint.maintenanceEventUuid ?? "-1",
+          bleacherEventUuid: "-1",
+          eventName: selMaint.eventName || "Maintenance / Repair",
+          address: selMaint.address || "",
+          eventStart: selMaint.eventStart,
+          eventEnd: selMaint.eventEnd,
+          hslHue: null,
+          booked: true,
+          goodshuffleUrl: null,
+          isMaintenance: true,
+          isSelected: true,
+        } as any;
+        spans.push({ start: selMaintStartCol, end: selMaintEndCol, ev, rowIndex });
       }
 
       // Sort spans by start column for consistent rendering

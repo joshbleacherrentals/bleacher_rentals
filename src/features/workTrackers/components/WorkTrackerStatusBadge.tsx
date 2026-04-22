@@ -1,6 +1,7 @@
 "use client";
 
-import { Send, FilePen, CheckCircle, Play, Award, XCircle } from "lucide-react";
+import Link from "next/link";
+import { Send, FilePen, CheckCircle, Play, Award, XCircle, ClipboardCheck } from "lucide-react";
 import { Toggle } from "@/components/Toggle";
 import { Tables } from "../../../../database.types";
 import { WORKTRACKER_STATUS_COLORS } from "../constants";
@@ -10,6 +11,7 @@ type WorkTrackerStatusBadgeProps = {
   onStatusChange?: (newStatus: "draft" | "released") => void;
   canEdit?: boolean;
   showText?: boolean;
+  workTrackerId?: string;
 };
 
 export default function WorkTrackerStatusBadge({
@@ -17,6 +19,7 @@ export default function WorkTrackerStatusBadge({
   onStatusChange,
   canEdit = false,
   showText = true,
+  workTrackerId,
 }: WorkTrackerStatusBadgeProps) {
   // Draft/Released toggle (editable by Account Managers)
   if (canEdit && (status === "draft" || status === "released")) {
@@ -86,12 +89,23 @@ export default function WorkTrackerStatusBadge({
     case "dropoff_inspection":
       const inProgressColors = WORKTRACKER_STATUS_COLORS[status];
       return (
-        <div
-          className={`flex items-center justify-center whitespace-nowrap ${showText ? "gap-2 px-3 py-1.5" : "p-1.5"} ${inProgressColors.bg} border ${inProgressColors.border} rounded-md`}
-        >
-          <Play className={`h-4 w-4 ${inProgressColors.text}`} />
-          {showText && (
-            <span className={`text-sm font-medium ${inProgressColors.text}`}>In Progress</span>
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex items-center justify-center whitespace-nowrap ${showText ? "gap-2 px-3 py-1.5" : "p-1.5"} ${inProgressColors.bg} border ${inProgressColors.border} rounded-md`}
+          >
+            <Play className={`h-4 w-4 ${inProgressColors.text}`} />
+            {showText && (
+              <span className={`text-sm font-medium ${inProgressColors.text}`}>In Progress</span>
+            )}
+          </div>
+          {workTrackerId && (
+            <Link
+              href={`/damage-reports?tab=inspections&work_tracker_id=${workTrackerId}`}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-darkBlue bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              {showText && "Inspections"}
+            </Link>
           )}
         </div>
       );
@@ -99,12 +113,23 @@ export default function WorkTrackerStatusBadge({
     case "completed":
       const completedColors = WORKTRACKER_STATUS_COLORS.completed;
       return (
-        <div
-          className={`flex items-center justify-center whitespace-nowrap ${showText ? "gap-2 px-3 py-1.5" : "p-1.5"} ${completedColors.bg} border ${completedColors.border} rounded-md`}
-        >
-          <Award className={`h-4 w-4 ${completedColors.text}`} />
-          {showText && (
-            <span className={`text-sm font-medium ${completedColors.text}`}>Completed</span>
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex items-center justify-center whitespace-nowrap ${showText ? "gap-2 px-3 py-1.5" : "p-1.5"} ${completedColors.bg} border ${completedColors.border} rounded-md`}
+          >
+            <Award className={`h-4 w-4 ${completedColors.text}`} />
+            {showText && (
+              <span className={`text-sm font-medium ${completedColors.text}`}>Completed</span>
+            )}
+          </div>
+          {workTrackerId && (
+            <Link
+              href={`/damage-reports?tab=inspections&work_tracker_id=${workTrackerId}`}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-darkBlue bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              {showText && "Inspections"}
+            </Link>
           )}
         </div>
       );

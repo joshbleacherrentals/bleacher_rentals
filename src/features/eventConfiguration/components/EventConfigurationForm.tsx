@@ -112,7 +112,7 @@ export const EventConfigurationForm = ({
 
   return (
     <div
-      className="p-4 rounded-lg border border-gray-200"
+      className="p-4"
       style={
         currentEventStore.hslHue !== null
           ? { backgroundColor: `hsl(${currentEventStore.hslHue}, 60%, 60%)` }

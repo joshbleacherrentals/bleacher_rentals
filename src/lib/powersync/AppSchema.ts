@@ -336,6 +336,86 @@ const DriverUnavailability = new Table(DriverUnavailabilityCols, {
   indexes: { driver_uuid: ["driver_uuid"] },
 });
 
+const WorkTrackerInspectionsCols = {
+  created_at: column.text,
+  walk_around_complete: column.integer,
+  issues_found: column.integer,
+  issue_description: column.text,
+  answers_json: column.text,
+} satisfies PowerSyncColsFor<"WorkTrackerInspections">;
+const WorkTrackerInspections = new Table(WorkTrackerInspectionsCols);
+
+const InspectionQuestionsCols = {
+  question_text: column.text,
+  required: column.integer,
+  question_type: column.text,
+  is_active: column.integer,
+  sort_order: column.integer,
+} satisfies PowerSyncColsFor<"InspectionQuestions">;
+const InspectionQuestions = new Table(InspectionQuestionsCols, {
+  indexes: { sort_order: ["sort_order"] },
+});
+
+const DamageReportsCols = {
+  inspection_uuid: column.text,
+  bleacher_uuid: column.text,
+  is_safe_to_sit: column.integer,
+  is_safe_to_haul: column.integer,
+  note: column.text,
+  created_at: column.text,
+  resolved_at: column.text,
+  maintenance_event_uuid: column.text,
+} satisfies PowerSyncColsFor<"DamageReports">;
+const DamageReports = new Table(DamageReportsCols, {
+  indexes: { bleacher_uuid: ["bleacher_uuid"], maintenance_event_uuid: ["maintenance_event_uuid"] },
+});
+
+const MaintenanceEventsCols = {
+  event_name: column.text,
+  event_start: column.text,
+  event_end: column.text,
+  cost_cents: column.integer,
+  address_uuid: column.text,
+  notes: column.text,
+  created_by_user_uuid: column.text,
+  created_at: column.text,
+} satisfies PowerSyncColsFor<"MaintenanceEvents">;
+const MaintenanceEvents = new Table(MaintenanceEventsCols, {
+  indexes: { address_uuid: ["address_uuid"], created_by_user_uuid: ["created_by_user_uuid"] },
+});
+
+const BleacherMaintEventsCols = {
+  bleacher_uuid: column.text,
+  maintenance_event_uuid: column.text,
+  created_at: column.text,
+} satisfies PowerSyncColsFor<"BleacherMaintEvents">;
+const BleacherMaintEvents = new Table(BleacherMaintEventsCols, {
+  indexes: { bleacher_uuid: ["bleacher_uuid"], maintenance_event_uuid: ["maintenance_event_uuid"] },
+});
+
+const DriverScorecardStatsPerDriverCols = {
+  driver_uuid: column.text,
+  year: column.integer,
+  distance_meters: column.integer,
+  drive_minutes: column.integer,
+  pay_cents: column.integer,
+  trip_count: column.integer,
+  last_updated: column.text,
+} satisfies PowerSyncColsFor<"DriverScorecardStatsPerDriver">;
+const DriverScorecardStatsPerDriver = new Table(DriverScorecardStatsPerDriverCols, {
+  indexes: { driver_uuid: ["driver_uuid"], year: ["year"] },
+});
+
+const DriverScoreCardStatsCols = {
+  year: column.integer,
+  key: column.text,
+  value: column.integer,
+  last_updated: column.text,
+} satisfies PowerSyncColsFor<"DriverScoreCardStats">;
+const DriverScoreCardStats = new Table(DriverScoreCardStatsCols, {
+  indexes: { key: ["key"], year: ["year"] },
+});
+
 export const AppSchema = new Schema({
   Addresses,
   AccountManagers,
@@ -350,12 +430,19 @@ export const AppSchema = new Schema({
   Events,
   HomeBases,
   Drivers,
+  DamageReports,
+  InspectionQuestions,
+  MaintenanceEvents,
+  BleacherMaintEvents,
   ScorecardTargets,
   Users,
   UserStatuses,
   Vendors,
   WorkTrackers,
   WorkTrackerGroups,
+  WorkTrackerInspections,
+  DriverScorecardStatsPerDriver,
+  DriverScoreCardStats,
 });
 
 export type PowerSyncDB = (typeof AppSchema)["types"];
@@ -377,3 +464,10 @@ export type VendorRecord = PowerSyncDB["Vendors"];
 export type WorkTrackerRecord = PowerSyncDB["WorkTrackers"];
 export type WorkTrackerGroupRecord = PowerSyncDB["WorkTrackerGroups"];
 export type DriverUnavailabilityRecord = PowerSyncDB["DriverUnavailability"];
+export type WorkTrackerInspectionsRecord = PowerSyncDB["WorkTrackerInspections"];
+export type InspectionQuestionsRecord = PowerSyncDB["InspectionQuestions"];
+export type DamageReportsRecord = PowerSyncDB["DamageReports"];
+export type MaintenanceEventsRecord = PowerSyncDB["MaintenanceEvents"];
+export type BleacherMaintEventsRecord = PowerSyncDB["BleacherMaintEvents"];
+export type DriverScorecardStatsPerDriverRecord = PowerSyncDB["DriverScorecardStatsPerDriver"];
+export type DriverScoreCardStatsRecord = PowerSyncDB["DriverScoreCardStats"];

@@ -6,6 +6,7 @@ import { Baker } from "../util/Baker";
 import { EventLeftColumnCell } from "../ui/EventLeftColumnCell";
 import { Bleacher, DashboardEvent } from "../types";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
+import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useBleacherLocationModalStore } from "../state/useBleacherLocationModalStore";
 import { useSwapStore } from "../state/useSwapStore";
 import { useDashboardBleachersStore } from "../state/useDashboardBleachersStore";
@@ -27,7 +28,9 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
   private cellPool: Map<number, BleacherCell> = new Map();
   private unsub?: () => void;
   private unsubSwap?: () => void;
+  private unsubMaintenance?: () => void;
   private isFormExpanded = false;
+  private isMaintenanceFormExpanded = false;
   private selectedBleacherUuids: string[] = [];
 
   private yAxis: "Bleachers" | "Events" = "Bleachers";
@@ -37,7 +40,7 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
     app: Application,
     bleachers: Bleacher[],
     yAxis: "Bleachers" | "Events",
-    events: DashboardEvent[]
+    events: DashboardEvent[],
   ) {
     this.app = app;
     this.baker = new Baker(app);
@@ -49,46 +52,61 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
 
   private bootstrapStateSync() {
     const st = useCurrentEventStore.getState();
-    this.isFormExpanded = !!st.isFormExpanded;
-    this.selectedBleacherUuids = st.bleacherUuids.slice();
-    this.unsub = useCurrentEventStore.subscribe((s) => {
-      const expandedChanged = s.isFormExpanded !== this.isFormExpanded;
-      const selectedChanged = s.bleacherUuids !== this.selectedBleacherUuids;
-      if (!expandedChanged && !selectedChanged) return;
-      if (expandedChanged) this.isFormExpanded = s.isFormExpanded;
-      if (selectedChanged) this.selectedBleacherUuids = s.bleacherUuids.slice();
+    const mt = useMaintenanceEventStore.getState();
+    this.isFormExpanded = !!st.isFormExpanded || !!mt.isFormExpanded;
+    this.isMaintenanceFormExpanded = !!mt.isFormExpanded;
+    this.selectedBleacherUuids = mt.isFormExpanded
+      ? mt.bleacherUuids.slice()
+      : st.bleacherUuids.slice();
 
-      // Defer UI updates to next tick to avoid mid-build churn
+    // Helper to apply expand/select changes to all cells
+    const applyChanges = (expandedChanged: boolean, selectedChanged: boolean) => {
       const ticker = (this.app as any)?.ticker;
-      if (ticker && typeof ticker.addOnce === "function") {
-        ticker.addOnce(() => {
-          for (const [row, cell] of this.cellPool.entries()) {
-            if (expandedChanged) {
-              cell.setFormExpanded(this.isFormExpanded);
-              // Reset swap state when form collapses
-              if (!this.isFormExpanded) {
-                useSwapStore.getState().reset();
-              }
-            }
-            if (selectedChanged) {
-              const b = this.bleachers[row];
-              if (b) cell.setSelected(this.selectedBleacherUuids.includes(b.bleacherUuid));
+      const doUpdate = () => {
+        for (const [row, cell] of this.cellPool.entries()) {
+          if (expandedChanged) {
+            cell.setFormExpanded(this.isFormExpanded);
+            if (!this.isFormExpanded) {
+              useSwapStore.getState().reset();
             }
           }
-          // Update swap button visibility when form expansion or selection changes
-          this.updateSwapButtons();
-        });
-      } else {
-        // Fallback: update immediately if ticker missing (likely during teardown)
-        for (const [row, cell] of this.cellPool.entries()) {
-          if (expandedChanged) cell.setFormExpanded(this.isFormExpanded);
           if (selectedChanged) {
             const b = this.bleachers[row];
             if (b) cell.setSelected(this.selectedBleacherUuids.includes(b.bleacherUuid));
           }
         }
         this.updateSwapButtons();
+      };
+      if (ticker && typeof ticker.addOnce === "function") {
+        ticker.addOnce(doUpdate);
+      } else {
+        doUpdate();
       }
+    };
+
+    this.unsub = useCurrentEventStore.subscribe((s) => {
+      const anyExpanded = s.isFormExpanded || this.isMaintenanceFormExpanded;
+      const expandedChanged = anyExpanded !== this.isFormExpanded;
+      // Only track event bleacherUuids when event form is the active one
+      const selectedChanged =
+        !this.isMaintenanceFormExpanded && s.bleacherUuids !== this.selectedBleacherUuids;
+      if (!expandedChanged && !selectedChanged) return;
+      if (expandedChanged) this.isFormExpanded = anyExpanded;
+      if (selectedChanged) this.selectedBleacherUuids = s.bleacherUuids.slice();
+      applyChanges(expandedChanged, selectedChanged);
+    });
+
+    this.unsubMaintenance = useMaintenanceEventStore.subscribe((s) => {
+      this.isMaintenanceFormExpanded = !!s.isFormExpanded;
+      const eventExpanded = useCurrentEventStore.getState().isFormExpanded;
+      const anyExpanded = eventExpanded || s.isFormExpanded;
+      const expandedChanged = anyExpanded !== this.isFormExpanded;
+      // Track maintenance bleacherUuids when maintenance form is active
+      const selectedChanged = s.isFormExpanded && s.bleacherUuids !== this.selectedBleacherUuids;
+      if (!expandedChanged && !selectedChanged) return;
+      if (expandedChanged) this.isFormExpanded = anyExpanded;
+      if (selectedChanged) this.selectedBleacherUuids = s.bleacherUuids.slice();
+      applyChanges(expandedChanged, selectedChanged);
     });
 
     // Subscribe to swap store for UI updates
@@ -105,7 +123,9 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
   /**
    * Compute the swap button state for a single bleacher given current store state.
    */
-  private getSwapStateForBleacher(bleacher: Bleacher | undefined): "default" | "selected" | "prominent" | "hidden" {
+  private getSwapStateForBleacher(
+    bleacher: Bleacher | undefined,
+  ): "default" | "selected" | "prominent" | "hidden" {
     if (!bleacher) return "hidden";
     const swapState = useSwapStore.getState();
     const eventState = useCurrentEventStore.getState();
@@ -114,7 +134,7 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
     if (!this.isFormExpanded || !currentEventUuid) return "hidden";
 
     const bleacherHasCurrentEvent = bleacher.bleacherEvents.some(
-      (e) => e.eventUuid === currentEventUuid
+      (e) => e.eventUuid === currentEventUuid,
     );
 
     if (swapState.mode === "idle") {
@@ -156,8 +176,17 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
       const bleacher = this.bleachers[row];
       if (bleacher) cell.setBleacher(bleacher);
 
-      // Wire toggle handler
+      // Wire toggle handler - routes to event or maintenance store
       cell.setToggleHandler((id) => {
+        const mt = useMaintenanceEventStore.getState();
+        if (mt.isFormExpanded) {
+          const selected = mt.bleacherUuids;
+          const updated = selected.includes(id)
+            ? selected.filter((n) => n !== id)
+            : [...selected, id];
+          mt.setField("bleacherUuids", updated);
+          return;
+        }
         const st = useCurrentEventStore.getState();
         if (!st.isFormExpanded) return;
         const selected = st.bleacherUuids;
@@ -175,7 +204,7 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
           modalStore.openModal(
             bleacher.bleacherNumber,
             bleacher.bleacherUuid,
-            bleacher.linxupDeviceId
+            bleacher.linxupDeviceId,
           );
         }
       });
@@ -190,9 +219,7 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
         const bl = this.bleachers.find((b) => b.bleacherUuid === bleacherUuid);
         if (!bl) return;
 
-        const hasCurrentEvent = bl.bleacherEvents.some(
-          (e) => e.eventUuid === currentEventUuid
-        );
+        const hasCurrentEvent = bl.bleacherEvents.some((e) => e.eventUuid === currentEventUuid);
 
         if (swapState.mode === "idle") {
           // First selection
@@ -217,7 +244,7 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
             sourceBleacherUuid,
             targetBleacherUuid,
             currentEventUuid,
-            allBleachers
+            allBleachers,
           );
 
           swapState.confirmSecond(bleacherUuid, swaps);
@@ -243,7 +270,7 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
     col: number,
     cellWidth: number,
     cellHeight: number,
-    parent: Container
+    parent: Container,
   ): Container {
     parent.removeChildren();
 
@@ -280,8 +307,12 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
     try {
       this.unsubSwap?.();
     } catch {}
+    try {
+      this.unsubMaintenance?.();
+    } catch {}
     this.unsub = undefined;
     this.unsubSwap = undefined;
+    this.unsubMaintenance = undefined;
     this.cellPool.clear();
     this.baker.destroyAll();
   }
