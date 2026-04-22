@@ -54,7 +54,7 @@ export function useRepairs(filters: { bleacherUuid?: string | null }): RepairLis
 
   const { data: matchingIdRows = [] } = useTypedQuery(
     matchingEventsCompiled,
-    expect<{ eventId: string | null }>(),
+    expect<{ eventId: string }>(),
   );
 
   const matchingEventIds = useMemo(
