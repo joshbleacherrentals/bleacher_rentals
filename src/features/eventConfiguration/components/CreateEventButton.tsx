@@ -155,6 +155,10 @@ export const CreateEventButton = () => {
               onClick={() => {
                 setDropdownOpen(false);
                 maintenanceStore.openForm();
+                const resolved = resolveCurrentUserUuid();
+                if (resolved) {
+                  useMaintenanceEventStore.getState().setField("ownerUserUuid", resolved);
+                }
               }}
               className="w-full cursor-pointer px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 flex items-center gap-2"
             >
