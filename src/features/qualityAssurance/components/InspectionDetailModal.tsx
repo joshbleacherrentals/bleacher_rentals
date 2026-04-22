@@ -77,14 +77,13 @@ export default function InspectionDetailModal({
                     {row.inspectionKind === "pre" ? "Pre-trip" : "Post-trip"} Inspection
                   </h2>
                   <p className="text-sm text-gray-500">
-                    Bleacher{" "}
-                    {row.bleacherNumber != null ? `#${row.bleacherNumber}` : "—"}
+                    Bleacher {row.bleacherNumber != null ? `#${row.bleacherNumber}` : "—"}
                     {" · "}
                     {[row.driverFirstName, row.driverLastName].filter(Boolean).join(" ") || "—"}
                     {" · "}
                     {row.createdAt
                       ? new Date(row.createdAt).toLocaleString()
-                      : row.workTrackerDate ?? "—"}
+                      : (row.workTrackerDate ?? "—")}
                   </p>
                 </div>
               </div>
