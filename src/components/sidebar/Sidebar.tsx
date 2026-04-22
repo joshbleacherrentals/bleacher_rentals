@@ -112,11 +112,14 @@ const SideBar = () => {
         />
         <SideNavButton label="Team" href="/team" icon={Users} roles={[USER_ROLES.ADMIN]} />
         <SideNavButton label="Assets" href="/assets" icon={Truck} roles={[USER_ROLES.ADMIN]} />
-        <SideNavButton
-          label="Damage Reports"
-          href="/damage-reports"
+        <SideNavDropdown
+          label="Quality Assurance"
           icon={ShieldAlert}
-          roles={[USER_ROLES.ACCOUNT_MANAGER, USER_ROLES.ADMIN]}
+          children={[
+            { label: "Damage Reports", href: "/damage-reports" },
+            { label: "Inspections", href: "/inspections" },
+            { label: "Repairs", href: "/repairs" },
+          ]}
         />
         <SideNavButton
           label="Work Trackers"
