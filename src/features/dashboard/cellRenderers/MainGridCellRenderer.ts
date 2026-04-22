@@ -3,7 +3,7 @@ import { ICellRenderer } from "../interfaces/ICellRenderer";
 import { Baker } from "../util/Baker";
 import { EventBody } from "../ui/event/EventBody";
 import { EventSpanType, EventsUtil } from "../util/Events";
-import { Tile } from "../ui/Tile";
+import { Tile, DamageSeverity } from "../ui/Tile";
 import { FirstCellNotPinned } from "../ui/event/FirstCellNotPinned";
 import { PinnableSection } from "../ui/event/PinnableSection";
 import { CELL_WIDTH } from "../values/constants";
@@ -19,7 +19,7 @@ import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCur
 import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 
 /** Column range where the damage overlay should be drawn */
-type DamageOverlayRange = { startCol: number; endCol: number };
+type DamageOverlayRange = { startCol: number; endCol: number; severity: DamageSeverity };
 
 /**
  * CellRenderer for the main scrollable grid area
@@ -292,10 +292,8 @@ export class MainGridCellRenderer implements ICellRenderer {
 
     for (let row = 0; row < bleachers.length; row++) {
       const bleacher = bleachers[row];
-      const unsafeReports = (bleacher.damageReports ?? []).filter(
-        (dr) => !dr.isSafeToSit || !dr.isSafeToHaul,
-      );
-      if (unsafeReports.length === 0) continue;
+      const damageReports = bleacher.damageReports ?? [];
+      if (damageReports.length === 0) continue;
 
       // Sort maintenance events by start date ascending
       const maintEvents = [...(bleacher.maintenanceEvents ?? [])].sort((a, b) =>
@@ -304,8 +302,10 @@ export class MainGridCellRenderer implements ICellRenderer {
 
       const ranges: DamageOverlayRange[] = [];
 
-      for (const dr of unsafeReports) {
+      for (const dr of damageReports) {
         if (!dr.workTrackerDate) continue;
+
+        const severity: DamageSeverity = !dr.isSafeToSit || !dr.isSafeToHaul ? "major" : "minor";
 
         const wtDateISO = DateTime.fromISO(dr.workTrackerDate).toISODate();
         if (!wtDateISO) continue;
@@ -334,7 +334,7 @@ export class MainGridCellRenderer implements ICellRenderer {
         }
 
         if (startCol <= endCol) {
-          ranges.push({ startCol, endCol });
+          ranges.push({ startCol, endCol, severity });
         }
       }
 
@@ -347,12 +347,20 @@ export class MainGridCellRenderer implements ICellRenderer {
   }
 
   /**
-   * Check whether a given column falls within a damage overlay range for a row.
+   * Get the damage severity for a given cell, or null if not damaged.
+   * If multiple ranges overlap, "major" wins over "minor".
    */
-  private isInDamageOverlay(row: number, col: number): boolean {
+  private getDamageSeverity(row: number, col: number): DamageSeverity | null {
     const ranges = this.damageOverlaysByRow.get(row);
-    if (!ranges) return false;
-    return ranges.some((r) => col >= r.startCol && col <= r.endCol);
+    if (!ranges) return null;
+    let result: DamageSeverity | null = null;
+    for (const r of ranges) {
+      if (col >= r.startCol && col <= r.endCol) {
+        if (r.severity === "major") return "major";
+        result = "minor";
+      }
+    }
+    return result;
   }
 
   /**
@@ -406,7 +414,8 @@ export class MainGridCellRenderer implements ICellRenderer {
 
     // Get all events at this cell (handles overlapping spans)
     const allEventInfos = EventsUtil.getAllCellEventInfos(row, col, this.spansByRow);
-    const isDamageCell = this.yAxis === "Bleachers" && this.isInDamageOverlay(row, col);
+    const damageSeverity = this.yAxis === "Bleachers" ? this.getDamageSeverity(row, col) : null;
+    const isDamageCell = damageSeverity !== null;
 
     if (allEventInfos.length > 1) {
       // --- OVERLAPPING EVENTS ---
@@ -418,7 +427,7 @@ export class MainGridCellRenderer implements ICellRenderer {
 
       // Add damage tile behind events if applicable
       if (isDamageCell) {
-        const dmgTile = new Tile(dimensions, this.baker, row, col, false, true);
+        const dmgTile = new Tile(dimensions, this.baker, row, col, false, damageSeverity);
         dmgTile.zIndex = -1;
         parent.addChild(dmgTile);
       }
@@ -476,7 +485,7 @@ export class MainGridCellRenderer implements ICellRenderer {
         // Add damage tile behind event if applicable
         if (isDamageCell) {
           parent.sortableChildren = true;
-          const dmgTile = new Tile(dimensions, this.baker, row, col, false, true);
+          const dmgTile = new Tile(dimensions, this.baker, row, col, false, damageSeverity);
           dmgTile.zIndex = -1;
           parent.addChild(dmgTile);
         }
@@ -499,7 +508,7 @@ export class MainGridCellRenderer implements ICellRenderer {
         // Add damage tile behind event if applicable
         if (isDamageCell) {
           parent.sortableChildren = true;
-          const dmgTile = new Tile(dimensions, this.baker, row, col, false, true);
+          const dmgTile = new Tile(dimensions, this.baker, row, col, false, damageSeverity);
           dmgTile.zIndex = -1;
           parent.addChild(dmgTile);
         }
@@ -515,7 +524,7 @@ export class MainGridCellRenderer implements ICellRenderer {
         row,
         col,
         this.yAxis === "Bleachers",
-        isDamageCell,
+        damageSeverity,
       );
       parent.addChild(tile);
 

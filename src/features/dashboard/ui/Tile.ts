@@ -1,6 +1,8 @@
 import { Container, Graphics, Sprite } from "pixi.js";
 import { Baker } from "../util/Baker";
 
+export type DamageSeverity = "major" | "minor";
+
 export class Tile extends Container {
   private dimensions: { width: number; height: number };
   private bakedSprite: Sprite;
@@ -16,16 +18,20 @@ export class Tile extends Container {
     row: number,
     col: number,
     isClickable?: boolean,
-    isDamage?: boolean,
+    damageSeverity?: DamageSeverity | null,
   ) {
     super();
     this.row = row;
     this.col = col;
     this.dimensions = dimensions;
-    const textureKey = isDamage ? "DamageTile" : "TestTile";
+    const textureKey = damageSeverity
+      ? damageSeverity === "major"
+        ? "DamageTileMajor"
+        : "DamageTileMinor"
+      : "TestTile";
     const texture = baker.getTexture(textureKey, dimensions, (c) => {
-      if (isDamage) {
-        this.buildDamageTile(c);
+      if (damageSeverity) {
+        this.buildDamageTile(c, damageSeverity);
       } else {
         this.buildTile(c);
       }
@@ -69,16 +75,17 @@ export class Tile extends Container {
     // console.log("tile baked");
   }
 
-  private buildDamageTile(c: Container) {
+  private buildDamageTile(c: Container, severity: DamageSeverity) {
     const w = this.dimensions.width;
     const h = this.dimensions.height;
 
     // Same white background
     const fill = new Graphics().rect(0, 0, w, h).fill(0xffffff);
 
-    // Faint red diagonal stripes
+    // Diagonal stripes — red for major damage, yellow for minor
+    const stripeColor = severity === "major" ? 0xdc2626 : 0xeab308;
     const stripes = new Graphics();
-    stripes.setStrokeStyle({ width: 1, color: 0xdc2626, alpha: 0.5 });
+    stripes.setStrokeStyle({ width: 1, color: stripeColor, alpha: 0.5 });
     const step = 10;
     for (let offset = -h; offset < w; offset += step) {
       const x1 = Math.max(0, offset);
