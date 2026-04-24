@@ -31,6 +31,11 @@ import {
 } from "@/components/ui/dialog";
 import { buildTripStatusNotification } from "@/features/workTrackers/db/notifications";
 import BillOfLadingButton from "./billOfLading/BillOfLadingButton";
+import { useDriverAssignment } from "./driverAssignment/hooks/useDriverAssignment";
+import { DriverSuggestion, SuggestDriverButton } from "./driverAssignment/driverSuggestion";
+import { TripAssignment } from "./driverAssignment/lib/types/DriverAssignment";
+import { useUsersStore } from "@/state/userStore";
+import { useUser } from "@clerk/nextjs";
 
 type WorkTrackerModalProps = {
   selectedWorkTracker: Tables<"WorkTrackers"> | null;
@@ -66,6 +71,9 @@ export default function WorkTrackerModal({
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
   const [showEditTypes, setShowEditTypes] = useState(false);
 
+  const { suggest, isLoading: isSuggesting, error: suggestError } = useDriverAssignment();
+  const [suggestion, setSuggestion] = useState<TripAssignment | null>(null);
+
   // Fetch available work tracker types
   const { data: workTrackerTypes = [] } = useQuery({
     queryKey: ["work-tracker-types"],
@@ -78,6 +86,29 @@ export default function WorkTrackerModal({
       return data;
     },
   });
+
+  // --- Resolve current user's account manager UUID ---
+// useUser() gives us the Clerk session. We map clerk_user_id → internal Users.id
+// → AccountManagers.id in one query, done lazily only when "Suggest" is clicked.
+const { user: clerkUser } = useUser();
+const users = useUsersStore((s) => s.users);
+ 
+const getCurrentAccountManagerUuid = async (): Promise<string | null> => {
+  // 1. Map Clerk ID → internal user UUID via the users store
+  const internalUser = users.find((u) => u.clerk_user_id === clerkUser?.id);
+  if (!internalUser) return null;
+ 
+  // 2. Look up AccountManagers row for this user
+  const { data, error } = await supabase
+    .from("AccountManagers")
+    .select("id")
+    .eq("user_uuid", internalUser.id)
+    .eq("is_active", true)
+    .single();
+ 
+  if (error || !data) return null;
+  return data.id;
+};
 
   // Helper to format address for Distance Matrix API
   const formatAddressString = (addr: AddressData | null): string => {
@@ -101,6 +132,41 @@ export default function WorkTrackerModal({
   const dest = toLatLngString(dropOffAddress ?? undefined) || formatAddressString(dropOffAddress);
 
   const distanceQueryEnabled = Boolean(origin && dest);
+
+  const handleSuggestDriver = async () => {
+  if (!workTracker?.id) return;
+ 
+  // Require both addresses so the optimizer can calculate distances
+  if (!workTracker.pickup_address_uuid || !workTracker.dropoff_address_uuid) {
+    createErrorToast(["Set pickup and dropoff addresses before suggesting a driver."]);
+    return;
+  }
+ 
+  // New (unsaved) work trackers don't have a DB row yet — addresses aren't
+  // persisted so the optimizer can't look them up. Prompt the user to save first.
+  if (workTracker.id === "-1") {
+    createErrorToast(["Save the work tracker first, then use Suggest to find the best driver."]);
+    return;
+  }
+ 
+  // Derive account manager UUID from the logged-in user at click time
+  const accountManagerUuid = await getCurrentAccountManagerUuid();
+  if (!accountManagerUuid) {
+    createErrorToast(["Could not determine your account manager profile. Are you set up as an account manager?"]);
+    return;
+  }
+ 
+  const result = await suggest({
+    workTrackerIds: [workTracker.id],
+    accountManagerUuid,
+  });
+ 
+  if (result && result.assignments.length > 0) {
+    setSuggestion(result.assignments[0]);
+  } else {
+    createErrorToast(["No eligible drivers found for this trip."]);
+  }
+};
 
   // Debug logging
   console.log("Distance Query Debug:", {
@@ -435,21 +501,36 @@ export default function WorkTrackerModal({
             </div>
             <div className="flex flex-row gap-4">
               {/* Column 1: Global Info */}
-              <div className="flex-1">
+                <label className={labelClassName}>Driver</label>
+                <SuggestDriverButton
+                    onClick={handleSuggestDriver}
+                    isLoading={isSuggesting}
+                    disabled={!workTracker?.pickup_address_uuid || !workTracker?.dropoff_address_uuid}
+                  />
+                </div>
+                <SelectDriver
+                  value={workTracker?.driver_uuid ?? null}
+                  onChange={(id) => {
+                    setWorkTracker((prev) => ({ ...prev!, driver_uuid: id }));
+                    setSuggestion(null); // clear suggestion when manually changed
+                  }}
+                  placeholder="Select Driver"
+                  date={workTracker?.date ?? null}
+                />
+                <DriverSuggestion
+                  assignment={suggestion}
+                  isLoading={isSuggesting}
+                  error={suggestError}
+                  onAccept={(driverUuid) => {
+                    setWorkTracker((prev) => ({ ...prev!, driver_uuid: driverUuid }));
+                    setSuggestion(null);
+                  }}
+                />    
+                <div className="flex-1">
                 <div className="flex flex-row gap-2">
                   <div className="flex-[2]">
-                    <label className={labelClassName}>Driver</label>
-                    <SelectDriver
-                      value={workTracker?.driver_uuid ?? null}
-                      onChange={(id) =>
-                        setWorkTracker((prev) => ({
-                          ...prev!,
-                          driver_uuid: id,
-                        }))
-                      }
-                      placeholder="Select Driver"
-                      date={workTracker?.date ?? null}
-                    />
+                    <div className="flex items-center justify-between">
+
                   </div>
                   <div className="flex-1">
                     <label className={labelClassName}>Bleacher</label>
