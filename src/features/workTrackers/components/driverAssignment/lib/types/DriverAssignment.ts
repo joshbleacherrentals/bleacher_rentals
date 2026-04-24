@@ -38,7 +38,7 @@ export type TripAssignment = {
   work_tracker_id: string;
   suggested_driver_uuid: string;
   suggested_driver_name: string;
-  round_trip_meters: number;
+  total_cost_meters: number;
   leg_home_to_pickup_meters: number;
   leg_pickup_to_dropoff_meters: number;
   swap_warning: SwapWarning | null;

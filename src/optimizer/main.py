@@ -72,7 +72,7 @@ class TripAssignment(BaseModel):
     work_tracker_id: str
     suggested_driver_uuid: str
     suggested_driver_name: str
-    round_trip_meters: float
+    total_cost_meters: float          # home→pickup + pickup→dropoff
     leg_home_to_pickup_meters: float
     leg_pickup_to_dropoff_meters: float
     swap_warning: Optional[SwapWarning] = None
@@ -132,7 +132,7 @@ async def build_cost_matrix(
 ) -> tuple[np.ndarray, dict[str, set[str]]]:
     """
     Returns (cost_matrix, unavailability_map).
-    cost_matrix[i][j] = round-trip meters for driver j on trip i
+    cost_matrix[i][j] = home→pickup + pickup→dropoff meters for driver j on trip i
                         (INF if driver unavailable / wrong account manager)
     unavailability_map[driver_uuid] = set of trip_ids already assigned to that driver
     """
@@ -168,8 +168,7 @@ async def build_cost_matrix(
             leg2 = trip.distance_meters if trip.distance_meters else await road_distance_meters(
                 trip.pickup_address, trip.dropoff_address
             )
-            leg3 = await road_distance_meters(trip.dropoff_address, driver.home_address)
-            cost[i][j] = leg1 + leg2 + leg3
+            cost[i][j] = leg1 + leg2
 
     return cost, existing_assignments
 
@@ -205,9 +204,9 @@ async def solve_assignments(request: AssignmentRequest) -> AssignmentResponse:
             continue
 
         driver = drivers[j]
-        total_rt = float(cost_matrix[i][j])
-        leg2 = trip.distance_meters if trip.distance_meters else 0.0
+        total_cost = float(cost_matrix[i][j])
         leg1 = await road_distance_meters(driver.home_address, trip.pickup_address)
+        leg2 = trip.distance_meters if trip.distance_meters else 0.0
 
         # Check for swap warning
         swap_warning: Optional[SwapWarning] = None
@@ -237,7 +236,7 @@ async def solve_assignments(request: AssignmentRequest) -> AssignmentResponse:
                     f"to trip {conflicting_id}. "
                     + (
                         f"Consider swapping to {driver_name.get(alt_driver.driver_uuid, 'another driver')} "
-                        f"(+{round((alt_cost - total_rt) / 1000, 1)} km extra)."
+                        f"(+{round((alt_cost - total_cost) / 1000, 1)} km extra)."
                         if alt_driver
                         else "No alternative driver found."
                     )
@@ -249,14 +248,14 @@ async def solve_assignments(request: AssignmentRequest) -> AssignmentResponse:
                 work_tracker_id=trip.work_tracker_id,
                 suggested_driver_uuid=driver.driver_uuid,
                 suggested_driver_name=driver_name.get(driver.driver_uuid, ""),
-                round_trip_meters=total_rt,
+                total_cost_meters=total_cost,
                 leg_home_to_pickup_meters=leg1,
                 leg_pickup_to_dropoff_meters=leg2,
                 swap_warning=swap_warning,
             )
         )
 
-    total = sum(a.round_trip_meters for a in assignments)
+    total = sum(a.total_cost_meters for a in assignments)
     return AssignmentResponse(
         assignments=assignments,
         total_distance_meters=total,

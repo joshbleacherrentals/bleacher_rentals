@@ -10,6 +10,7 @@ import {
 import {
   fetchDriverInputsForAccountManager,
   fetchTripInputs,
+  fetchSameDayConflictTrips,
 } from "../lib/fetchAssignmentData";
 
 const OPTIMIZER_URL =
@@ -44,23 +45,37 @@ export function useDriverAssignment(): UseDriverAssignmentResult {
       setError(null);
 
       try {
-        // 1. Fetch trip + driver data in parallel
+        // 1. Fetch the target trips and drivers in parallel
         const [tripInputs, driverInputs] = await Promise.all([
           fetchTripInputs(supabase, workTrackerIds),
           fetchDriverInputsForAccountManager(supabase, accountManagerUuid),
         ]);
 
-        // 2. Stamp account_manager_uuid onto each trip
+        // 2. Stamp account_manager_uuid onto each target trip
         const tripsWithAM = tripInputs.map((t) => ({
           ...t,
           account_manager_uuid: accountManagerUuid,
         }));
 
-        // 3. Call the optimizer
+        // 3. Fetch all OTHER assigned trips on the same date(s) so the optimizer
+        //    can detect conflicts with drivers already booked that day.
+        const dates = [...new Set(tripsWithAM.map((t) => t.date).filter(Boolean))];
+        const conflictTrips = await fetchSameDayConflictTrips(
+          supabase,
+          dates,
+          workTrackerIds,
+          accountManagerUuid,
+        );
+
+        // Merge: target trips first (optimizer returns suggestions for these),
+        // conflict trips appended as context (they already have current_driver_uuid set).
+        const allTrips = [...tripsWithAM, ...conflictTrips];
+
+        // 4. Call the optimizer
         const res = await fetch(`${OPTIMIZER_URL}/assign`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trips: tripsWithAM, drivers: driverInputs }),
+          body: JSON.stringify({ trips: allTrips, drivers: driverInputs }),
         });
 
         if (!res.ok) {

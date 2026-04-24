@@ -33,7 +33,7 @@ export function DriverSuggestion({ assignment, isLoading, error, onAccept }: Pro
 
   if (!assignment) return null;
 
-  const roundTripKm = (assignment.round_trip_meters / 1000).toFixed(1);
+  const roundTripKm = (assignment.total_cost_meters / 1000).toFixed(1);
   const leg1Km = (assignment.leg_home_to_pickup_meters / 1000).toFixed(1);
   const tripKm = (assignment.leg_pickup_to_dropoff_meters / 1000).toFixed(1);
 

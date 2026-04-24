@@ -4,7 +4,7 @@
 // no lat/lng columns required in the Addresses table.
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "../../../../../../database.types"; // adjust path as needed
+import { Database } from "../../../../../../database.types";
 import { DriverInput, TripInput, AddressPoint } from "./types/DriverAssignment";
 
 // ---------------------------------------------------------------------------
@@ -136,6 +136,8 @@ export async function fetchDriverInputsForAccountManager(
   supabase: SupabaseClient<Database>,
   accountManagerUuid: string,
 ): Promise<DriverInput[]> {
+  console.log("[fetchDriverInputs] accountManagerUuid:", accountManagerUuid);
+
   const { data: driversData, error } = await supabase
     .from("Drivers")
     .select(
@@ -150,6 +152,8 @@ export async function fetchDriverInputsForAccountManager(
     .eq("account_manager_uuid", accountManagerUuid)
     .eq("is_active", true);
 
+  console.log("[fetchDriverInputs] raw drivers:", driversData?.length ?? 0, "error:", error?.message ?? null);
+
   if (error || !driversData) return [];
 
   // Batch-geocode all driver home addresses in one pass
@@ -157,17 +161,24 @@ export async function fetchDriverInputsForAccountManager(
     .map((d) => d.address_uuid)
     .filter(Boolean) as string[];
 
+  console.log("[fetchDriverInputs] address UUIDs to geocode:", addressUuids);
+
   const addressMap = await resolveAddressPoints(supabase, addressUuids);
+
+  console.log("[fetchDriverInputs] geocoded", addressMap.size, "of", addressUuids.length, "addresses");
 
   const results: DriverInput[] = [];
 
   for (const d of driversData as any[]) {
     const homeAddress = d.address_uuid ? addressMap.get(d.address_uuid) : undefined;
-    if (!homeAddress) continue; // can't route without a geocoded home
+    if (!homeAddress) {
+      console.warn(`[fetchDriverInputs] Skipping driver ${d.id} — no geocoded home (address_uuid: ${d.address_uuid})`);
+      continue;
+    }
 
-    // Fetch days off for this driver
+    // Fetch days off — update table name if yours differs
     const { data: daysOffData } = await supabase
-      .from("DriverUnavailability") //
+      .from("DriverUnavailability")
       .select("date")
       .eq("driver_uuid", d.id);
 
@@ -184,6 +195,7 @@ export async function fetchDriverInputsForAccountManager(
     });
   }
 
+  console.log("[fetchDriverInputs] returning", results.length, "eligible drivers");
   return results;
 }
 
@@ -239,6 +251,55 @@ export async function fetchTripInputs(
       dropoff_address: dropoffAddr,
       distance_meters: wt.distance_meters ?? null,
       current_driver_uuid: wt.driver_uuid ?? null,
+    });
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Fetch all OTHER WorkTrackers on the same date(s) as the target trips.
+// These are passed to the optimizer as context so it can detect driver
+// conflicts — e.g. a driver already assigned to another trip that day.
+// Only trips that already have a driver_uuid set are relevant here.
+// ---------------------------------------------------------------------------
+export async function fetchSameDayConflictTrips(
+  supabase: SupabaseClient<Database>,
+  dates: string[],          // YYYY-MM-DD dates of the trips we're optimizing
+  excludeIds: string[],     // the work tracker IDs we're already sending
+  accountManagerUuid: string,
+): Promise<TripInput[]> {
+  if (dates.length === 0) return [];
+
+  // Fetch all assigned trips on those dates (excluding the ones we already have)
+  const { data, error } = await supabase
+    .from("WorkTrackers")
+    .select("id, date, driver_uuid, distance_meters, pickup_address_uuid, dropoff_address_uuid")
+    .in("date", dates)
+    .not("driver_uuid", "is", null)      // only matters if a driver is already assigned
+    .not("id", "in", `(${excludeIds.join(",")})`)  // don't double-include the target trips
+
+  if (error || !data || data.length === 0) return [];
+
+  // Geocode addresses in batch
+  const allUuids = (data as any[])
+    .flatMap((wt) => [wt.pickup_address_uuid, wt.dropoff_address_uuid].filter(Boolean)) as string[];
+  const addressMap = await resolveAddressPoints(supabase, allUuids);
+
+  const results: TripInput[] = [];
+  for (const wt of data as any[]) {
+    const pickupAddr = wt.pickup_address_uuid ? addressMap.get(wt.pickup_address_uuid) : undefined;
+    const dropoffAddr = wt.dropoff_address_uuid ? addressMap.get(wt.dropoff_address_uuid) : undefined;
+    if (!pickupAddr || !dropoffAddr) continue;
+
+    results.push({
+      work_tracker_id: wt.id,
+      account_manager_uuid: accountManagerUuid,
+      date: wt.date ?? "",
+      pickup_address: pickupAddr,
+      dropoff_address: dropoffAddr,
+      distance_meters: wt.distance_meters ?? null,
+      current_driver_uuid: wt.driver_uuid ?? null,  // this is what the conflict checker reads
     });
   }
 
