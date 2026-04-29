@@ -17,7 +17,6 @@ import { useRoadmapUsers } from "../_lib/hooks/useRoadmapUsers";
 import { useRoadmapAccessLevel } from "../_lib/hooks/useRoadmapAccessLevel";
 
 type FilterMode = "all" | "mine";
-type StatusFilter = "all" | "in_progress" | "completed";
 
 export default function BacklogPage() {
   const router = useRouter();
@@ -27,7 +26,7 @@ export default function BacklogPage() {
   const newTicket = searchParams.get("new") === "ticket";
 
   const [filter, setFilter] = useState<FilterMode>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [showCompleted, setShowCompleted] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
 
   const { tasks, isLoading } = useBacklogTasks(showDeleted);
@@ -51,13 +50,11 @@ export default function BacklogPage() {
 
   const visibleTasks = useMemo(() => {
     let list = filter === "mine" ? tasks.filter((t) => myTaskIds.has(t.id)) : tasks;
-    if (statusFilter === "in_progress") {
-      list = list.filter((t) => t.status === "in_progress" || !!t.sprint_id);
-    } else if (statusFilter === "completed") {
-      list = list.filter((t) => t.status === "completed");
+    if (!showCompleted) {
+      list = list.filter((t) => t.status !== "completed");
     }
     return list;
-  }, [tasks, filter, statusFilter, myTaskIds]);
+  }, [tasks, filter, showCompleted, myTaskIds]);
 
   const baseUrl = "/roadmap/backlog";
   const ticketId = ticketParam === "new" ? null : ticketParam;
@@ -92,15 +89,17 @@ export default function BacklogPage() {
             {mode === "all" ? "All" : "My Tickets"}
           </button>
         ))}
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          className="ml-auto px-3 py-1 rounded border border-gray-300 text-xs bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-darkBlue"
+        <button
+          type="button"
+          onClick={() => setShowCompleted((v) => !v)}
+          className={`ml-auto px-3 py-1 rounded-full text-xs border cursor-pointer ${
+            showCompleted
+              ? "bg-green-100 text-green-700 border-green-300"
+              : "bg-white border-gray-300 hover:bg-gray-50 text-gray-500"
+          }`}
         >
-          <option value="all">All Statuses</option>
-          <option value="in_progress">In Progress / Assigned</option>
-          <option value="completed">Completed</option>
-        </select>
+          {showCompleted ? "Hiding Completed" : "Show Completed"}
+        </button>
         {isDeveloper && (
           <button
             type="button"
