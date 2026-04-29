@@ -17,5 +17,6 @@ export function useUserFormPaths() {
     driver: `${basePath}/driver`,
     accountManager: `${basePath}/account-manager`,
     administrator: `${basePath}/administrator`,
+    developer: `${basePath}/developer`,
   };
 }
