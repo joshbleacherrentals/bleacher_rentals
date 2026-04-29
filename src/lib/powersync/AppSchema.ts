@@ -333,7 +333,7 @@ const BlueBookCols = {
   created_at: column.text,
   updated_at: column.text,
 } satisfies PowerSyncColsFor<"BlueBook">;
-const BlueBook = new Table(BlueBookCols, { indexes: { uuid: ["uuid"] } });
+const BlueBook = new Table(BlueBookCols);
 
 const DriverUnavailabilityCols = {
   driver_uuid: column.text,
