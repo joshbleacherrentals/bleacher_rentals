@@ -159,6 +159,16 @@ export async function createUser(
       await updateBleacherAssignments(supabase, userUuid, state);
     }
 
+    // 4. If developer, insert into Developers table
+    if (state.isDeveloper) {
+      const { error: devError } = await supabase.from("Developers").insert({
+        user_uuid: userUuid,
+        is_active: true,
+        auto_subscribe_to_new_tickets: state.autoSubscribeToNewTickets,
+      });
+      if (devError) throw devError;
+    }
+
     return { success: true, userUuid };
   } catch (error) {
     console.error("Error creating user:", error);
@@ -307,6 +317,39 @@ export async function updateUser(
       if (amUpdateError) throw amUpdateError;
     }
 
+    // 4. Handle Developer role
+    const { data: existingDev } = await supabase
+      .from("Developers")
+      .select("id")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (state.isDeveloper) {
+      if (!existingDev) {
+        const { error: devInsertError } = await supabase.from("Developers").insert({
+          user_uuid: userUuid,
+          is_active: true,
+          auto_subscribe_to_new_tickets: state.autoSubscribeToNewTickets,
+        });
+        if (devInsertError) throw devInsertError;
+      } else {
+        const { error: devUpdateError } = await supabase
+          .from("Developers")
+          .update({
+            is_active: true,
+            auto_subscribe_to_new_tickets: state.autoSubscribeToNewTickets,
+          })
+          .eq("user_uuid", userUuid);
+        if (devUpdateError) throw devUpdateError;
+      }
+    } else if (existingDev) {
+      const { error: devDeactivateError } = await supabase
+        .from("Developers")
+        .update({ is_active: false })
+        .eq("user_uuid", userUuid);
+      if (devDeactivateError) throw devDeactivateError;
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Error updating user:", error);
@@ -422,6 +465,7 @@ export async function fetchUserById(
       phoneNumber: user.phone,
       isDriver: false,
       isAccountManager: false,
+      isDeveloper: false,
     };
 
     // 2. Check if user is a driver
@@ -501,6 +545,19 @@ export async function fetchUserById(
 
       result.summerBleacherUuids = summerBleachers?.map((b) => b.id) || [];
       result.winterBleacherUuids = winterBleachers?.map((b) => b.id) || [];
+    }
+
+    // 4. Check if user is a developer
+    const { data: developer } = await supabase
+      .from("Developers")
+      .select("id, is_active, auto_subscribe_to_new_tickets")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (developer && developer.is_active) {
+      roleTabs.push("developer");
+      result.isDeveloper = true;
+      result.autoSubscribeToNewTickets = developer.auto_subscribe_to_new_tickets ?? true;
     }
 
     result.roleTabs = roleTabs;
