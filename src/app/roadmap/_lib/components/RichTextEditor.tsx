@@ -72,7 +72,8 @@ export function RichTextEditor({ value, onChange, placeholder, disabled }: Props
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: "focus:outline-none p-3 min-h-[120px] prose prose-sm max-w-none",
+        class:
+          "focus:outline-none p-3 min-h-[120px] prose prose-sm max-w-none [&_p]:my-0.25 [&_h1]:my-0.25 [&_h2]:my-0.25 [&_h3]:my-0.25 [&_ul]:my-0.25 [&_ol]:my-0.25 [&_li]:my-0",
       },
     },
   });
