@@ -20,7 +20,7 @@ export function useRoadmapUsers() {
         .selectFrom("Users")
         .select(["id", "first_name", "last_name", "email", "status_uuid"])
         .compile(),
-    []
+    [],
   );
 
   const { data } = useTypedQuery(compiled, expect<Row>());
