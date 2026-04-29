@@ -5,6 +5,7 @@ import { useCurrentUserStore } from "@/features/manageTeam/state/useCurrentUserS
 import { DriverList } from "@/features/manageTeam/components/lists/DriverList";
 import { AccountManagerList } from "@/features/manageTeam/components/lists/AccountManagerList";
 import { AdminList } from "@/features/manageTeam/components/lists/AdminList";
+import { DeveloperList } from "@/features/manageTeam/components/lists/DeveloperList";
 import { IncompleteList } from "@/features/manageTeam/components/lists/IncompleteList";
 import TabNavigation, { TeamTab } from "../../features/manageTeam/components/inputs/TabNavigation";
 import SearchBar from "../../features/manageTeam/components/inputs/SearchBar";
@@ -91,6 +92,14 @@ export default function TeamPage() {
         </div>
       )}
 
+      {/* Developers Section */}
+      {activeTab === "developers" && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Developers</h2>
+          <DeveloperList showInactive={showInactive} />
+        </div>
+      )}
+
       {/* All Users Section */}
       {activeTab === "all" && (
         <div>
@@ -107,6 +116,11 @@ export default function TeamPage() {
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Drivers</h2>
             <DriverList showInactive={showInactive} />
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Developers</h2>
+            <DeveloperList showInactive={showInactive} />
           </div>
         </div>
       )}
