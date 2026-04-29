@@ -14,6 +14,14 @@ const AccountManagersCols = {
 } satisfies PowerSyncColsFor<"AccountManagers">;
 const AccountManagers = new Table(AccountManagersCols, { indexes: { user_uuid: ["user_uuid"] } });
 
+const DevelopersCols = {
+  created_at: column.text,
+  is_active: column.integer,
+  user_uuid: column.text,
+  auto_subscribe_to_new_tickets: column.integer,
+} satisfies PowerSyncColsFor<"Developers">;
+const Developers = new Table(DevelopersCols, { indexes: { user_uuid: ["user_uuid"] } });
+
 const AddressesCols = {
   created_at: column.text,
   street: column.text,
@@ -416,9 +424,152 @@ const DriverScoreCardStats = new Table(DriverScoreCardStatsCols, {
   indexes: { key: ["key"], year: ["year"] },
 });
 
+// =====================
+// Roadmap
+// =====================
+const RoadmapQuartersCols = {
+  created_at: column.text,
+  year: column.integer,
+  quarter: column.integer,
+} satisfies PowerSyncColsFor<"RoadmapQuarters">;
+const RoadmapQuarters = new Table(RoadmapQuartersCols, {
+  indexes: { year: ["year"] },
+});
+
+const RoadmapSprintsCols = {
+  created_at: column.text,
+  quarter_id: column.text,
+  sprint_number: column.integer,
+  start_date: column.text,
+  end_date: column.text,
+} satisfies PowerSyncColsFor<"RoadmapSprints">;
+const RoadmapSprints = new Table(RoadmapSprintsCols, {
+  indexes: {
+    quarter_id: ["quarter_id"],
+    start_date: ["start_date"],
+  },
+});
+
+const RoadmapFeaturesCols = {
+  created_at: column.text,
+  completed_at: column.text,
+  quarter_id: column.text,
+  title: column.text,
+  description: column.text,
+  status: column.text,
+  sort_order: column.integer,
+} satisfies PowerSyncColsFor<"RoadmapFeatures">;
+const RoadmapFeatures = new Table(RoadmapFeaturesCols, {
+  indexes: {
+    quarter_id: ["quarter_id"],
+    status: ["status"],
+  },
+});
+
+const RoadmapFeatureSprintLabelsCols = {
+  created_at: column.text,
+  feature_id: column.text,
+  sprint_id: column.text,
+} satisfies PowerSyncColsFor<"RoadmapFeatureSprintLabels">;
+const RoadmapFeatureSprintLabels = new Table(RoadmapFeatureSprintLabelsCols, {
+  indexes: {
+    feature_id: ["feature_id"],
+    sprint_id: ["sprint_id"],
+  },
+});
+
+const RoadmapTasksCols = {
+  created_at: column.text,
+  completed_at: column.text,
+  deleted_at: column.text,
+  sprint_id: column.text,
+  feature_id: column.text,
+  title: column.text,
+  description: column.text,
+  status: column.text,
+  sort_order: column.integer,
+  created_by_user_uuid: column.text,
+  is_backlog: column.integer,
+  developer_uuid: column.text,
+} satisfies PowerSyncColsFor<"RoadmapTasks">;
+const RoadmapTasks = new Table(RoadmapTasksCols, {
+  indexes: {
+    sprint_id: ["sprint_id"],
+    feature_id: ["feature_id"],
+    status: ["status"],
+  },
+});
+
+const RoadmapAttachmentsCols = {
+  created_at: column.text,
+  parent_type: column.text,
+  parent_id: column.text,
+  storage_bucket: column.text,
+  storage_path: column.text,
+  file_name: column.text,
+  mime_type: column.text,
+  file_size_bytes: column.integer,
+  uploaded_by_user_uuid: column.text,
+} satisfies PowerSyncColsFor<"RoadmapAttachments">;
+const RoadmapAttachments = new Table(RoadmapAttachmentsCols, {
+  indexes: {
+    parent: ["parent_type", "parent_id"],
+  },
+});
+
+const RoadmapTaskSubscriptionsCols = {
+  task_id: column.text,
+  user_uuid: column.text,
+  created_at: column.text,
+} satisfies PowerSyncColsFor<"RoadmapTaskSubscriptions">;
+const RoadmapTaskSubscriptions = new Table(RoadmapTaskSubscriptionsCols, {
+  indexes: {
+    task_id: ["task_id"],
+    user_uuid: ["user_uuid"],
+  },
+});
+
+const RoadmapTaskMessagesCols = {
+  task_id: column.text,
+  user_uuid: column.text,
+  body: column.text,
+  created_at: column.text,
+  is_system: column.integer,
+} satisfies PowerSyncColsFor<"RoadmapTaskMessages">;
+const RoadmapTaskMessages = new Table(RoadmapTaskMessagesCols, {
+  indexes: {
+    task_id: ["task_id"],
+  },
+});
+
+const RoadmapTaskMessageReadReceiptsCols = {
+  message_id: column.text,
+  user_uuid: column.text,
+  read_at: column.text,
+} satisfies PowerSyncColsFor<"RoadmapTaskMessageReadReceipts">;
+const RoadmapTaskMessageReadReceipts = new Table(RoadmapTaskMessageReadReceiptsCols, {
+  indexes: {
+    message_id: ["message_id"],
+    user_uuid: ["user_uuid"],
+  },
+});
+
+const RoadmapTaskTypingIndicatorsCols = {
+  task_id: column.text,
+  user_uuid: column.text,
+  is_typing: column.integer,
+  updated_at: column.text,
+} satisfies PowerSyncColsFor<"RoadmapTaskTypingIndicators">;
+const RoadmapTaskTypingIndicators = new Table(RoadmapTaskTypingIndicatorsCols, {
+  indexes: {
+    task_id: ["task_id"],
+  },
+});
+
 export const AppSchema = new Schema({
   Addresses,
   AccountManagers,
+  Developers,
   DashboardFilterSettings,
   DriverUnavailability,
   Tasks,
@@ -443,12 +594,23 @@ export const AppSchema = new Schema({
   WorkTrackerInspections,
   DriverScorecardStatsPerDriver,
   DriverScoreCardStats,
+  RoadmapQuarters,
+  RoadmapSprints,
+  RoadmapFeatures,
+  RoadmapFeatureSprintLabels,
+  RoadmapTasks,
+  RoadmapAttachments,
+  RoadmapTaskSubscriptions,
+  RoadmapTaskMessages,
+  RoadmapTaskMessageReadReceipts,
+  RoadmapTaskTypingIndicators,
 });
 
 export type PowerSyncDB = (typeof AppSchema)["types"];
 export type BlocksRecord = PowerSyncDB["Blocks"];
 export type AddressRecord = PowerSyncDB["Addresses"];
 export type AccountManagerRecord = PowerSyncDB["AccountManagers"];
+export type DeveloperRecord = PowerSyncDB["Developers"];
 export type DashboardFilterSettingsRecord = PowerSyncDB["DashboardFilterSettings"];
 export type TaskRecord = PowerSyncDB["Tasks"];
 export type DriverRecord = PowerSyncDB["Drivers"];
@@ -471,3 +633,13 @@ export type MaintenanceEventsRecord = PowerSyncDB["MaintenanceEvents"];
 export type BleacherMaintEventsRecord = PowerSyncDB["BleacherMaintEvents"];
 export type DriverScorecardStatsPerDriverRecord = PowerSyncDB["DriverScorecardStatsPerDriver"];
 export type DriverScoreCardStatsRecord = PowerSyncDB["DriverScoreCardStats"];
+export type RoadmapQuarterRecord = PowerSyncDB["RoadmapQuarters"];
+export type RoadmapSprintRecord = PowerSyncDB["RoadmapSprints"];
+export type RoadmapFeatureRecord = PowerSyncDB["RoadmapFeatures"];
+export type RoadmapFeatureSprintLabelRecord = PowerSyncDB["RoadmapFeatureSprintLabels"];
+export type RoadmapTaskRecord = PowerSyncDB["RoadmapTasks"];
+export type RoadmapAttachmentRecord = PowerSyncDB["RoadmapAttachments"];
+export type RoadmapTaskSubscriptionRecord = PowerSyncDB["RoadmapTaskSubscriptions"];
+export type RoadmapTaskMessageRecord = PowerSyncDB["RoadmapTaskMessages"];
+export type RoadmapTaskMessageReadReceiptRecord = PowerSyncDB["RoadmapTaskMessageReadReceipts"];
+export type RoadmapTaskTypingIndicatorRecord = PowerSyncDB["RoadmapTaskTypingIndicators"];

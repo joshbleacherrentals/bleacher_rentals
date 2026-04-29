@@ -3324,3 +3324,47 @@ WHERE driver_uuid IS NOT NULL
 GROUP BY driver_uuid, EXTRACT(YEAR FROM date)
 ON CONFLICT (driver_uuid, year) DO NOTHING;
 
+
+
+-- =====================
+-- Backfill: migrate old Tasks → RoadmapTasks
+-- Maps old task_status to roadmap_task_status:
+--   in_progress  → in_progress
+--   in_staging   → in_progress
+--   complete     → completed
+--   approved     → completed
+--   backlog/paused/null → to_do
+-- All migrated tasks are marked as backlog items (is_backlog = true).
+-- =====================
+insert into public."RoadmapTasks" (
+  id,
+  title,
+  description,
+  status,
+  is_backlog,
+  created_by_user_uuid,
+  created_at
+)
+select
+  t.id,
+  t.name,
+  nullif(trim(t.description), ''),
+  case t.status
+    when 'in_progress' then 'in_progress'::roadmap_task_status
+    when 'in_staging'  then 'in_progress'::roadmap_task_status
+    when 'complete'    then 'completed'::roadmap_task_status
+    when 'approved'    then 'completed'::roadmap_task_status
+    else                    'to_do'::roadmap_task_status
+  end,
+  true,
+  t.created_by_user_uuid,
+  t.created_at
+from public."Tasks" t
+on conflict (id) do nothing;
+
+-- Subscribe the original creator to each migrated task
+insert into public."RoadmapTaskSubscriptions" (task_id, user_uuid, created_at)
+select t.id, t.created_by_user_uuid, t.created_at
+from public."Tasks" t
+where t.created_by_user_uuid is not null
+on conflict (task_id, user_uuid) do nothing;
