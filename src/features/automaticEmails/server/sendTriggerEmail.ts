@@ -11,8 +11,14 @@ import {
   renderTemplate,
 } from "@/features/automaticEmails/variables";
 import { logEmailSend } from "./logEmailSend";
+import { PAYMENT_MADE_AM, QUOTE_SIGNED_AM } from "@/features/automaticEmails/triggers";
 
 export type SendResult = { sent: true; to: string } | { sent: false; reason: string };
+
+// Finance wants a copy of every account-manager notification for these two
+// triggers. Hard-coded on purpose — this isn't a per-office setting yet.
+const FINANCE_EMAIL = "finance@bleacherrentals.com";
+const FINANCE_CC_TRIGGERS = new Set([QUOTE_SIGNED_AM, PAYMENT_MADE_AM]);
 
 /**
  * Dispatch one automatic-email trigger for a booking.
@@ -168,6 +174,7 @@ export async function sendTriggerEmail(opts: {
   await client.sendEmail({
     From: senderFrom,
     To: recipient,
+    ...(FINANCE_CC_TRIGGERS.has(trigger) ? { Cc: FINANCE_EMAIL } : {}),
     Subject: subject,
     HtmlBody: htmlBody,
     MessageStream: "outbound",

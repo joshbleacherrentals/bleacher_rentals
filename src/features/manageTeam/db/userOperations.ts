@@ -275,6 +275,15 @@ export async function createUser(
       if (devError) throw devError;
     }
 
+    // 6. If maintainer, insert into Maintainers table
+    if (state.isMaintainer) {
+      const { error: maintError } = await supabase.from("Maintainers").insert({
+        user_uuid: userUuid,
+        is_active: true,
+      });
+      if (maintError) throw maintError;
+    }
+
     return { success: true, userUuid };
   } catch (error) {
     console.error("Error creating user:", error);
@@ -499,6 +508,37 @@ export async function updateUser(
         .update({ is_active: false })
         .eq("user_uuid", userUuid);
       if (devDeactivateError) throw devDeactivateError;
+    }
+
+    // 5. Handle Maintainer role. Revoking deactivates the row rather than
+    // deleting it, exactly as the other roles do — the record of who held it
+    // is worth keeping.
+    const { data: existingMaint } = await supabase
+      .from("Maintainers")
+      .select("id")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (state.isMaintainer) {
+      if (!existingMaint) {
+        const { error: maintInsertError } = await supabase.from("Maintainers").insert({
+          user_uuid: userUuid,
+          is_active: true,
+        });
+        if (maintInsertError) throw maintInsertError;
+      } else {
+        const { error: maintUpdateError } = await supabase
+          .from("Maintainers")
+          .update({ is_active: true })
+          .eq("user_uuid", userUuid);
+        if (maintUpdateError) throw maintUpdateError;
+      }
+    } else if (existingMaint) {
+      const { error: maintDeactivateError } = await supabase
+        .from("Maintainers")
+        .update({ is_active: false })
+        .eq("user_uuid", userUuid);
+      if (maintDeactivateError) throw maintDeactivateError;
     }
 
     return { success: true };
@@ -896,6 +936,18 @@ export async function fetchUserById(
       roleTabs.push("developer");
       result.isDeveloper = true;
       result.autoSubscribeToNewTickets = developer.auto_subscribe_to_new_tickets ?? true;
+    }
+
+    // 5. Check if user is a maintainer
+    const { data: maintainer } = await supabase
+      .from("Maintainers")
+      .select("id, is_active")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (maintainer && maintainer.is_active) {
+      roleTabs.push("maintainer");
+      result.isMaintainer = true;
     }
 
     result.roleTabs = roleTabs;

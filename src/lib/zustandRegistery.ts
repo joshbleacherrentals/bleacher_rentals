@@ -19,6 +19,11 @@ type SetStaleFn = () => void;
 
 export const setStaleByTable: Record<TableName, SetStaleFn> = {
   Addresses: () => useAddressesStore.getState().setStale(true),
+  BleacherAnnualInspections: () => {},
+  // Read reactively through PowerSync on the damage reports page; no Zustand
+  // store to invalidate.
+  DamageReportAcknowledgements: () => {},
+  Maintainers: () => {},
   BleacherEvents: () => useBleacherEventsStore.getState().setStale(true),
   Bleachers: () => useBleachersStore.getState().setStale(true),
   Blocks: () => useBlocksStore.getState().setStale(true),

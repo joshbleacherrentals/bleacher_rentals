@@ -14,6 +14,13 @@ const AccountManagersCols = {
 } satisfies PowerSyncColsFor<"AccountManagers">;
 const AccountManagers = new Table(AccountManagersCols, { indexes: { user_uuid: ["user_uuid"] } });
 
+const MaintainersCols = {
+  created_at: column.text,
+  user_uuid: column.text,
+  is_active: column.integer,
+} satisfies PowerSyncColsFor<"Maintainers">;
+const Maintainers = new Table(MaintainersCols, { indexes: { user_uuid: ["user_uuid"] } });
+
 const DevelopersCols = {
   created_at: column.text,
   is_active: column.integer,
@@ -72,6 +79,22 @@ const Bleachers = new Table(BleachersCols, {
     winter_home_base_uuid: ["winter_home_base_uuid"],
     zone_uuid: ["zone_uuid"],
     storage_location_uuid: ["storage_location_uuid"],
+  },
+});
+
+const BleacherAnnualInspectionsCols = {
+  created_at: column.text,
+  created_by: column.text,
+  bleacher_uuid: column.text,
+  inspected_on: column.text,
+  next_due_on: column.text,
+  document_path: column.text,
+  notes: column.text,
+} satisfies PowerSyncColsFor<"BleacherAnnualInspections">;
+const BleacherAnnualInspections = new Table(BleacherAnnualInspectionsCols, {
+  indexes: {
+    bleacher_uuid: ["bleacher_uuid"],
+    next_due_on: ["next_due_on"],
   },
 });
 
@@ -309,6 +332,7 @@ const UsersCols = {
   created_at: column.text,
   expo_push_token: column.text,
   changelog_last_read_at: column.text,
+  inspection_queue_last_seen_at: column.text,
 } satisfies PowerSyncColsFor<"Users">;
 
 const ChangeLogCols = {
@@ -564,9 +588,28 @@ const DamageReportsCols = {
   created_by_user_uuid: column.text,
   deleted: column.integer,
   photos_uploaded: column.integer,
+  // A driver's claim that the damage is gone. Not a resolve — the report stays
+  // open until someone here closes it (see the Mark as Resolved button on the
+  // damage reports page).
+  fixed_by_driver: column.integer,
+  fixed_at: column.text,
+  fixed_by_user_uuid: column.text,
 } satisfies PowerSyncColsFor<"DamageReports">;
 const DamageReports = new Table(DamageReportsCols, {
   indexes: { bleacher_uuid: ["bleacher_uuid"], maintenance_event_uuid: ["maintenance_event_uuid"] },
+});
+
+const DamageReportAcknowledgementsCols = {
+  damage_report_uuid: column.text,
+  inspection_uuid: column.text,
+  work_tracker_uuid: column.text,
+  acknowledged_by_user_uuid: column.text,
+  created_at: column.text,
+  deleted: column.integer,
+  report_resolved_at: column.text,
+} satisfies PowerSyncColsFor<"DamageReportAcknowledgements">;
+const DamageReportAcknowledgements = new Table(DamageReportAcknowledgementsCols, {
+  indexes: { damage_report_uuid: ["damage_report_uuid"] },
 });
 
 const DamageReportPhotosCols = {
@@ -1189,6 +1232,8 @@ export const AppSchema = new Schema({
   DriverUnavailability,
   Tasks,
   Bleachers,
+  BleacherAnnualInspections,
+  Maintainers,
   BleacherEvents,
   BleacherUsers,
   Blocks,
@@ -1199,6 +1244,7 @@ export const AppSchema = new Schema({
   DriverZones,
   DamageReports,
   DamageReportPhotos,
+  DamageReportAcknowledgements,
   InspectionQuestions,
   MaintenanceEvents,
   BleacherMaintEvents,
@@ -1286,6 +1332,8 @@ export type NotificationRecord = PowerSyncDB["Notifications"];
 export type DriverUnavailabilityRecord = PowerSyncDB["DriverUnavailability"];
 export type WorkTrackerInspectionsRecord = PowerSyncDB["WorkTrackerInspections"];
 export type InspectionQuestionsRecord = PowerSyncDB["InspectionQuestions"];
+export type BleacherAnnualInspectionsRecord = PowerSyncDB["BleacherAnnualInspections"];
+export type MaintainersRecord = PowerSyncDB["Maintainers"];
 export type DamageReportsRecord = PowerSyncDB["DamageReports"];
 export type DamageReportPhotosRecord = PowerSyncDB["DamageReportPhotos"];
 export type MaintenanceEventsRecord = PowerSyncDB["MaintenanceEvents"];

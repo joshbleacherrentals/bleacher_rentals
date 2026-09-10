@@ -35,12 +35,22 @@ type SidebarButtonItem = {
   icon: React.ComponentType<any>;
 };
 
+export type SidebarDropdownChild = {
+  label: string;
+  href: string;
+  /**
+   * Which roles may see this child. Absent means everyone who can see the
+   * parent — the case for every child that predates the maintainer role.
+   */
+  roles?: WebRole[];
+};
+
 type SidebarDropdownItem = {
   type: "dropdown";
   key: string;
   label: string;
   icon: React.ComponentType<any>;
-  children: { label: string; href: string }[];
+  children: SidebarDropdownChild[];
 };
 
 type SidebarSectionItem = {
@@ -88,9 +98,22 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     label: "Quality Assurance",
     icon: ShieldAlert,
     children: [
-      { label: "Damage Reports", href: "/damage-reports" },
-      { label: "Inspections", href: "/inspections" },
-      { label: "Repairs", href: "/repairs" },
+      // A maintainer owns the annual inspections and nothing else here; an
+      // account manager owns everything here except the annual inspections.
+      // Without per-child roles the dropdown is all-or-nothing, and both would
+      // be shown links that bounce them straight back out.
+      {
+        label: "Damage Reports",
+        href: "/damage-reports",
+        roles: ["admin", "account_manager", "viewer"],
+      },
+      { label: "Inspections", href: "/inspections", roles: ["admin", "account_manager", "viewer"] },
+      {
+        label: "Annual Inspections",
+        href: "/annual-inspections",
+        roles: ["admin", "viewer", "maintainer"],
+      },
+      { label: "Repairs", href: "/repairs", roles: ["admin", "account_manager", "viewer"] },
     ],
   },
   {
@@ -285,6 +308,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "documentation",
   ],
   driver: [],
+  maintainer: ["quality-assurance", "documentation", "assets"],
 };
 
 export function useSidebarItems(roles: WebRole[]): SidebarItemConfig[] {
@@ -294,5 +318,20 @@ export function useSidebarItems(roles: WebRole[]): SidebarItemConfig[] {
       keySet.add(key);
     }
   }
-  return ALL_ITEMS.filter((item) => keySet.has(item.key));
+
+  const visible = ALL_ITEMS.filter((item) => keySet.has(item.key));
+
+  return visible.flatMap((item): SidebarItemConfig[] => {
+    if (item.type !== "dropdown") return [item];
+
+    const children = item.children.filter(
+      (child) => !child.roles || child.roles.some((role) => roles.includes(role)),
+    );
+
+    // A dropdown whose every child was filtered out is a menu that opens onto
+    // nothing, so it does not belong in the sidebar at all.
+    if (children.length === 0) return [];
+
+    return [{ ...item, children }];
+  });
 }

@@ -1,13 +1,21 @@
 "use client";
 import { useState } from "react";
 
-export type TeamTab = "admins" | "account-managers" | "drivers" | "developers" | "viewers" | "all";
+export type TeamTab =
+  | "admins"
+  | "account-managers"
+  | "drivers"
+  | "developers"
+  | "maintainers"
+  | "viewers"
+  | "all";
 
 const tabs = [
   { id: "admins" as const, label: "Admins" },
   { id: "account-managers" as const, label: "Account Managers" },
   { id: "drivers" as const, label: "Drivers" },
   { id: "developers" as const, label: "Developers" },
+  { id: "maintainers" as const, label: "Maintainers" },
   { id: "viewers" as const, label: "Viewers" },
   { id: "all" as const, label: "All" },
 ];

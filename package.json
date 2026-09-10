@@ -1,6 +1,6 @@
 {
   "name": "bleacher_rentals",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "private": true,
   "scripts": {
     "generate-types-staging": "supabase gen types typescript --project-id \"sycrvbdpdbaczyfdwcnc\" --schema public > database.types.ts",
@@ -25,7 +25,7 @@
     "test:db:fuzz": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/driver-scorecard.fuzz.sql",
     "test:db:damage": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/damage_reports_photos_uploaded.test.sql",
     "test:db:payments": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/manual_payment_entry.test.sql",
-    "test:db:all": "npm run test:db && npm run test:db:fuzz && npm run test:db:damage && npm run test:db:swap && npm run test:db:survey && npm run test:db:payments && npm run test:db:tax && npm run test:db:qty && npm run test:db:worktrackertypes && npm run test:db:pickupdropofftime && npm run test:db:worktrackertypeswrites",
+    "test:db:all": "npm run test:db && npm run test:db:fuzz && npm run test:db:damage && npm run test:db:swap && npm run test:db:survey && npm run test:db:payments && npm run test:db:tax && npm run test:db:qty && npm run test:db:inspections && npm run test:db:maintainer && npm run test:db:fixed && npm run test:db:acks && npm run test:db:worktrackertypes && npm run test:db:pickupdropofftime && npm run test:db:worktrackertypeswrites",
     "test:e2e": "set -a && source .env.local && set +a && playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:auth": "playwright test src/features/manageTeam/e2e/auth.setup.ts --headed --project=chromium",
@@ -35,6 +35,10 @@
     "test:db:swap": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/actual_bleacher.test.sql",
     "test:db:tax": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/driver_tax_dec.test.sql",
     "test:db:qty": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/work_tracker_line_item_qty_decimal.test.sql",
+    "test:db:inspections": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/bleacher_annual_inspections.test.sql",
+    "test:db:maintainer": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/maintainer_role.test.sql",
+    "test:db:fixed": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/damage_reports_fixed_by_driver.test.sql",
+    "test:db:acks": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/damage_report_acknowledgements.test.sql",
     "test:db:worktrackertypes": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/work_tracker_type_codes.test.sql",
     "test:db:pickupdropofftime": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/work_tracker_pickup_dropoff_time.test.sql",
     "test:db:worktrackertypeswrites": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/work_tracker_types_admin_only_writes.test.sql",

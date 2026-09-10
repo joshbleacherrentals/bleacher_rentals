@@ -4,8 +4,19 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, Suspense } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
-import { AlertTriangle, CheckCircle2, Plus, X, Trash2, RotateCcw, ImageUp } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  X,
+  Trash2,
+  RotateCcw,
+  ImageUp,
+  Wrench,
+  Users,
+} from "lucide-react";
 import { DamageReportModal, EditDamageReport } from "./DamageReportModal";
+import { useAcknowledgements, type AcknowledgementSummary } from "./_lib/acknowledgements";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { useUserAccess } from "@/features/userAccess/client";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
@@ -52,6 +63,15 @@ function DamageReportsContent() {
         ? reports
         : reports.filter((r) => (showResolved ? r.resolved_at !== null : r.resolved_at === null)),
     [reports, showResolved, showDeleted],
+  );
+
+  // Confirmations from other drivers on the reports currently listed. This is
+  // what a manager now prioritises by: three drivers confirming one report
+  // matters more than three separate reports ever did, and it is the only
+  // visible sign that the deduplication is working rather than that drivers
+  // stopped reporting.
+  const { byReport: acknowledgementsByReport } = useAcknowledgements(
+    useMemo(() => filteredReports.map((report) => report.id), [filteredReports]),
   );
 
   const selectedBleacherNumber = useMemo(() => {
@@ -189,6 +209,7 @@ function DamageReportsContent() {
             <DamageReportCard
               key={report.id}
               report={report}
+              acknowledgements={acknowledgementsByReport[report.id]}
               onClick={() => setEditingReport(report)}
               isAdmin={isAdmin}
               showDeleted={showDeleted}
@@ -248,8 +269,10 @@ function DamageReportCard({
   showDeleted,
   onDelete,
   onRestore,
+  acknowledgements,
 }: {
   report: DamageReport;
+  acknowledgements?: AcknowledgementSummary;
   onClick: () => void;
   isAdmin: boolean;
   showDeleted: boolean;
@@ -284,6 +307,23 @@ function DamageReportCard({
               <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
                 <AlertTriangle className="h-3 w-3" />
                 Open
+              </span>
+            )}
+            {/* A driver says this one is already fixed — still open, but the
+                cheap end of the backlog: it closes in one click. */}
+            {acknowledgements && !isResolved && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                <Users className="h-3 w-3" />
+                Confirmed by {acknowledgements.count}
+                {acknowledgements.latestAt
+                  ? ` · ${new Date(acknowledgements.latestAt).toLocaleDateString()}`
+                  : ""}
+              </span>
+            )}
+            {report.fixed_by_driver && !isResolved && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                <Wrench className="h-3 w-3" />
+                Fixed by driver
               </span>
             )}
           </div>

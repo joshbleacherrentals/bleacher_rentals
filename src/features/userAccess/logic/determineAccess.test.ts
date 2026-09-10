@@ -20,6 +20,7 @@ describe("determineUserAccess", () => {
       account_manager_id: "am-1",
       driver_id: "d-1",
       developer_id: "dev-1",
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "account-deactivated" });
@@ -34,6 +35,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: "d-1",
       developer_id: null,
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "driver-only" });
@@ -48,6 +50,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: null,
       developer_id: null,
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "no-roles-assigned" });
@@ -64,6 +67,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: null,
       developer_id: null,
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -83,6 +87,7 @@ describe("determineUserAccess", () => {
       account_manager_id: "am-1",
       driver_id: null,
       developer_id: null,
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -102,6 +107,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: null,
       developer_id: "dev-1",
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -121,6 +127,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: null,
       developer_id: null,
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -142,6 +149,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: null,
       developer_id: "dev-1",
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -161,6 +169,7 @@ describe("determineUserAccess", () => {
       account_manager_id: "am-1",
       driver_id: null,
       developer_id: "dev-1",
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -180,6 +189,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: null,
       developer_id: "dev-1",
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -199,6 +209,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: "d-1",
       developer_id: null,
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -218,6 +229,7 @@ describe("determineUserAccess", () => {
       account_manager_id: null,
       driver_id: "d-1",
       developer_id: "dev-1",
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -237,6 +249,7 @@ describe("determineUserAccess", () => {
       account_manager_id: "am-1",
       driver_id: "d-1",
       developer_id: "dev-1",
+      maintainer_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -244,6 +257,118 @@ describe("determineUserAccess", () => {
       roles: ["admin", "account_manager", "developer", "viewer", "driver"],
       userId: "1",
       accountManagerId: "am-1",
+    });
+  });
+
+  // --- Maintainer ---
+
+  it("active: maintainer only — the role must not read as no roles assigned", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: "m-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["maintainer"],
+      userId: "1",
+      accountManagerId: null,
+    });
+  });
+
+  it("active: admin + maintainer → both roles", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 1,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: "m-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["admin", "maintainer"],
+      userId: "1",
+      accountManagerId: null,
+    });
+  });
+
+  it("active: account manager + maintainer → both roles", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: "am-1",
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: "m-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["account_manager", "maintainer"],
+      userId: "1",
+      accountManagerId: "am-1",
+    });
+  });
+
+  it("blocked: a deactivated maintainer is still deactivated", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.inactive,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: "m-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({ status: "blocked", reason: "account-deactivated" });
+  });
+
+  it("blocked: driver-only is unchanged by an absent maintainer row", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: "d-1",
+      developer_id: null,
+      maintainer_id: null,
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({ status: "blocked", reason: "driver-only" });
+  });
+
+  it("active: maintainer + driver → maintainer keeps the web session", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: "d-1",
+      developer_id: null,
+      maintainer_id: "m-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["maintainer", "driver"],
+      userId: "1",
+      accountManagerId: null,
     });
   });
 });

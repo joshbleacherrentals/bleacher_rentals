@@ -4,6 +4,7 @@ import { getEditAccess, TeamPermissions } from "./useTeamPermissions";
 const adminPermissions: TeamPermissions = {
   isAdmin: true,
   isAccountManager: false,
+  isMaintainer: false,
   userId: "admin-user-1",
   accountManagerId: null,
   canCreateUser: true,
@@ -13,6 +14,7 @@ const adminPermissions: TeamPermissions = {
 const amPermissions: TeamPermissions = {
   isAdmin: false,
   isAccountManager: true,
+  isMaintainer: false,
   userId: "am-user-1",
   accountManagerId: "am-id-1",
   canCreateUser: true,
@@ -22,6 +24,7 @@ const amPermissions: TeamPermissions = {
 const viewerPermissions: TeamPermissions = {
   isAdmin: false,
   isAccountManager: false,
+  isMaintainer: false,
   userId: "viewer-user-1",
   accountManagerId: null,
   canCreateUser: false,
