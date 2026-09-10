@@ -34,6 +34,12 @@ SELECT is(
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
+-- Ensure the "Inactive" status row exists (CI runs `supabase db reset --no-seed`,
+-- so it isn't there unless a test creates it — see rls_multi_role.test.sql).
+INSERT INTO public."UserStatuses" (id, status)
+VALUES ('7b65d5a1-8ee0-4b7a-816d-d3ec1ed123c5', 'Inactive')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public."Users" (first_name, last_name, email, clerk_user_id, is_admin, is_viewer)
 VALUES ('Maint', 'Only', 'maint_only@test.com', 'clerk_maint_only', false, false)
 RETURNING id AS user_maint \gset
