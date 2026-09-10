@@ -185,6 +185,10 @@ BEGIN
   -- ── T8: resolving the parent updates every ack's mirror ──
   -- This is what takes the acks off the phones along with the report itself.
   RESET ROLE;
+  -- RESET ROLE drops the database role, not the JWT: the driver's claims are
+  -- still on the session, so the column fence would read this superuser write
+  -- as a driver editing resolved_at and reject it. Clear the claims too.
+  PERFORM set_config('request.jwt.claims', '{}', true);
   UPDATE "DamageReports" SET resolved_at = now() WHERE id = dr_open;
 
   SELECT count(*) INTO v_count FROM "DamageReportAcknowledgements"

@@ -285,7 +285,10 @@ BEGIN
   -- reach either way round.
   v_raised := false;
   BEGIN
-    UPDATE "DamageReports" SET photos_uploaded = true WHERE id = dr_queue;
+    -- false, not true: T10 already left the flag true, and the fence compares
+    -- values — writing back the value it already has changes nothing and is
+    -- correctly let through, which would prove nothing here.
+    UPDATE "DamageReports" SET photos_uploaded = false WHERE id = dr_queue;
   EXCEPTION WHEN others THEN
     v_raised := true;
   END;
