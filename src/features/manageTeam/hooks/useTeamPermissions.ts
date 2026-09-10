@@ -5,6 +5,7 @@ import { useUserAccess } from "@/features/userAccess/client";
 export type TeamPermissions = {
   isAdmin: boolean;
   isAccountManager: boolean;
+  isMaintainer: boolean;
   userId: string | null;
   accountManagerId: string | null;
   canCreateUser: boolean;
@@ -18,6 +19,7 @@ export function useTeamPermissions(): TeamPermissions {
     return {
       isAdmin: false,
       isAccountManager: false,
+      isMaintainer: false,
       userId: null,
       accountManagerId: null,
       canCreateUser: false,
@@ -31,6 +33,7 @@ export function useTeamPermissions(): TeamPermissions {
   return {
     isAdmin,
     isAccountManager: isAccountManager && !isAdmin,
+    isMaintainer: access.roles.includes("maintainer"),
     userId: access.userId,
     accountManagerId: access.accountManagerId,
     canCreateUser: isAdmin || isAccountManager,

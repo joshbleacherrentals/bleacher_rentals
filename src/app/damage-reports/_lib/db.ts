@@ -23,6 +23,11 @@ export type DamageReport = {
   created_by_user_uuid: string | null;
   deleted: boolean;
   photos_uploaded: boolean;
+  /** A driver reported this damage fixed — a claim, not a resolve. */
+  fixed_by_driver: boolean;
+  fixed_at: string | null;
+  fixed_by_user_uuid: string | null;
+  fixed_by_user: { first_name: string; last_name: string } | null;
   bleacher: { bleacher_number: number } | null;
   maintenance_event: { event_name: string } | null;
   created_by_user: { first_name: string; last_name: string } | null;
@@ -44,6 +49,11 @@ type ReportRow = {
   created_by_user_uuid: string | null;
   deleted: number | null;
   photos_uploaded: number | null;
+  fixed_by_driver: number | null;
+  fixed_at: string | null;
+  fixed_by_user_uuid: string | null;
+  fixed_first_name: string | null;
+  fixed_last_name: string | null;
   bleacher_number: number | null;
   event_name: string | null;
   first_name: string | null;
@@ -71,6 +81,9 @@ export function buildDamageReportsQuery(params: {
     .leftJoin("Bleachers as b", "b.id", "dr.bleacher_uuid")
     .leftJoin("MaintenanceEvents as me", "me.id", "dr.maintenance_event_uuid")
     .leftJoin("Users as u", "u.id", "dr.created_by_user_uuid")
+    // Whoever pressed Fixed is rarely whoever filed the report — the driver on
+    // site is the one who fixed it — so this is a second join, not `u` reused.
+    .leftJoin("Users as fu", "fu.id", "dr.fixed_by_user_uuid")
     .select([
       "dr.id",
       "dr.bleacher_uuid",
@@ -86,10 +99,15 @@ export function buildDamageReportsQuery(params: {
       "dr.created_by_user_uuid",
       "dr.deleted",
       "dr.photos_uploaded",
+      "dr.fixed_by_driver",
+      "dr.fixed_at",
+      "dr.fixed_by_user_uuid",
       "b.bleacher_number as bleacher_number",
       "me.event_name as event_name",
       "u.first_name as first_name",
       "u.last_name as last_name",
+      "fu.first_name as fixed_first_name",
+      "fu.last_name as fixed_last_name",
     ])
     .where("dr.deleted", "=", showDeleted ? 1 : 0);
 
@@ -158,6 +176,16 @@ export function useDamageReports(params: {
         created_by_user_uuid: r.created_by_user_uuid,
         deleted: !!r.deleted,
         photos_uploaded: !!r.photos_uploaded,
+        fixed_by_driver: !!r.fixed_by_driver,
+        fixed_at: r.fixed_at,
+        fixed_by_user_uuid: r.fixed_by_user_uuid,
+        fixed_by_user:
+          r.fixed_first_name || r.fixed_last_name
+            ? {
+                first_name: r.fixed_first_name ?? "",
+                last_name: r.fixed_last_name ?? "",
+              }
+            : null,
         bleacher: r.bleacher_number != null ? { bleacher_number: r.bleacher_number } : null,
         maintenance_event: r.event_name ? { event_name: r.event_name } : null,
         created_by_user:

@@ -28,6 +28,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { DamageReportResolveMaintenanceModal } from "./DamageReportResolveMaintenanceModal";
+import { useAcknowledgements } from "./_lib/acknowledgements";
+import {
+  buildRemoveFixedMarkUpdate,
+  buildResolveWithoutMaintenanceUpdate,
+  canResolveWithoutMaintenance,
+  describeFixedMark,
+} from "./_lib/fixedMark";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { buildPhotoInserts } from "./_lib/photoInserts";
 import { validateDamageReportForm, describePhotoLimit } from "./_lib/damageReportForm";
@@ -67,6 +74,9 @@ export type EditDamageReport = {
   note: string | null;
   resolved_at: string | null;
   maintenance_event_uuid: string | null;
+  fixed_by_driver: boolean;
+  fixed_at: string | null;
+  fixed_by_user: { first_name: string; last_name: string } | null;
   bleacher: { bleacher_number: number } | null;
   created_by_user: { first_name: string; last_name: string } | null;
   photos: { id: string; photo_path: string }[];
@@ -140,6 +150,13 @@ export function DamageReportModal({
   const [resolveMaintenanceOpen, setResolveMaintenanceOpen] = useState(false);
 
   const isReportResolved = !!editReport?.resolved_at;
+
+  // Who else has seen this damage. Drivers now confirm an open report instead
+  // of filing a second one about it, so this is where those confirmations
+  // surface — without it the change looks like fewer reports rather than more
+  // agreement.
+  const { byReport } = useAcknowledgements(editReport ? [editReport.id] : []);
+  const acknowledgements = editReport ? byReport[editReport.id] : undefined;
 
   // Populate form when editing
   useEffect(() => {
@@ -388,6 +405,71 @@ export function DamageReportModal({
     }
   };
 
+  /**
+   * Close a report a driver has already fixed, without inventing a maintenance
+   * event for a repair that never happened. Offered only when
+   * `canResolveWithoutMaintenance` says so — see `_lib/fixedMark.ts`.
+   */
+  const handleResolveWithoutMaintenance = async () => {
+    if (!editReport) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("DamageReports")
+        .update(buildResolveWithoutMaintenanceUpdate(new Date().toISOString()))
+        .eq("id", editReport.id);
+
+      if (error) throw new Error(error.message);
+
+      toast.custom(
+        (t) => React.createElement(SuccessToast, { id: t, lines: ["Damage report resolved."] }),
+        { duration: 5000 },
+      );
+      resetForm();
+      onSaved();
+    } catch (err: any) {
+      toast.custom(
+        (t) =>
+          React.createElement(ErrorToast, {
+            id: t,
+            lines: ["Failed to resolve damage report.", err?.message ?? ""],
+          }),
+        { duration: 10000 },
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** The driver pressed Fixed by accident, or the damage came back. */
+  const handleRemoveFixedMark = async () => {
+    if (!editReport) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("DamageReports")
+        .update(buildRemoveFixedMarkUpdate())
+        .eq("id", editReport.id);
+
+      if (error) throw new Error(error.message);
+
+      onSaved();
+    } catch (err: any) {
+      toast.custom(
+        (t) =>
+          React.createElement(ErrorToast, {
+            id: t,
+            lines: ["Failed to remove the fixed mark.", err?.message ?? ""],
+          }),
+        { duration: 10000 },
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleOpenChange = (next: boolean) => {
     if (!next) resetForm();
     onOpenChange(next);
@@ -479,19 +561,75 @@ export function DamageReportModal({
               </div>
             )}
 
+            {acknowledgements && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                <p className="font-semibold">
+                  Confirmed by {acknowledgements.count}{" "}
+                  {acknowledgements.count === 1 ? "driver" : "drivers"}
+                </p>
+                <ul className="mt-1 space-y-0.5 text-xs">
+                  {acknowledgements.entries.map((entry) => (
+                    <li key={entry.id}>
+                      {entry.name}
+                      {entry.at ? ` · ${new Date(entry.at).toLocaleDateString()}` : ""}
+                      {entry.source === "inspection" ? " · during an inspection" : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* A driver's claim that the damage is gone. Shown before the
+                resolve controls because it is what changes which of them
+                makes sense. */}
+            {isEditing && editReport?.fixed_by_driver && !isReportResolved && (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                <span>
+                  {describeFixedMark({
+                    fixed_at: editReport.fixed_at,
+                    first_name: editReport.fixed_by_user?.first_name ?? null,
+                    last_name: editReport.fixed_by_user?.last_name ?? null,
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRemoveFixedMark}
+                  disabled={saving}
+                  className="shrink-0 underline underline-offset-2 hover:no-underline cursor-pointer disabled:opacity-50"
+                >
+                  Remove fixed mark
+                </button>
+              </div>
+            )}
+
             {/* Resolve via maintenance — edit mode, unresolved only */}
             {isEditing && !isReportResolved && (
               <div className="space-y-2">
                 <p className="text-sm text-gray-600">
                   To resolve this report, create a maintenance event for the repair.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setResolveMaintenanceOpen(true)}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer text-sm font-semibold"
-                >
-                  Create Maintenance to Resolve
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setResolveMaintenanceOpen(true)}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer text-sm font-semibold"
+                  >
+                    Create Maintenance to Resolve
+                  </button>
+                  {/* Only when a driver has vouched for it: closing a report
+                      with no repair behind it and nobody saying the damage is
+                      gone would lose it silently. */}
+                  {editReport && canResolveWithoutMaintenance(editReport) && (
+                    <button
+                      type="button"
+                      onClick={handleResolveWithoutMaintenance}
+                      disabled={saving}
+                      className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition cursor-pointer text-sm font-semibold disabled:opacity-50"
+                    >
+                      Mark as Resolved
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 

@@ -9,6 +9,7 @@ type CurrentUser = {
   created_at: string | null;
   avatar_image_url: string | null;
   changelog_last_read_at: string | null;
+  inspection_queue_last_seen_at: string | null;
   clerk_user_id: string | null;
   email: string | null;
   expo_push_token: string | null;

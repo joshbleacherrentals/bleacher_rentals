@@ -4,7 +4,13 @@ import { create } from "zustand";
 import { fetchUserById } from "../db/userOperations";
 import type { DriverPayRange } from "../logic/driverPayRanges";
 
-export type TeamRoleTab = "administrator" | "account-manager" | "driver" | "developer" | "viewer";
+export type TeamRoleTab =
+  | "administrator"
+  | "account-manager"
+  | "driver"
+  | "developer"
+  | "viewer"
+  | "maintainer";
 
 export type CurrentUserState = {
   // Basic user info
@@ -18,6 +24,7 @@ export type CurrentUserState = {
   isDriver: boolean;
   isAccountManager: boolean;
   isDeveloper: boolean;
+  isMaintainer: boolean;
   isViewer: boolean;
   autoSubscribeToNewTickets: boolean;
   roleTabs: TeamRoleTab[];
@@ -99,6 +106,7 @@ const initialState: CurrentUserState = {
   isDriver: false,
   isAccountManager: false,
   isDeveloper: false,
+  isMaintainer: false,
   isViewer: false,
   autoSubscribeToNewTickets: true,
   roleTabs: [],
@@ -159,6 +167,7 @@ export const useCurrentUserStore = create<CurrentUserStore>((set) => ({
         isAccountManager: role === "account-manager" ? true : state.isAccountManager,
         isDriver: role === "driver" ? true : state.isDriver,
         isDeveloper: role === "developer" ? true : state.isDeveloper,
+        isMaintainer: role === "maintainer" ? true : state.isMaintainer,
         isViewer: role === "viewer" ? true : state.isViewer,
         // Default auto-subscribe to true when developer role is first added
         autoSubscribeToNewTickets: role === "developer" ? true : state.autoSubscribeToNewTickets,
@@ -180,6 +189,7 @@ export const useCurrentUserStore = create<CurrentUserStore>((set) => ({
         isAccountManager: role === "account-manager" ? false : state.isAccountManager,
         isDriver: role === "driver" ? false : state.isDriver,
         isDeveloper: role === "developer" ? false : state.isDeveloper,
+        isMaintainer: role === "maintainer" ? false : state.isMaintainer,
         isViewer: role === "viewer" ? false : state.isViewer,
       };
     }),

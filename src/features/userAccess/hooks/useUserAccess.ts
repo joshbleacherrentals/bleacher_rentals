@@ -44,6 +44,9 @@ export function useUserAccess(): UserAccessState {
       .leftJoin("Developers as dev", (join) =>
         join.onRef("dev.user_uuid", "=", "u.id").on("dev.is_active", "=", 1),
       )
+      .leftJoin("Maintainers as maint", (join) =>
+        join.onRef("maint.user_uuid", "=", "u.id").on("maint.is_active", "=", 1),
+      )
       .select([
         "u.id as id",
         "u.status_uuid",
@@ -52,6 +55,7 @@ export function useUserAccess(): UserAccessState {
         "am.id as account_manager_id",
         "d.id as driver_id",
         "dev.id as developer_id",
+        "maint.id as maintainer_id",
       ])
       .where("u.clerk_user_id", "=", clerkUserIdForQuery)
       .limit(1)
@@ -97,7 +101,8 @@ export function useUserAccess(): UserAccessState {
           is_viewer,
           AccountManagers!AccountManagers_user_uuid_fkey(id, is_active),
           Drivers!Drivers_user_uuid_fkey(id, is_active),
-          Developers!Developers_user_uuid_fkey(id, is_active)
+          Developers!Developers_user_uuid_fkey(id, is_active),
+          Maintainers!maintainers_user_uuid_fkey(id, is_active)
         `,
         )
         .eq("clerk_user_id", clerkUserId)
@@ -124,6 +129,7 @@ export function useUserAccess(): UserAccessState {
         account_manager_id: activeId(row.AccountManagers),
         driver_id: activeId(row.Drivers),
         developer_id: activeId(row.Developers),
+        maintainer_id: activeId(row.Maintainers),
       };
 
       setFallback({ clerkUserId, result: determineUserAccess(mapped) });

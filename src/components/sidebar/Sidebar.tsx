@@ -7,6 +7,7 @@ import { SideNavDropdown } from "./SideNavDropdown";
 import { useUserAccess } from "@/features/userAccess/client";
 import { useSidebarItems, type SidebarItemConfig } from "./useSidebarItems";
 import { useHasUnreadChangelog } from "@/features/changelog/hooks/useHasUnreadChangelog";
+import { useUnseenInspectionCount } from "@/features/annualInspections/db/annualInspections";
 
 const SideBar = () => {
   const access = useUserAccess();
@@ -14,6 +15,12 @@ const SideBar = () => {
   const items = useSidebarItems(roles);
   const pathname = usePathname();
   const hasUnreadChangelog = useHasUnreadChangelog();
+  // A count, not the rows: the shell re-renders on every navigation, and
+  // subscribing it to the queue itself would redraw the sidebar whenever any
+  // inspection anywhere changed. The hook answers 0 for anyone who is not a
+  // maintainer, so who is nagged is decided in one place, not here.
+  const unseenInspections = useUnseenInspectionCount();
+  const badges = { "/annual-inspections": unseenInspections };
 
   return (
     <div
@@ -21,7 +28,7 @@ const SideBar = () => {
       data-testid="sidebar"
     >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden pt-2">
-        {items.map((item) => renderItem(item, pathname, hasUnreadChangelog))}
+        {items.map((item) => renderItem(item, pathname, hasUnreadChangelog, badges))}
       </nav>
     </div>
   );
@@ -60,7 +67,12 @@ const SideNavSection = ({
   );
 };
 
-function renderItem(item: SidebarItemConfig, pathname: string, hasUnreadChangelog: boolean) {
+function renderItem(
+  item: SidebarItemConfig,
+  pathname: string,
+  hasUnreadChangelog: boolean,
+  badges: Record<string, number>,
+) {
   switch (item.type) {
     case "button":
       return (
@@ -79,12 +91,13 @@ function renderItem(item: SidebarItemConfig, pathname: string, hasUnreadChangelo
           label={item.label}
           icon={item.icon}
           children={item.children}
+          badges={badges}
         />
       );
     case "section":
       return (
         <SideNavSection key={item.key} item={item} pathname={pathname}>
-          {item.children.map((child) => renderItem(child, pathname, hasUnreadChangelog))}
+          {item.children.map((child) => renderItem(child, pathname, hasUnreadChangelog, badges))}
         </SideNavSection>
       );
   }

@@ -20,6 +20,7 @@ import {
 import { setBleacherDeleted, useBleacherByNumber, useBleacherTotalDistance } from "../../db";
 import { useBleacherForm, useStorageLocationOptions } from "../../hooks/useBleacherForm";
 import { BleacherFormFields } from "../BleacherFormFields";
+import { BleacherInspectionSummary } from "@/features/annualInspections/components/BleacherInspectionSummary";
 
 export function SheetEditBleacher() {
   const router = useRouter();
@@ -109,6 +110,13 @@ export function SheetEditBleacher() {
                 totalDistanceMeters={totalDistanceMeters}
               />
             </fieldset>
+
+            {existing?.id && (
+              <BleacherInspectionSummary
+                bleacherUuid={existing.id}
+                bleacherNumber={existing.bleacher_number}
+              />
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/60 px-6 py-4">

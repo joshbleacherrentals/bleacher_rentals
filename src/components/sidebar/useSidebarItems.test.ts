@@ -82,4 +82,56 @@ describe("useSidebarItems", () => {
     const items = useSidebarItems([]);
     expect(items).toEqual([]);
   });
+
+  // ═══ Maintainer ═══
+
+  it("maintainer sees Quality Assurance with only Annual Inspections under it", () => {
+    const items = useSidebarItems(["maintainer"]);
+    const qa = items.find((i) => i.key === "quality-assurance");
+    expect(qa).toBeDefined();
+    expect(qa!.type).toBe("dropdown");
+    const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
+    expect(children.map((c) => c.href)).toEqual(["/annual-inspections"]);
+  });
+
+  it("maintainer sees nothing operational beyond assets — no dashboard or work trackers", () => {
+    const keys = useSidebarItems(["maintainer"]).map((i) => i.key);
+    expect(keys).not.toContain("dashboard");
+    expect(keys).not.toContain("work-trackers");
+    // Assets stays: a maintainer opens a bleacher to reach its inspection history.
+    expect(keys).toContain("assets");
+  });
+
+  it("account_manager no longer sees Annual Inspections, but keeps the rest of Quality Assurance", () => {
+    const items = useSidebarItems(["account_manager"]);
+    const qa = items.find((i) => i.key === "quality-assurance");
+    const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
+    expect(children.map((c) => c.href)).toEqual(["/damage-reports", "/inspections", "/repairs"]);
+  });
+
+  it("admin and viewer still see every Quality Assurance child", () => {
+    for (const role of ["admin", "viewer"] as const) {
+      const qa = useSidebarItems([role]).find((i) => i.key === "quality-assurance");
+      const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
+      expect(children.map((c) => c.href)).toEqual([
+        "/damage-reports",
+        "/inspections",
+        "/annual-inspections",
+        "/repairs",
+      ]);
+    }
+  });
+
+  it("an account manager who is also a maintainer gets the union of the children", () => {
+    const qa = useSidebarItems(["account_manager", "maintainer"]).find(
+      (i) => i.key === "quality-assurance",
+    );
+    const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
+    expect(children.map((c) => c.href)).toEqual([
+      "/damage-reports",
+      "/inspections",
+      "/annual-inspections",
+      "/repairs",
+    ]);
+  });
 });

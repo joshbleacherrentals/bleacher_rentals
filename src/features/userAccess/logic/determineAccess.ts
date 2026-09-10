@@ -1,7 +1,13 @@
 import { STATUSES } from "@/features/manageTeam/constants";
 import type { UserAccessData } from "../types";
 
-export type WebRole = "admin" | "account_manager" | "developer" | "viewer" | "driver";
+export type WebRole =
+  | "admin"
+  | "account_manager"
+  | "developer"
+  | "viewer"
+  | "driver"
+  | "maintainer";
 
 export type BlockedReason =
   | "cannot-find-account"
@@ -28,6 +34,7 @@ export function determineUserAccess(userData: UserAccessData | null): AccessResu
   if (userData.account_manager_id) roles.push("account_manager");
   if (userData.developer_id) roles.push("developer");
   if (Boolean(userData.is_viewer)) roles.push("viewer");
+  if (userData.maintainer_id) roles.push("maintainer");
 
   if (roles.length === 0) {
     if (userData.driver_id) {

@@ -19,5 +19,6 @@ export function useUserFormPaths() {
     administrator: `${basePath}/administrator`,
     developer: `${basePath}/developer`,
     viewer: `${basePath}/viewer`,
+    maintainer: `${basePath}/maintainer`,
   };
 }

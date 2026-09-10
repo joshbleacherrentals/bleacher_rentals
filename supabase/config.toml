@@ -126,6 +126,15 @@ public = false
 file_size_limit = "10MiB"
 allowed_mime_types = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
 
+# Annual inspection certificates. Also created by
+# 20260908120000_bleacher_annual_inspections.sql, which is what creates it on
+# staging and production — this block only seeds the local stack, so that a
+# `supabase db reset` always brings the bucket back. Keep the two in sync.
+[storage.buckets.bleacher-inspections]
+public = true
+file_size_limit = "10MiB"
+allowed_mime_types = ["application/pdf"]
+
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
