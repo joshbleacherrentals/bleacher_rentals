@@ -837,13 +837,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "damage_report_acks_report_fkey"
-            columns: ["damage_report_uuid"]
-            isOneToOne: false
-            referencedRelation: "DamageReports"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "damage_report_acks_inspection_fkey"
             columns: ["inspection_uuid"]
             isOneToOne: false
@@ -851,10 +844,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "damage_report_acks_work_tracker_fkey"
-            columns: ["work_tracker_uuid"]
+            foreignKeyName: "damage_report_acks_report_fkey"
+            columns: ["damage_report_uuid"]
             isOneToOne: false
-            referencedRelation: "WorkTrackers"
+            referencedRelation: "DamageReports"
             referencedColumns: ["id"]
           },
           {
@@ -862,6 +855,13 @@ export type Database = {
             columns: ["acknowledged_by_user_uuid"]
             isOneToOne: false
             referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damage_report_acks_work_tracker_fkey"
+            columns: ["work_tracker_uuid"]
+            isOneToOne: false
+            referencedRelation: "WorkTrackers"
             referencedColumns: ["id"]
           },
         ]
@@ -960,6 +960,13 @@ export type Database = {
           seat_damage?: Database["public"]["Enums"]["damage_severity"]
         }
         Relationships: [
+          {
+            foreignKeyName: "damage_reports_fixed_by_user_uuid_fkey"
+            columns: ["fixed_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "DamageReports_bleacher_uuid_fkey"
             columns: ["bleacher_uuid"]
