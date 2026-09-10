@@ -144,7 +144,8 @@ export function IncompleteList({ showInactive = false }: { showInactive?: boolea
             </div>
             <p className="text-sm text-red-700 mt-1">
               The following users have been created but are not assigned any roles. Users must be an
-              Admin, Account Manager, Driver, Developer, or Viewer to access the application.
+              Admin, Account Manager, Driver, Developer, Maintainer, or Viewer to access the
+              application.
             </p>
           </div>
           <IncompleteTable users={activeUsers} onRowClick={handleClick} />

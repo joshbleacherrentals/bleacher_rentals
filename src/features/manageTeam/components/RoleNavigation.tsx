@@ -29,6 +29,7 @@ const ROLE_LABELS: Record<TeamRoleTab, string> = {
   driver: "Driver",
   developer: "Developer",
   viewer: "Viewer",
+  maintainer: "Maintainer",
 };
 
 const ALL_ROLES: TeamRoleTab[] = [
@@ -37,6 +38,7 @@ const ALL_ROLES: TeamRoleTab[] = [
   "driver",
   "developer",
   "viewer",
+  "maintainer",
 ];
 
 export default function RoleNavigation() {

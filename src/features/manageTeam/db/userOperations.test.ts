@@ -11,6 +11,7 @@ const baseState: CurrentUserState = {
   isDriver: false,
   isAccountManager: false,
   isDeveloper: false,
+  isMaintainer: false,
   isViewer: false,
   autoSubscribeToNewTickets: true,
   roleTabs: [],

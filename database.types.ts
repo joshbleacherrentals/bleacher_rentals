@@ -182,6 +182,54 @@ export type Database = {
         }
         Relationships: []
       }
+      BleacherAnnualInspections: {
+        Row: {
+          bleacher_uuid: string
+          created_at: string
+          created_by: string | null
+          document_path: string | null
+          id: string
+          inspected_on: string | null
+          next_due_on: string
+          notes: string | null
+        }
+        Insert: {
+          bleacher_uuid: string
+          created_at?: string
+          created_by?: string | null
+          document_path?: string | null
+          id?: string
+          inspected_on?: string | null
+          next_due_on: string
+          notes?: string | null
+        }
+        Update: {
+          bleacher_uuid?: string
+          created_at?: string
+          created_by?: string | null
+          document_path?: string | null
+          id?: string
+          inspected_on?: string | null
+          next_due_on?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bleacher_annual_inspections_bleacher_uuid_fkey"
+            columns: ["bleacher_uuid"]
+            isOneToOne: false
+            referencedRelation: "Bleachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bleacher_annual_inspections_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       BleacherEvents: {
         Row: {
           bleacher_uuid: string | null
@@ -756,6 +804,68 @@ export type Database = {
           },
         ]
       }
+      DamageReportAcknowledgements: {
+        Row: {
+          acknowledged_by_user_uuid: string
+          created_at: string
+          damage_report_uuid: string
+          deleted: boolean
+          id: string
+          inspection_uuid: string | null
+          report_resolved_at: string | null
+          work_tracker_uuid: string | null
+        }
+        Insert: {
+          acknowledged_by_user_uuid?: string
+          created_at?: string
+          damage_report_uuid: string
+          deleted?: boolean
+          id?: string
+          inspection_uuid?: string | null
+          report_resolved_at?: string | null
+          work_tracker_uuid?: string | null
+        }
+        Update: {
+          acknowledged_by_user_uuid?: string
+          created_at?: string
+          damage_report_uuid?: string
+          deleted?: boolean
+          id?: string
+          inspection_uuid?: string | null
+          report_resolved_at?: string | null
+          work_tracker_uuid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "damage_report_acks_inspection_fkey"
+            columns: ["inspection_uuid"]
+            isOneToOne: false
+            referencedRelation: "WorkTrackerInspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damage_report_acks_report_fkey"
+            columns: ["damage_report_uuid"]
+            isOneToOne: false
+            referencedRelation: "DamageReports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damage_report_acks_user_fkey"
+            columns: ["acknowledged_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damage_report_acks_work_tracker_fkey"
+            columns: ["work_tracker_uuid"]
+            isOneToOne: false
+            referencedRelation: "WorkTrackers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       DamageReportPhotos: {
         Row: {
           created_at: string
@@ -797,6 +907,9 @@ export type Database = {
           created_at: string
           created_by_user_uuid: string | null
           deleted: boolean
+          fixed_at: string | null
+          fixed_by_driver: boolean
+          fixed_by_user_uuid: string | null
           haul_damage: Database["public"]["Enums"]["damage_severity"]
           id: string
           inspection_uuid: string | null
@@ -813,6 +926,9 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           deleted?: boolean
+          fixed_at?: string | null
+          fixed_by_driver?: boolean
+          fixed_by_user_uuid?: string | null
           haul_damage?: Database["public"]["Enums"]["damage_severity"]
           id?: string
           inspection_uuid?: string | null
@@ -829,6 +945,9 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           deleted?: boolean
+          fixed_at?: string | null
+          fixed_by_driver?: boolean
+          fixed_by_user_uuid?: string | null
           haul_damage?: Database["public"]["Enums"]["damage_severity"]
           id?: string
           inspection_uuid?: string | null
@@ -841,6 +960,13 @@ export type Database = {
           seat_damage?: Database["public"]["Enums"]["damage_severity"]
         }
         Relationships: [
+          {
+            foreignKeyName: "damage_reports_fixed_by_user_uuid_fkey"
+            columns: ["fixed_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "DamageReports_bleacher_uuid_fkey"
             columns: ["bleacher_uuid"]
@@ -2368,6 +2494,35 @@ export type Database = {
         }
         Relationships: []
       }
+      Maintainers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          user_uuid: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_uuid: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_uuid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintainers_user_uuid_fkey"
+            columns: ["user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       MaintenanceEvents: {
         Row: {
           address_uuid: string | null
@@ -3611,6 +3766,7 @@ export type Database = {
           expo_push_token: string | null
           first_name: string | null
           id: string
+          inspection_queue_last_seen_at: string | null
           is_admin: boolean
           is_viewer: boolean
           last_name: string | null
@@ -3627,6 +3783,7 @@ export type Database = {
           expo_push_token?: string | null
           first_name?: string | null
           id?: string
+          inspection_queue_last_seen_at?: string | null
           is_admin?: boolean
           is_viewer?: boolean
           last_name?: string | null
@@ -3643,6 +3800,7 @@ export type Database = {
           expo_push_token?: string | null
           first_name?: string | null
           id?: string
+          inspection_queue_last_seen_at?: string | null
           is_admin?: boolean
           is_viewer?: boolean
           last_name?: string | null

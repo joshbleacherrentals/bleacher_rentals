@@ -17,10 +17,15 @@ type IncompleteUser = {
 };
 
 /**
- * Hook to fetch users who have no roles assigned (not admin, not account manager, not driver)
+ * Users who hold no role at all, and so cannot get into the application.
+ *
+ * Every role has to be named here. A role missing from this list makes the
+ * people who hold it look like a broken account on /team — which is what
+ * happened to the maintainer — so this query and `determineUserAccess` have to
+ * agree on what counts as having a role.
  */
-export function useIncomplete(): IncompleteUser[] {
-  const compiled = db
+export function buildIncompleteQuery() {
+  return db
     .selectFrom("Users as u")
     .leftJoin("AccountManagers as am", (join) =>
       join.onRef("am.user_uuid", "=", "u.id").on("am.is_active", "=", 1),
@@ -30,6 +35,9 @@ export function useIncomplete(): IncompleteUser[] {
     )
     .leftJoin("Developers as dev", (join) =>
       join.onRef("dev.user_uuid", "=", "u.id").on("dev.is_active", "=", 1),
+    )
+    .leftJoin("Maintainers as maint", (join) =>
+      join.onRef("maint.user_uuid", "=", "u.id").on("maint.is_active", "=", 1),
     )
     .select([
       "u.id as userUuid",
@@ -47,11 +55,16 @@ export function useIncomplete(): IncompleteUser[] {
         eb("am.id", "is", null),
         eb("d.id", "is", null),
         eb("dev.id", "is", null),
+        eb("maint.id", "is", null),
       ]),
     )
     .orderBy("u.first_name", "asc")
     .orderBy("u.last_name", "asc")
     .compile();
+}
+
+export function useIncomplete(): IncompleteUser[] {
+  const compiled = buildIncompleteQuery();
 
   const { data } = useTypedQuery(compiled, expect<IncompleteUser>());
   const searchQuery = useSearchQueryStore((s) => s.searchQuery);
