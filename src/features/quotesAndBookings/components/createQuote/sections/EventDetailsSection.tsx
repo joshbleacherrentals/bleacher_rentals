@@ -4,16 +4,44 @@ import { useMemo } from "react";
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { useEventTypes } from "../../../hooks/useEventTypes";
 import { Dropdown } from "@/components/DropDown";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import { VenuePicker, type VenuePickerValue } from "@/components/VenuePicker";
 
 export function EventDetailsSection() {
   const eventName = useCreateQuoteStore((s) => s.eventName);
   const eventTypeId = useCreateQuoteStore((s) => s.eventTypeId);
-  const eventAddress = useCreateQuoteStore((s) => s.eventAddress);
   const eventAddressData = useCreateQuoteStore((s) => s.eventAddressData);
+  const venueId = useCreateQuoteStore((s) => s.venueId);
+  const venueName = useCreateQuoteStore((s) => s.venueName);
   const eventStart = useCreateQuoteStore((s) => s.eventStart);
   const eventEnd = useCreateQuoteStore((s) => s.eventEnd);
   const setField = useCreateQuoteStore((s) => s.setField);
+
+  const venuePickerValue: VenuePickerValue =
+    venueId && eventAddressData
+      ? { mode: "venue", venueId, name: venueName, address: eventAddressData }
+      : eventAddressData
+        ? { mode: "manual", venueId: null, address: eventAddressData }
+        : { mode: "empty", venueId: null, address: null };
+
+  const handleVenueChange = (value: VenuePickerValue) => {
+    if (value.mode === "venue") {
+      setField("venueId", value.venueId);
+      setField("venueName", value.name);
+      setField("eventAddress", value.address.street);
+      setField("eventAddressData", value.address);
+    } else if (value.mode === "manual") {
+      // Detach — see docs/specs/venue-history.md §2.3/§3.1.
+      setField("venueId", null);
+      setField("venueName", "");
+      setField("eventAddress", value.address.street);
+      setField("eventAddressData", value.address);
+    } else {
+      setField("venueId", null);
+      setField("venueName", "");
+      setField("eventAddress", "");
+      setField("eventAddressData", null);
+    }
+  };
 
   const { eventTypes } = useEventTypes();
 
@@ -50,33 +78,7 @@ export function EventDetailsSection() {
         />
       </div>
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Event Address <span className="text-red-500">*</span>
-        </label>
-        <AddressAutocomplete
-          initialValue={eventAddress}
-          onAddressSelect={(data) => {
-            setField("eventAddress", data.address);
-            setField("eventAddressData", {
-              street: data.address ?? "",
-              city: data.city ?? "",
-              stateProvince: data.state ?? "",
-              zipPostal: data.postalCode ?? "",
-              lat: data.lat,
-              lng: data.lng,
-              placeId: data.placeId,
-              country: data.country,
-            });
-          }}
-          className="h-[40px] px-3 border rounded text-sm"
-        />
-        {eventAddressData?.city && (
-          <p className="text-xs text-gray-500 mt-1">
-            {eventAddressData.city}
-            {eventAddressData.stateProvince ? `, ${eventAddressData.stateProvince}` : ""}
-            {eventAddressData.zipPostal ? ` ${eventAddressData.zipPostal}` : ""}
-          </p>
-        )}
+        <VenuePicker value={venuePickerValue} onChange={handleVenueChange} required />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>

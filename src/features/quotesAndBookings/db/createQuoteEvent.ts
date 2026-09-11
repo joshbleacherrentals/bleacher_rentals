@@ -12,10 +12,15 @@ export async function createQuoteEvent(
   supabase: SupabaseClient<Database>,
   currentUserUuid?: string | null,
 ): Promise<string> {
-  // 1. Insert Address
+  // 1. Address / Venue — see docs/specs/venue-history.md §4.
+  //    venueId set ("venue" mode): write venue_uuid only, the
+  //    events_sync_address_from_venue trigger sets address_uuid from it.
+  //    No venueId ("manual"/"empty" mode): insert this event's own private
+  //    Addresses row, exactly as before Venues existed.
   let addressUuid: string | null = null;
+  const venueUuid: string | null = state.venueId ?? null;
 
-  if (state.eventAddressData) {
+  if (!venueUuid && state.eventAddressData) {
     addressUuid = crypto.randomUUID();
     await typedExecute(
       db
@@ -54,6 +59,7 @@ export async function createQuoteEvent(
         event_start: state.eventStart || null,
         event_end: state.eventEnd || null,
         address_uuid: addressUuid,
+        venue_uuid: venueUuid,
         event_status: state.status || "draft",
         event_type_uuid: state.eventTypeId || null,
         quote_valid_till: state.quoteValidTill || null,

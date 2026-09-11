@@ -37,6 +37,12 @@ export type CreateQuoteState = {
   eventName: string;
   eventAddress: string;
   eventAddressData: AddressFields | null;
+  // Set when eventAddress/eventAddressData came from picking a Venue; null
+  // when the address was typed/edited directly ("manual" — see
+  // docs/specs/venue-history.md §2.3). Independent of eventAddressData, which
+  // always holds the resolved address either way.
+  venueId: string | null;
+  venueName: string;
   eventStart: string;
   eventEnd: string;
   eventTypeId: string | null;
@@ -103,6 +109,8 @@ const initialState: CreateQuoteState = {
   eventName: "",
   eventAddress: "",
   eventAddressData: null,
+  venueId: null,
+  venueName: "",
   eventStart: "",
   eventEnd: "",
   eventTypeId: null,
@@ -150,7 +158,10 @@ function throttledStorage(delay: number) {
       }
     },
     removeItem: (name: string) => {
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
       localStorage.removeItem(name);
     },
   };
@@ -186,6 +197,7 @@ const TRACKED_KEYS: (keyof CreateQuoteState)[] = [
   "eventStart",
   "eventEnd",
   "contactId",
+  "venueId",
   "salesOfficeId",
   "lineItems",
   "paymentInstallments",

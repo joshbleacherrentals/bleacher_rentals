@@ -42,6 +42,17 @@ const AddressesCols = {
 } satisfies PowerSyncColsFor<"Addresses">;
 const Addresses = new Table(AddressesCols);
 
+const VenuesCols = {
+  created_at: column.text,
+  name: column.text,
+  address_uuid: column.text,
+  created_by_user_uuid: column.text,
+  deleted: column.integer,
+} satisfies PowerSyncColsFor<"Venues">;
+const Venues = new Table(VenuesCols, {
+  indexes: { address_uuid: ["address_uuid"] },
+});
+
 const BleachersCols = {
   created_at: column.text,
   bleacher_number: column.integer,
@@ -224,11 +235,13 @@ const EventsCols = {
   finance_contact_uuid: column.text,
   content_hash: column.text,
   contract_hash: column.text,
+  venue_uuid: column.text,
 } satisfies PowerSyncColsFor<"Events">;
 const Events = new Table(EventsCols, {
   indexes: {
     created_by_user_uuid: ["created_by_user_uuid"],
     address_uuid: ["address_uuid"],
+    venue_uuid: ["venue_uuid"],
   },
 });
 
@@ -856,9 +869,10 @@ const ContactsCols = {
   notes: column.text,
   phone: column.text,
   preferred_language: column.text,
+  default_venue_uuid: column.text,
 } satisfies PowerSyncColsFor<"Contacts">;
 const Contacts = new Table(ContactsCols, {
-  indexes: { company_uuid: ["company_uuid"] },
+  indexes: { company_uuid: ["company_uuid"], default_venue_uuid: ["default_venue_uuid"] },
 });
 
 const EventAttachmentsCols = {
@@ -1223,6 +1237,7 @@ const DriverSurveyResponses = new Table(DriverSurveyResponsesCols, {
 
 export const AppSchema = new Schema({
   Addresses,
+  Venues,
   AccountManagers,
   AccountManagerZones,
   ChangeLog,

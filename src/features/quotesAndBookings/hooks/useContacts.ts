@@ -11,6 +11,7 @@ export type ContactRow = {
   email: string | null;
   phone: string | null;
   company_uuid: string | null;
+  default_venue_uuid: string | null;
 };
 
 export type ContactOption = {
@@ -20,6 +21,7 @@ export type ContactOption = {
   email: string | null;
   phone: string | null;
   companyUuid: string | null;
+  defaultVenueId: string | null;
 };
 
 export function useContacts(): { contacts: ContactOption[]; isLoading: boolean } {
@@ -27,7 +29,15 @@ export function useContacts(): { contacts: ContactOption[]; isLoading: boolean }
     () =>
       db
         .selectFrom("Contacts")
-        .select(["id", "first_name", "last_name", "email", "phone", "company_uuid"])
+        .select([
+          "id",
+          "first_name",
+          "last_name",
+          "email",
+          "phone",
+          "company_uuid",
+          "default_venue_uuid",
+        ])
         .where("deleted", "=", 0)
         .orderBy("first_name")
         .compile(),
@@ -45,6 +55,7 @@ export function useContacts(): { contacts: ContactOption[]; isLoading: boolean }
         email: c.email,
         phone: c.phone,
         companyUuid: c.company_uuid,
+        defaultVenueId: c.default_venue_uuid,
       })),
     [data],
   );

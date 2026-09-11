@@ -8,6 +8,9 @@ import { Database, Tables, TablesInsert } from "../../../../../database.types";
 import { checkEventFormRules } from "../../functions";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
+
+type VenueUuidRow = { venue_uuid: string | null };
 
 export async function updateEvent(
   state: CurrentEventStore,
@@ -27,10 +30,33 @@ export async function updateEvent(
     throw new Error("Event form validation failed");
   }
 
-  // 1. Handle Address
+  // 1. Handle Address / Venue — see docs/specs/venue-history.md §3.5, §4.
+  //    venueUuid set ("venue" mode): write venue_uuid only, skip the
+  //    Addresses block — the events_sync_address_from_venue trigger sets
+  //    address_uuid from it. No venueUuid + address present ("manual" mode):
+  //    insert-or-update this event's own private Addresses row, exactly as
+  //    before Venues existed — reusing the existing row only when it isn't
+  //    the shared row of a Venue this event was just detached from
+  //    (shouldReuseExistingAddressRow, §0.1). CoreTab already nulls
+  //    addressUuid on detach; this is a defense-in-depth second check.
   let addressUuid: string | null = null;
-  if (state.addressData) {
-    if (state.addressData.addressUuid) {
+  const venueUuid: string | null = state.venueUuid ?? null;
+
+  if (!venueUuid && state.addressData) {
+    const existingRows = state.eventUuid
+      ? await typedGetAll(
+          db
+            .selectFrom("Events")
+            .select(["venue_uuid"])
+            .where("id", "=", state.eventUuid)
+            .limit(1)
+            .compile(),
+          expect<VenueUuidRow>(),
+        )
+      : [];
+    const wasLinkedToVenue = Boolean(existingRows[0]?.venue_uuid);
+
+    if (shouldReuseExistingAddressRow(state.addressData.addressUuid, wasLinkedToVenue)) {
       addressUuid = state.addressData.addressUuid;
       await typedExecute(
         db
@@ -45,7 +71,7 @@ export async function updateEvent(
             country: state.addressData.country ?? null,
             place_id: state.addressData.placeId ?? null,
           })
-          .where("id", "=", state.addressData.addressUuid)
+          .where("id", "=", state.addressData.addressUuid!)
           .compile(),
       );
     } else {
@@ -93,6 +119,7 @@ export async function updateEvent(
         created_by_user_uuid: state.ownerUserUuid ?? null,
         booked_at: state.bookedAt ? new Date(state.bookedAt).toISOString() : null,
         ...(state.createdAt ? { created_at: new Date(state.createdAt).toISOString() } : {}),
+        venue_uuid: venueUuid,
         ...(addressUuid ? { address_uuid: addressUuid } : {}),
       })
       .where("id", "=", state.eventUuid!)
@@ -102,7 +129,7 @@ export async function updateEvent(
   await updateBleacherEvents(state);
 
   createSuccessToast(["Event Updated"]);
-  updateDataBase(["Bleachers", "BleacherEvents", "Addresses", "Events"]);
+  updateDataBase(["Bleachers", "BleacherEvents", "Addresses", "Venues", "Events"]);
 }
 
 async function updateBleacherEvents(state: CurrentEventStore) {

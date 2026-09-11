@@ -28,6 +28,10 @@ export type QuoteDetail = {
     stateProvince: string;
     zipPostal: string | null;
   } | null;
+  venue: {
+    id: string;
+    name: string;
+  } | null;
   contact: {
     id: string;
     firstName: string;
@@ -75,6 +79,8 @@ type Row = {
   address_city: string | null;
   address_state_province: string | null;
   address_zip_postal: string | null;
+  venue_id: string | null;
+  venue_name: string | null;
   contact_id: string | null;
   contact_first_name: string | null;
   contact_last_name: string | null;
@@ -94,6 +100,7 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
   const compiled = db
     .selectFrom("Events as e")
     .leftJoin("Addresses as a", "e.address_uuid", "a.id")
+    .leftJoin("Venues as v", "e.venue_uuid", "v.id")
     .leftJoin("Contacts as ct", "e.contact_uuid", "ct.id")
     .leftJoin("Contacts as fc", "e.finance_contact_uuid", "fc.id")
     .leftJoin("Users as u", "e.created_by_user_uuid", "u.id")
@@ -123,6 +130,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
       "a.city as address_city",
       "a.state_province as address_state_province",
       "a.zip_postal as address_zip_postal",
+      "v.id as venue_id",
+      "v.name as venue_name",
       "ct.id as contact_id",
       "ct.first_name as contact_first_name",
       "ct.last_name as contact_last_name",
@@ -176,6 +185,7 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
           zipPostal: r.address_zip_postal,
         }
       : null,
+    venue: r.venue_id ? { id: r.venue_id, name: r.venue_name ?? "" } : null,
     contact: r.contact_id
       ? {
           id: r.contact_id,

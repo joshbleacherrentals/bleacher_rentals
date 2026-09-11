@@ -27,6 +27,7 @@ type EventWithAddress = {
   address_city: string | null;
   address_state: string | null;
   address_postal: string | null;
+  venue_uuid: string | null;
 };
 
 type BleacherEventRow = {
@@ -77,6 +78,7 @@ export async function loadEventForModal(
         "a.city as address_city",
         "a.state_province as address_state",
         "a.zip_postal as address_postal",
+        "e.venue_uuid as venue_uuid",
       ])
       .where("e.id", "=", eventId)
       .compile();
@@ -142,6 +144,7 @@ export async function loadEventForModal(
           }
         : null,
     );
+    setField("venueUuid", eventData.venue_uuid);
     setField("seats", eventData.total_seats);
     setField("sevenRow", eventData.seven_row);
     setField("tenRow", eventData.ten_row);

@@ -15,6 +15,7 @@ import { DuplicateWarning } from "./DuplicateWarning";
 import { findContactDuplicates } from "../utils/findDuplicates";
 import { hasErrors, validateContactForm, type ContactFormValues } from "../utils/formValidation";
 import { PREFERRED_LANGUAGE_OPTIONS, type PreferredLanguage } from "../db/preferredLanguage";
+import { VenuePicker, type VenuePickerValue } from "@/components/VenuePicker";
 
 export type CreatedContact = {
   id: string;
@@ -57,6 +58,11 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
   const [companyUuid, setCompanyUuid] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage>("english");
+  const [venue, setVenue] = useState<VenuePickerValue>({
+    mode: "empty",
+    venueId: null,
+    address: null,
+  });
   const [saving, setSaving] = useState(false);
 
   const errors = validateContactForm(values);
@@ -70,6 +76,7 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
     setCompanyUuid(null);
     setNotes("");
     setPreferredLanguage("english");
+    setVenue({ mode: "empty", venueId: null, address: null });
     resetTouched();
   };
 
@@ -100,7 +107,13 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
     setSaving(true);
     try {
       const displayName = `${values.firstName} ${values.lastName}`.trim();
-      const id = await createContact({ ...values, notes, companyUuid, preferredLanguage });
+      const id = await createContact({
+        ...values,
+        notes,
+        companyUuid,
+        preferredLanguage,
+        defaultVenueUuid: venue.mode === "venue" ? venue.venueId : null,
+      });
       createSuccessToast([`Contact "${displayName}" created.`]);
       onCreated?.({
         id,
@@ -208,6 +221,8 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
                 </button>
               </div>
             </div>
+
+            <VenuePicker value={venue} onChange={setVenue} />
 
             <TextAreaField
               label="Notes"

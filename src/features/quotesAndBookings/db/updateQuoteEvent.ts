@@ -13,6 +13,7 @@ import {
 } from "./logEventChanges";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
 
 type OldEventRow = {
   event_name: string | null;
@@ -23,6 +24,7 @@ type OldEventRow = {
   contact_uuid: string | null;
   finance_contact_uuid: string | null;
   address_uuid: string | null;
+  venue_uuid: string | null;
   sales_office_uuid: string | null;
   terms_and_conditions_uuid: string | null;
   quote_valid_till: string | null;
@@ -41,7 +43,7 @@ type OldLineItemRow = {
   value_cents: number | null;
   currency: string | null;
 };
-type AddressUuidRow = { address_uuid: string | null };
+type AddressUuidRow = { address_uuid: string | null; venue_uuid: string | null };
 
 export async function updateQuoteEvent(
   eventId: string,
@@ -49,17 +51,40 @@ export async function updateQuoteEvent(
   supabase: SupabaseClient<Database>,
   currentUserUuid?: string | null,
 ): Promise<void> {
-  // 1. Handle address
+  // 1. Handle address / venue — see docs/specs/venue-history.md §4.
+  //    venueId set ("venue" mode): write venue_uuid only, skip the Addresses
+  //    block entirely — the events_sync_address_from_venue trigger sets
+  //    address_uuid from it. No venueId + address present ("manual" mode,
+  //    i.e. the address was hand-edited): run the same insert-or-update
+  //    Addresses logic as before Venues existed, and explicitly detach by
+  //    writing venue_uuid = null (this event may currently be linked to a
+  //    venue). No venueId + no address ("empty" mode): leave both untouched,
+  //    same as today when eventAddressData is absent.
   let addressUuid: string | null = null;
+  let venueUuid: string | null | undefined;
 
-  if (state.eventAddressData) {
+  if (state.venueId) {
+    venueUuid = state.venueId;
+  } else if (state.eventAddressData) {
+    venueUuid = null;
     const existingRows = await typedGetAll(
-      db.selectFrom("Events").select(["address_uuid"]).where("id", "=", eventId).limit(1).compile(),
+      db
+        .selectFrom("Events")
+        .select(["address_uuid", "venue_uuid"])
+        .where("id", "=", eventId)
+        .limit(1)
+        .compile(),
       expect<AddressUuidRow>(),
     );
     const existingAddressUuid = existingRows[0]?.address_uuid ?? null;
+    // If this event was linked to a Venue, its address_uuid IS that Venue's
+    // own private Addresses row (see §1.3's trigger) — shared with every
+    // other event still linked to that Venue. Detaching must never mutate it
+    // in place; always give a detaching event a brand-new private row instead
+    // (docs/specs/venue-history.md §0.1).
+    const wasLinkedToVenue = Boolean(existingRows[0]?.venue_uuid);
 
-    if (existingAddressUuid) {
+    if (shouldReuseExistingAddressRow(existingAddressUuid, wasLinkedToVenue)) {
       addressUuid = existingAddressUuid;
       await typedExecute(
         db
@@ -111,6 +136,7 @@ export async function updateQuoteEvent(
         "contact_uuid",
         "finance_contact_uuid",
         "address_uuid",
+        "venue_uuid",
         "sales_office_uuid",
         "terms_and_conditions_uuid",
         "quote_valid_till",
@@ -173,6 +199,12 @@ export async function updateQuoteEvent(
     terms_and_conditions_uuid: state.termsDocumentId || null,
   };
 
+  if (venueUuid !== undefined) {
+    // "venue" mode: venueUuid is the picked id, address_uuid is left alone —
+    // the trigger sets it from the venue. "manual" mode: venueUuid is
+    // explicitly null (detach), addressUuid is this event's own row.
+    updates.venue_uuid = venueUuid;
+  }
   if (addressUuid) {
     updates.address_uuid = addressUuid;
   }

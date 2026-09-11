@@ -4,6 +4,8 @@ import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useContacts } from "../../../hooks/useContacts";
 import { useCompanies } from "../../../hooks/useCompanies";
+import { useVenuesAll } from "@/features/venues/hooks/useVenuesAll";
+import { resolveVenueOnContactSelect } from "../../../utils/resolveVenueOnContactSelect";
 
 export function ClientInfoSection() {
   const contactId = useCreateQuoteStore((s) => s.contactId);
@@ -12,6 +14,7 @@ export function ClientInfoSection() {
   const setField = useCreateQuoteStore((s) => s.setField);
   const { contacts, isLoading } = useContacts();
   const { companies } = useCompanies();
+  const { venues } = useVenuesAll();
 
   const companyNameById = new Map(companies.map((c) => [c.id, c.companyName]));
 
@@ -32,6 +35,20 @@ export function ClientInfoSection() {
       setField("contactName", `${contact.firstName} ${contact.lastName ?? ""}`.trim());
       if (contact.email) setField("companyEmail", contact.email);
       if (contact.phone) setField("phone", contact.phone);
+
+      // Auto-fill the venue from the contact's default, but only if no venue
+      // is picked yet — never overwrite one already chosen for this event.
+      const venue = resolveVenueOnContactSelect(
+        useCreateQuoteStore.getState().venueId,
+        contact.defaultVenueId,
+        venues,
+      );
+      if (venue) {
+        setField("venueId", venue.id);
+        setField("venueName", venue.name);
+        setField("eventAddress", venue.address.street);
+        setField("eventAddressData", venue.address);
+      }
     }
   };
 
@@ -42,7 +59,9 @@ export function ClientInfoSection() {
       </h2>
       <div className="flex items-end gap-4">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Contact <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Contact <span className="text-red-500">*</span>
+          </label>
           <SearchableSelect
             options={contactOptions}
             selected={contactId}

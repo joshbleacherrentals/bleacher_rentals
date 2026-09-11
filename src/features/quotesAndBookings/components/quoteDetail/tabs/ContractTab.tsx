@@ -8,6 +8,7 @@ import { DateTime } from "luxon";
 import { useMemo, useState, useEffect } from "react";
 import { ExternalLink, FileText } from "lucide-react";
 import { ContactHistorySheet } from "./ContactHistorySheet";
+import { VenueHistorySheet } from "./VenueHistorySheet";
 
 type SignatureInfo = {
   signerName: string;
@@ -192,6 +193,7 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
   const currency = useEventCurrency(quote.id);
   const [signature, setSignature] = useState<SignatureInfo>(null);
   const [contactSheetOpen, setContactSheetOpen] = useState(false);
+  const [venueSheetOpen, setVenueSheetOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/contracts/${quote.id}`)
@@ -341,11 +343,21 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
       {quote.address && (
         <div>
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Venue</h3>
-          <p className="text-sm">
-            {quote.address.street}
-            <br />
-            {quote.address.zipPostal ?? ""}
-          </p>
+          {quote.venue ? (
+            <button
+              type="button"
+              onClick={() => setVenueSheetOpen(true)}
+              className="text-sm font-medium text-darkBlue hover:underline text-left"
+            >
+              {quote.venue.name}
+            </button>
+          ) : (
+            <p className="text-sm">
+              {quote.address.street}
+              <br />
+              {quote.address.zipPostal ?? ""}
+            </p>
+          )}
         </div>
       )}
 
@@ -410,6 +422,15 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
           contactName={`${quote.contact.firstName} ${quote.contact.lastName ?? ""}`.trim()}
           open={contactSheetOpen}
           onOpenChange={setContactSheetOpen}
+        />
+      )}
+
+      {quote.venue && (
+        <VenueHistorySheet
+          venueId={quote.venue.id}
+          venueName={quote.venue.name}
+          open={venueSheetOpen}
+          onOpenChange={setVenueSheetOpen}
         />
       )}
     </div>
