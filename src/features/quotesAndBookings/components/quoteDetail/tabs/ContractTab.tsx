@@ -7,6 +7,7 @@ import { formatMoney } from "../../../utils/formatMoney";
 import { DateTime } from "luxon";
 import { useMemo, useState, useEffect } from "react";
 import { ExternalLink, FileText } from "lucide-react";
+import { ContactHistorySheet } from "./ContactHistorySheet";
 
 type SignatureInfo = {
   signerName: string;
@@ -190,6 +191,7 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
   const { lineItems, isLoading } = useEventLineItems(quote.id);
   const currency = useEventCurrency(quote.id);
   const [signature, setSignature] = useState<SignatureInfo>(null);
+  const [contactSheetOpen, setContactSheetOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/contracts/${quote.id}`)
@@ -289,9 +291,13 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
               <>
                 <div>
                   <span className="text-gray-500">Contact:</span>{" "}
-                  <span className="font-medium text-darkBlue">
+                  <button
+                    type="button"
+                    onClick={() => setContactSheetOpen(true)}
+                    className="font-medium text-darkBlue hover:underline"
+                  >
                     {quote.contact.firstName} {quote.contact.lastName ?? ""}
-                  </span>
+                  </button>
                 </div>
                 {quote.contact.email && (
                   <div>
@@ -397,6 +403,15 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
           />
         )}
       </div>
+
+      {quote.contact && (
+        <ContactHistorySheet
+          contactId={quote.contact.id}
+          contactName={`${quote.contact.firstName} ${quote.contact.lastName ?? ""}`.trim()}
+          open={contactSheetOpen}
+          onOpenChange={setContactSheetOpen}
+        />
+      )}
     </div>
   );
 }
