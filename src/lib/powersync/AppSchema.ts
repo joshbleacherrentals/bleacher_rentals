@@ -398,6 +398,8 @@ const WorkTrackersCols = {
   dropoff_time_mode: column.text,
   dropoff_time_start: column.text,
   dropoff_time_end: column.text,
+  declined_at: column.text,
+  abandoned_at: column.text,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
 const WorkTrackers = new Table(WorkTrackersCols, {
   indexes: {

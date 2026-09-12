@@ -4029,6 +4029,7 @@ export type Database = {
       }
       WorkTrackers: {
         Row: {
+          abandoned_at: string | null
           accepted_at: string | null
           actual_bleacher_uuid: string | null
           bleacher_change_reason: string | null
@@ -4038,6 +4039,7 @@ export type Database = {
           created_at: string
           created_by_user_uuid: string | null
           date: string | null
+          declined_at: string | null
           distance_meters: number | null
           drive_minutes: number | null
           driver_uuid: string | null
@@ -4075,6 +4077,7 @@ export type Database = {
           worktracker_group_uuid: string | null
         }
         Insert: {
+          abandoned_at?: string | null
           accepted_at?: string | null
           actual_bleacher_uuid?: string | null
           bleacher_change_reason?: string | null
@@ -4084,6 +4087,7 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           date?: string | null
+          declined_at?: string | null
           distance_meters?: number | null
           drive_minutes?: number | null
           driver_uuid?: string | null
@@ -4121,6 +4125,7 @@ export type Database = {
           worktracker_group_uuid?: string | null
         }
         Update: {
+          abandoned_at?: string | null
           accepted_at?: string | null
           actual_bleacher_uuid?: string | null
           bleacher_change_reason?: string | null
@@ -4130,6 +4135,7 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           date?: string | null
+          declined_at?: string | null
           distance_meters?: number | null
           drive_minutes?: number | null
           driver_uuid?: string | null
@@ -4524,6 +4530,8 @@ export type Database = {
         | "dropoff_inspection"
         | "completed"
         | "cancelled"
+        | "declined"
+        | "abandoned"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4715,6 +4723,8 @@ export const Constants = {
         "dropoff_inspection",
         "completed",
         "cancelled",
+        "declined",
+        "abandoned",
       ],
     },
   },

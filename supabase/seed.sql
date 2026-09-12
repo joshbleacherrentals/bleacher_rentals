@@ -15209,6 +15209,51 @@ INSERT INTO "public"."AccountManagerZones" ("id", "account_manager_uuid", "zone_
 VALUES
   ('a1b2c3d4-0000-4000-8000-000000000001', '8d5473b1-269a-4e28-9420-dc98e9442e1b', '27633341-400b-4f18-a567-85e6de7ad65d', true);
 
+-- E2E: a driver who DOES share the AM's zone, with one declined and one
+-- abandoned tracker. Used by withdrawnCounts.*.spec.ts.
+--
+-- Deliberately a second driver rather than the existing "E2E Driver": that one
+-- is kept out of Zone 1 on purpose (see above and driverScope.am.spec.ts), and
+-- the withdrawal counts only exist for drivers inside the manager's zones.
+-- The week is next week, not this one, so the admin specs that open
+-- "the Monday of this week" and click the E2E Driver row are untouched.
+INSERT INTO "public"."Users"
+  ("first_name", "last_name", "email", "clerk_user_id", "role", "is_admin", "status_uuid", "id", "is_viewer")
+VALUES
+  ('Withdrawal', 'Driver', 'max+withdrawal@bleacherrentals.com',
+   'user_e2e_withdrawal_driver', 1, false,
+   '5d314da7-0a1e-4294-b012-ab74f6e07cd6', 'c0ffee00-0000-4000-8000-000000000001', false)
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "public"."Drivers"
+  ("tax", "pay_rate_cents", "pay_currency", "pay_per_unit", "is_active", "id", "user_uuid")
+VALUES (0, 400, 'CAD', 'KM', true, 'c0ffee00-0000-4000-8000-000000000002',
+        'c0ffee00-0000-4000-8000-000000000001')
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "public"."DriverZones" ("id", "driver_uuid", "zone_uuid")
+VALUES ('c0ffee00-0000-4000-8000-000000000003', 'c0ffee00-0000-4000-8000-000000000002',
+        '27633341-400b-4f18-a567-85e6de7ad65d')
+ON CONFLICT ("id") DO NOTHING;
+
+-- The week only appears in the work tracker week list if it has a group.
+INSERT INTO "public"."WorkTrackerGroups" ("id", "driver_uuid", "week_start", "week_end", "status")
+VALUES ('c0ffee00-0000-4000-8000-000000000004', 'c0ffee00-0000-4000-8000-000000000002',
+        '2026-09-14', '2026-09-20', 'draft')
+ON CONFLICT ("id") DO NOTHING;
+
+-- One of each withdrawal, plus a cancelled one that must NOT be counted: that
+-- is the office calling a job off, not the driver walking away.
+INSERT INTO "public"."WorkTrackers" ("id", "driver_uuid", "date", "status")
+VALUES
+  ('c0ffee00-0000-4000-8000-000000000005', 'c0ffee00-0000-4000-8000-000000000002',
+   '2026-09-15', 'declined'),
+  ('c0ffee00-0000-4000-8000-000000000006', 'c0ffee00-0000-4000-8000-000000000002',
+   '2026-09-16', 'abandoned'),
+  ('c0ffee00-0000-4000-8000-000000000007', 'c0ffee00-0000-4000-8000-000000000002',
+   '2026-09-17', 'cancelled')
+ON CONFLICT ("id") DO NOTHING;
+
 -- E2E: a booked quote with a payment schedule, so the Billing tab has something
 -- to record a payment against. Used by recordPayment.*.spec.ts.
 --

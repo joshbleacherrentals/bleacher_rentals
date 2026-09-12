@@ -35,7 +35,7 @@ export function resolveDriverScope(input: {
 }
 
 /** Driver uuids that share at least one zone with the given account manager. */
-function driverUuidsInAccountManagerZones(accountManagerUuid: string) {
+export function driverUuidsInAccountManagerZones(accountManagerUuid: string) {
   return db
     .selectFrom("DriverZones as dz")
     .innerJoin("AccountManagerZones as amz", "amz.zone_uuid", "dz.zone_uuid")

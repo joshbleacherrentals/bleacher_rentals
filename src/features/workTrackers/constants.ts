@@ -24,6 +24,11 @@ export const WORKTRACKER_STATUS_COLORS: Record<
   },
   completed: { bg: "bg-green-800/10", border: "border-green-800/75", text: "text-green-800/75" },
   cancelled: { bg: "bg-red-500/10", border: "border-red-600", text: "text-red-700" },
+  // The two driver withdrawals. Both read as red — the office has to re-cover
+  // the work either way — but they are not the same red as `cancelled`, which
+  // is the office's own decision and needs no reaction.
+  declined: { bg: "bg-rose-500/10", border: "border-rose-600", text: "text-rose-700" },
+  abandoned: { bg: "bg-red-700/10", border: "border-red-700", text: "text-red-800" },
 };
 
 export type WorkTrackerTypeStyle = {

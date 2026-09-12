@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
+import { CountBadge } from "@/components/CountBadge";
 
 type DropdownChild = {
   label: string;
@@ -23,13 +24,13 @@ type SideNavDropdownProps = {
 
 function Badge({ count, label }: { count: number; label: string }) {
   return (
-    <span
-      data-testid="sidebar-badge"
-      aria-label={label}
-      className="ml-auto shrink-0 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white"
-    >
-      {count}
-    </span>
+    <CountBadge
+      count={count}
+      label={label}
+      tone="amber"
+      className="ml-auto"
+      testId="sidebar-badge"
+    />
   );
 }
 

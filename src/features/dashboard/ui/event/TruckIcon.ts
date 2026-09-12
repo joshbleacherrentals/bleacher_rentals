@@ -16,6 +16,8 @@ const STATUS_TINT: Record<WorkTrackerStatus, number> = {
   dropoff_inspection: 0x17e3a4, // emerald-600
   completed: 0x166534, // green-800
   cancelled: 0xdc2626, // red-600
+  declined: 0xe11d48, // rose-600
+  abandoned: 0xb91c1c, // red-700
 };
 
 /**

@@ -9,6 +9,8 @@ import { useState } from "react";
 import { PaymentStatusButton } from "./PaymentStatusButton";
 import { TotalsMatch } from "./TotalsMatch";
 import { DateTime } from "luxon";
+import { useWithdrawnCountsByDriver } from "../db/withdrawnTrackers";
+import { WithdrawnBadgeSlot } from "./WithdrawnBadgeSlot";
 import {
   PAY_CURRENCIES,
   parsePayCurrencyFilter,
@@ -77,6 +79,11 @@ export function DriverListForWeek({ startDate }: Props) {
   const currentUserUuid = getCurrentUserUuid();
 
   const { access: accessData, isLoading: accessLoading } = useWorkTrackerAccess(currentUserUuid);
+
+  // Always scoped to my own zones, even while "See All Drivers" is on: the
+  // badge answers "what do I have to re-cover", which does not widen just
+  // because the list does.
+  const withdrawnByDriver = useWithdrawnCountsByDriver(startDate);
 
   const hasAccess = !!accessData && (accessData.isAdmin || accessData.isAccountManager);
 
@@ -174,6 +181,10 @@ export function DriverListForWeek({ startDate }: Props) {
             <td className="py-1 px-3 text-left">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <WithdrawnBadgeSlot
+                    count={withdrawnByDriver.get(row.driver_uuid) ?? 0}
+                    label={`${withdrawnByDriver.get(row.driver_uuid) ?? 0} work trackers declined or abandoned by this driver this week`}
+                  />
                   <span className="flex items-center gap-1.5 truncate">
                     {row.first_name + " " + row.last_name}
                     <RegionFlag region={row.region} />

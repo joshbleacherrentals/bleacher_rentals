@@ -247,6 +247,32 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Declined & Abandoned Work Tracker Counts",
+    description:
+      "The red count next to Work Trackers in the sidebar, next to each week on the Work Trackers page, and next to each driver inside a week. It counts trackers a driver declined (never took the work on) or abandoned (took it on and handed it back) — not the ones the office cancelled.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: custom(
+        "Only counted when the admin is also an active account manager, and then only for the drivers in their own zones. An admin with no zones is shown no count at all — the number is a nag about work somebody has to re-cover, and a company-wide total is not something one person can act on.",
+      ),
+      account_manager: custom(
+        "Counts every tracker declined or abandoned by a driver who shares a zone with them, for all time, however long ago the trip was. The count is always their own zones, even while 'See All Drivers' is switched on. It drops as those trackers are deleted, and the badge disappears once the last one is gone.",
+      ),
+      developer: none(
+        "Unable to even access the pages where the counts are shown, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "A viewer manages no zones, so there is no work for them to re-cover and no count is shown. A viewer who is also an active account manager is counted as that account manager, for their own zones.",
+      ),
+      driver: none(
+        "The driver's own withdrawals are reported to the account managers of their zones, not back to them in the mobile app.",
+      ),
+      maintainer: none(
+        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      ),
+    },
+  },
+  {
     label: "Mobile Driver App Access",
     description:
       "This only applies to being able to maintain data in the mobile app on the iOS and Android app store.",
