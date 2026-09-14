@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getQboTokens, setQboTokens } from "./db";
 import OAuthClient from "intuit-oauth-ts";
+import { describeQboAuthError } from "./describeQboAuthError";
 
 const ENCRYPTION_KEY = process.env.QBO_TOKEN_ENCRYPTION_KEY!; // Generate random 32-byte key and set as env variable, e.g. in terminal run node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 const IV_LENGTH = 16; // AES block size
@@ -118,7 +119,10 @@ export async function getQboAccessTokenAndRealmId(connectionId: string): Promise
       console.log(`${QBO} Refreshed tokens saved and set on client`);
     } catch (e: any) {
       console.error(`${QBO} Failed to refresh tokens:`, e.originalMessage || e.message);
-      throw e;
+      // e is intuit-oauth-ts's own error shape — its top-level .message is a
+      // generic "Response has an Error", not useful to a user. Re-throw with
+      // the real reason + what to do about it instead.
+      throw new Error(describeQboAuthError(e));
     }
   } else {
     console.log(`${QBO} Access token still valid — no refresh needed`);
