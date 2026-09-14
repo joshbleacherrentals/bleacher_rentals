@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/utils/supabase/getClerkSupabaseServerClient";
 import { DateTime } from "luxon";
 import { generateDriverPdfBuffer } from "@/features/workTrackers/generatePdf";
+import { interpretQboBillError } from "@/features/quickbooks-integration/interpretQboBillError";
 
 async function uploadPdfToQbo(
   accessToken: string,
@@ -319,7 +320,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         {
-          error: "Failed to create bill in QuickBooks",
+          error: interpretQboBillError(errorData),
           details: errorData,
         },
         { status: response.status },
