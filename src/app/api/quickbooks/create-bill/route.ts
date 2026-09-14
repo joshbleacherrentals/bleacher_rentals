@@ -1,10 +1,17 @@
 import { getBaseUrl, getQboAccessTokenAndRealmId } from "@/features/quickbooks-integration/util";
 import { requireAuth } from "@/features/userAccess/logic/requireAuth";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createServerSupabaseClient } from "@/utils/supabase/getClerkSupabaseServerClient";
 import { DateTime } from "luxon";
 import { generateDriverPdfBuffer } from "@/features/workTrackers/generatePdf";
 import { interpretQboBillError } from "@/features/quickbooks-integration/interpretQboBillError";
+
+// Kept for when this project is on a plan where it isn't silently capped
+// (see the `after()` use below for what actually fixes this on Hobby): on
+// Hobby every function is hard-capped at 10s regardless of what's set here,
+// no override possible; on Pro/Enterprise this raises the real limit for
+// this route only.
+export const maxDuration = 60;
 
 async function uploadPdfToQbo(
   accessToken: string,
@@ -332,18 +339,10 @@ export async function POST(req: NextRequest) {
 
     const savedBillId = billData.Bill?.Id;
 
-    // Attach PDF to the bill in QBO (fire-and-forget, don't fail if attachment fails)
-    if (savedBillId && driver.user_uuid) {
-      try {
-        const pdfBuffer = await generateDriverPdfBuffer(supabase, driver.user_uuid, startDate);
-        const fileName = `work-trackers-${billNumber.replace(/\//g, "-")}.pdf`;
-        await uploadPdfToQbo(accessToken, realmId, baseUrl, savedBillId, fileName, pdfBuffer);
-      } catch (pdfErr) {
-        console.error("Failed to generate or attach PDF to QBO bill:", pdfErr);
-      }
-    }
-
-    // Update WorkTrackerGroup with bill ID and status
+    // Update WorkTrackerGroup with bill ID and status — before responding,
+    // and before the PDF step below. The client re-queries WorkTrackerGroups
+    // after this request settles rather than reading status off this JSON
+    // body, so this has to have landed by the time the response goes out.
     if (workTrackerGroupId) {
       const { error: updateError } = await supabase
         .from("WorkTrackerGroups")
@@ -357,6 +356,27 @@ export async function POST(req: NextRequest) {
         console.error("Failed to update WorkTrackerGroup:", updateError);
         // Don't fail the request if this update fails
       }
+    }
+
+    // Attach the PDF *after* responding, not before. It's the slowest part
+    // of this route (a react-pdf render plus a second QBO upload call) and
+    // isn't required for the bill to exist in QuickBooks or for the DB
+    // update above. Doing it before the response meant a slow PDF step
+    // could push the whole request past Hobby's 10s cap — and since the
+    // Bill POST above had *already* succeeded by then, the client saw a
+    // timeout with no billId to retry against, risking an actual duplicate
+    // bill in QuickBooks on retry, not just a confusing error message.
+    const pdfUserUuid = driver.user_uuid;
+    if (savedBillId && pdfUserUuid) {
+      after(async () => {
+        try {
+          const pdfBuffer = await generateDriverPdfBuffer(supabase, pdfUserUuid, startDate);
+          const fileName = `work-trackers-${billNumber.replace(/\//g, "-")}.pdf`;
+          await uploadPdfToQbo(accessToken, realmId, baseUrl, savedBillId, fileName, pdfBuffer);
+        } catch (pdfErr) {
+          console.error("Failed to generate or attach PDF to QBO bill:", pdfErr);
+        }
+      });
     }
 
     // Return success with bill details
