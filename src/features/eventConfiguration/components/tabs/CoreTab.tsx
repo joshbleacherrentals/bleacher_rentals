@@ -38,13 +38,13 @@ export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
     currentEventStore.subrentalConstraint,
   );
 
-  const { addressData, venueUuid } = currentEventStore;
+  const { addressData, venueUuid, venueName } = currentEventStore;
   const venuePickerValue: VenuePickerValue =
     venueUuid && addressData
       ? {
           mode: "venue",
           venueId: venueUuid,
-          name: "", // unused by VenuePicker's own rendering; see docs/specs/venue-history.md §2.3
+          name: venueName,
           address: {
             street: addressData.address,
             city: addressData.city ?? "",
@@ -89,6 +89,7 @@ export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
     // it insert a brand-new private row instead.
     const wasLinkedToVenue = Boolean(currentEventStore.venueUuid);
     currentEventStore.setField("venueUuid", value.mode === "venue" ? value.venueId : null);
+    currentEventStore.setField("venueName", value.mode === "venue" ? value.name : "");
     currentEventStore.setField("addressData", {
       addressUuid:
         value.mode === "venue" || wasLinkedToVenue
@@ -204,6 +205,7 @@ export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
           onChange={handleVenueChange}
           required
           className="mt-1"
+          currentEventId={currentEventStore.eventUuid}
         />
       </div>
       <div>

@@ -28,6 +28,7 @@ type EventWithAddress = {
   address_state: string | null;
   address_postal: string | null;
   venue_uuid: string | null;
+  venue_name: string | null;
 };
 
 type BleacherEventRow = {
@@ -53,6 +54,7 @@ export async function loadEventForModal(
     const eventQuery = db
       .selectFrom("Events as e")
       .leftJoin("Addresses as a", "e.address_uuid", "a.id")
+      .leftJoin("Venues as v", "e.venue_uuid", "v.id")
       .select([
         "e.id as id",
         "e.event_name",
@@ -79,6 +81,7 @@ export async function loadEventForModal(
         "a.state_province as address_state",
         "a.zip_postal as address_postal",
         "e.venue_uuid as venue_uuid",
+        "v.name as venue_name",
       ])
       .where("e.id", "=", eventId)
       .compile();
@@ -145,6 +148,7 @@ export async function loadEventForModal(
         : null,
     );
     setField("venueUuid", eventData.venue_uuid);
+    setField("venueName", eventData.venue_name ?? "");
     setField("seats", eventData.total_seats);
     setField("sevenRow", eventData.seven_row);
     setField("tenRow", eventData.ten_row);

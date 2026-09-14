@@ -9,6 +9,7 @@ import { useMemo, useState, useEffect } from "react";
 import { ExternalLink, FileText } from "lucide-react";
 import { ContactHistorySheet } from "./ContactHistorySheet";
 import { VenueHistorySheet } from "./VenueHistorySheet";
+import { VenueCard } from "@/components/VenueCard";
 
 type SignatureInfo = {
   signerName: string;
@@ -339,25 +340,40 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
         </div>
       </div>
 
-      {/* Venue */}
+      {/* Venue — read-only here: clicking opens the event history for this
+          venue, never an editor. Editing only happens from the Edit Quote
+          page / dashboard event modal's VenuePicker. */}
       {quote.address && (
         <div>
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Venue</h3>
-          {quote.venue ? (
-            <button
-              type="button"
-              onClick={() => setVenueSheetOpen(true)}
-              className="text-sm font-medium text-darkBlue hover:underline text-left"
-            >
-              {quote.venue.name}
-            </button>
-          ) : (
-            <p className="text-sm">
-              {quote.address.street}
-              <br />
-              {quote.address.zipPostal ?? ""}
-            </p>
-          )}
+          <VenueCard
+            value={
+              quote.venue
+                ? {
+                    mode: "venue",
+                    venueId: quote.venue.id,
+                    name: quote.venue.name,
+                    address: {
+                      street: quote.address.street,
+                      city: quote.address.city,
+                      stateProvince: quote.address.stateProvince,
+                      zipPostal: quote.address.zipPostal ?? "",
+                    },
+                  }
+                : {
+                    mode: "manual",
+                    venueId: null,
+                    address: {
+                      street: quote.address.street,
+                      city: quote.address.city,
+                      stateProvince: quote.address.stateProvince,
+                      zipPostal: quote.address.zipPostal ?? "",
+                    },
+                  }
+            }
+            onClick={quote.venue ? () => setVenueSheetOpen(true) : undefined}
+            className="max-w-sm"
+          />
         </div>
       )}
 

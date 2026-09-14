@@ -7,6 +7,7 @@ import { Dropdown } from "@/components/DropDown";
 import { VenuePicker, type VenuePickerValue } from "@/components/VenuePicker";
 
 export function EventDetailsSection() {
+  const editingEventId = useCreateQuoteStore((s) => s.editingEventId);
   const eventName = useCreateQuoteStore((s) => s.eventName);
   const eventTypeId = useCreateQuoteStore((s) => s.eventTypeId);
   const eventAddressData = useCreateQuoteStore((s) => s.eventAddressData);
@@ -78,7 +79,12 @@ export function EventDetailsSection() {
         />
       </div>
       <div className="mb-4">
-        <VenuePicker value={venuePickerValue} onChange={handleVenueChange} required />
+        <VenuePicker
+          value={venuePickerValue}
+          onChange={handleVenueChange}
+          required
+          currentEventId={editingEventId}
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>

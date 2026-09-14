@@ -3,7 +3,11 @@
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
+import usePlacesAutocomplete, {
+  getGeocode,
+  getLatLng,
+  type Suggestion,
+} from "use-places-autocomplete";
 import { parseGoogleAddressComponents } from "./parseGoogleAddressComponents";
 
 interface AddressData {
@@ -15,17 +19,37 @@ interface AddressData {
   lng?: number;
   placeId?: string;
   country?: string;
+  /**
+   * The business/POI name Google attached to this result (its
+   * `structured_formatting.main_text` when `types` marks it as an
+   * establishment or point of interest), e.g. "Jester King Brewery" for a
+   * brewery address. Undefined for a plain street address — most results.
+   * Callers that want to prefill a name field (a Venue's name, say) from
+   * this should still let the user freely overwrite it; it's a suggestion,
+   * not the address itself.
+   */
+  businessName?: string;
 }
 
 interface AddressAutocompleteProps {
   onAddressSelect: (data: AddressData) => void;
   initialValue?: string;
+  /**
+   * Like `initialValue`, but also actively fetches suggestions right away
+   * instead of just sitting there as static text — for seeding the field
+   * with free text the user already typed somewhere else (a search box,
+   * say) so a dropdown of real addresses shows immediately. Set once when
+   * the field first appears; typing after that behaves normally either
+   * way. Pass at most one of `initialValue` / `initialSearchQuery`.
+   */
+  initialSearchQuery?: string;
   className?: string;
 }
 
 export default function AddressAutocomplete({
   onAddressSelect,
   initialValue,
+  initialSearchQuery,
   className = "",
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,6 +75,15 @@ export default function AddressAutocomplete({
     }
   }, [initialValue, addressData]);
 
+  // Separate from the effect above: this one fetches (shouldFetchData=true)
+  // so suggestions actually populate right away, rather than just filling
+  // the box with text and waiting for the next keystroke.
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setValue(initialSearchQuery, true);
+    }
+  }, [initialSearchQuery]);
+
   useEffect(() => {
     if (status === "OK" && inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect();
@@ -62,7 +95,8 @@ export default function AddressAutocomplete({
     }
   }, [status]);
 
-  const handleSelect = async (description: string, placeId: string) => {
+  const handleSelect = async (suggestion: Suggestion) => {
+    const { place_id: placeId, description } = suggestion;
     setValue(description, false);
     clearSuggestions();
 
@@ -79,7 +113,28 @@ export default function AddressAutocomplete({
         description,
       );
 
-      onAddressSelect({ address, city, state, postalCode, lat, lng, placeId, country });
+      // Replace the raw suggestion text (which can lead with a business/POI
+      // name, e.g. "Jester King Brewery, Fitzhugh Road, Austin, TX, USA")
+      // with the plain parsed address — this is an address field, not a
+      // place-name field.
+      setValue([address, city, state, postalCode].filter(Boolean).join(", "), false);
+
+      const isPlace = suggestion.types?.some(
+        (t: string) => t === "establishment" || t === "point_of_interest",
+      );
+      const businessName = isPlace ? suggestion.structured_formatting?.main_text : undefined;
+
+      onAddressSelect({
+        address,
+        city,
+        state,
+        postalCode,
+        lat,
+        lng,
+        placeId,
+        country,
+        businessName,
+      });
     } catch (error) {
       console.error("Error fetching address details:", error);
     }
@@ -111,13 +166,13 @@ export default function AddressAutocomplete({
                 pointerEvents: "auto",
               }}
             >
-              {data.map(({ place_id, description }) => (
+              {data.map((suggestion) => (
                 <li
-                  key={place_id}
+                  key={suggestion.place_id}
                   className="p-2 cursor-pointer hover:bg-gray-200 text-sm"
-                  onClick={() => handleSelect(description, place_id)}
+                  onClick={() => handleSelect(suggestion)}
                 >
-                  {description}
+                  {suggestion.description}
                 </li>
               ))}
             </ul>
