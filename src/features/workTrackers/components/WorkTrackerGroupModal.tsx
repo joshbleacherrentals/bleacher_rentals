@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Loader2, FileText, CheckCircle, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { parseQboApiResponse } from "@/features/quickbooks-integration/parseQboApiResponse";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
@@ -268,10 +269,10 @@ export function WorkTrackerGroupModal({
         }),
       });
 
-      const data = await response.json();
+      const data = await parseQboApiResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create bill");
+        throw new Error((data.error as string) || "Failed to create bill");
       }
 
       // Invalidate the drivers query to refresh the list
