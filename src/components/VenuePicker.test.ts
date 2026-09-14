@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { venueAddressLine } from "./VenueSearchSelect";
+import { venueAddressLine } from "./VenuePicker";
 
 describe("venueAddressLine", () => {
   it("joins street, city, state, and zip with commas", () => {

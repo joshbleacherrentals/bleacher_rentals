@@ -1,41 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, X } from "lucide-react";
-import type { VenueFull, VenuePickerValue } from "@/features/venues/types";
 
-export function venueAddressLine(address: {
-  street: string;
-  city: string;
-  stateProvince: string;
-  zipPostal: string;
-}): string {
-  return [address.street, address.city, address.stateProvince, address.zipPostal]
-    .filter(Boolean)
-    .join(", ");
-}
-
-type VenueSearchSelectProps = {
-  value: VenuePickerValue;
-  venues: VenueFull[];
-  /** Pick an existing venue. */
-  onSelect: (venue: VenueFull) => void;
+type EntitySearchSelectProps<T extends { id: string }> = {
+  items: T[];
+  /** The currently selected item (in the same shape as `items`), or null. */
+  selected: T | null;
+  /** Pick an existing item. */
+  onSelect: (item: T) => void;
   /** Clear back to nothing selected. */
   onClear: () => void;
-  /** "+ Create New Venue" clicked, with whatever's currently typed. */
+  /** "+ Create New ..." clicked, with whatever's currently typed. */
   onCreateNew: (query: string) => void;
   /** Pencil clicked — on a dropdown row, or on the selected-state card. */
-  onEditVenue: (venueId: string) => void;
+  onEdit: (id: string) => void;
+  /** Bigger-font line of a card (dropdown row or the selected-state card). */
+  renderPrimary: (item: T) => ReactNode;
+  /** Smaller, lighter line underneath `renderPrimary`. */
+  renderSecondary: (item: T) => ReactNode;
+  /** Text matched against the typed query — not necessarily what's shown. */
+  getSearchText: (item: T) => string;
+  /** e.g. "+ Create New Venue" / "+ Create New Contact". */
+  createLabel: string;
+  /** e.g. "No venues found." / "No contacts found." */
+  emptyLabel: string;
   placeholder?: string;
 };
 
-function VenueRow({
-  venue,
+function EntityRow<T extends { id: string }>({
+  item,
+  renderPrimary,
+  renderSecondary,
   onSelect,
   onEdit,
 }: {
-  venue: VenueFull;
+  item: T;
+  renderPrimary: (item: T) => ReactNode;
+  renderSecondary: (item: T) => ReactNode;
   onSelect: () => void;
   onEdit: () => void;
 }) {
@@ -45,8 +48,8 @@ function VenueRow({
       onClick={onSelect}
     >
       <div className="min-w-0">
-        <div className="text-sm font-semibold text-darkBlue truncate">{venue.name}</div>
-        <div className="text-xs text-gray-500 truncate">{venueAddressLine(venue.address)}</div>
+        <div className="text-sm font-semibold text-darkBlue truncate">{renderPrimary(item)}</div>
+        <div className="text-xs text-gray-500 truncate">{renderSecondary(item)}</div>
       </div>
       <button
         type="button"
@@ -54,7 +57,7 @@ function VenueRow({
           e.stopPropagation();
           onEdit();
         }}
-        aria-label={`Edit ${venue.name}`}
+        aria-label="Edit"
         className="shrink-0 p-1.5 text-gray-400 hover:text-darkBlue transition-colors"
       >
         <Pencil className="w-3.5 h-3.5" />
@@ -64,23 +67,31 @@ function VenueRow({
 }
 
 /**
- * Venue-specific replacement for SearchableSelect: at rest looks like a
- * plain text field, not a dropdown-styled button — typing filters a list
- * of Venue Card rows (name + one-line address + an edit pencil each,
- * independent of selecting that row), with "+ Create New Venue" pinned at
- * the bottom. Once something's picked, this same row layout becomes the
- * field's own display (in place of the search box) — click it to search
- * again, click its pencil to edit, click its X to clear.
+ * Entity-agnostic replacement for SearchableSelect: at rest looks like a
+ * plain text field, not a dropdown-styled button — typing filters a list of
+ * card rows (a bigger-font primary line + a smaller lighter secondary line +
+ * an edit pencil each, independent of selecting that row), with a
+ * "+ Create New ..." row pinned at the bottom. Once something's picked, this
+ * same row layout becomes the field's own display (in place of the search
+ * box) — click it to search again, click its pencil to edit, click its X to
+ * clear. Originally built for venues (see docs/specs/venue-history.md §2.3);
+ * genericized so contacts (and any future entity) can share the exact same
+ * behavior, including the portal outside-click fix below.
  */
-export function VenueSearchSelect({
-  value,
-  venues,
+export function EntitySearchSelect<T extends { id: string }>({
+  items,
+  selected,
   onSelect,
   onClear,
   onCreateNew,
-  onEditVenue,
-  placeholder = "Search by name or address...",
-}: VenueSearchSelectProps) {
+  onEdit,
+  renderPrimary,
+  renderSecondary,
+  getSearchText,
+  createLabel,
+  emptyLabel,
+  placeholder = "Search...",
+}: EntitySearchSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -91,15 +102,15 @@ export function VenueSearchSelect({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
 
-  const selectedVenueId = value.mode === "venue" ? value.venueId : null;
+  const selectedId = selected?.id ?? null;
 
   // A save (create, or edit-from-dropdown which also selects — see
-  // VenuePicker) lands here as `value` changing to a venue. Drop back into
-  // display mode automatically rather than leaving the dropdown open over
-  // a selection that already happened.
+  // VenuePicker/ContactPicker) lands here as `selected` changing. Drop back
+  // into display mode automatically rather than leaving the dropdown open
+  // over a selection that already happened.
   useEffect(() => {
-    if (selectedVenueId) setOpen(false);
-  }, [selectedVenueId]);
+    if (selectedId) setOpen(false);
+  }, [selectedId]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -136,7 +147,7 @@ export function VenueSearchSelect({
   };
 
   // Selected, dropdown closed — the card is the whole field.
-  if (!open && value.mode === "venue") {
+  if (!open && selected) {
     return (
       <div
         role="button"
@@ -146,17 +157,19 @@ export function VenueSearchSelect({
         className="flex items-center justify-between gap-2 w-full border rounded-md px-3 py-2 bg-white cursor-pointer hover:border-gray-300"
       >
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-darkBlue truncate">{value.name}</div>
-          <div className="text-xs text-gray-500 truncate">{venueAddressLine(value.address)}</div>
+          <div className="text-sm font-semibold text-darkBlue truncate">
+            {renderPrimary(selected)}
+          </div>
+          <div className="text-xs text-gray-500 truncate">{renderSecondary(selected)}</div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onEditVenue(value.venueId);
+              onEdit(selected.id);
             }}
-            aria-label="Edit venue"
+            aria-label="Edit"
             className="p-1.5 text-gray-400 hover:text-darkBlue transition-colors"
           >
             <Pencil className="w-3.5 h-3.5" />
@@ -167,7 +180,7 @@ export function VenueSearchSelect({
               e.stopPropagation();
               onClear();
             }}
-            aria-label="Clear venue"
+            aria-label="Clear"
             className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
           >
             <X className="w-3.5 h-3.5" />
@@ -180,8 +193,8 @@ export function VenueSearchSelect({
   // Nothing selected, or actively searching — plain text field.
   const q = query.trim().toLowerCase();
   const filtered = q
-    ? venues.filter((v) => `${v.name} ${venueAddressLine(v.address)}`.toLowerCase().includes(q))
-    : venues;
+    ? items.filter((item) => getSearchText(item).toLowerCase().includes(q))
+    : items;
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -208,19 +221,21 @@ export function VenueSearchSelect({
             style={{ top: pos.top, left: pos.left, width: pos.width, position: "absolute" }}
           >
             {filtered.length === 0 && (
-              <p className="px-3 py-2 text-sm text-gray-400">No venues found.</p>
+              <p className="px-3 py-2 text-sm text-gray-400">{emptyLabel}</p>
             )}
-            {filtered.map((v) => (
-              <VenueRow
-                key={v.id}
-                venue={v}
+            {filtered.map((item) => (
+              <EntityRow
+                key={item.id}
+                item={item}
+                renderPrimary={renderPrimary}
+                renderSecondary={renderSecondary}
                 onSelect={() => {
-                  onSelect(v);
+                  onSelect(item);
                   setOpen(false);
                 }}
                 onEdit={() => {
                   setOpen(false);
-                  onEditVenue(v.id);
+                  onEdit(item.id);
                 }}
               />
             ))}
@@ -231,7 +246,7 @@ export function VenueSearchSelect({
                 onCreateNew(query);
               }}
             >
-              + Create New Venue
+              {createLabel}
             </div>
           </div>,
           document.body,

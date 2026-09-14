@@ -3,6 +3,10 @@
 import { useMemo } from "react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
+import {
+  toPreferredLanguage,
+  type PreferredLanguage,
+} from "@/features/companiesContacts/db/preferredLanguage";
 
 export type ContactRow = {
   id: string;
@@ -12,6 +16,8 @@ export type ContactRow = {
   phone: string | null;
   company_uuid: string | null;
   default_venue_uuid: string | null;
+  notes: string | null;
+  preferred_language: string | null;
 };
 
 export type ContactOption = {
@@ -22,6 +28,8 @@ export type ContactOption = {
   phone: string | null;
   companyUuid: string | null;
   defaultVenueId: string | null;
+  notes: string | null;
+  preferredLanguage: PreferredLanguage;
 };
 
 export function useContacts(): { contacts: ContactOption[]; isLoading: boolean } {
@@ -37,6 +45,8 @@ export function useContacts(): { contacts: ContactOption[]; isLoading: boolean }
           "phone",
           "company_uuid",
           "default_venue_uuid",
+          "notes",
+          "preferred_language",
         ])
         .where("deleted", "=", 0)
         .orderBy("first_name")
@@ -56,6 +66,8 @@ export function useContacts(): { contacts: ContactOption[]; isLoading: boolean }
         phone: c.phone,
         companyUuid: c.company_uuid,
         defaultVenueId: c.default_venue_uuid,
+        notes: c.notes,
+        preferredLanguage: toPreferredLanguage(c.preferred_language),
       })),
     [data],
   );

@@ -73,7 +73,6 @@ export type CreateQuoteState = {
   attachPdfViaEmail: boolean;
 
   // Modals
-  isNewContactModalOpen: boolean;
   isAddLineItemModalOpen: boolean;
   isEditPaymentScheduleModalOpen: boolean;
 };
@@ -132,7 +131,6 @@ const initialState: CreateQuoteState = {
   termsDocumentId: null,
   attachPdfViaEmail: false,
 
-  isNewContactModalOpen: false,
   isAddLineItemModalOpen: false,
   isEditPaymentScheduleModalOpen: false,
 };

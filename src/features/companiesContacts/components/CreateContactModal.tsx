@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { Dropdown } from "@/components/DropDown";
@@ -20,10 +20,15 @@ import { VenuePicker, type VenuePickerValue } from "@/components/VenuePicker";
 export type CreatedContact = {
   id: string;
   displayName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   companyUuid: string | null;
   companyName: string;
+  notes: string;
+  preferredLanguage: PreferredLanguage;
+  defaultVenueUuid: string | null;
 };
 
 const CONTACT_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
@@ -43,9 +48,22 @@ type Props = {
    * portal defaults to, so the panel needs raising or it renders underneath.
    */
   contentClassName?: string;
+  /**
+   * Whatever was typed in a search box before hitting "+ Create New
+   * Contact" — seeds First/Last Name (split on the first space) so the
+   * caller doesn't have to retype it. Applied once each time the modal
+   * opens; free to edit afterwards either way.
+   */
+  initialQuery?: string;
 };
 
-export function CreateContactModal({ isOpen, onClose, onCreated, contentClassName }: Props) {
+export function CreateContactModal({
+  isOpen,
+  onClose,
+  onCreated,
+  contentClassName,
+  initialQuery,
+}: Props) {
   const { companies, isLoading } = useCompaniesAll();
   const { contacts } = useContactsAll();
   const [createCompanyOpen, setCreateCompanyOpen] = useState(false);
@@ -70,6 +88,14 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
 
   const setValue = (key: keyof ContactFormValues) => (value: string) =>
     setValues((prev) => ({ ...prev, [key]: value }));
+
+  useEffect(() => {
+    if (!isOpen || !initialQuery?.trim()) return;
+    const [first, ...rest] = initialQuery.trim().split(/\s+/);
+    setValues((prev) => ({ ...prev, firstName: first, lastName: rest.join(" ") }));
+    // Intentionally keyed on `isOpen` only — seeds once per open, not on
+    // every keystroke into `initialQuery` from the caller.
+  }, [isOpen]);
 
   const reset = () => {
     setValues({ firstName: "", lastName: "", email: "", phone: "" });
@@ -118,10 +144,15 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
       onCreated?.({
         id,
         displayName,
+        firstName: values.firstName,
+        lastName: values.lastName,
         email: values.email,
         phone: values.phone,
         companyUuid,
         companyName: selectedCompanyName,
+        notes,
+        preferredLanguage,
+        defaultVenueUuid: venue.mode === "venue" ? venue.venueId : null,
       });
       handleClose();
     } catch {

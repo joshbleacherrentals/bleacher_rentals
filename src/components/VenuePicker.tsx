@@ -4,7 +4,7 @@ import { useState } from "react";
 import AddressAutocomplete from "./AddressAutoComplete";
 import { TextField, FIELD_LABEL } from "./form/TextField";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { VenueSearchSelect } from "./VenueSearchSelect";
+import { EntitySearchSelect } from "./EntitySearchSelect";
 import { useVenuesAll } from "@/features/venues/hooks/useVenuesAll";
 import { createVenue } from "@/features/venues/db/createVenue";
 import { updateVenue } from "@/features/venues/db/updateVenue";
@@ -15,6 +15,12 @@ import { venueAddressKey } from "@/features/venues/logic/venueAddressKey";
 import type { VenueAddressFields, VenueFull, VenuePickerValue } from "@/features/venues/types";
 
 export type { VenuePickerValue } from "@/features/venues/types";
+
+export function venueAddressLine(address: VenueAddressFields): string {
+  return [address.street, address.city, address.stateProvince, address.zipPostal]
+    .filter(Boolean)
+    .join(", ");
+}
 
 type VenuePickerProps = {
   value: VenuePickerValue;
@@ -84,7 +90,7 @@ function DuplicateNotice({ venue, onUseInstead }: { venue: VenueFull; onUseInste
 /**
  * Search-existing / create-new / edit-in-place venue picker. See
  * docs/specs/venue-history.md §2.3 for the mode contract this reads and
- * writes. VenueSearchSelect is the only inline element — search, "+ Create
+ * writes. EntitySearchSelect is the only inline element — search, "+ Create
  * New Venue" and the pencil-edit affordance (reachable on any row, not
  * just the current selection) all live in small modals opened from it.
  */
@@ -96,6 +102,8 @@ export function VenuePicker({
   currentEventId,
 }: VenuePickerProps) {
   const { venues } = useVenuesAll();
+  const selected: VenueFull | null =
+    value.mode === "venue" ? { id: value.venueId, name: value.name, address: value.address } : null;
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
@@ -259,15 +267,21 @@ export function VenuePicker({
         Venue{required && <span className="text-red-500"> *</span>}
       </label>
 
-      <VenueSearchSelect
-        value={value}
-        venues={venues}
+      <EntitySearchSelect<VenueFull>
+        items={venues}
+        selected={selected}
         onSelect={(venue) =>
           onChange({ mode: "venue", venueId: venue.id, name: venue.name, address: venue.address })
         }
         onClear={() => onChange({ mode: "empty", venueId: null, address: null })}
         onCreateNew={openCreate}
-        onEditVenue={openEdit}
+        onEdit={openEdit}
+        renderPrimary={(venue) => venue.name}
+        renderSecondary={(venue) => venueAddressLine(venue.address)}
+        getSearchText={(venue) => `${venue.name} ${venueAddressLine(venue.address)}`}
+        createLabel="+ Create New Venue"
+        emptyLabel="No venues found."
+        placeholder="Search by name or address..."
       />
 
       {/* Create New Venue */}
