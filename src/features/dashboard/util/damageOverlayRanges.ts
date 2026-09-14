@@ -16,12 +16,14 @@ export type DamageOverlayRange = {
 export type DamageOverlayReport = {
   createdAt: string | null;
   resolvedAt: string | null;
+  maintenanceEventUuid: string | null;
   seatDamage: DamageSeverity;
   haulDamage: DamageSeverity;
 };
 
 /** The maintenance-event fields the overlay math needs. */
 export type DamageOverlayMaintenanceEvent = {
+  maintenanceEventUuid: string;
   eventStart: string;
 };
 
@@ -41,6 +43,14 @@ function lastColBefore(dates: readonly string[], iso: string): number | null {
   return null;
 }
 
+/** Last column whose date is at or before `iso`, or null when the whole window follows it. */
+function lastColAtOrBefore(dates: readonly string[], iso: string): number | null {
+  for (let i = dates.length - 1; i >= 0; i--) {
+    if (dates[i] <= iso) return i;
+  }
+  return null;
+}
+
 /** Date part of an ISO timestamp, or null when it cannot be parsed. */
 function toISODate(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -50,15 +60,20 @@ function toISODate(value: string | null | undefined): string | null {
 /**
  * Column ranges for one bleacher row's damage strips.
  *
- * Each unresolved damage report with effective damage produces one range:
+ * Each damage report with effective damage produces one range:
  * - it starts on the day the report was created (inclusive), clamped to the first
  *   visible column when the report predates the window;
- * - it ends the day before the earliest maintenance event that starts on or after
- *   the report, and otherwise runs to the last visible column.
+ * - it ends the day before repair work starts — the maintenance event the report is
+ *   linked to, or failing that the earliest one starting on or after the report;
+ * - a report resolved with no maintenance event ends on its resolution day;
+ * - otherwise it runs to the last visible column.
  *
- * Reports created after the window, and damage already repaired before the window
- * opens, produce no range. Overlapping ranges are resolved by the caller
- * (major wins over minor).
+ * Resolved reports still draw: `createMaintenanceEvent` stamps `resolved_at` on every
+ * open report of the bleacher, so skipping them would erase the strip at the exact
+ * moment the repair that bounds it is scheduled.
+ *
+ * Reports created after the window, and damage already closed before the window opens,
+ * produce no range. Overlapping ranges are resolved by the caller (major wins over minor).
  */
 export function computeDamageOverlayRanges(
   reports: readonly DamageOverlayReport[],
@@ -68,16 +83,19 @@ export function computeDamageOverlayRanges(
   if (dates.length === 0) return [];
   const lastCol = dates.length - 1;
 
-  const maintStarts = maintenanceEvents
-    .map((me) => toISODate(me.eventStart))
-    .filter((d): d is string => d !== null)
-    .sort((a, b) => a.localeCompare(b));
+  const startByEventUuid = new Map<string, string>();
+  const maintStarts: string[] = [];
+  for (const me of maintenanceEvents) {
+    const startISO = toISODate(me.eventStart);
+    if (!startISO) continue;
+    startByEventUuid.set(me.maintenanceEventUuid, startISO);
+    maintStarts.push(startISO);
+  }
+  maintStarts.sort((a, b) => a.localeCompare(b));
 
   const ranges: DamageOverlayRange[] = [];
 
   for (const report of reports) {
-    if (report.resolvedAt) continue;
-
     const severity = overlaySeverityFromEffective(report.seatDamage, report.haulDamage);
     if (!severity) continue;
 
@@ -88,13 +106,24 @@ export function computeDamageOverlayRanges(
     const startCol = firstColAtOrAfter(dates, createdISO);
     if (startCol === null) continue;
 
-    // Maintenance closes the strip the day before work begins.
-    const repairStart = maintStarts.find((d) => d >= createdISO);
+    // Maintenance closes the strip the day before work begins. The event the report
+    // was resolved against wins; otherwise take the next repair after the damage.
+    const linkedStart = report.maintenanceEventUuid
+      ? startByEventUuid.get(report.maintenanceEventUuid)
+      : undefined;
+    const repairStart = linkedStart ?? maintStarts.find((d) => d >= createdISO);
+
     let endCol = lastCol;
     if (repairStart !== undefined) {
       const beforeRepair = lastColBefore(dates, repairStart);
       if (beforeRepair === null) continue; // repaired before the window opened
       endCol = beforeRepair;
+    } else if (report.resolvedAt) {
+      // Resolved by hand, with no repair to bound it — the strip ends that day.
+      const resolvedISO = toISODate(report.resolvedAt);
+      const closed = resolvedISO ? lastColAtOrBefore(dates, resolvedISO) : lastCol;
+      if (closed === null) continue; // closed before the window opened
+      endCol = closed;
     }
 
     if (startCol <= endCol) {
