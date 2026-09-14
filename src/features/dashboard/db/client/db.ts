@@ -9,6 +9,7 @@ import {
   CurrentEventStore,
 } from "../../../eventConfiguration/state/useCurrentEventStore";
 import { useAddressesStore } from "@/state/addressesStore";
+import { normalizeLostFields } from "@/features/quotesAndBookings/utils/lostReason";
 import { useEventsStore } from "@/state/eventsStore";
 import { useBleacherEventsStore } from "@/state/bleacherEventStore";
 import { useMemo } from "react";
@@ -885,6 +886,7 @@ export async function createEvent(
         fifteen_row: state.fifteenRow,
         address_uuid,
         event_status: state.selectedStatus,
+        ...normalizeLostFields({ ...state, status: state.selectedStatus }),
         contract_revenue_cents: state.contractRevenueCents,
         notes: state.notes,
         hsl_hue: state.hslHue,

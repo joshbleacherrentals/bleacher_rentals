@@ -17,6 +17,7 @@ export type AddressData = {
 };
 
 import { EventStatus } from "@/features/dashboard/types";
+import type { LostReason } from "@/features/quotesAndBookings/utils/lostReason";
 import { AlertPayload } from "@/features/alerts/types";
 
 export type CurrentEventState = {
@@ -42,6 +43,10 @@ export type CurrentEventState = {
   sameDayTeardown: boolean;
   lenient: boolean;
   selectedStatus: EventStatus;
+  // Why the event was lost. Only meaningful while selectedStatus is "lost" —
+  // every save normalizes it away otherwise (see quotesAndBookings/utils/lostReason).
+  lostReason: LostReason | null;
+  lostReasonNote: string;
   notes: string;
   mustBeClean: boolean;
   bleacherUuids: string[];
@@ -97,6 +102,8 @@ const initialState: CurrentEventState = {
   sameDayTeardown: true,
   lenient: false,
   selectedStatus: "quoted",
+  lostReason: null,
+  lostReasonNote: "",
   notes: "",
   mustBeClean: false,
   bleacherUuids: [],

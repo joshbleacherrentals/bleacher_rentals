@@ -1,6 +1,7 @@
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
 import { useCurrentEventStore } from "../state/useCurrentEventStore";
+import type { LostReason } from "@/features/quotesAndBookings/utils/lostReason";
 
 type EventWithAddress = {
   id: string;
@@ -15,6 +16,8 @@ type EventWithAddress = {
   fifteen_row: number | null;
   lenient: number | null;
   event_status: string | null;
+  lost_reason: string | null;
+  lost_reason_note: string | null;
   contract_revenue_cents: number | null;
   notes: string | null;
   must_be_clean: number | null;
@@ -65,6 +68,8 @@ export async function loadEventForModal(
         "e.fifteen_row",
         "e.lenient",
         "e.event_status",
+        "e.lost_reason",
+        "e.lost_reason_note",
         "e.contract_revenue_cents",
         "e.notes",
         "e.must_be_clean",
@@ -157,6 +162,8 @@ export async function loadEventForModal(
       "selectedStatus",
       (eventData.event_status as "quoted" | "booked" | "lost" | "draft") ?? "quoted",
     );
+    setField("lostReason", (eventData.lost_reason as LostReason | null) ?? null);
+    setField("lostReasonNote", eventData.lost_reason_note ?? "");
     setField("contractRevenueCents", eventData.contract_revenue_cents ?? null);
     setField("notes", eventData.notes ?? "");
     setField("mustBeClean", !!eventData.must_be_clean);

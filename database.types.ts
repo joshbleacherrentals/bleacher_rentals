@@ -2148,6 +2148,8 @@ export type Database = {
           invoice_number: number | null
           is_qbo: boolean
           lenient: boolean
+          lost_reason: Database["public"]["Enums"]["event_lost_reason"] | null
+          lost_reason_note: string | null
           must_be_clean: boolean
           notes: string | null
           po_number: string | null
@@ -2187,6 +2189,8 @@ export type Database = {
           invoice_number?: number | null
           is_qbo?: boolean
           lenient: boolean
+          lost_reason?: Database["public"]["Enums"]["event_lost_reason"] | null
+          lost_reason_note?: string | null
           must_be_clean?: boolean
           notes?: string | null
           po_number?: string | null
@@ -2226,6 +2230,8 @@ export type Database = {
           invoice_number?: number | null
           is_qbo?: boolean
           lenient?: boolean
+          lost_reason?: Database["public"]["Enums"]["event_lost_reason"] | null
+          lost_reason_note?: string | null
           must_be_clean?: boolean
           notes?: string | null
           po_number?: string | null
@@ -4479,6 +4485,12 @@ export type Database = {
       currency: "USD" | "CAD"
       damage_severity: "none" | "minor" | "major"
       email_send_status: "sent" | "failed"
+      event_lost_reason:
+        | "out_of_service_area"
+        | "sold_out"
+        | "size_does_not_work"
+        | "price_too_high"
+        | "other"
       event_status: "quoted" | "booked" | "lost" | "draft"
       pay_currency_type: "CAD" | "USD"
       pay_per_unit_type: "KM" | "MI" | "HR"
@@ -4667,6 +4679,13 @@ export const Constants = {
       currency: ["USD", "CAD"],
       damage_severity: ["none", "minor", "major"],
       email_send_status: ["sent", "failed"],
+      event_lost_reason: [
+        "out_of_service_area",
+        "sold_out",
+        "size_does_not_work",
+        "price_too_high",
+        "other",
+      ],
       event_status: ["quoted", "booked", "lost", "draft"],
       pay_currency_type: ["CAD", "USD"],
       pay_per_unit_type: ["KM", "MI", "HR"],

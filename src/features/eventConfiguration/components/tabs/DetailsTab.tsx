@@ -1,35 +1,24 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { CheckCircle, TriangleAlert } from "lucide-react";
 import { Dropdown } from "@/components/DropDown";
 import { Textarea } from "@/components/TextArea";
 import { useCurrentEventStore } from "../../state/useCurrentEventStore";
 import { EventStatus } from "@/features/dashboard/types";
-import CentsInput from "@/components/CentsInput";
 import { useBleacherTypesActive } from "@/features/pricingMatrix/hooks/useBleacherTypesActive";
 import { useBleacherMismatch } from "../../hooks/useBleacherMismatch";
+import { LostReasonFields } from "@/features/quotesAndBookings/components/lostReason/LostReasonFields";
 
 export const DetailsTab = () => {
-  const contractRevenueCents = useCurrentEventStore((s) => s.contractRevenueCents);
   const setField = useCurrentEventStore((s) => s.setField);
   const selectedStatus = useCurrentEventStore((s) => s.selectedStatus);
+  const lostReason = useCurrentEventStore((s) => s.lostReason);
+  const lostReasonNote = useCurrentEventStore((s) => s.lostReasonNote);
   const notes = useCurrentEventStore((s) => s.notes);
-  const eventId = useCurrentEventStore((s) => s.eventUuid);
   const bookedAt = useCurrentEventStore((s) => s.bookedAt);
   const createdAt = useCurrentEventStore((s) => s.createdAt);
   const bleacherRequirements = useCurrentEventStore((s) => s.bleacherRequirements);
   const { bleacherTypes } = useBleacherTypesActive();
   const { assignedCountByType } = useBleacherMismatch();
-
-  const [revenueDisplay, setRevenueDisplay] = React.useState(
-    contractRevenueCents !== null ? (contractRevenueCents / 100).toFixed(2) : "",
-  );
-
-  React.useEffect(() => {
-    const displayValue =
-      contractRevenueCents !== null ? (contractRevenueCents / 100).toFixed(2) : "";
-    setRevenueDisplay(displayValue);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
 
   React.useEffect(() => {
     if (selectedStatus === "booked") {
@@ -81,13 +70,13 @@ export const DetailsTab = () => {
                 );
               })}
               {Object.entries(assignedCountByType)
-                .filter(([typeUuid]) =>
-                  !bleacherRequirements.some((r) => r.bleacherTypeUuid === typeUuid),
+                .filter(
+                  ([typeUuid]) =>
+                    !bleacherRequirements.some((r) => r.bleacherTypeUuid === typeUuid),
                 )
                 .map(([typeUuid, count]) => {
                   const bt = bleacherTypes.find((t) => t.id === typeUuid);
-                  const name =
-                    bt?.name ?? (bt?.row_count ? `${bt.row_count}-Row` : typeUuid);
+                  const name = bt?.name ?? (bt?.row_count ? `${bt.row_count}-Row` : typeUuid);
                   return (
                     <li
                       key={typeUuid}
@@ -119,6 +108,17 @@ export const DetailsTab = () => {
               placeholder="Pick status"
             />
           </div>
+          {selectedStatus === "lost" && (
+            <div className="flex-1 min-w-0">
+              <LostReasonFields
+                reason={lostReason}
+                note={lostReasonNote}
+                onReasonChange={(val) => setField("lostReason", val)}
+                onNoteChange={(val) => setField("lostReasonNote", val)}
+                labelClassName="block text-sm font-medium text-black/70"
+              />
+            </div>
+          )}
           {selectedStatus === "booked" && (
             <div className="flex-1 min-w-0">
               <label className="block text-sm font-medium text-black/70">Booked At</label>
@@ -141,18 +141,6 @@ export const DetailsTab = () => {
               onChange={(e) =>
                 setField("createdAt", e.target.value ? e.target.value + ":00Z" : null)
               }
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <label className="block text-sm font-medium text-black/70">Contract Revenue</label>
-            <CentsInput
-              value={revenueDisplay}
-              onChange={(value, cents) => {
-                setRevenueDisplay(value);
-                setField("contractRevenueCents", cents);
-              }}
-              placeholder="0.00"
-              className="w-full h-[40px] px-3 py-2 border bg-white rounded text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
             />
           </div>
         </div>

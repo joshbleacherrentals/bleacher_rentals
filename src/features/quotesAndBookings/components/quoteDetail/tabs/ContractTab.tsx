@@ -4,6 +4,7 @@ import { QuoteDetail } from "../../../db/fetchQuoteDetail";
 import { useEventLineItems, EventLineItemRow } from "../../../hooks/useEventLineItems";
 import { useEventCurrency } from "../../../hooks/useEventCurrency";
 import { formatMoney } from "../../../utils/formatMoney";
+import { formatLostReason } from "../../../utils/lostReason";
 import { DateTime } from "luxon";
 import { useMemo, useState, useEffect } from "react";
 import { ExternalLink, FileText } from "lucide-react";
@@ -269,6 +270,14 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
                 {quote.eventStatus ?? "Unknown"}
               </span>
             </div>
+            {quote.eventStatus === "lost" && (
+              <div>
+                <span className="text-gray-500">Lost Reason:</span>{" "}
+                <span className="font-medium">
+                  {formatLostReason(quote.lostReason, quote.lostReasonNote)}
+                </span>
+              </div>
+            )}
             <div>
               <span className="text-gray-500">Account Manager:</span>{" "}
               <span className="font-medium">

@@ -4,6 +4,7 @@ import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { CreateQuoteState } from "../state/useCreateQuoteStore";
 import { syncPaymentInstallments } from "./paymentInstallments";
 import { calculateTotals } from "../utils/calculateTotals";
+import { normalizeLostFields } from "../utils/lostReason";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute } from "@/lib/powersync/typedQuery";
 
@@ -55,6 +56,7 @@ export async function createQuoteEvent(
         event_end: state.eventEnd || null,
         address_uuid: addressUuid,
         event_status: state.status || "draft",
+        ...normalizeLostFields(state),
         event_type_uuid: state.eventTypeId || null,
         quote_valid_till: state.quoteValidTill || null,
         contract_revenue_cents: contractRevenueCents,
