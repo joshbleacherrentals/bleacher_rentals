@@ -1,17 +1,29 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../../../../database.types";
+import { lostReasonLabel } from "../utils/lostReason";
 
-export type ActionType = "create" | "update" | "sign" | "send" | "status_change" | "line_item_add" | "line_item_remove" | "line_item_change";
+export type ActionType =
+  | "create"
+  | "update"
+  | "sign"
+  | "send"
+  | "status_change"
+  | "line_item_add"
+  | "line_item_remove"
+  | "line_item_change";
 
 export const TRACKED_FIELDS = [
   "event_name",
   "event_start",
   "event_end",
   "event_status",
+  "lost_reason",
+  "lost_reason_note",
   "event_type_uuid",
   "contact_uuid",
   "finance_contact_uuid",
   "address_uuid",
+  "venue_uuid",
   "sales_office_uuid",
   "terms_and_conditions_uuid",
   "quote_valid_till",
@@ -30,10 +42,13 @@ export const FIELD_LABELS: Record<string, string> = {
   event_start: "Start Date",
   event_end: "End Date",
   event_status: "Status",
+  lost_reason: "Lost Reason",
+  lost_reason_note: "Lost Reason Note",
   event_type_uuid: "Event Type",
   contact_uuid: "Contact",
   finance_contact_uuid: "Finance Contact",
   address_uuid: "Address",
+  venue_uuid: "Venue",
   sales_office_uuid: "Sales Office",
   terms_and_conditions_uuid: "Terms & Conditions",
   quote_valid_till: "Quote Valid Till",
@@ -60,6 +75,7 @@ const UUID_FIELDS_TO_SKIP_RAW = new Set([
   "terms_and_conditions_uuid",
   "created_by_user_uuid",
   "address_uuid",
+  "venue_uuid",
 ]);
 
 const CENTS_FIELDS = new Set(["tax_amount_cents", "contract_revenue_cents"]);
@@ -82,7 +98,11 @@ async function resolveUuid(
   uuid: string,
 ): Promise<string> {
   if (field === "contact_uuid" || field === "finance_contact_uuid") {
-    const { data } = await supabase.from("Contacts").select("first_name, last_name").eq("id", uuid).single();
+    const { data } = await supabase
+      .from("Contacts")
+      .select("first_name, last_name")
+      .eq("id", uuid)
+      .single();
     return data ? `${data.first_name} ${data.last_name ?? ""}`.trim() : uuid;
   }
   if (field === "sales_office_uuid") {
@@ -94,11 +114,19 @@ async function resolveUuid(
     return data?.name ?? uuid;
   }
   if (field === "terms_and_conditions_uuid") {
-    const { data } = await supabase.from("TermsAndConditions").select("name").eq("id", uuid).single();
+    const { data } = await supabase
+      .from("TermsAndConditions")
+      .select("name")
+      .eq("id", uuid)
+      .single();
     return data?.name ?? uuid;
   }
   if (field === "created_by_user_uuid") {
-    const { data } = await supabase.from("Users").select("first_name, last_name").eq("id", uuid).single();
+    const { data } = await supabase
+      .from("Users")
+      .select("first_name, last_name")
+      .eq("id", uuid)
+      .single();
     return data ? `${data.first_name} ${data.last_name ?? ""}`.trim() : uuid;
   }
   return uuid;
@@ -160,9 +188,8 @@ export async function logEventChanges(
     }
   }
 
-  const resolvedNames: ResolvedNames = pairs.length > 0
-    ? await resolveAllUuids(supabase, pairs)
-    : {};
+  const resolvedNames: ResolvedNames =
+    pairs.length > 0 ? await resolveAllUuids(supabase, pairs) : {};
 
   const rows: Array<{
     event_uuid: string;
@@ -184,6 +211,10 @@ export async function logEventChanges(
     if (UUID_FIELDS_TO_SKIP_RAW.has(key)) {
       prevDisplay = oldVal ? (resolvedNames[`${key}:${oldVal}`] ?? serialize(oldVal)) : null;
       nextDisplay = newVal ? (resolvedNames[`${key}:${newVal}`] ?? serialize(newVal)) : null;
+    } else if (key === "lost_reason") {
+      // The log is read by people, not by the enum.
+      prevDisplay = lostReasonLabel(oldVal as string | null);
+      nextDisplay = lostReasonLabel(newVal as string | null);
     } else if (CENTS_FIELDS.has(key)) {
       prevDisplay = oldVal != null ? formatCentsForLog(oldVal, currency) : null;
       nextDisplay = newVal != null ? formatCentsForLog(newVal, currency) : null;
@@ -286,7 +317,9 @@ export async function logLineItemChanges(
         changes.push(`qty ${oldLi.qty} → ${newLi.qty}`);
       }
       if (oldLi.unitPriceCents !== newLi.unitPriceCents) {
-        changes.push(`price ${formatCentsForLog(oldLi.unitPriceCents, currency)} → ${formatCentsForLog(newLi.unitPriceCents, currency)}`);
+        changes.push(
+          `price ${formatCentsForLog(oldLi.unitPriceCents, currency)} → ${formatCentsForLog(newLi.unitPriceCents, currency)}`,
+        );
       }
 
       if (changes.length > 0) {

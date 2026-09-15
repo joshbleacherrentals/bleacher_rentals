@@ -12,6 +12,7 @@ type CreateContactParams = {
   companyUuid: string | null;
   // Language used by client-facing quotes for this contact.
   preferredLanguage?: PreferredLanguage;
+  defaultVenueUuid?: string | null;
 };
 
 export async function createContact(params: CreateContactParams): Promise<string> {
@@ -30,6 +31,7 @@ export async function createContact(params: CreateContactParams): Promise<string
           notes: params.notes || null,
           company_uuid: params.companyUuid,
           preferred_language: params.preferredLanguage ?? "english",
+          default_venue_uuid: params.defaultVenueUuid ?? null,
           deleted: 0,
         })
         .compile(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { Dropdown } from "@/components/DropDown";
@@ -15,14 +15,20 @@ import { DuplicateWarning } from "./DuplicateWarning";
 import { findContactDuplicates } from "../utils/findDuplicates";
 import { hasErrors, validateContactForm, type ContactFormValues } from "../utils/formValidation";
 import { PREFERRED_LANGUAGE_OPTIONS, type PreferredLanguage } from "../db/preferredLanguage";
+import { VenuePicker, type VenuePickerValue } from "@/components/VenuePicker";
 
 export type CreatedContact = {
   id: string;
   displayName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   companyUuid: string | null;
   companyName: string;
+  notes: string;
+  preferredLanguage: PreferredLanguage;
+  defaultVenueUuid: string | null;
 };
 
 const CONTACT_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
@@ -42,9 +48,22 @@ type Props = {
    * portal defaults to, so the panel needs raising or it renders underneath.
    */
   contentClassName?: string;
+  /**
+   * Whatever was typed in a search box before hitting "+ Create New
+   * Contact" — seeds First/Last Name (split on the first space) so the
+   * caller doesn't have to retype it. Applied once each time the modal
+   * opens; free to edit afterwards either way.
+   */
+  initialQuery?: string;
 };
 
-export function CreateContactModal({ isOpen, onClose, onCreated, contentClassName }: Props) {
+export function CreateContactModal({
+  isOpen,
+  onClose,
+  onCreated,
+  contentClassName,
+  initialQuery,
+}: Props) {
   const { companies, isLoading } = useCompaniesAll();
   const { contacts } = useContactsAll();
   const [createCompanyOpen, setCreateCompanyOpen] = useState(false);
@@ -57,6 +76,11 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
   const [companyUuid, setCompanyUuid] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage>("english");
+  const [venue, setVenue] = useState<VenuePickerValue>({
+    mode: "empty",
+    venueId: null,
+    address: null,
+  });
   const [saving, setSaving] = useState(false);
 
   const errors = validateContactForm(values);
@@ -65,11 +89,20 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
   const setValue = (key: keyof ContactFormValues) => (value: string) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
+  useEffect(() => {
+    if (!isOpen || !initialQuery?.trim()) return;
+    const [first, ...rest] = initialQuery.trim().split(/\s+/);
+    setValues((prev) => ({ ...prev, firstName: first, lastName: rest.join(" ") }));
+    // Intentionally keyed on `isOpen` only — seeds once per open, not on
+    // every keystroke into `initialQuery` from the caller.
+  }, [isOpen]);
+
   const reset = () => {
     setValues({ firstName: "", lastName: "", email: "", phone: "" });
     setCompanyUuid(null);
     setNotes("");
     setPreferredLanguage("english");
+    setVenue({ mode: "empty", venueId: null, address: null });
     resetTouched();
   };
 
@@ -100,15 +133,26 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
     setSaving(true);
     try {
       const displayName = `${values.firstName} ${values.lastName}`.trim();
-      const id = await createContact({ ...values, notes, companyUuid, preferredLanguage });
+      const id = await createContact({
+        ...values,
+        notes,
+        companyUuid,
+        preferredLanguage,
+        defaultVenueUuid: venue.mode === "venue" ? venue.venueId : null,
+      });
       createSuccessToast([`Contact "${displayName}" created.`]);
       onCreated?.({
         id,
         displayName,
+        firstName: values.firstName,
+        lastName: values.lastName,
         email: values.email,
         phone: values.phone,
         companyUuid,
         companyName: selectedCompanyName,
+        notes,
+        preferredLanguage,
+        defaultVenueUuid: venue.mode === "venue" ? venue.venueId : null,
       });
       handleClose();
     } catch {
@@ -208,6 +252,8 @@ export function CreateContactModal({ isOpen, onClose, onCreated, contentClassNam
                 </button>
               </div>
             </div>
+
+            <VenuePicker value={venue} onChange={setVenue} />
 
             <TextAreaField
               label="Notes"

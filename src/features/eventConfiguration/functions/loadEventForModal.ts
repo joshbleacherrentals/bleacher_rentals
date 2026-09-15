@@ -1,6 +1,7 @@
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
 import { useCurrentEventStore } from "../state/useCurrentEventStore";
+import type { LostReason } from "@/features/quotesAndBookings/utils/lostReason";
 
 type EventWithAddress = {
   id: string;
@@ -15,6 +16,8 @@ type EventWithAddress = {
   fifteen_row: number | null;
   lenient: number | null;
   event_status: string | null;
+  lost_reason: string | null;
+  lost_reason_note: string | null;
   contract_revenue_cents: number | null;
   notes: string | null;
   must_be_clean: number | null;
@@ -27,6 +30,8 @@ type EventWithAddress = {
   address_city: string | null;
   address_state: string | null;
   address_postal: string | null;
+  venue_uuid: string | null;
+  venue_name: string | null;
 };
 
 type BleacherEventRow = {
@@ -52,6 +57,7 @@ export async function loadEventForModal(
     const eventQuery = db
       .selectFrom("Events as e")
       .leftJoin("Addresses as a", "e.address_uuid", "a.id")
+      .leftJoin("Venues as v", "e.venue_uuid", "v.id")
       .select([
         "e.id as id",
         "e.event_name",
@@ -65,6 +71,8 @@ export async function loadEventForModal(
         "e.fifteen_row",
         "e.lenient",
         "e.event_status",
+        "e.lost_reason",
+        "e.lost_reason_note",
         "e.contract_revenue_cents",
         "e.notes",
         "e.must_be_clean",
@@ -77,6 +85,8 @@ export async function loadEventForModal(
         "a.city as address_city",
         "a.state_province as address_state",
         "a.zip_postal as address_postal",
+        "e.venue_uuid as venue_uuid",
+        "v.name as venue_name",
       ])
       .where("e.id", "=", eventId)
       .compile();
@@ -142,6 +152,8 @@ export async function loadEventForModal(
           }
         : null,
     );
+    setField("venueUuid", eventData.venue_uuid);
+    setField("venueName", eventData.venue_name ?? "");
     setField("seats", eventData.total_seats);
     setField("sevenRow", eventData.seven_row);
     setField("tenRow", eventData.ten_row);
@@ -157,6 +169,8 @@ export async function loadEventForModal(
       "selectedStatus",
       (eventData.event_status as "quoted" | "booked" | "lost" | "draft") ?? "quoted",
     );
+    setField("lostReason", (eventData.lost_reason as LostReason | null) ?? null);
+    setField("lostReasonNote", eventData.lost_reason_note ?? "");
     setField("contractRevenueCents", eventData.contract_revenue_cents ?? null);
     setField("notes", eventData.notes ?? "");
     setField("mustBeClean", !!eventData.must_be_clean);

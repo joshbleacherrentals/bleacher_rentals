@@ -8,6 +8,7 @@ import { useUserAccess } from "@/features/userAccess/client";
 import { useSidebarItems, type SidebarItemConfig } from "./useSidebarItems";
 import { useHasUnreadChangelog } from "@/features/changelog/hooks/useHasUnreadChangelog";
 import { useUnseenInspectionCount } from "@/features/annualInspections/db/annualInspections";
+import { useWithdrawnCount } from "@/features/workTrackers/db/withdrawnTrackers";
 
 const SideBar = () => {
   const access = useUserAccess();
@@ -21,6 +22,10 @@ const SideBar = () => {
   // maintainer, so who is nagged is decided in one place, not here.
   const unseenInspections = useUnseenInspectionCount();
   const badges = { "/annual-inspections": unseenInspections };
+  // Trackers the drivers in my zones declined or abandoned, for all time. The
+  // hook answers 0 to anyone who is not an active account manager, so an admin
+  // without zones is not nagged about work that is nobody's to re-cover.
+  const withdrawnTrackers = useWithdrawnCount();
 
   return (
     <div
@@ -28,7 +33,9 @@ const SideBar = () => {
       data-testid="sidebar"
     >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden pt-2">
-        {items.map((item) => renderItem(item, pathname, hasUnreadChangelog, badges))}
+        {items.map((item) =>
+          renderItem(item, pathname, hasUnreadChangelog, badges, withdrawnTrackers),
+        )}
       </nav>
     </div>
   );
@@ -72,6 +79,7 @@ function renderItem(
   pathname: string,
   hasUnreadChangelog: boolean,
   badges: Record<string, number>,
+  withdrawnTrackers: number,
 ) {
   switch (item.type) {
     case "button":
@@ -82,6 +90,15 @@ function renderItem(
           href={item.href}
           icon={item.icon}
           showIndicator={item.key === "changelog" && hasUnreadChangelog}
+          badge={
+            item.key === "work-trackers" && withdrawnTrackers > 0
+              ? {
+                  count: withdrawnTrackers,
+                  label: `${withdrawnTrackers} work trackers declined or abandoned by your drivers`,
+                  testId: "sidebar-withdrawn-badge",
+                }
+              : undefined
+          }
         />
       );
     case "dropdown":
@@ -97,7 +114,9 @@ function renderItem(
     case "section":
       return (
         <SideNavSection key={item.key} item={item} pathname={pathname}>
-          {item.children.map((child) => renderItem(child, pathname, hasUnreadChangelog, badges))}
+          {item.children.map((child) =>
+            renderItem(child, pathname, hasUnreadChangelog, badges, withdrawnTrackers),
+          )}
         </SideNavSection>
       );
   }

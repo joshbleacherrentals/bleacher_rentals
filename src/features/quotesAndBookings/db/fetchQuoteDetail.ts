@@ -5,6 +5,8 @@ export type QuoteDetail = {
   invoiceNumber: number | null;
   eventName: string;
   eventStatus: string | null;
+  lostReason: string | null;
+  lostReasonNote: string | null;
   eventStart: string | null;
   eventEnd: string | null;
   setupStart: string | null;
@@ -27,6 +29,10 @@ export type QuoteDetail = {
     city: string;
     stateProvince: string;
     zipPostal: string | null;
+  } | null;
+  venue: {
+    id: string;
+    name: string;
   } | null;
   contact: {
     id: string;
@@ -54,6 +60,8 @@ type Row = {
   invoice_number: number | null;
   event_name: string;
   event_status: string | null;
+  lost_reason: string | null;
+  lost_reason_note: string | null;
   event_start: string | null;
   event_end: string | null;
   setup_start: string | null;
@@ -75,6 +83,8 @@ type Row = {
   address_city: string | null;
   address_state_province: string | null;
   address_zip_postal: string | null;
+  venue_id: string | null;
+  venue_name: string | null;
   contact_id: string | null;
   contact_first_name: string | null;
   contact_last_name: string | null;
@@ -94,6 +104,7 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
   const compiled = db
     .selectFrom("Events as e")
     .leftJoin("Addresses as a", "e.address_uuid", "a.id")
+    .leftJoin("Venues as v", "e.venue_uuid", "v.id")
     .leftJoin("Contacts as ct", "e.contact_uuid", "ct.id")
     .leftJoin("Contacts as fc", "e.finance_contact_uuid", "fc.id")
     .leftJoin("Users as u", "e.created_by_user_uuid", "u.id")
@@ -102,6 +113,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
       "e.invoice_number as invoice_number",
       "e.event_name as event_name",
       "e.event_status as event_status",
+      "e.lost_reason as lost_reason",
+      "e.lost_reason_note as lost_reason_note",
       "e.event_start as event_start",
       "e.event_end as event_end",
       "e.setup_start as setup_start",
@@ -123,6 +136,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
       "a.city as address_city",
       "a.state_province as address_state_province",
       "a.zip_postal as address_zip_postal",
+      "v.id as venue_id",
+      "v.name as venue_name",
       "ct.id as contact_id",
       "ct.first_name as contact_first_name",
       "ct.last_name as contact_last_name",
@@ -151,6 +166,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
     invoiceNumber: r.invoice_number,
     eventName: r.event_name,
     eventStatus: r.event_status,
+    lostReason: r.lost_reason,
+    lostReasonNote: r.lost_reason_note,
     eventStart: r.event_start,
     eventEnd: r.event_end,
     setupStart: r.setup_start,
@@ -176,6 +193,7 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
           zipPostal: r.address_zip_postal,
         }
       : null,
+    venue: r.venue_id ? { id: r.venue_id, name: r.venue_name ?? "" } : null,
     contact: r.contact_id
       ? {
           id: r.contact_id,

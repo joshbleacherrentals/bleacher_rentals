@@ -42,6 +42,17 @@ const AddressesCols = {
 } satisfies PowerSyncColsFor<"Addresses">;
 const Addresses = new Table(AddressesCols);
 
+const VenuesCols = {
+  created_at: column.text,
+  name: column.text,
+  address_uuid: column.text,
+  created_by_user_uuid: column.text,
+  deleted: column.integer,
+} satisfies PowerSyncColsFor<"Venues">;
+const Venues = new Table(VenuesCols, {
+  indexes: { address_uuid: ["address_uuid"] },
+});
+
 const BleachersCols = {
   created_at: column.text,
   bleacher_number: column.integer,
@@ -206,6 +217,8 @@ const EventsCols = {
   address_uuid: column.text,
   created_by_user_uuid: column.text,
   event_status: column.text,
+  lost_reason: column.text,
+  lost_reason_note: column.text,
   contract_revenue_cents: column.integer,
   booked_at: column.text,
   event_type_uuid: column.text,
@@ -224,11 +237,13 @@ const EventsCols = {
   finance_contact_uuid: column.text,
   content_hash: column.text,
   contract_hash: column.text,
+  venue_uuid: column.text,
 } satisfies PowerSyncColsFor<"Events">;
 const Events = new Table(EventsCols, {
   indexes: {
     created_by_user_uuid: ["created_by_user_uuid"],
     address_uuid: ["address_uuid"],
+    venue_uuid: ["venue_uuid"],
   },
 });
 
@@ -398,6 +413,8 @@ const WorkTrackersCols = {
   dropoff_time_mode: column.text,
   dropoff_time_start: column.text,
   dropoff_time_end: column.text,
+  declined_at: column.text,
+  abandoned_at: column.text,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
 const WorkTrackers = new Table(WorkTrackersCols, {
   indexes: {
@@ -856,9 +873,10 @@ const ContactsCols = {
   notes: column.text,
   phone: column.text,
   preferred_language: column.text,
+  default_venue_uuid: column.text,
 } satisfies PowerSyncColsFor<"Contacts">;
 const Contacts = new Table(ContactsCols, {
-  indexes: { company_uuid: ["company_uuid"] },
+  indexes: { company_uuid: ["company_uuid"], default_venue_uuid: ["default_venue_uuid"] },
 });
 
 const EventAttachmentsCols = {
@@ -1223,6 +1241,7 @@ const DriverSurveyResponses = new Table(DriverSurveyResponsesCols, {
 
 export const AppSchema = new Schema({
   Addresses,
+  Venues,
   AccountManagers,
   AccountManagerZones,
   ChangeLog,

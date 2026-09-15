@@ -24,6 +24,9 @@ export const setStaleByTable: Record<TableName, SetStaleFn> = {
   // store to invalidate.
   DamageReportAcknowledgements: () => {},
   Maintainers: () => {},
+  // Read reactively through PowerSync (typedGetAll/useTypedQuery); no Zustand
+  // store to invalidate.
+  Venues: () => {},
   BleacherEvents: () => useBleacherEventsStore.getState().setStale(true),
   Bleachers: () => useBleachersStore.getState().setStale(true),
   Blocks: () => useBlocksStore.getState().setStale(true),
