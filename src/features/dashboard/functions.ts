@@ -32,8 +32,11 @@ export function checkEventFormRules(
   if (createEventPayload.eventName == "") {
     missingFields.push("Missing: Event Name");
   }
+  // "Venue" here just means an address is set — via a linked Venue or a
+  // manually-typed one ("detached", see docs/specs/venue-history.md §2.3).
+  // Only the label changed; addressData is populated either way.
   if (createEventPayload.addressData == null || createEventPayload.addressData.address == "") {
-    missingFields.push("Missing: Address");
+    missingFields.push("Missing: Venue");
   }
   if (!createEventPayload.eventStart || createEventPayload.eventStart == "") {
     missingFields.push("Missing: Event Start");

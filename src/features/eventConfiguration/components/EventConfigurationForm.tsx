@@ -31,6 +31,8 @@ import { useDashboardBleachersStore } from "@/features/dashboard/state/useDashbo
 import { useCreateQuoteStore } from "@/features/quotesAndBookings/state/useCreateQuoteStore";
 import { useEventFormTransportationAlerts } from "../hooks/useEventFormTransportationAlerts";
 import { useBleacherMismatch } from "../hooks/useBleacherMismatch";
+import { validateLostReason } from "@/features/quotesAndBookings/utils/lostReason";
+import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 
 const tabs = ["Core", "Details", "Alerts"] as const;
 type Tab = (typeof tabs)[number];
@@ -98,9 +100,18 @@ export const EventConfigurationForm = ({
     useBleacherEventsStore.getState().setStale(true);
   };
 
+  // Marking an event lost is the last moment the reason can be captured, so no
+  // save goes through without one. Any other status saves as before.
+  const lostReasonBlocks = (state: ReturnType<typeof useCurrentEventStore.getState>): boolean => {
+    const errors = validateLostReason({ ...state, status: state.selectedStatus });
+    if (errors.length > 0) createErrorToastNoThrow(errors);
+    return errors.length > 0;
+  };
+
   const handleCreateEvent = async () => {
-    setLoading(true);
     const state = useCurrentEventStore.getState();
+    if (lostReasonBlocks(state)) return;
+    setLoading(true);
     try {
       const newEventUuid = await createEvent(state, supabase, user ?? null);
       await triage("Events", { id: newEventUuid }, supabase);
@@ -117,8 +128,9 @@ export const EventConfigurationForm = ({
   };
 
   const handleUpdateEvent = async () => {
-    setLoading(true);
     const state = useCurrentEventStore.getState();
+    if (lostReasonBlocks(state)) return;
+    setLoading(true);
     try {
       await updateEvent(state, supabase, user ?? null, bleacherEvents);
       if (state.eventUuid) {
@@ -206,7 +218,9 @@ export const EventConfigurationForm = ({
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
-                {tab === "Alerts" && currentEventStore.alerts.length > 0 && ` (${currentEventStore.alerts.length})`}
+                {tab === "Alerts" &&
+                  currentEventStore.alerts.length > 0 &&
+                  ` (${currentEventStore.alerts.length})`}
                 {tab === "Details" && hasDetailsMismatch && " !"}
               </button>
             );
@@ -257,16 +271,16 @@ export const EventConfigurationForm = ({
               )}
             </button>
           )}
-          {/* Details button — always visible when canEdit */}
+          {/* Quote button — always visible when canEdit */}
           {canEdit && (
             <button
               type="button"
-              title="Open in Quote Details"
+              title="Open Quote"
               className="flex items-center gap-1.5 px-4 py-2 bg-white text-gray-700 text-sm font-semibold border border-gray-300 rounded-sm hover:bg-gray-50 transition cursor-pointer"
               onClick={handleOpenDetails}
             >
               <ExternalLink className="w-4 h-4" />
-              Details
+              Quote
             </button>
           )}
           {/* Delete button - only for existing events the user can edit */}

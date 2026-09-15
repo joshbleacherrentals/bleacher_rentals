@@ -10,6 +10,7 @@ import {
   PaymentMethod,
   QuoteStatus,
 } from "../types/quoteTypes";
+import type { LostReason } from "../utils/lostReason";
 
 export type CreateQuoteState = {
   // Edit mode
@@ -19,6 +20,10 @@ export type CreateQuoteState = {
   quoteNumber: string;
   quoteValidTill: string;
   status: QuoteStatus;
+  // Why the quote was lost. Only meaningful while status is "lost" — every save
+  // normalizes it away otherwise (see utils/lostReason).
+  lostReason: LostReason | null;
+  lostReasonNote: string;
   salesOfficeId: string | null;
   accountManagerId: string | null;
   ownerUserUuid: string | null;
@@ -37,6 +42,12 @@ export type CreateQuoteState = {
   eventName: string;
   eventAddress: string;
   eventAddressData: AddressFields | null;
+  // Set when eventAddress/eventAddressData came from picking a Venue; null
+  // when the address was typed/edited directly ("manual" — see
+  // docs/specs/venue-history.md §2.3). Independent of eventAddressData, which
+  // always holds the resolved address either way.
+  venueId: string | null;
+  venueName: string;
   eventStart: string;
   eventEnd: string;
   eventTypeId: string | null;
@@ -67,7 +78,6 @@ export type CreateQuoteState = {
   attachPdfViaEmail: boolean;
 
   // Modals
-  isNewContactModalOpen: boolean;
   isAddLineItemModalOpen: boolean;
   isEditPaymentScheduleModalOpen: boolean;
 };
@@ -87,6 +97,8 @@ const initialState: CreateQuoteState = {
   quoteNumber: "",
   quoteValidTill: "",
   status: "draft",
+  lostReason: null,
+  lostReasonNote: "",
   salesOfficeId: null,
   accountManagerId: null,
   ownerUserUuid: null,
@@ -103,6 +115,8 @@ const initialState: CreateQuoteState = {
   eventName: "",
   eventAddress: "",
   eventAddressData: null,
+  venueId: null,
+  venueName: "",
   eventStart: "",
   eventEnd: "",
   eventTypeId: null,
@@ -124,7 +138,6 @@ const initialState: CreateQuoteState = {
   termsDocumentId: null,
   attachPdfViaEmail: false,
 
-  isNewContactModalOpen: false,
   isAddLineItemModalOpen: false,
   isEditPaymentScheduleModalOpen: false,
 };
@@ -150,7 +163,10 @@ function throttledStorage(delay: number) {
       }
     },
     removeItem: (name: string) => {
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
       localStorage.removeItem(name);
     },
   };
@@ -183,9 +199,13 @@ export const useCreateQuoteStore = create<CreateQuoteState & CreateQuoteActions>
 
 const TRACKED_KEYS: (keyof CreateQuoteState)[] = [
   "eventName",
+  "status",
+  "lostReason",
+  "lostReasonNote",
   "eventStart",
   "eventEnd",
   "contactId",
+  "venueId",
   "salesOfficeId",
   "lineItems",
   "paymentInstallments",

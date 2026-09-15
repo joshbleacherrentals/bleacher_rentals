@@ -43,6 +43,8 @@ type SearchableSelectProps = {
   footerItem?: { label: string; onSelect: () => void };
   /** Overrides the trigger text while `selected` is null (legacy free-text values). */
   fallbackLabel?: string | null;
+  /** Fires on every keystroke in the search box — e.g. to pre-fill a "+ Add new" form's name field with whatever was typed. */
+  onSearchChange?: (query: string) => void;
 };
 
 /**
@@ -62,6 +64,7 @@ export function SearchableSelect({
   className,
   footerItem,
   fallbackLabel = null,
+  onSearchChange,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
 
@@ -115,7 +118,7 @@ export function SearchableSelect({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
-          <CommandInput placeholder={searchPlaceholder} />
+          <CommandInput placeholder={searchPlaceholder} onValueChange={onSearchChange} />
           <CommandList>
             <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>

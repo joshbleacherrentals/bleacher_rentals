@@ -17,6 +17,7 @@ export type AddressData = {
 };
 
 import { EventStatus } from "@/features/dashboard/types";
+import type { LostReason } from "@/features/quotesAndBookings/utils/lostReason";
 import { AlertPayload } from "@/features/alerts/types";
 
 export type CurrentEventState = {
@@ -29,6 +30,11 @@ export type CurrentEventState = {
   originalOwnerUserUuid: string | null;
   eventName: string;
   addressData: AddressData | null;
+  // Set when addressData came from picking a Venue; null when the address
+  // was typed/edited directly ("manual" / detached — see
+  // docs/specs/venue-history.md §2.3, §3.5).
+  venueUuid: string | null;
+  venueName: string;
   seats: number | null;
   sevenRow: number | null;
   tenRow: number | null;
@@ -42,6 +48,10 @@ export type CurrentEventState = {
   sameDayTeardown: boolean;
   lenient: boolean;
   selectedStatus: EventStatus;
+  // Why the event was lost. Only meaningful while selectedStatus is "lost" —
+  // every save normalizes it away otherwise (see quotesAndBookings/utils/lostReason).
+  lostReason: LostReason | null;
+  lostReasonNote: string;
   notes: string;
   mustBeClean: boolean;
   bleacherUuids: string[];
@@ -84,6 +94,8 @@ const initialState: CurrentEventState = {
   originalOwnerUserUuid: null,
   eventName: "",
   addressData: null,
+  venueUuid: null,
+  venueName: "",
   seats: 0,
   sevenRow: 0,
   tenRow: 0,
@@ -97,6 +109,8 @@ const initialState: CurrentEventState = {
   sameDayTeardown: true,
   lenient: false,
   selectedStatus: "quoted",
+  lostReason: null,
+  lostReasonNote: "",
   notes: "",
   mustBeClean: false,
   bleacherUuids: [],

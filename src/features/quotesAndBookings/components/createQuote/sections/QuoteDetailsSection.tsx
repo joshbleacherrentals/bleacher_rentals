@@ -9,11 +9,14 @@ import { useAccountManagers } from "@/features/manageTeam/hooks/useAccountManage
 import { useSalesOffices } from "../../../hooks/useSalesOffices";
 import { salesOfficeLabel } from "../../../utils/salesOfficeLabel";
 import { isCompanyEmail, COMPANY_EMAIL_DOMAIN } from "../../../utils/companyEmail";
+import { LostReasonFields } from "../../lostReason/LostReasonFields";
 
 export function QuoteDetailsSection() {
   const quoteNumber = useCreateQuoteStore((s) => s.quoteNumber);
   const quoteValidTill = useCreateQuoteStore((s) => s.quoteValidTill);
   const status = useCreateQuoteStore((s) => s.status);
+  const lostReason = useCreateQuoteStore((s) => s.lostReason);
+  const lostReasonNote = useCreateQuoteStore((s) => s.lostReasonNote);
   const salesOfficeId = useCreateQuoteStore((s) => s.salesOfficeId);
   const accountManagerId = useCreateQuoteStore((s) => s.accountManagerId);
   const currency = useCreateQuoteStore((s) => s.currency);
@@ -114,6 +117,14 @@ export function QuoteDetailsSection() {
             onSelect={(val) => setField("status", val)}
           />
         </div>
+        {status === "lost" && (
+          <LostReasonFields
+            reason={lostReason}
+            note={lostReasonNote}
+            onReasonChange={(val) => setField("lostReason", val)}
+            onNoteChange={(val) => setField("lostReasonNote", val)}
+          />
+        )}
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>

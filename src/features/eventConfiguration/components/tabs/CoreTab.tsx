@@ -1,7 +1,7 @@
 "use client";
 import { Toggle } from "../../../../components/Toggle";
 import React, { useEffect } from "react";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import { VenuePicker, type VenuePickerValue } from "@/components/VenuePicker";
 import { useUsersStore } from "@/state/userStore";
 import { Dropdown } from "@/components/DropDown";
 import { useCurrentEventStore } from "../../state/useCurrentEventStore";
@@ -37,6 +37,74 @@ export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
     currentEventStore.eventEnd,
     currentEventStore.subrentalConstraint,
   );
+
+  const { addressData, venueUuid, venueName } = currentEventStore;
+  const venuePickerValue: VenuePickerValue =
+    venueUuid && addressData
+      ? {
+          mode: "venue",
+          venueId: venueUuid,
+          name: venueName,
+          address: {
+            street: addressData.address,
+            city: addressData.city ?? "",
+            stateProvince: addressData.state ?? "",
+            zipPostal: addressData.postalCode ?? "",
+            lat: addressData.lat,
+            lng: addressData.lng,
+            placeId: addressData.placeId,
+            country: addressData.country,
+          },
+        }
+      : addressData
+        ? {
+            mode: "manual",
+            venueId: null,
+            address: {
+              street: addressData.address,
+              city: addressData.city ?? "",
+              stateProvince: addressData.state ?? "",
+              zipPostal: addressData.postalCode ?? "",
+              lat: addressData.lat,
+              lng: addressData.lng,
+              placeId: addressData.placeId,
+              country: addressData.country,
+            },
+          }
+        : { mode: "empty", venueId: null, address: null };
+
+  const handleVenueChange = (value: VenuePickerValue) => {
+    if (value.mode === "empty") {
+      currentEventStore.setField("venueUuid", null);
+      currentEventStore.setField("addressData", null);
+      return;
+    }
+    // "venue" mode: picked an existing/new Venue. "manual" mode: address
+    // hand-edited — detaches from whatever venue was previously set (see
+    // docs/specs/venue-history.md §3.5). When detaching, the carried-over
+    // addressUuid must NOT be reused: if this event was linked to a Venue,
+    // that id is the Venue's own shared Addresses row (see §0.1/§4)  —
+    // updateEvent.ts would otherwise mutate it in place for every other
+    // event still linked to that Venue. Forcing addressUuid to null makes
+    // it insert a brand-new private row instead.
+    const wasLinkedToVenue = Boolean(currentEventStore.venueUuid);
+    currentEventStore.setField("venueUuid", value.mode === "venue" ? value.venueId : null);
+    currentEventStore.setField("venueName", value.mode === "venue" ? value.name : "");
+    currentEventStore.setField("addressData", {
+      addressUuid:
+        value.mode === "venue" || wasLinkedToVenue
+          ? null
+          : (currentEventStore.addressData?.addressUuid ?? null),
+      address: value.address.street,
+      city: value.address.city,
+      state: value.address.stateProvince,
+      postalCode: value.address.zipPostal,
+      lat: value.address.lat,
+      lng: value.address.lng,
+      placeId: value.address.placeId,
+      country: value.address.country,
+    });
+  };
 
   const filteredUsers = filterOwnerOptions({
     users,
@@ -132,16 +200,12 @@ export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
           value={currentEventStore.eventName}
           onChange={(e) => currentEventStore.setField("eventName", e.target.value)}
         />
-        <label className="block mt-1 text-sm font-medium text-black/70">Address</label>
-        <AddressAutocomplete
-          className="bg-white "
-          onAddressSelect={(data) =>
-            currentEventStore.setField("addressData", {
-              ...data,
-              addressUuid: currentEventStore.addressData?.addressUuid ?? null,
-            })
-          }
-          initialValue={currentEventStore.addressData?.address || ""}
+        <VenuePicker
+          value={venuePickerValue}
+          onChange={handleVenueChange}
+          required
+          className="mt-1"
+          currentEventId={currentEventStore.eventUuid}
         />
       </div>
       <div>
