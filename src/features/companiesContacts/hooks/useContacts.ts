@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
-import {
-  toPreferredLanguage,
-  type PreferredLanguage,
-} from "@/features/companiesContacts/db/preferredLanguage";
+import { toPreferredLanguage, type PreferredLanguage } from "../db/preferredLanguage";
 
+// Data shape for @/components/ContactPicker. Lighter than ContactFull
+// (useContactsAll.ts) in one way — no joined companyName — but adds
+// defaultVenueId, which the picker's callers use to auto-fill a venue
+// field. Shared across features (quotesAndBookings' Client Info section,
+// workTrackers' pickup/dropoff POC) rather than living under either one.
 export type ContactRow = {
   id: string;
   first_name: string | null;

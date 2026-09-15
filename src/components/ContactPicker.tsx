@@ -23,7 +23,8 @@ import {
   PREFERRED_LANGUAGE_OPTIONS,
   type PreferredLanguage,
 } from "@/features/companiesContacts/db/preferredLanguage";
-import type { ContactOption } from "@/features/quotesAndBookings/hooks/useContacts";
+import type { ContactOption } from "@/features/companiesContacts/hooks/useContacts";
+import { cn } from "@/lib/utils";
 
 export function contactDisplayName(contact: { firstName: string; lastName: string | null }) {
   return `${contact.firstName} ${contact.lastName ?? ""}`.trim();
@@ -44,6 +45,21 @@ type ContactPickerProps = {
   required?: boolean;
   className?: string;
   placeholder?: string;
+  /**
+   * Shown in place of the usual card when `contactId` doesn't resolve to a
+   * live contact in `contacts` (a legacy free-text value with no linked
+   * contact at all, or a contact that's since been soft-deleted) — so the
+   * field still shows something instead of reading as empty. No edit
+   * pencil (there's no contact record behind it to edit), but Clear still
+   * works. Ignored once a real contact resolves.
+   */
+  fallbackLabel?: string | null;
+  /**
+   * Extra classes for the Create/Edit dialog panels — needed when this is
+   * opened from a surface that isn't a Radix dialog and paints its own
+   * overlay above z-50 (e.g. WorkTrackerModal's z-[2000]).
+   */
+  contentClassName?: string;
 };
 
 /**
@@ -65,6 +81,8 @@ export function ContactPicker({
   // what tips Chrome's autofill heuristics into treating this as an address
   // field (see EntitySearchSelect's readOnly-until-focus workaround).
   placeholder = "Search contacts...",
+  fallbackLabel,
+  contentClassName,
 }: ContactPickerProps) {
   const { companies, isLoading: loadingCompanies } = useCompaniesAll();
 
@@ -208,6 +226,7 @@ export function ContactPicker({
         createLabel="+ Create New Contact"
         emptyLabel="No contacts found."
         emptyCardLabel={`Select ${label ? label.toLowerCase() : "contact"}...`}
+        fallbackLabel={fallbackLabel}
         placeholder={placeholder}
       />
 
@@ -219,12 +238,13 @@ export function ContactPicker({
           setCreateOpen(false);
         }}
         initialQuery={createQuery}
+        contentClassName={contentClassName}
       />
 
       {/* Edit Contact — confirming a delete is just another view inside
           this same Dialog, not a second overlay. */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className={cn("sm:max-w-md", contentClassName)}>
           {editStep === "form" && (
             <>
               <DialogHeader>

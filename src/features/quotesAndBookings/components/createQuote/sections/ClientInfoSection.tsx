@@ -2,10 +2,9 @@
 
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { ContactPicker } from "@/components/ContactPicker";
-import { useContacts } from "../../../hooks/useContacts";
+import { useContacts, type ContactOption } from "@/features/companiesContacts/hooks/useContacts";
 import { useVenuesAll } from "@/features/venues/hooks/useVenuesAll";
 import { resolveVenueOnContactSelect } from "../../../utils/resolveVenueOnContactSelect";
-import type { ContactOption } from "../../../hooks/useContacts";
 
 export function ClientInfoSection() {
   const contactId = useCreateQuoteStore((s) => s.contactId);

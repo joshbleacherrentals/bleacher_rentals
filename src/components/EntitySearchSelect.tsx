@@ -29,6 +29,14 @@ type EntitySearchSelectProps<T extends { id: string }> = {
   emptyLabel: string;
   /** Placeholder shown on the persistent card when nothing is selected, e.g. "Select venue..." */
   emptyCardLabel: string;
+  /**
+   * Shown in the persistent card, in place of `emptyCardLabel`, when
+   * `selected` is null but this is non-blank — e.g. a legacy value that
+   * predates linking to a real item, or one that's since been deleted.
+   * Rendered without the edit pencil (there's nothing resolved to edit),
+   * but Clear still works.
+   */
+  fallbackLabel?: string | null;
   placeholder?: string;
 };
 
@@ -71,9 +79,11 @@ function EntityRow<T extends { id: string }>({
 
 /**
  * Entity-agnostic replacement for SearchableSelect: a persistent card — the
- * selected item's row (primary/secondary + edit pencil + clear), or an
- * empty-state placeholder card when nothing's picked — that's always what's
- * shown at rest. Clicking it (either state) opens a floating panel right
+ * selected item's row (primary/secondary + edit pencil + clear), a
+ * `fallbackLabel` card (clear, no pencil) when there's a stored value that
+ * doesn't resolve to a live item, or an empty-state placeholder card when
+ * nothing's picked — that's always what's shown at rest. Clicking it (any
+ * state) opens a floating panel right
  * below it with a focused search box, a filtered list of the same card
  * rows, and a "+ Create New ..." row pinned at the bottom; picking a row,
  * clicking the card again, clicking outside, or Escape all close it back
@@ -94,6 +104,7 @@ export function EntitySearchSelect<T extends { id: string }>({
   createLabel,
   emptyLabel,
   emptyCardLabel,
+  fallbackLabel,
   placeholder = "Search...",
 }: EntitySearchSelectProps<T>) {
   const [open, setOpen] = useState(false);
@@ -212,6 +223,23 @@ export function EntitySearchSelect<T extends { id: string }>({
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
+          </>
+        ) : fallbackLabel ? (
+          <>
+            <span className="text-sm font-medium text-gray-600 italic truncate">
+              {fallbackLabel}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear();
+              }}
+              aria-label="Clear"
+              className="shrink-0 p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </>
         ) : (
           <span className="text-sm text-gray-400">{emptyCardLabel}</span>

@@ -73,7 +73,8 @@ import {
   isPickupTransportationMismatch,
 } from "@/features/alerts/util/workTrackerTransportation";
 import { getUpcomingWindowEnd } from "@/features/alerts/util/getUpcomingWindow";
-import { PocSelect } from "./PocSelect";
+import { ContactPicker, contactDisplayName } from "@/components/ContactPicker";
+import { useContacts } from "@/features/companiesContacts/hooks/useContacts";
 import { getExpectedPocForWorkTracker, type PocDirection } from "../util/resolvePocContact";
 import { describePocPopulateResult, type PocValue } from "../util/pocField";
 import {
@@ -143,6 +144,9 @@ export default function WorkTrackerModal({
 
   // Fetch available work tracker types (local-first via PowerSync)
   const { types: workTrackerTypes } = useWorkTrackerTypes();
+
+  // For the Pickup/Dropoff POC pickers below.
+  const { contacts: pocContacts } = useContacts();
 
   const selectedWorkTrackerType = workTrackerTypes.find(
     (t) => t.id === workTracker?.work_tracker_type_uuid,
@@ -1159,11 +1163,25 @@ export default function WorkTrackerModal({
                               <label className={labelClassName}>Pickup POC</label>
                               <div className="flex flex-row gap-2 items-center">
                                 <div className="flex-1 min-w-0">
-                                  <PocSelect
-                                    contactUuid={workTracker?.pickup_poc_contact_uuid ?? null}
-                                    pocText={workTracker?.pickup_poc ?? null}
-                                    onChange={setPickupPoc}
-                                    placeholder="Pickup POC"
+                                  <ContactPicker
+                                    label=""
+                                    contactId={workTracker?.pickup_poc_contact_uuid ?? null}
+                                    contacts={pocContacts}
+                                    fallbackLabel={workTracker?.pickup_poc ?? null}
+                                    onSelect={(contact) =>
+                                      setPickupPoc({
+                                        contactUuid: contact.id,
+                                        pocText: contactDisplayName(contact),
+                                      })
+                                    }
+                                    onClear={() =>
+                                      setPickupPoc({ contactUuid: null, pocText: null })
+                                    }
+                                    placeholder="Search contacts..."
+                                    // WorkTrackerModal isn't a Radix dialog: it paints its own
+                                    // z-[2000] overlay, so the picker's dialogs need raising past
+                                    // it — matches the z-[2101] its save-confirm dialog uses.
+                                    contentClassName="z-[2101]"
                                   />
                                 </div>
                                 {canEditFields && (
@@ -1270,11 +1288,22 @@ export default function WorkTrackerModal({
                             </label>
                             <div className="flex flex-row gap-2 items-center">
                               <div className="flex-1 min-w-0">
-                                <PocSelect
-                                  contactUuid={workTracker?.dropoff_poc_contact_uuid ?? null}
-                                  pocText={workTracker?.dropoff_poc ?? null}
-                                  onChange={setDropoffPoc}
-                                  placeholder={isSingleFieldSetType ? "POC" : "Dropoff POC"}
+                                <ContactPicker
+                                  label=""
+                                  contactId={workTracker?.dropoff_poc_contact_uuid ?? null}
+                                  contacts={pocContacts}
+                                  fallbackLabel={workTracker?.dropoff_poc ?? null}
+                                  onSelect={(contact) =>
+                                    setDropoffPoc({
+                                      contactUuid: contact.id,
+                                      pocText: contactDisplayName(contact),
+                                    })
+                                  }
+                                  onClear={() =>
+                                    setDropoffPoc({ contactUuid: null, pocText: null })
+                                  }
+                                  placeholder="Search contacts..."
+                                  contentClassName="z-[2101]"
                                 />
                               </div>
                               {canEditFields && (
