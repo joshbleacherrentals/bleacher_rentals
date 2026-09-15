@@ -61,7 +61,10 @@ export function ContactPicker({
   label = "Contact",
   required,
   className,
-  placeholder = "Search by name, email or phone...",
+  // Deliberately vague — "name", "email" or "phone" in this text is exactly
+  // what tips Chrome's autofill heuristics into treating this as an address
+  // field (see EntitySearchSelect's readOnly-until-focus workaround).
+  placeholder = "Search contacts...",
 }: ContactPickerProps) {
   const { companies, isLoading: loadingCompanies } = useCompaniesAll();
 
@@ -204,6 +207,7 @@ export function ContactPicker({
         getSearchText={(c) => `${contactDisplayName(c)} ${contactSecondaryLine(c)}`}
         createLabel="+ Create New Contact"
         emptyLabel="No contacts found."
+        emptyCardLabel={`Select ${label ? label.toLowerCase() : "contact"}...`}
         placeholder={placeholder}
       />
 

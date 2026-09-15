@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type EntitySearchSelectProps<T extends { id: string }> = {
   items: T[];
@@ -26,6 +27,8 @@ type EntitySearchSelectProps<T extends { id: string }> = {
   createLabel: string;
   /** e.g. "No venues found." / "No contacts found." */
   emptyLabel: string;
+  /** Placeholder shown on the persistent card when nothing is selected, e.g. "Select venue..." */
+  emptyCardLabel: string;
   placeholder?: string;
 };
 
@@ -67,14 +70,14 @@ function EntityRow<T extends { id: string }>({
 }
 
 /**
- * Entity-agnostic replacement for SearchableSelect: at rest looks like a
- * plain text field, not a dropdown-styled button — typing filters a list of
- * card rows (a bigger-font primary line + a smaller lighter secondary line +
- * an edit pencil each, independent of selecting that row), with a
- * "+ Create New ..." row pinned at the bottom. Once something's picked, this
- * same row layout becomes the field's own display (in place of the search
- * box) — click it to search again, click its pencil to edit, click its X to
- * clear. Originally built for venues (see docs/specs/venue-history.md §2.3);
+ * Entity-agnostic replacement for SearchableSelect: a persistent card — the
+ * selected item's row (primary/secondary + edit pencil + clear), or an
+ * empty-state placeholder card when nothing's picked — that's always what's
+ * shown at rest. Clicking it (either state) opens a floating panel right
+ * below it with a focused search box, a filtered list of the same card
+ * rows, and a "+ Create New ..." row pinned at the bottom; picking a row,
+ * clicking the card again, clicking outside, or Escape all close it back
+ * up. Originally built for venues (see docs/specs/venue-history.md §2.3);
  * genericized so contacts (and any future entity) can share the exact same
  * behavior, including the portal outside-click fix below.
  */
@@ -90,39 +93,45 @@ export function EntitySearchSelect<T extends { id: string }>({
   getSearchText,
   createLabel,
   emptyLabel,
+  emptyCardLabel,
   placeholder = "Search...",
 }: EntitySearchSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  // The persistent card — used both to anchor the floating panel's position
+  // and, via the outside-click check below, to know a click on the card
+  // itself isn't "outside" (its own onClick handles the open/close toggle).
+  const cardRef = useRef<HTMLDivElement>(null);
   // The dropdown is a createPortal into document.body — it is not a DOM
-  // descendant of containerRef, so the outside-click check below needs its
-  // own ref to know a click inside the (portaled) dropdown isn't "outside".
+  // descendant of cardRef, so the outside-click check below needs its own
+  // ref to know a click inside the (portaled) panel isn't "outside" either.
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
-
-  const selectedId = selected?.id ?? null;
-
-  // A save (create, or edit-from-dropdown which also selects — see
-  // VenuePicker/ContactPicker) lands here as `selected` changing. Drop back
-  // into display mode automatically rather than leaving the dropdown open
-  // over a selection that already happened.
-  useEffect(() => {
-    if (selectedId) setOpen(false);
-  }, [selectedId]);
+  // Chrome's address/contact autofill keys off far more than a matching
+  // `autocomplete` value — it also reads keywords in nearby placeholder/label
+  // text (this box searches by name, email and phone, so it reads as an
+  // address field) and can suggest anyway. Starting the field `readOnly` and
+  // stripping that on the first real focus/touch defeats it reliably: Chrome
+  // checks `readOnly` at the moment focus fires, before this state update
+  // lands, so it never sees an editable field to attach a suggestion to.
+  const [inputReadOnly, setInputReadOnly] = useState(true);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (open) {
+      inputRef.current?.focus();
+    } else {
+      setInputReadOnly(true);
+    }
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      const inContainer = containerRef.current?.contains(target) ?? false;
+      const inCard = cardRef.current?.contains(target) ?? false;
       const inDropdown = dropdownRef.current?.contains(target) ?? false;
-      if (!inContainer && !inDropdown) {
+      if (!inCard && !inDropdown) {
         setOpen(false);
       }
     };
@@ -131,8 +140,8 @@ export function EntitySearchSelect<T extends { id: string }>({
   }, [open]);
 
   useEffect(() => {
-    if (open && inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
+    if (open && cardRef.current) {
+      const rect = cardRef.current.getBoundingClientRect();
       setPos({
         top: rect.bottom + window.scrollY,
         left: rect.left + window.scrollX,
@@ -141,112 +150,136 @@ export function EntitySearchSelect<T extends { id: string }>({
     }
   }, [open]);
 
-  const openSearch = () => {
-    setQuery("");
-    setOpen(true);
+  const toggleOpen = () => {
+    setOpen((prev) => {
+      if (!prev) setQuery("");
+      return !prev;
+    });
   };
 
-  // Selected, dropdown closed — the card is the whole field.
-  if (!open && selected) {
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={openSearch}
-        onKeyDown={(e) => e.key === "Enter" && openSearch()}
-        className="flex items-center justify-between gap-2 w-full border rounded-md px-3 py-2 bg-white cursor-pointer hover:border-gray-300"
-      >
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-darkBlue truncate">
-            {renderPrimary(selected)}
-          </div>
-          <div className="text-xs text-gray-500 truncate">{renderSecondary(selected)}</div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(selected.id);
-            }}
-            aria-label="Edit"
-            className="p-1.5 text-gray-400 hover:text-darkBlue transition-colors"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClear();
-            }}
-            aria-label="Clear"
-            className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Nothing selected, or actively searching — plain text field.
   const q = query.trim().toLowerCase();
   const filtered = q
     ? items.filter((item) => getSearchText(item).toLowerCase().includes(q))
     : items;
 
   return (
-    <div ref={containerRef} className="relative w-full">
-      <input
-        ref={inputRef}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => setOpen(true)}
+    <div className="relative w-full">
+      <div
+        ref={cardRef}
+        role="button"
+        tabIndex={0}
+        onClick={toggleOpen}
         onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            setOpen(false);
-            inputRef.current?.blur();
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleOpen();
           }
         }}
-        placeholder={placeholder}
-        className="w-full p-2 border rounded text-sm"
-      />
+        className={cn(
+          "flex items-center justify-between gap-2 w-full border rounded-md px-3 py-2 bg-white cursor-pointer hover:border-gray-300",
+          open && "border-darkBlue",
+        )}
+      >
+        {selected ? (
+          <>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-darkBlue truncate">
+                {renderPrimary(selected)}
+              </div>
+              <div className="text-xs text-gray-500 truncate">{renderSecondary(selected)}</div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(selected.id);
+                }}
+                aria-label="Edit"
+                className="p-1.5 text-gray-400 hover:text-darkBlue transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear();
+                }}
+                aria-label="Clear"
+                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </>
+        ) : (
+          <span className="text-sm text-gray-400">{emptyCardLabel}</span>
+        )}
+      </div>
+
       {open &&
         typeof window !== "undefined" &&
         createPortal(
           <div
             ref={dropdownRef}
-            className="absolute bg-white border shadow-lg rounded z-[9999] max-h-72 overflow-y-auto"
+            className="absolute bg-white border shadow-lg rounded z-[9999] overflow-hidden"
             style={{ top: pos.top, left: pos.left, width: pos.width, position: "absolute" }}
           >
-            {filtered.length === 0 && (
-              <p className="px-3 py-2 text-sm text-gray-400">{emptyLabel}</p>
-            )}
-            {filtered.map((item) => (
-              <EntityRow
-                key={item.id}
-                item={item}
-                renderPrimary={renderPrimary}
-                renderSecondary={renderSecondary}
-                onSelect={() => {
-                  onSelect(item);
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
                   setOpen(false);
-                }}
-                onEdit={() => {
-                  setOpen(false);
-                  onEdit(item.id);
-                }}
-              />
-            ))}
-            <div
-              className="px-3 py-2 text-sm font-medium text-darkBlue hover:bg-gray-50 cursor-pointer border-t"
-              onClick={() => {
-                setOpen(false);
-                onCreateNew(query);
+                  inputRef.current?.blur();
+                }
               }}
-            >
-              {createLabel}
+              placeholder={placeholder}
+              className="w-full p-2 border-b text-sm focus:outline-none"
+              // Belt-and-suspenders against Chrome's address/contact autofill:
+              // "new-password" is the one autoComplete hint it reliably never
+              // fills; readOnly (stripped on first real focus/touch, below) is
+              // the part that actually stops the suggestion popover, since
+              // Chrome also keys off nearby text and not just this attribute.
+              autoComplete="new-password"
+              name="entity-search"
+              data-1p-ignore
+              data-lpignore="true"
+              readOnly={inputReadOnly}
+              onFocus={() => setInputReadOnly(false)}
+              onTouchStart={() => setInputReadOnly(false)}
+            />
+            <div className="max-h-72 overflow-y-auto">
+              {filtered.length === 0 && (
+                <p className="px-3 py-2 text-sm text-gray-400">{emptyLabel}</p>
+              )}
+              {filtered.map((item) => (
+                <EntityRow
+                  key={item.id}
+                  item={item}
+                  renderPrimary={renderPrimary}
+                  renderSecondary={renderSecondary}
+                  onSelect={() => {
+                    onSelect(item);
+                    setOpen(false);
+                  }}
+                  onEdit={() => {
+                    setOpen(false);
+                    onEdit(item.id);
+                  }}
+                />
+              ))}
+              <div
+                className="px-3 py-2 text-sm font-medium text-darkBlue hover:bg-gray-50 cursor-pointer border-t"
+                onClick={() => {
+                  setOpen(false);
+                  onCreateNew(query);
+                }}
+              >
+                {createLabel}
+              </div>
             </div>
           </div>,
           document.body,

@@ -281,7 +281,8 @@ export function VenuePicker({
         getSearchText={(venue) => `${venue.name} ${venueAddressLine(venue.address)}`}
         createLabel="+ Create New Venue"
         emptyLabel="No venues found."
-        placeholder="Search by name or address..."
+        emptyCardLabel="Select venue..."
+        placeholder="Search venues..."
       />
 
       {/* Create New Venue */}
