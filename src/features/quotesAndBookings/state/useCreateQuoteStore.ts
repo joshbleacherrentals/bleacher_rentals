@@ -10,6 +10,7 @@ import {
   PaymentMethod,
   QuoteStatus,
 } from "../types/quoteTypes";
+import type { LostReason } from "../utils/lostReason";
 
 export type CreateQuoteState = {
   // Edit mode
@@ -19,6 +20,10 @@ export type CreateQuoteState = {
   quoteNumber: string;
   quoteValidTill: string;
   status: QuoteStatus;
+  // Why the quote was lost. Only meaningful while status is "lost" — every save
+  // normalizes it away otherwise (see utils/lostReason).
+  lostReason: LostReason | null;
+  lostReasonNote: string;
   salesOfficeId: string | null;
   accountManagerId: string | null;
   ownerUserUuid: string | null;
@@ -92,6 +97,8 @@ const initialState: CreateQuoteState = {
   quoteNumber: "",
   quoteValidTill: "",
   status: "draft",
+  lostReason: null,
+  lostReasonNote: "",
   salesOfficeId: null,
   accountManagerId: null,
   ownerUserUuid: null,
@@ -192,6 +199,9 @@ export const useCreateQuoteStore = create<CreateQuoteState & CreateQuoteActions>
 
 const TRACKED_KEYS: (keyof CreateQuoteState)[] = [
   "eventName",
+  "status",
+  "lostReason",
+  "lostReasonNote",
   "eventStart",
   "eventEnd",
   "contactId",

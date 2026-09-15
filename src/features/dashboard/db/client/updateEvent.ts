@@ -7,6 +7,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { Database, Tables, TablesInsert } from "../../../../../database.types";
 import { checkEventFormRules } from "../../functions";
 import { db } from "@/components/providers/SystemProvider";
+import { normalizeLostFields } from "@/features/quotesAndBookings/utils/lostReason";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
 
@@ -111,7 +112,10 @@ export async function updateEvent(
         ten_row: state.tenRow,
         fifteen_row: state.fifteenRow,
         event_status: state.selectedStatus,
-        contract_revenue_cents: state.contractRevenueCents,
+        ...normalizeLostFields({ ...state, status: state.selectedStatus }),
+        // contract_revenue_cents is deliberately NOT written here: it is derived
+        // from line items + tax by the quote flow, and this path had no input
+        // left to source it from once Contract Revenue left the Details tab.
         notes: state.notes,
         hsl_hue: state.hslHue,
         must_be_clean: state.mustBeClean ? 1 : 0,

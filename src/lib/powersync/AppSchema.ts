@@ -217,6 +217,8 @@ const EventsCols = {
   address_uuid: column.text,
   created_by_user_uuid: column.text,
   event_status: column.text,
+  lost_reason: column.text,
+  lost_reason_note: column.text,
   contract_revenue_cents: column.integer,
   booked_at: column.text,
   event_type_uuid: column.text,
@@ -411,6 +413,8 @@ const WorkTrackersCols = {
   dropoff_time_mode: column.text,
   dropoff_time_start: column.text,
   dropoff_time_end: column.text,
+  declined_at: column.text,
+  abandoned_at: column.text,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
 const WorkTrackers = new Table(WorkTrackersCols, {
   indexes: {

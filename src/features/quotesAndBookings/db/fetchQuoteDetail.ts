@@ -5,6 +5,8 @@ export type QuoteDetail = {
   invoiceNumber: number | null;
   eventName: string;
   eventStatus: string | null;
+  lostReason: string | null;
+  lostReasonNote: string | null;
   eventStart: string | null;
   eventEnd: string | null;
   setupStart: string | null;
@@ -58,6 +60,8 @@ type Row = {
   invoice_number: number | null;
   event_name: string;
   event_status: string | null;
+  lost_reason: string | null;
+  lost_reason_note: string | null;
   event_start: string | null;
   event_end: string | null;
   setup_start: string | null;
@@ -109,6 +113,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
       "e.invoice_number as invoice_number",
       "e.event_name as event_name",
       "e.event_status as event_status",
+      "e.lost_reason as lost_reason",
+      "e.lost_reason_note as lost_reason_note",
       "e.event_start as event_start",
       "e.event_end as event_end",
       "e.setup_start as setup_start",
@@ -160,6 +166,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
     invoiceNumber: r.invoice_number,
     eventName: r.event_name,
     eventStatus: r.event_status,
+    lostReason: r.lost_reason,
+    lostReasonNote: r.lost_reason_note,
     eventStart: r.event_start,
     eventEnd: r.event_end,
     setupStart: r.setup_start,

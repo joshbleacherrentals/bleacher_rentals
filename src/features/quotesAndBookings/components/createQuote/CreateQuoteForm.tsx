@@ -24,7 +24,7 @@ import { updateQuoteEvent } from "../../db/updateQuoteEvent";
 import { logQuoteSentLocal } from "../../db/logQuoteSentLocal";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import { createErrorToast } from "@/components/toasts/ErrorToast";
+import { createErrorToast, createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { useAutoTax } from "../../hooks/useAutoTax";
 import { useCurrentUserUuid } from "../../hooks/useCurrentUserUuid";
 import { triage } from "@/features/alerts/triage";
@@ -32,6 +32,7 @@ import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsS
 import { useNavigationGuard } from "../../hooks/useNavigationGuard";
 import { UnsavedChangesDialog } from "./modals/UnsavedChangesDialog";
 import { draftSaveDefaults, validateQuoteForSend } from "../../utils/quoteValidation";
+import { validateLostReason } from "../../utils/lostReason";
 
 export function CreateQuoteForm() {
   const router = useRouter();
@@ -49,6 +50,16 @@ export function CreateQuoteForm() {
   const { qboError, countryMismatch } = useAutoTax();
 
   const isEditing = !!editingEventId;
+
+  // Marking a quote lost is the last moment the reason can be captured, so it
+  // gates every write — including the draft Save, which blocks on nothing else.
+  const validateLost = (): boolean => {
+    const errors = validateLostReason(useCreateQuoteStore.getState());
+    // No-throw: this is a refusal to save, not a failure — the caller decides
+    // what happens next (stay on the page, keep the guard dialog open).
+    if (errors.length > 0) createErrorToastNoThrow(errors);
+    return errors.length === 0;
+  };
 
   // Full completeness check — required before a quote can be sent or previewed.
   const validateRequiredFields = (): boolean => {
@@ -74,6 +85,7 @@ export function CreateQuoteForm() {
    * or null on error.
    */
   const persistQuote = async (): Promise<string | null> => {
+    if (!validateLost()) return null;
     setSaving(true);
     try {
       // event_name/start/end are NOT NULL columns — default a blank one so an
@@ -122,7 +134,7 @@ export function CreateQuoteForm() {
   };
 
   const handlePreviewPdf = async () => {
-    if (!validateRequiredFields()) return;
+    if (!validateLost() || !validateRequiredFields()) return;
     setSaving(true);
     try {
       const state = useCreateQuoteStore.getState();
@@ -148,7 +160,7 @@ export function CreateQuoteForm() {
   };
 
   const handleSendQuote = async () => {
-    if (!validateRequiredFields()) return;
+    if (!validateLost() || !validateRequiredFields()) return;
     setSaving(true);
     try {
       // Override status to "quoted" when sending

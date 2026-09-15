@@ -1,7 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Send, FilePen, CheckCircle, Play, Award, XCircle, ClipboardCheck } from "lucide-react";
+import {
+  Send,
+  FilePen,
+  CheckCircle,
+  Play,
+  Award,
+  XCircle,
+  ClipboardCheck,
+  UserX,
+  LogOut,
+} from "lucide-react";
 import { Toggle } from "@/components/Toggle";
 import { Tables } from "../../../../database.types";
 import { WORKTRACKER_STATUS_COLORS } from "../constants";
@@ -167,6 +177,35 @@ export default function WorkTrackerStatusBadge({
           <XCircle className={`h-4 w-4 ${cancelledColors.text}`} />
           {showText && (
             <span className={`text-sm font-medium ${cancelledColors.text}`}>Cancelled</span>
+          )}
+        </div>
+      );
+
+    // A driver stepping away from the work, as opposed to `cancelled`, which is
+    // the office calling the job off. Read-only here: the driver sets these
+    // from the mobile app, the web dashboard only reports them.
+    case "declined":
+      const declinedColors = WORKTRACKER_STATUS_COLORS.declined;
+      return (
+        <div
+          className={`flex items-center justify-center whitespace-nowrap ${showText ? "gap-2 px-3 py-1.5" : "p-1.5"} ${declinedColors.bg} border ${declinedColors.border} rounded-md`}
+        >
+          <UserX className={`h-4 w-4 ${declinedColors.text}`} />
+          {showText && (
+            <span className={`text-sm font-medium ${declinedColors.text}`}>Declined</span>
+          )}
+        </div>
+      );
+
+    case "abandoned":
+      const abandonedColors = WORKTRACKER_STATUS_COLORS.abandoned;
+      return (
+        <div
+          className={`flex items-center justify-center whitespace-nowrap ${showText ? "gap-2 px-3 py-1.5" : "p-1.5"} ${abandonedColors.bg} border ${abandonedColors.border} rounded-md`}
+        >
+          <LogOut className={`h-4 w-4 ${abandonedColors.text}`} />
+          {showText && (
+            <span className={`text-sm font-medium ${abandonedColors.text}`}>Abandoned</span>
           )}
         </div>
       );

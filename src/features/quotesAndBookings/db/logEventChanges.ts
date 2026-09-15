@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../../../../database.types";
+import { lostReasonLabel } from "../utils/lostReason";
 
 export type ActionType =
   | "create"
@@ -16,6 +17,8 @@ export const TRACKED_FIELDS = [
   "event_start",
   "event_end",
   "event_status",
+  "lost_reason",
+  "lost_reason_note",
   "event_type_uuid",
   "contact_uuid",
   "finance_contact_uuid",
@@ -39,6 +42,8 @@ export const FIELD_LABELS: Record<string, string> = {
   event_start: "Start Date",
   event_end: "End Date",
   event_status: "Status",
+  lost_reason: "Lost Reason",
+  lost_reason_note: "Lost Reason Note",
   event_type_uuid: "Event Type",
   contact_uuid: "Contact",
   finance_contact_uuid: "Finance Contact",
@@ -206,6 +211,10 @@ export async function logEventChanges(
     if (UUID_FIELDS_TO_SKIP_RAW.has(key)) {
       prevDisplay = oldVal ? (resolvedNames[`${key}:${oldVal}`] ?? serialize(oldVal)) : null;
       nextDisplay = newVal ? (resolvedNames[`${key}:${newVal}`] ?? serialize(newVal)) : null;
+    } else if (key === "lost_reason") {
+      // The log is read by people, not by the enum.
+      prevDisplay = lostReasonLabel(oldVal as string | null);
+      nextDisplay = lostReasonLabel(newVal as string | null);
     } else if (CENTS_FIELDS.has(key)) {
       prevDisplay = oldVal != null ? formatCentsForLog(oldVal, currency) : null;
       nextDisplay = newVal != null ? formatCentsForLog(newVal, currency) : null;

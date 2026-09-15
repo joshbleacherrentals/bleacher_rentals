@@ -11,6 +11,7 @@ import {
   TRACKED_FIELDS,
   SimpleLineItem,
 } from "./logEventChanges";
+import { normalizeLostFields } from "../utils/lostReason";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
@@ -20,6 +21,8 @@ type OldEventRow = {
   event_start: string | null;
   event_end: string | null;
   event_status: string | null;
+  lost_reason: string | null;
+  lost_reason_note: string | null;
   event_type_uuid: string | null;
   contact_uuid: string | null;
   finance_contact_uuid: string | null;
@@ -132,6 +135,8 @@ export async function updateQuoteEvent(
         "event_start",
         "event_end",
         "event_status",
+        "lost_reason",
+        "lost_reason_note",
         "event_type_uuid",
         "contact_uuid",
         "finance_contact_uuid",
@@ -184,6 +189,7 @@ export async function updateQuoteEvent(
     event_start: state.eventStart || null,
     event_end: state.eventEnd || null,
     event_status: state.status || "draft",
+    ...normalizeLostFields(state),
     event_type_uuid: state.eventTypeId || null,
     quote_valid_till: state.quoteValidTill || null,
     contract_revenue_cents: contractRevenueCents,
