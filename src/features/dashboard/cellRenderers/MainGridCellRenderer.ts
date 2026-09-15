@@ -4,7 +4,7 @@ import { Baker } from "../util/Baker";
 import { EventBody } from "../ui/event/EventBody";
 import { EventSpanType, EventsUtil } from "../util/Events";
 import { Tile, DamageSeverity } from "../ui/Tile";
-import { overlaySeverityFromEffective } from "@/lib/damageReportSeverity";
+import { computeDamageOverlayRanges, type DamageOverlayRange } from "../util/damageOverlayRanges";
 import { FirstCellNotPinned } from "../ui/event/FirstCellNotPinned";
 import { PinnableSection } from "../ui/event/PinnableSection";
 import { CELL_WIDTH } from "../values/constants";
@@ -28,9 +28,6 @@ import {
 } from "@/features/workTrackers/util/createWorkTrackerDraft";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
-
-/** Column range where the damage overlay should be drawn */
-type DamageOverlayRange = { startCol: number; endCol: number; severity: DamageSeverity };
 
 /**
  * CellRenderer for the main scrollable grid area
@@ -379,75 +376,23 @@ export class MainGridCellRenderer implements ICellRenderer {
   /**
    * Compute damage overlay column ranges for each bleacher row.
    *
-   * For each unresolved damage report where the bleacher is NOT safe:
-   * - Overlay starts the day AFTER the associated work tracker's date
-   * - Overlay ends the day BEFORE the earliest maintenance event that starts
-   *   on or after the work tracker date (for the same bleacher)
-   * - If no maintenance event exists, overlay extends to the end of the grid
+   * Start/end rules live in `computeDamageOverlayRanges`: a strip opens on the day
+   * its damage report was created and closes the day before maintenance work starts.
    */
   private computeDamageOverlays(
     bleachers: Bleacher[],
     dates: string[],
   ): Map<number, DamageOverlayRange[]> {
     const result = new Map<number, DamageOverlayRange[]>();
-    const dateToIndex = new Map(dates.map((d, i) => [d, i]));
-    const lastCol = dates.length - 1;
 
     for (let row = 0; row < bleachers.length; row++) {
       const bleacher = bleachers[row];
-      const damageReports = bleacher.damageReports ?? [];
-      if (damageReports.length === 0) continue;
-
-      // Sort maintenance events by start date ascending
-      const maintEvents = [...(bleacher.maintenanceEvents ?? [])].sort((a, b) =>
-        a.eventStart.localeCompare(b.eventStart),
+      const ranges = computeDamageOverlayRanges(
+        bleacher.damageReports ?? [],
+        bleacher.maintenanceEvents ?? [],
+        dates,
       );
-
-      const ranges: DamageOverlayRange[] = [];
-
-      for (const dr of damageReports) {
-        if (dr.resolvedAt) continue;
-
-        const referenceDate = dr.workTrackerDate ?? dr.createdAt;
-        if (!referenceDate) continue;
-
-        const severity = overlaySeverityFromEffective(dr.seatDamage, dr.haulDamage);
-        if (!severity) continue;
-
-        const wtDateISO = DateTime.fromISO(referenceDate).toISODate();
-        if (!wtDateISO) continue;
-
-        const wtCol = dateToIndex.get(wtDateISO);
-        if (wtCol === undefined) continue;
-
-        // Overlay starts the day after the work tracker
-        const startCol = wtCol + 1;
-        if (startCol > lastCol) continue;
-
-        // Find the earliest maintenance event for this bleacher
-        // that starts on or after the work tracker date
-        let endCol = lastCol;
-        for (const me of maintEvents) {
-          const meStartISO = DateTime.fromISO(me.eventStart).toISODate();
-          if (!meStartISO) continue;
-          if (meStartISO >= wtDateISO) {
-            const meCol = dateToIndex.get(meStartISO);
-            if (meCol !== undefined && meCol > wtCol) {
-              // Last overlay tile is the day before maintenance starts
-              endCol = meCol - 1;
-              break;
-            }
-          }
-        }
-
-        if (startCol <= endCol) {
-          ranges.push({ startCol, endCol, severity });
-        }
-      }
-
-      if (ranges.length > 0) {
-        result.set(row, ranges);
-      }
+      if (ranges.length > 0) result.set(row, ranges);
     }
 
     return result;

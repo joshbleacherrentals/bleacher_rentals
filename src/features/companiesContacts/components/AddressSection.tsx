@@ -1,6 +1,6 @@
 "use client";
 
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import { FIELD_LABEL } from "@/components/form/TextField";
 import { AddressFields } from "@/features/quotesAndBookings/types/quoteTypes";
 
@@ -17,13 +17,18 @@ type Props = {
   onChange: (address: AddressFields) => void;
 };
 
-/** Autocomplete address picker plus a read-back line for the resolved city/state/zip. */
+/** Autocomplete address picker — the field itself shows the full street/city/state/zip line. */
 export function AddressSection({ label, value, onChange }: Props) {
   return (
     <div>
       <p className={FIELD_LABEL}>{label}</p>
       <AddressAutocomplete
-        initialValue={value.street}
+        initialValue={formatAddressLine({
+          street: value.street,
+          city: value.city,
+          state: value.stateProvince,
+          postalCode: value.zipPostal,
+        })}
         onAddressSelect={(data) =>
           onChange({
             street: data.address ?? "",
@@ -38,13 +43,6 @@ export function AddressSection({ label, value, onChange }: Props) {
         }
         className="h-9 px-3 bg-gray-50 border border-gray-200 rounded-md text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 transition-colors"
       />
-      {value.city && (
-        <p className="text-xs text-gray-400 mt-1">
-          {value.city}
-          {value.stateProvince ? `, ${value.stateProvince}` : ""}
-          {value.zipPostal ? ` ${value.zipPostal}` : ""}
-        </p>
-      )}
     </div>
   );
 }

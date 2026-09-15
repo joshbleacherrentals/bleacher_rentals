@@ -7,6 +7,8 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useCrossBorderWeekStarts } from "../hooks/useCrossBorderWeekStarts";
+import { useWithdrawnCountsByWeek } from "../db/withdrawnTrackers";
+import { WithdrawnBadgeSlot } from "./WithdrawnBadgeSlot";
 
 type WeekGroup = {
   week_start: string | null;
@@ -62,6 +64,7 @@ export function CurrentWeeksList() {
   }, []);
 
   const crossBorderWeekStarts = useCrossBorderWeekStarts(dateRange.start, dateRange.end);
+  const withdrawnByWeek = useWithdrawnCountsByWeek();
 
   const query = useMemo(() => {
     return db
@@ -117,9 +120,15 @@ export function CurrentWeeksList() {
             onClick={() => router.push(`/work-trackers/${row.week_start}`)}
           >
             <td className="py-2 px-3 text-left">
-              <div className="flex flex-col">
-                <span className="font-semibold text-base">{label}</span>
-                <span className="text-sm text-gray-500">{dateRange}</span>
+              <div className="flex items-center gap-2">
+                <WithdrawnBadgeSlot
+                  count={withdrawnByWeek.get(row.week_start) ?? 0}
+                  label={`${withdrawnByWeek.get(row.week_start) ?? 0} work trackers declined or abandoned this week`}
+                />
+                <div className="flex flex-col">
+                  <span className="font-semibold text-base">{label}</span>
+                  <span className="text-sm text-gray-500">{dateRange}</span>
+                </div>
               </div>
             </td>
           </tr>

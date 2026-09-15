@@ -4,6 +4,7 @@ import { fetchQuoteDetail } from "./fetchQuoteDetail";
 import { fetchLineItemsForEvent } from "./fetchLineItems";
 import { resolveInvoiceDisplay } from "../utils/invoiceNumber";
 import { db, powerSyncDb } from "@/components/providers/SystemProvider";
+import type { LostReason } from "../utils/lostReason";
 
 /**
  * Fetches an event by ID (via PowerSync) and loads its data into useCreateQuoteStore for editing.
@@ -21,6 +22,8 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
 
   store.setField("quoteNumber", resolveInvoiceDisplay(data.invoiceNumber, data.id));
   store.setField("status", (data.eventStatus as any) ?? "draft");
+  store.setField("lostReason", (data.lostReason as LostReason | null) ?? null);
+  store.setField("lostReasonNote", data.lostReasonNote ?? "");
   store.setField("salesOfficeId", data.salesOfficeUuid ?? null);
   store.setField("termsDocumentId", data.termsAndConditionsUuid ?? null);
   store.setField("eventName", data.eventName ?? "");
@@ -44,7 +47,10 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
         .where("is_active", "=", 1)
         .limit(1)
         .compile();
-      const amRows = await powerSyncDb.getAll<{ id: string }>(amQuery.sql, amQuery.parameters as any[]);
+      const amRows = await powerSyncDb.getAll<{ id: string }>(
+        amQuery.sql,
+        amQuery.parameters as any[],
+      );
       if (amRows.length > 0) {
         store.setField("accountManagerId", amRows[0].id);
       }
@@ -61,6 +67,14 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
       stateProvince: data.address.stateProvince,
       zipPostal: data.address.zipPostal ?? "",
     });
+  }
+
+  // Must be set for EventDetailsSection to render the Venue picker as a
+  // linked venue instead of falling back to "manual" (plain address, no
+  // venue link) — see its venuePickerValue derivation.
+  if (data.venue) {
+    store.setField("venueId", data.venue.id);
+    store.setField("venueName", data.venue.name);
   }
 
   if (data.financeContact) {

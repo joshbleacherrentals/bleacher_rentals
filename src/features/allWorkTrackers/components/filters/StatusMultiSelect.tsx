@@ -12,6 +12,8 @@ const STATUS_OPTIONS = [
   { label: "Dropoff Inspection", value: "dropoff_inspection" },
   { label: "Completed", value: "completed" },
   { label: "Cancelled", value: "cancelled" },
+  { label: "Declined", value: "declined" },
+  { label: "Abandoned", value: "abandoned" },
 ];
 
 type StatusMultiSelectProps = {

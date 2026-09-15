@@ -13,4 +13,6 @@ export const STATUS_TINT: Record<WorkTrackerStatus, number> = {
   dropoff_inspection: 0xd9d9d9,
   completed: 0xd9d9d9,
   cancelled: 0xd9d9d9,
+  declined: 0xd9d9d9,
+  abandoned: 0xd9d9d9,
 };

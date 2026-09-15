@@ -199,20 +199,20 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Companies & Contacts",
     description:
-      "This applies to the Companies & Contacts page, and to the contact and company forms reached from the quote builder and the work tracker.",
+      'This applies to the Companies & Contacts page, and to the contact, company and venue forms reached from the quote builder and the work tracker. Venues (named addresses like "Lincoln High School Stadium", picked or created from the quote form and the dashboard event modal) follow the exact same rule as contacts and companies.',
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can create, edit and delete any company or contact, including setting the Quote Language that decides which language that contact's quotes are sent in.",
+        "Can create, edit and delete any company, contact or venue, including setting the Quote Language that decides which language that contact's quotes are sent in.",
       ),
       account_manager: full(
-        "Contacts and companies are a shared address book, not owned records — account managers can create and edit any of them, including the Quote Language, because they are the ones speaking to the client and sending the quote.",
+        "Contacts, companies and venues are a shared address book, not owned records — account managers can create and edit any of them, including the Quote Language, because they are the ones speaking to the client and sending the quote.",
       ),
       developer: none(
         "Unable to even access the page, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: read(
-        "This user can see companies and contacts and every detail, but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
+        "This user can see companies, contacts and venues and every detail, but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(
@@ -240,6 +240,32 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: custom(
         "(in the mobile app only) Drivers only have access to work trackers that have been released and are assigned to them. They only have the ability to change the status and submit inspection forms to this work tracker. They cannot delete a work tracker or change any other information.",
+      ),
+      maintainer: none(
+        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      ),
+    },
+  },
+  {
+    label: "Declined & Abandoned Work Tracker Counts",
+    description:
+      "The red count next to Work Trackers in the sidebar, next to each week on the Work Trackers page, and next to each driver inside a week. It counts trackers a driver declined (never took the work on) or abandoned (took it on and handed it back) — not the ones the office cancelled.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: custom(
+        "Only counted when the admin is also an active account manager, and then only for the drivers in their own zones. An admin with no zones is shown no count at all — the number is a nag about work somebody has to re-cover, and a company-wide total is not something one person can act on.",
+      ),
+      account_manager: custom(
+        "Counts every tracker declined or abandoned by a driver who shares a zone with them, for all time, however long ago the trip was. The count is always their own zones, even while 'See All Drivers' is switched on. It drops as those trackers are deleted, and the badge disappears once the last one is gone.",
+      ),
+      developer: none(
+        "Unable to even access the pages where the counts are shown, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "A viewer manages no zones, so there is no work for them to re-cover and no count is shown. A viewer who is also an active account manager is counted as that account manager, for their own zones.",
+      ),
+      driver: none(
+        "The driver's own withdrawals are reported to the account managers of their zones, not back to them in the mobile app.",
       ),
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",

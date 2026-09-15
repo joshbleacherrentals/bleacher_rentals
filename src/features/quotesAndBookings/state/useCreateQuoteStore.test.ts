@@ -8,9 +8,8 @@ vi.stubGlobal("localStorage", {
   removeItem: (k: string) => void mem.delete(k),
 });
 
-const { useCreateQuoteStore, hasUnsavedChanges, captureQuoteBaseline } = await import(
-  "./useCreateQuoteStore"
-);
+const { useCreateQuoteStore, hasUnsavedChanges, captureQuoteBaseline } =
+  await import("./useCreateQuoteStore");
 
 describe("hasUnsavedChanges / captureQuoteBaseline", () => {
   beforeEach(() => {
@@ -46,5 +45,31 @@ describe("hasUnsavedChanges / captureQuoteBaseline", () => {
 
     useCreateQuoteStore.getState().updateLineItem("a", { lineTotalCents: 200 });
     expect(hasUnsavedChanges()).toBe(true);
+  });
+
+  it("marks dirty when the status flips to lost and a reason is picked", () => {
+    useCreateQuoteStore.getState().setField("status", "lost");
+    expect(hasUnsavedChanges()).toBe(true);
+
+    captureQuoteBaseline();
+    useCreateQuoteStore.getState().setField("lostReason", "price_too_high");
+    expect(hasUnsavedChanges()).toBe(true);
+
+    captureQuoteBaseline();
+    useCreateQuoteStore.getState().setField("lostReasonNote", "went elsewhere");
+    expect(hasUnsavedChanges()).toBe(true);
+  });
+});
+
+describe("resetForm", () => {
+  it("clears the lost reason fields", () => {
+    useCreateQuoteStore.getState().setField("status", "lost");
+    useCreateQuoteStore.getState().setField("lostReason", "other");
+    useCreateQuoteStore.getState().setField("lostReasonNote", "competitor");
+
+    useCreateQuoteStore.getState().resetForm();
+
+    expect(useCreateQuoteStore.getState().lostReason).toBeNull();
+    expect(useCreateQuoteStore.getState().lostReasonNote).toBe("");
   });
 });

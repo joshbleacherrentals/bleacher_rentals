@@ -7,7 +7,7 @@ import { SelectDriverZones } from "@/features/manageTeam/components/inputs/Selec
 import { DriverPayTrack } from "@/features/manageTeam/components/inputs/DriverPayTrack";
 import { VendorSelection } from "@/features/manageTeam/components/inputs/VendorSelection";
 import { useCurrentUserStore } from "@/features/manageTeam/state/useCurrentUserStore";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import { DriverDocumentCard } from "@/features/manageTeam/components/inputs/DriverDocumentCard";
 import { DRIVER_DOCUMENTS } from "@/features/manageTeam/logic/driverDocuments";
 import { useTodayIso } from "@/features/manageTeam/hooks/useTodayIso";
@@ -119,7 +119,9 @@ export function DriverPageContent() {
   const assignedDriverZoneUuids = useCurrentUserStore((s) => s.assignedDriverZoneUuids);
   const phoneNumber = useCurrentUserStore((s) => s.phoneNumber);
   const homeAddress = useCurrentUserStore((s) => s.homeAddress);
+  const homeCity = useCurrentUserStore((s) => s.homeCity);
   const homeState = useCurrentUserStore((s) => s.homeState);
+  const homePostalCode = useCurrentUserStore((s) => s.homePostalCode);
   const vehicleMake = useCurrentUserStore((s) => s.vehicleMake);
   const vehicleModel = useCurrentUserStore((s) => s.vehicleModel);
   const vehicleYear = useCurrentUserStore((s) => s.vehicleYear);
@@ -423,7 +425,12 @@ export function DriverPageContent() {
                     setField("homePlaceId", data.placeId ?? null);
                     setField("homeCountry", data.country ?? null);
                   }}
-                  initialValue={homeAddress ?? ""}
+                  initialValue={formatAddressLine({
+                    street: homeAddress,
+                    city: homeCity,
+                    state: homeState,
+                    postalCode: homePostalCode,
+                  })}
                 />
               </div>
               {/* Country Indicator Badge */}
