@@ -36,6 +36,9 @@ import {
 } from "@/features/workTrackers/db/notifications";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { startTrace } from "@/lib/perf/perfTrace";
+import { scheduleTriage } from "@/features/alerts/scheduleTriage";
+import { triage } from "@/features/alerts/triage";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { buildActualBleacherUpdate } from "@/features/workTrackers/util/bleacherSwap";
 import {
@@ -363,10 +366,13 @@ export async function saveWorkTracker(
   }
   // const payCents = Math.round(payInput * 100);
 
+  const trace = startTrace("saveWorkTracker");
+
   let pickUpAddressUuid: string | null = workTracker.pickup_address_uuid;
   let dropOffAddressUuid: string | null = workTracker.dropoff_address_uuid;
   pickUpAddressUuid = await saveAddress(pickUpAddress, pickUpAddressUuid);
   dropOffAddressUuid = await saveAddress(dropOffAddress, dropOffAddressUuid);
+  trace.mark("addresses");
 
   const wasInsert = workTracker.id === "-1";
   let savedWorkTrackerUuid = workTracker.id;
@@ -457,6 +463,7 @@ export async function saveWorkTracker(
         .compile(),
     );
   }
+  trace.mark(wasInsert ? "insert tracker" : "update tracker");
 
   const notification =
     changeType === undefined ||
@@ -480,19 +487,26 @@ export async function saveWorkTracker(
       await insertDriverNotification(driverUserUuid, notification);
     }
   }
+  trace.mark("driver notification");
 
-  try {
-    const { triage } = await import("@/features/alerts/triage");
-    await triage("WorkTrackers", {
-      id: savedWorkTrackerUuid,
-      previous_bleacher_uuid: previousBleacherUuid,
-    });
-  } catch (e) {
-    console.error("[alerts] failed to triage after work tracker save", e);
-  }
+  // Not awaited: the alert cascade is advisory work that nothing below depends
+  // on. `scheduleTriage` documents the trade-off. The phase label is unchanged
+  // so traces stay comparable with the ones captured before this change — it
+  // now measures scheduling, and the cascade reports its own trace when it
+  // finishes.
+  scheduleTriage("WorkTrackers", {
+    id: savedWorkTrackerUuid,
+    previous_bleacher_uuid: previousBleacherUuid,
+  });
+  trace.mark("alert triage");
 
+  // Not awaited, but it fans out: every connected client re-fetches the whole
+  // WorkTrackers and Addresses tables from Supabase. `fetchTableSetStoreAndCache`
+  // logs what that costs on the receiving side.
   updateDataBase(["WorkTrackers", "Addresses"]);
   createSuccessToast(["Work Tracker saved"]);
+
+  trace.end({ workTrackerUuid: savedWorkTrackerUuid, wasInsert });
 
   return savedWorkTrackerUuid;
 }
@@ -512,6 +526,7 @@ export async function moveWorkTracker(params: {
   date?: string | null;
 }): Promise<void> {
   const nextStatus = params.previousStatus === "accepted" ? "released" : params.previousStatus;
+  const trace = startTrace("moveWorkTracker");
 
   await typedExecute(
     db
@@ -524,6 +539,7 @@ export async function moveWorkTracker(params: {
       .where("id", "=", params.workTrackerUuid)
       .compile(),
   );
+  trace.mark("update tracker");
 
   if (shouldSendDriverNotification("un-accept", params.previousStatus, false, nextStatus)) {
     const notification = buildTripStatusNotification({
@@ -545,18 +561,17 @@ export async function moveWorkTracker(params: {
       }
     }
   }
+  trace.mark("driver notification");
 
-  try {
-    const { triage } = await import("@/features/alerts/triage");
-    await triage("WorkTrackers", {
-      id: params.workTrackerUuid,
-      previous_bleacher_uuid: params.previousBleacherUuid,
-    });
-  } catch (e) {
-    console.error("[alerts] failed to triage after work tracker move", e);
-  }
+  scheduleTriage("WorkTrackers", {
+    id: params.workTrackerUuid,
+    previous_bleacher_uuid: params.previousBleacherUuid,
+  });
+  trace.mark("alert triage");
 
   updateDataBase(["WorkTrackers"]);
+
+  trace.end({ workTrackerUuid: params.workTrackerUuid });
 }
 
 export async function deleteWorkTracker(
@@ -603,8 +618,10 @@ export async function deleteWorkTracker(
   const deleteQuery = db.deleteFrom("WorkTrackers").where("id", "=", workTrackerUuid).compile();
   await typedExecute(deleteQuery);
 
+  // Still awaited: deletion triage removes alerts for a row that is going away,
+  // and it is not dedup-keyed the way the save cascade is. Only the lazy import
+  // is dropped here.
   try {
-    const { triage } = await import("@/features/alerts/triage");
     await triage("WorkTrackers_deleted", { id: workTrackerUuid, bleacher_uuid: bleacherUuid });
   } catch (e) {
     console.error("[alerts] failed to triage after work tracker delete", e);

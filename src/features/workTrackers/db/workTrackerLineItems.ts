@@ -1,5 +1,6 @@
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { startTrace } from "@/lib/perf/perfTrace";
 import { Database } from "../../../../database.types";
 
 export type WorkTrackerLineItemType = Database["public"]["Enums"]["work_tracker_line_item_type"];
@@ -150,12 +151,15 @@ export async function syncWorkTrackerLineItems(
   workTrackerUuid: string,
   items: DraftWorkTrackerLineItem[],
 ): Promise<void> {
+  const trace = startTrace("syncWorkTrackerLineItems");
+
   await typedExecute(
     db
       .deleteFrom("WorkTrackerLineItems")
       .where("work_tracker_uuid", "=", workTrackerUuid)
       .compile(),
   );
+  trace.mark("delete existing");
 
   for (const item of items) {
     await typedExecute(
@@ -174,4 +178,7 @@ export async function syncWorkTrackerLineItems(
         .compile(),
     );
   }
+  trace.mark(`insert ${items.length} items`);
+
+  trace.end({ workTrackerUuid });
 }

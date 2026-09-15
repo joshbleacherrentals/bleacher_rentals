@@ -15,13 +15,14 @@ import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { Tables } from "../../../../database.types";
-import { fetchBleachersForOptions, fetchDriverPaymentData } from "@/app/team/_lib/db";
+import { fetchDriverPaymentData } from "@/app/team/_lib/db";
+import { readBleacherOptions } from "@/features/workTrackers/db/readBleacherOptions";
 import { toLatLngString, describeDriverPay, describeDeadheadPay } from "../util";
 import RouteMapPreview from "./RouteMapPreview";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import WorkTrackerStatusBadge from "./WorkTrackerStatusBadge";
 import { EditBlock } from "@/features/dashboard/types";
-import { fetchWorkTrackerByUuid } from "@/features/dashboard/db/client/fetchWorkTracker";
+import { readWorkTrackerForModal } from "@/features/dashboard/db/client/readWorkTrackerForModal";
 import { SelectDriver } from "./SelectDriver";
 import { useDrivers } from "../hooks/useDrivers.db";
 import { useWorkTrackerTypes } from "../hooks/useWorkTrackerTypes";
@@ -57,6 +58,7 @@ import { useDashboardBleachersStore } from "@/features/dashboard/state/useDashbo
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery, typedGetAll } from "@/lib/powersync/typedQuery";
+import { startTrace, type PerfTrace } from "@/lib/perf/perfTrace";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import WorkTrackerLineItemsTab from "./WorkTrackerLineItemsTab";
 import {
@@ -104,6 +106,15 @@ export default function WorkTrackerModal({
   const supabase = useClerkSupabaseClient();
   const queryClient = useQueryClient();
   const router = useRouter();
+
+  // Started when the modal is handed a tracker, ended below once every query it
+  // blocks on has settled — this is the delay managers actually feel after a drag.
+  const openTraceRef = useRef<PerfTrace | null>(null);
+  const openTraceIdRef = useRef<string | null>(null);
+  if (selectedWorkTracker && openTraceIdRef.current !== selectedWorkTracker.id) {
+    openTraceIdRef.current = selectedWorkTracker.id;
+    openTraceRef.current = startTrace("WorkTrackerModal open → data ready");
+  }
 
   // Fetch drivers with user data using PowerSync
   const { data: drivers = [] } = useDrivers();
@@ -242,7 +253,10 @@ export default function WorkTrackerModal({
   } = useQuery({
     queryKey: ["workTracker", selectedWorkTracker?.id],
     queryFn: async () => {
-      return fetchWorkTrackerByUuid(selectedWorkTracker!.id, supabase);
+      // Read locally: PowerSync already holds the tracker and its addresses, and
+      // the modal only opens for a tracker that is on screen — which means it is
+      // in the local DB. The network version cost 8.31s on a cold cache.
+      return readWorkTrackerForModal(selectedWorkTracker!.id);
     },
     enabled: !!selectedWorkTracker && selectedWorkTracker.id !== "-1",
     refetchOnWindowFocus: false,
@@ -476,7 +490,8 @@ export default function WorkTrackerModal({
   } = useQuery({
     queryKey: ["bleacherOptions", amFilterId],
     queryFn: async () => {
-      return fetchBleachersForOptions(supabase, amFilterId);
+      // Was a full `Bleachers` table pull over the network on every cold open.
+      return readBleacherOptions(amFilterId);
     },
   });
 
@@ -493,6 +508,20 @@ export default function WorkTrackerModal({
     },
     enabled: !!workTracker?.driver_uuid && !!selectedDriver,
   });
+
+  const modalDataPending =
+    isWorkTrackerLoading || isLineItemsLoading || isBleachersLoading || isDriverPaymentLoading;
+
+  useEffect(() => {
+    if (modalDataPending) return;
+    const trace = openTraceRef.current;
+    if (!trace) return;
+    openTraceRef.current = null;
+    trace.end({
+      workTrackerUuid: openTraceIdRef.current,
+      note: "all blocking queries settled",
+    });
+  }, [modalDataPending]);
 
   // Once types load, set default type for new work trackers that don't yet have one
   useEffect(() => {
