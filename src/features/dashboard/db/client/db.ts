@@ -35,8 +35,9 @@ import {
   insertDriverNotification,
 } from "@/features/workTrackers/db/notifications";
 import { db } from "@/components/providers/SystemProvider";
-import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { typedExecute, typedExecuteBatch, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { startTrace } from "@/lib/perf/perfTrace";
+import { planWorkTrackerSave } from "@/features/workTrackers/db/planWorkTrackerSave";
 import { scheduleTriage } from "@/features/alerts/scheduleTriage";
 import { triage } from "@/features/alerts/triage";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
@@ -241,52 +242,6 @@ export function fetchDashboardEvents() {
   }, [events, addresses, bleacherEvents]);
 }
 
-async function saveAddress(
-  address: AddressData | null,
-  addressUuid: string | null,
-): Promise<string | null> {
-  if (!address) return null;
-
-  if (addressUuid) {
-    await typedExecute(
-      db
-        .updateTable("Addresses")
-        .set({
-          city: address.city ?? "",
-          state_province: address.state ?? "",
-          street: address.address ?? "",
-          zip_postal: address.postalCode ?? "",
-          latitude: address.lat ?? null,
-          longitude: address.lng ?? null,
-          country: address.country ?? null,
-          place_id: address.placeId ?? null,
-        })
-        .where("id", "=", addressUuid)
-        .compile(),
-    );
-    return addressUuid;
-  } else {
-    const id = crypto.randomUUID();
-    await typedExecute(
-      db
-        .insertInto("Addresses")
-        .values({
-          id,
-          city: address.city ?? "",
-          state_province: address.state ?? "",
-          street: address.address ?? "",
-          zip_postal: address.postalCode ?? "",
-          latitude: address.lat ?? null,
-          longitude: address.lng ?? null,
-          country: address.country ?? null,
-          place_id: address.placeId ?? null,
-        })
-        .compile(),
-    );
-    return id;
-  }
-}
-
 export function getAddressFromUuid(addressUuid: string | null): AddressData | null {
   const addresses = useAddressesStore.getState().addresses;
   if (!addressUuid) return null;
@@ -368,16 +323,11 @@ export async function saveWorkTracker(
 
   const trace = startTrace("saveWorkTracker");
 
-  let pickUpAddressUuid: string | null = workTracker.pickup_address_uuid;
-  let dropOffAddressUuid: string | null = workTracker.dropoff_address_uuid;
-  pickUpAddressUuid = await saveAddress(pickUpAddress, pickUpAddressUuid);
-  dropOffAddressUuid = await saveAddress(dropOffAddress, dropOffAddressUuid);
-  trace.mark("addresses");
-
   const wasInsert = workTracker.id === "-1";
-  let savedWorkTrackerUuid = workTracker.id;
-  let previousBleacherUuid: string | null = null;
 
+  // Reads first, because the plan below needs their answers and nothing may sit
+  // between the plan and its single commit.
+  let previousBleacherUuid: string | null = null;
   if (!wasInsert) {
     const previousRows = await typedGetAll(
       db
@@ -390,80 +340,13 @@ export async function saveWorkTracker(
     );
     previousBleacherUuid = previousRows[0]?.bleacher_uuid ?? null;
   }
+
   const previousStatus = options?.previousStatus ?? "draft";
   const changeType = options?.changeType;
   const effectiveStatus =
     changeType === undefined
       ? workTracker.status
       : resolveStatusOnSave(previousStatus, changeType, workTracker.status);
-  const pickupAddressText = toNotificationAddress(
-    pickUpAddress,
-    options?.previousPickupAddress ?? "an unknown pickup location",
-  );
-  const pickupCityText = toNotificationCity(pickUpAddress, options?.previousPickupCity);
-  const dropoffAddressText = toNotificationAddress(
-    dropOffAddress,
-    options?.previousDropoffAddress ?? "an unknown dropoff location",
-  );
-  const dropoffCityText = toNotificationCity(dropOffAddress, options?.previousDropoffCity);
-
-  const wtFields = {
-    date: workTracker.date,
-    pickup_address_uuid: pickUpAddressUuid,
-    pickup_poc: workTracker.pickup_poc,
-    pickup_poc_contact_uuid: workTracker.pickup_poc_contact_uuid,
-    // pickup_time/dropoff_time (legacy free-text columns, kept only for the
-    // driver app) are no longer written from the web app — they're kept in
-    // sync from pickup_time_mode/start/end by the sync_work_tracker_time_text() DB trigger.
-    pickup_time_mode: workTracker.pickup_time_mode,
-    pickup_time_start: workTracker.pickup_time_start,
-    pickup_time_end: workTracker.pickup_time_end,
-    pickup_instructions: workTracker.pickup_instructions,
-    teardown_required: workTracker.teardown_required ? 1 : 0,
-    dropoff_address_uuid: dropOffAddressUuid,
-    dropoff_poc: workTracker.dropoff_poc,
-    dropoff_poc_contact_uuid: workTracker.dropoff_poc_contact_uuid,
-    dropoff_time_mode: workTracker.dropoff_time_mode,
-    dropoff_time_start: workTracker.dropoff_time_start,
-    dropoff_time_end: workTracker.dropoff_time_end,
-    dropoff_instructions: workTracker.dropoff_instructions,
-    setup_required: workTracker.setup_required ? 1 : 0,
-    notes: workTracker.notes,
-    pay_cents: workTracker.pay_cents,
-    bleacher_uuid: workTracker.bleacher_uuid,
-    // Both columns always move together: reverting to the assigned bleacher has
-    // to clear the reason in the same UPDATE, or the row keeps a reason for a
-    // swap that no longer exists.
-    ...buildActualBleacherUpdate({
-      assignedBleacherUuid: workTracker.bleacher_uuid,
-      nextActualBleacherUuid: workTracker.actual_bleacher_uuid,
-      nextReason: workTracker.bleacher_change_reason,
-    }),
-    internal_notes: workTracker.internal_notes,
-    driver_uuid: workTracker.driver_uuid,
-    status: effectiveStatus,
-    work_tracker_type_uuid: workTracker.work_tracker_type_uuid,
-    distance_meters: workTracker.distance_meters,
-    drive_minutes: workTracker.drive_minutes,
-    project_number: workTracker.project_number,
-  };
-
-  if (!wasInsert) {
-    await typedExecute(
-      db.updateTable("WorkTrackers").set(wtFields).where("id", "=", workTracker.id).compile(),
-    );
-  } else {
-    savedWorkTrackerUuid = crypto.randomUUID();
-    const createdByUserUuid =
-      workTracker.created_by_user_uuid ?? usePermissionsStore.getState().userId ?? null;
-    await typedExecute(
-      db
-        .insertInto("WorkTrackers")
-        .values({ id: savedWorkTrackerUuid, ...wtFields, created_by_user_uuid: createdByUserUuid })
-        .compile(),
-    );
-  }
-  trace.mark(wasInsert ? "insert tracker" : "update tracker");
 
   const notification =
     changeType === undefined ||
@@ -471,23 +354,45 @@ export async function saveWorkTracker(
       ? buildTripStatusNotification({
           previousStatus: wasInsert ? "draft" : previousStatus,
           nextStatus: effectiveStatus,
-          pickupAddress: pickupAddressText,
-          pickupCity: pickupCityText,
-          dropoffAddress: dropoffAddressText,
-          dropoffCity: dropoffCityText,
+          pickupAddress: toNotificationAddress(
+            pickUpAddress,
+            options?.previousPickupAddress ?? "an unknown pickup location",
+          ),
+          pickupCity: toNotificationCity(pickUpAddress, options?.previousPickupCity),
+          dropoffAddress: toNotificationAddress(
+            dropOffAddress,
+            options?.previousDropoffAddress ?? "an unknown dropoff location",
+          ),
+          dropoffCity: toNotificationCity(dropOffAddress, options?.previousDropoffCity),
           date: workTracker.date,
         })
       : null;
 
-  if (notification) {
-    const driverUserUuid =
-      options?.driverUserUuid ?? (await fetchDriverUserUuidByDriverUuid(workTracker.driver_uuid));
+  const notificationUserUuid = notification
+    ? (options?.driverUserUuid ?? (await fetchDriverUserUuidByDriverUuid(workTracker.driver_uuid)))
+    : null;
+  trace.mark("reads");
 
-    if (driverUserUuid) {
-      await insertDriverNotification(driverUserUuid, notification);
-    }
-  }
-  trace.mark("driver notification");
+  // Addresses, the tracker row and the driver notification used to be three or
+  // four separate transactions, each one an IndexedDB round-trip that also woke
+  // every watched query on the tables it touched. They are one transaction now;
+  // `planWorkTrackerSave` explains why generating the ids up front is what made
+  // that possible.
+  const plan = planWorkTrackerSave({
+    workTracker,
+    pickUpAddress,
+    dropOffAddress,
+    effectiveStatus,
+    createdByUserUuid:
+      workTracker.created_by_user_uuid ?? usePermissionsStore.getState().userId ?? null,
+    notification,
+    notificationUserUuid,
+    newId: () => crypto.randomUUID(),
+  });
+
+  await typedExecuteBatch(plan.statements);
+  const savedWorkTrackerUuid = plan.workTrackerUuid;
+  trace.mark(wasInsert ? "insert tracker" : "update tracker");
 
   // Not awaited: the alert cascade is advisory work that nothing below depends
   // on. `scheduleTriage` documents the trade-off. The phase label is unchanged
