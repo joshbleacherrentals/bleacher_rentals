@@ -271,16 +271,16 @@ export const EventConfigurationForm = ({
               )}
             </button>
           )}
-          {/* Details button — always visible when canEdit */}
+          {/* Quote button — always visible when canEdit */}
           {canEdit && (
             <button
               type="button"
-              title="Open in Quote Details"
+              title="Open Quote"
               className="flex items-center gap-1.5 px-4 py-2 bg-white text-gray-700 text-sm font-semibold border border-gray-300 rounded-sm hover:bg-gray-50 transition cursor-pointer"
               onClick={handleOpenDetails}
             >
               <ExternalLink className="w-4 h-4" />
-              Details
+              Quote
             </button>
           )}
           {/* Delete button - only for existing events the user can edit */}
