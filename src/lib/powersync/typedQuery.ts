@@ -1,8 +1,16 @@
 "use client";
+import { useEffect, useRef } from "react";
 import type { CompiledQuery } from "kysely";
 import { useQuery } from "@powersync/react";
 import { db, powerSyncDb } from "@/components/providers/SystemProvider";
-import { countDbBatch, countDbRead, countDbWrite } from "@/lib/perf/perfTrace";
+import {
+  countDbBatch,
+  countDbRead,
+  countDbWrite,
+  countWatcherEmission,
+  countWatcherMount,
+  countWatcherUnmount,
+} from "@/lib/perf/perfTrace";
 
 export type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
@@ -21,11 +29,46 @@ type EnsureExact<Actual, Expected> =
 // phantom helper (runtime = undefined, compile-time = T)
 export const expect = <T>() => undefined as unknown as T;
 
+/**
+ * Counts what `@powersync/react` does that no other counter can see.
+ *
+ * Without a `rowComparator` the hook re-runs its SQL and returns a *new array*
+ * on every change to any table the query reads, identical rows or not. A new
+ * `data` reference is therefore exactly one emission, and one commit produces
+ * one per mounted watcher on each table it touched.
+ *
+ * The first non-loading result is the initial load, not a re-run after a
+ * commit, so it seeds the comparison rather than being counted — the number the
+ * report is after is emissions *per commit*.
+ *
+ * Cost is a ref compare in an effect that React has already scheduled, so this
+ * stays as cheap as the read/write counters and stays on.
+ */
+function useWatcherEmissionCount(sql: string, data: unknown, isLoading: boolean): void {
+  const seen = useRef<unknown>(undefined);
+
+  useEffect(() => {
+    countWatcherMount(sql);
+    return () => countWatcherUnmount(sql);
+  }, [sql]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (seen.current === data) return;
+
+    const isInitialLoad = seen.current === undefined;
+    seen.current = data;
+    if (!isInitialLoad) countWatcherEmission(sql);
+  }, [sql, data, isLoading]);
+}
+
 export function useTypedQuery<C extends CompiledQuery<any>, TExpected>(
   compiled: C & EnsureExact<CompiledResultOf<C>, TExpected>,
   _expected: TExpected, // required so you can't forget the check
 ) {
-  return useQuery<TExpected>(compiled.sql, compiled.parameters as any[]);
+  const result = useQuery<TExpected>(compiled.sql, compiled.parameters as any[]);
+  useWatcherEmissionCount(compiled.sql, result.data, result.isLoading);
+  return result;
 }
 
 export function typedGetAll<C extends CompiledQuery<any>, TExpected>(

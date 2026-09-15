@@ -147,6 +147,140 @@ export function countCascadeRun(): void {
   cascadeRuns++;
 }
 
+// ---------------------------------------------------------------------------
+// Watched-query emissions
+// ---------------------------------------------------------------------------
+
+/**
+ * `useTypedQuery` passes no `rowComparator`, so `@powersync/react` re-runs each
+ * watched query and hands back a *new array* on every change to any table the
+ * query reads — even when the rows are identical. That work happens inside the
+ * library, where `countDbRead` never sees it, which is why a commit can be
+ * followed by a stall that no trace accounts for.
+ *
+ * These counters make the emissions visible: one per mounted watcher per commit
+ * that touches one of its tables. Keyed by SQL so the hottest queries can be
+ * named, and rolled up per table so the number can be compared against the
+ * static per-table count of call sites.
+ */
+export type WatcherEmission = {
+  /** Whitespace-normalized SQL — the same query formatted two ways is one key. */
+  key: string;
+  tables: string[];
+  emissions: number;
+  /** Watchers currently mounted on this query. */
+  watchers: number;
+};
+
+export function watcherKeyFromSql(sql: string): string {
+  return sql.replace(/\s+/g, " ").trim();
+}
+
+const TABLE_IN_SQL = /\b(?:from|join)\s+"([A-Za-z_][A-Za-z0-9_]*)"/gi;
+
+/**
+ * The tables a watcher wakes on, for the report's roll-up only — PowerSync does
+ * its own resolution and is the authority. Unrecognized SQL yields nothing
+ * rather than a guess.
+ */
+export function tablesInSql(sql: string): string[] {
+  const tables: string[] = [];
+  TABLE_IN_SQL.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = TABLE_IN_SQL.exec(sql)) !== null) {
+    if (!tables.includes(match[1])) tables.push(match[1]);
+  }
+  return tables;
+}
+
+type WatcherState = { tables: string[]; emissions: number; watchers: number };
+
+let watcherStates = new Map<string, WatcherState>();
+
+function watcherState(sql: string): WatcherState {
+  const key = watcherKeyFromSql(sql);
+  const existing = watcherStates.get(key);
+  if (existing) return existing;
+
+  // Table extraction is the only non-trivial cost here, and it happens once per
+  // distinct query rather than once per emission.
+  const created: WatcherState = { tables: tablesInSql(key), emissions: 0, watchers: 0 };
+  watcherStates.set(key, created);
+  return created;
+}
+
+export function countWatcherMount(sql: string): void {
+  watcherState(sql).watchers++;
+}
+
+export function countWatcherUnmount(sql: string): void {
+  const state = watcherState(sql);
+  state.watchers = Math.max(0, state.watchers - 1);
+}
+
+/** One watcher handed back a fresh result array. */
+export function countWatcherEmission(sql: string): void {
+  watcherState(sql).emissions++;
+}
+
+export function watcherEmissionCounts(): WatcherEmission[] {
+  return [...watcherStates.entries()]
+    .map(([key, state]) => ({
+      key,
+      tables: state.tables,
+      emissions: state.emissions,
+      watchers: state.watchers,
+    }))
+    .sort((a, b) => b.emissions - a.emissions);
+}
+
+export type WatcherTableSummary = { table: string; emissions: number; queries: number };
+
+export function summarizeWatcherEmissionsByTable(rows: WatcherEmission[]): WatcherTableSummary[] {
+  const byTable = new Map<string, WatcherTableSummary>();
+
+  for (const row of rows) {
+    for (const table of row.tables) {
+      const summary = byTable.get(table) ?? { table, emissions: 0, queries: 0 };
+      summary.emissions += row.emissions;
+      summary.queries += 1;
+      byTable.set(table, summary);
+    }
+  }
+
+  return [...byTable.values()].sort((a, b) => b.emissions - a.emissions);
+}
+
+const WATCHER_SQL_PREVIEW = 90;
+
+function previewSql(sql: string): string {
+  return sql.length <= WATCHER_SQL_PREVIEW ? sql : `${sql.slice(0, WATCHER_SQL_PREVIEW - 1)}…`;
+}
+
+/** Report section. Empty when nothing has been watched, so it costs no noise. */
+export function formatWatcherEmissions(rows: WatcherEmission[], limit = 10): string[] {
+  if (rows.length === 0) return [];
+
+  const emissions = rows.reduce((sum, row) => sum + row.emissions, 0);
+  const watchers = rows.reduce((sum, row) => sum + row.watchers, 0);
+
+  const lines = [
+    `watched-query emissions: ${emissions} across ${rows.length} distinct queries (${watchers} live watchers)`,
+  ];
+
+  const byTable = summarizeWatcherEmissionsByTable(rows);
+  if (byTable.length > 0) {
+    lines.push(`  by table: ${byTable.map((t) => `${t.table} ${t.emissions}`).join(", ")}`);
+  }
+
+  for (const row of rows.slice(0, limit)) {
+    lines.push(`  ${row.emissions} emissions  ×${row.watchers} watchers  ${previewSql(row.key)}`);
+  }
+  if (rows.length > limit) lines.push(`  … ${rows.length - limit} more queries`);
+
+  return lines;
+}
+
 export function dbOpCounts(): DbCounts {
   return { ...totals };
 }
@@ -161,6 +295,7 @@ export function resetPerfCounters(): void {
   cascadeRequests = 0;
   cascadeRuns = 0;
   openTraces.clear();
+  watcherStates = new Map();
 }
 
 // ---------------------------------------------------------------------------
@@ -272,6 +407,8 @@ export function buildReport(entries: PerfLogEntry[]): string {
   if (requests > 0 || runs > 0) {
     lines.push(`cascades: ${requests} requests → ${runs} runs (collapsed ${requests - runs})`);
   }
+
+  lines.push(...formatWatcherEmissions(watcherEmissionCounts()));
 
   const summaries = summarizeByName(entries);
   if (summaries.length === 0) {
