@@ -171,3 +171,148 @@ result. (Verified: no alert rows exist in the matrix today.)
 `npm run tc`, `npx vitest run`, Prettier on touched files only, plus the
 before/after table: `moveWorkTracker` total, `alert triage` phase and `alert
 ripple` count, for one drag and for eight rapid drags of one tracker.
+
+---
+
+# Round two — bounding the per-definition scans
+
+Status: **awaiting approval** · Covers item 1 only. Items 2
+(`syncWorkTrackerLineItems` batching) and 3 (early-exit an empty cascade) are
+local and proceed without a spec.
+
+## Problem
+
+Round one removed the blocking and the transaction storm. What is left is that
+each alert definition scans the bleacher's **entire history** — few reads, but
+expensive ones:
+
+| Definition               | Worst measured | Reads |
+| ------------------------ | -------------- | ----- |
+| Pickup Location Mismatch | 1.19s          | 4     |
+| Scheduling Conflict      | 795ms          | 4     |
+| No Transportation        | 732ms          | 6     |
+
+Because cascades still compete for the single wa-sqlite worker, this shows up as
+foreground degradation: `moveWorkTracker` 75–110ms quiet → 514ms under cascade,
+`readWorkTrackerForModal` 23–65ms → 217–290ms. Shortening the cascade is what
+removes the contention.
+
+## Approach: push the selection into SQL, leave `resolveAddress` untouched
+
+`resolveAddress` / `resolveAddressFull` are max/min selections. Over 2 candidate
+rows they return exactly what they return over 2000 — **provided the candidates
+are chosen with the same predicates**. So the change is only to how rows are
+fetched: `ORDER BY … LIMIT 1` per source instead of the whole history.
+`resolveAddress` and its tests are not touched.
+
+The equivalence holds only if every JS filter is mirrored exactly. Three
+subtleties make that non-trivial, and all three are places where a plausible
+implementation is silently wrong.
+
+### Subtlety 1 — the two functions do not use the same comparison
+
+They look symmetric. They are not:
+
+|                                 | events                           | work trackers                    |
+| ------------------------------- | -------------------------------- | -------------------------------- |
+| `resolveAddress` past           | `date <= target`                 | `date <= target`                 |
+| `resolveAddress` **future**     | `date > target` (**strict**)     | `date > target` (**strict**)     |
+| `resolveAddressFull` past       | `date <= target`                 | `date <= target`                 |
+| `resolveAddressFull` **future** | `date >= target` (**inclusive**) | `date >= target` (**inclusive**) |
+
+`resolveAddress` future excludes the target date; `resolveAddressFull` future
+includes it. Each SQL bound mirrors its own function. Copying one bound to the
+other changes behaviour on the boundary date only — exactly the case a casual
+test would miss.
+
+### Subtlety 2 — `event_start` is a timestamp, `targetDate` is not always a date
+
+The JS compares `DateTime.fromISO(event_start).toISODate()` — a **local** date —
+against `targetDate` as a string. `Events.event_start` is a timestamp column, so
+the SQL bound must be an instant, the same lesson as `upcomingWindowEndInstant()`.
+
+And `targetDate` is not always date-shaped: `bleacherTransportation` passes
+`be.event_start`, a full timestamp. The existing JS handles this by accident of
+string ordering — `"2026-09-20" <= "2026-09-20T14:00:00Z"` is true, so same-day
+rows are included, while `"2026-09-21"` is correctly excluded.
+
+That reduces exactly to comparing against the first 10 characters of
+`targetDate`. So: **derive the bound from `targetDate.slice(0, 10)`**, then
+convert to an instant at the local day boundary. The existing behaviour —
+including the same-day-inclusive quirk — is preserved rather than "corrected",
+because correcting it here would change which alerts fire.
+
+New helpers in `getUpcomingWindow.ts` (or a sibling), each tested directly:
+
+- `localDayStartInstant(dateStr)` → local 00:00:00.000 of that date, as ISO
+- `localDayEndInstant(dateStr)` → local 23:59:59.999 of that date, as ISO
+
+### Subtlety 3 — a filter missed in SQL turns a row into a null, not a wrong row
+
+With the full history, a nearest row rejected in JS simply let the next-nearest
+win. With `LIMIT 1`, a row the SQL returns and the JS then discards produces
+`null` — the alert silently stops firing. So every JS filter must be in the
+`WHERE`, not just the date bound:
+
+- events: `event_status = 'booked'`, `deleted = 0`, `street IS NOT NULL AND street != ''`
+- work trackers (past): `dropoff street IS NOT NULL AND != ''`; for
+  `resolveAddressFull` also `dropoff_address_uuid IS NOT NULL`
+- work trackers (future, `resolveAddressFull`): the **pickup** address instead
+- `excludeWorkTrackerUuid` where the caller passes one
+
+The empty-string check matters: the JS maps `address: r.address ?? ""` and then
+skips falsy, so `''` is a reject. `IS NOT NULL` alone is not enough.
+
+## Query shapes
+
+Per source, direction `past`:
+
+```sql
+WHERE <date column> <= :bound
+  AND <every JS filter above>
+ORDER BY <date column> DESC
+LIMIT 1
+```
+
+Direction `future`: `>= :bound` (or `>`, per subtlety 1), `ORDER BY … ASC`.
+
+The two candidate rows then go to `resolveAddress` unchanged, which still applies
+the tie rule (event wins on an equal date) and still re-checks every predicate.
+The JS remains the source of truth; SQL only reduces how many rows it sees.
+
+### `schedulingConflict` — an overlap predicate, not a window
+
+Different shape: it needs overlapping events, so it gets
+
+```sql
+WHERE e2.event_end   >= :thisSetupStartOrEventStart
+  AND e2.event_start <= :thisTeardownEndOrEventEnd
+```
+
+Deliberately **slightly wider** than the JS check, with the existing JS
+comparison kept as the source of truth. Behaviour cannot change; only the row
+count drops. No `LIMIT` — it must still find any conflict, and it returns on the
+first one.
+
+## Testing
+
+The highest-value tests assert that one-candidate fetching yields the same result
+as full-history, specifically where the nearest row is filtered out:
+
+1. nearest event is unbooked → the older booked event wins
+2. nearest event has an empty street → the older one wins
+3. nearest work tracker is the excluded one → the next wins
+4. an event and a work tracker on the same date → the event wins (tie rule)
+5. boundary date, both directions, both functions (subtlety 1)
+6. an event whose UTC timestamp is a different local date than its UTC date
+   (subtlety 2)
+
+`getExpectedAddressFullForWorkTracker` is user-visible through the modal's
+locate buttons (`handlePopulatePickupFromLastAddress` /
+`handlePopulateDropoffFromNextAddress`), so both directions are covered and
+Playwright runs.
+
+## Permissions
+
+No change expected — this alters query shapes, not who may do anything. Will be
+re-confirmed against `permissionPageData.ts` rather than assumed.

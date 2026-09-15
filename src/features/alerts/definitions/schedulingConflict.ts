@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertDefinition, AlertPayload, InMemoryAlertContext } from "../types";
+import { sql } from "kysely";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
 
@@ -58,6 +59,9 @@ export const schedulingConflict: AlertDefinition = {
 
     const start = new Date(be.setup_start ?? be.event_start);
     const end = new Date(be.teardown_end ?? be.event_end);
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const windowStart = new Date(start.getTime() - DAY_MS).toISOString();
+    const windowEnd = new Date(end.getTime() + DAY_MS).toISOString();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (end < today) return null;
@@ -77,6 +81,16 @@ export const schedulingConflict: AlertDefinition = {
         .where("be2.id", "!=", bleacherEventUuid)
         .where("e2.event_status", "=", "booked")
         .where("e2.deleted", "=", 0)
+        // An overlap predicate rather than a date window — a conflict can sit
+        // anywhere on the calendar. Padded by a day on each side so it stays
+        // deliberately WIDER than the JS check below, which remains the source
+        // of truth: this only cuts how many rows the loop has to look at.
+        .where(
+          sql<boolean>`coalesce(${sql.ref("e2.teardown_end")}, ${sql.ref("e2.event_end")}) >= ${windowStart}`,
+        )
+        .where(
+          sql<boolean>`coalesce(${sql.ref("e2.setup_start")}, ${sql.ref("e2.event_start")}) <= ${windowEnd}`,
+        )
         .compile(),
       expect<OtherBeRow>(),
     );
