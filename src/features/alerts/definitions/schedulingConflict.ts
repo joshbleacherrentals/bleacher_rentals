@@ -25,6 +25,27 @@ type OtherBeRow = {
   teardown_end: string | null;
 };
 
+/**
+ * The start or end of the window an event actually occupies a bleacher for.
+ *
+ * Setup and teardown extend it; an event with neither occupies only its own
+ * dates. The subtlety is that "no setup" reaches us as an **empty string**, not
+ * null — `loadEventForModal` writes `setup_start ?? ""` and the store defaults
+ * to `""` — so `??` does not fall through and `new Date("")` is an Invalid Date.
+ * Every comparison against an Invalid Date is false, which silently disabled
+ * this alert for every same-day-setup event.
+ *
+ * Returns null when neither value is usable, and the caller skips the event
+ * rather than comparing against a date that cannot be ordered.
+ */
+function occupiedBoundary(preferred: string | null, fallback: string | null): Date | null {
+  const value = [preferred, fallback].find((v) => v != null && v.trim() !== "");
+  if (!value) return null;
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export const schedulingConflict: AlertDefinition = {
   title: "Scheduling Conflict",
   entityType: "bleacher_event",
@@ -97,8 +118,9 @@ export const schedulingConflict: AlertDefinition = {
 
     for (const other of otherRows) {
       if (!other.event_start || !other.event_end) continue;
-      const oStart = new Date(other.setup_start ?? other.event_start);
-      const oEnd = new Date(other.teardown_end ?? other.event_end);
+      const oStart = occupiedBoundary(other.setup_start, other.event_start);
+      const oEnd = occupiedBoundary(other.teardown_end, other.event_end);
+      if (!oStart || !oEnd) continue;
 
       if (start <= oEnd && oStart <= end) {
         const desc = [
@@ -122,8 +144,9 @@ export const schedulingConflict: AlertDefinition = {
     const alerts: AlertPayload[] = [];
     if (event.selectedStatus !== "booked") return alerts;
 
-    const currentStart = new Date(event.setupStart ?? event.eventStart);
-    const currentEnd = new Date(event.teardownEnd ?? event.eventEnd);
+    const currentStart = occupiedBoundary(event.setupStart, event.eventStart);
+    const currentEnd = occupiedBoundary(event.teardownEnd, event.eventEnd);
+    if (!currentStart || !currentEnd) return alerts;
 
     const eventUuidToBleachers: Record<string, string[]> = {};
     for (const be of allBleacherEvents) {
@@ -136,8 +159,9 @@ export const schedulingConflict: AlertDefinition = {
       if (other.id === event.eventUuid) continue;
       if (other.event_status !== "booked") continue;
 
-      const oStart = new Date(other.setup_start ?? other.event_start);
-      const oEnd = new Date(other.teardown_end ?? other.event_end);
+      const oStart = occupiedBoundary(other.setup_start, other.event_start);
+      const oEnd = occupiedBoundary(other.teardown_end, other.event_end);
+      if (!oStart || !oEnd) continue;
 
       const bleachersInOther = eventUuidToBleachers[other.id] ?? [];
       const hasOverlap = bleachersInOther.some((id) => event.bleacherUuids.includes(id));
