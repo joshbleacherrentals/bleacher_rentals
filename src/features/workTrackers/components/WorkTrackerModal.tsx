@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AddressAutocomplete from "@/components/AddressAutoComplete";
 import {
-  getAddressFromUuid,
+  useAddressFromUuid,
   saveWorkTracker,
   deleteWorkTracker,
 } from "../../dashboard/db/client/db";
@@ -123,8 +123,8 @@ export default function WorkTrackerModal({
   const [workTracker, setWorkTracker] = useState<Tables<"WorkTrackers"> | null>(
     selectedWorkTracker,
   );
-  const pickupAddress = getAddressFromUuid(selectedWorkTracker?.pickup_address_uuid ?? null);
-  const dropoffAddress = getAddressFromUuid(selectedWorkTracker?.dropoff_address_uuid ?? null);
+  const pickupAddress = useAddressFromUuid(selectedWorkTracker?.pickup_address_uuid ?? null);
+  const dropoffAddress = useAddressFromUuid(selectedWorkTracker?.dropoff_address_uuid ?? null);
   const [pickUpAddress, setPickUpAddress] = useState<AddressData | null>(pickupAddress);
   const [dropOffAddress, setDropOffAddress] = useState<AddressData | null>(dropoffAddress);
 

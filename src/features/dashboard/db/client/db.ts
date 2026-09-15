@@ -1,5 +1,3 @@
-import { useBleachersStore } from "@/state/bleachersStore";
-import { useHomeBasesStore } from "@/state/homeBaseStore";
 import { toast } from "sonner";
 import React from "react";
 import { createErrorToast, ErrorToast } from "@/components/toasts/ErrorToast";
@@ -8,16 +6,11 @@ import {
   AddressData,
   CurrentEventStore,
 } from "../../../eventConfiguration/state/useCurrentEventStore";
-import { useAddressesStore } from "@/state/addressesStore";
 import { normalizeLostFields } from "@/features/quotesAndBookings/utils/lostReason";
-import { useEventsStore } from "@/state/eventsStore";
-import { useBleacherEventsStore } from "@/state/bleacherEventStore";
 import { useMemo } from "react";
 import { UserResource } from "@clerk/types";
 import { updateDataBase } from "@/app/actions/db.actions";
-import { useBlocksStore } from "@/state/blocksStore";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { useWorkTrackersStore } from "@/state/workTrackersStore";
 import { Enums } from "../../../../../database.types";
 import {
   DashboardBleacher,
@@ -35,6 +28,7 @@ import {
   insertDriverNotification,
 } from "@/features/workTrackers/db/notifications";
 import { db } from "@/components/providers/SystemProvider";
+import { usePsAddresses } from "@/features/dashboard/db/hooks/powersync/usePsAddresses";
 import { typedExecute, typedExecuteBatch, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { startTrace } from "@/lib/perf/perfTrace";
 import { planWorkTrackerSave } from "@/features/workTrackers/db/planWorkTrackerSave";
@@ -54,204 +48,23 @@ import {
 // 🔁 4. Enrich each event with its address from the addresses store.
 // ✅ 5. Add those events as the events field in each DashboardBleacher.
 
-export function fetchBleachers() {
-  const bleachers = useBleachersStore((s) => s.bleachers);
-  const homeBases = useHomeBasesStore((s) => s.homeBases);
-  const addresses = useAddressesStore((s) => s.addresses);
-  const events = useEventsStore((s) => s.events);
-  const bleacherEvents = useBleacherEventsStore((s) => s.bleacherEvents);
-  const blocks = useBlocksStore((s) => s.blocks);
-  const workTrackers = useWorkTrackersStore((s) => s.workTrackers);
-
-  return useMemo(() => {
-    // console.log("fetchBleachers (dashboard)");
-    if (!bleachers) return [];
-
-    const formattedBleachers: DashboardBleacher[] = bleachers
-      .map((bleacher) => {
-        const homeBase = homeBases.find((base) => base.id === bleacher.summer_home_base_uuid);
-        const winterHomeBase = homeBases.find((base) => base.id === bleacher.winter_home_base_uuid);
-
-        const relatedWorkTrackers = workTrackers.filter((wt) => wt.bleacher_uuid === bleacher.id);
-
-        const relatedBlocks: DashboardBlock[] = blocks
-          .filter((block) => block.bleacher_uuid === bleacher.id)
-          .map((block) => ({
-            blockUuid: block.id,
-            bleacherUuid: bleacher.id,
-            text: block.text ?? "",
-            date: block.date ?? "",
-          }));
-
-        // ✅ Find all bleacherEvents for this bleacher
-        const relatedBleacherEvents = bleacherEvents.filter(
-          (be) => be.bleacher_uuid === bleacher.id,
-        );
-
-        // ✅ Map event_ids to full DashboardEvent objects
-        const relatedEvents: DashboardEvent[] = relatedBleacherEvents
-          .map((be) => {
-            const event = events.find((e) => e.id === be.event_uuid);
-            if (!event) return null;
-
-            const address = addresses.find((a) => a.id === event.address_uuid);
-
-            return {
-              eventUuid: event.id,
-              bleacherEventUuid: be.id,
-              eventName: event.event_name,
-              addressData: address
-                ? {
-                    addressUuid: address.id,
-                    address: address.street,
-                    city: address.city,
-                    state: address.state_province,
-                    postalCode: address.zip_postal ?? undefined,
-                  }
-                : null,
-              seats: event.total_seats,
-              sevenRow: event.seven_row,
-              tenRow: event.ten_row,
-              fifteenRow: event.fifteen_row,
-              bleacherRequirements: [],
-              setupStart: event.setup_start ?? "",
-              setupText: be.setup_text,
-              setupConfirmed: be.setup_confirmed,
-              sameDaySetup: !event.setup_start, // if setup_start is null, assume same-day
-              eventStart: event.event_start,
-              eventEnd: event.event_end,
-              teardownEnd: event.teardown_end ?? "",
-              teardownText: be.teardown_text,
-              teardownConfirmed: be.teardown_confirmed,
-              sameDayTeardown: !event.teardown_end, // same logic
-              lenient: event.lenient,
-              token: "", // not needed or included here
-              selectedStatus: event.event_status,
-              notes: event.notes ?? "",
-              numDays: calculateNumDays(event.event_start, event.event_end),
-              status: event.event_status,
-              hslHue: event.hsl_hue,
-              alerts: [],
-              mustBeClean: event.must_be_clean,
-              bleacherUuids: bleacherEvents
-                .filter((be) => be.event_uuid === event.id)
-                .map((be) => be.bleacher_uuid),
-              goodshuffleUrl: event.goodshuffle_url ?? null,
-              ownerUserUuid: event.created_by_user_uuid ?? null,
-            };
-          })
-          .filter((e) => e !== null) as DashboardEvent[]; // filter out nulls
-
-        return {
-          bleacherUuid: bleacher.id,
-          bleacherNumber: bleacher.bleacher_number,
-          bleacherRows: bleacher.bleacher_rows,
-          bleacherSeats: bleacher.bleacher_seats,
-          summerHomeBase: {
-            homeBaseUuid: homeBase?.id ?? "",
-            homeBaseName: homeBase?.home_base_name ?? "",
-          },
-          winterHomeBase: {
-            homeBaseUuid: winterHomeBase?.id ?? "",
-            homeBaseName: winterHomeBase?.home_base_name ?? "",
-          },
-          events: relatedEvents,
-          blocks: relatedBlocks,
-          relatedWorkTrackers: relatedWorkTrackers.map((wt) => ({
-            workTrackerUuid: wt.id,
-            date: wt.date ?? "",
-          })),
-        };
-      })
-      .sort((a, b) => b.bleacherNumber - a.bleacherNumber);
-    // console.log("formattedBleachers", formattedBleachers);
-
-    return formattedBleachers;
-  }, [bleachers, homeBases, addresses, events, bleacherEvents, blocks]);
-}
-
-export function fetchDashboardEvents() {
-  const events = useEventsStore((s) => s.events);
-  const addresses = useAddressesStore((s) => s.addresses);
-  const bleacherEvents = useBleacherEventsStore((s) => s.bleacherEvents);
-  return useMemo(() => {
-    if (!events) return [];
-
-    const activeEvents = events.filter((e) => !e.deleted);
-
-    const dashboardEvents: DashboardEvent[] = activeEvents.map((event) => {
-      const address = addresses.find((a) => a.id === event.address_uuid);
-
-      // ✅ Filter out null values from bleacher UUIDs
-      const eventBleachers = bleacherEvents.filter((be) => be.event_uuid === event.id);
-      const bleacherUuids = eventBleachers
-        .map((be) => be.bleacher_uuid)
-        .filter((uuid): uuid is string => uuid !== null); // Type guard to remove nulls
-
-      return {
-        eventUuid: event.id,
-        bleacherEventUuid: "-1", // unused
-        eventName: event.event_name,
-        addressData: address
-          ? {
-              addressUuid: address.id,
-              address: address.street,
-              city: address.city,
-              state: address.state_province,
-              postalCode: address.zip_postal ?? undefined,
-            }
-          : null,
-        seats: event.total_seats,
-        sevenRow: event.seven_row,
-        tenRow: event.ten_row,
-        fifteenRow: event.fifteen_row,
-        bleacherRequirements: [],
-        setupStart: event.setup_start ?? "",
-        setupText: null, // unused
-        setupConfirmed: false, // unused
-        sameDaySetup: !event.setup_start,
-        eventStart: event.event_start,
-        eventEnd: event.event_end,
-        teardownEnd: event.teardown_end ?? "",
-        teardownText: null, // unused
-        teardownConfirmed: false, // unused
-        sameDayTeardown: !event.teardown_end,
-        lenient: event.lenient,
-        token: "", // unused
-        selectedStatus: (event.event_status ?? "quoted") as Enums<"event_status">,
-        notes: event.notes ?? "",
-        numDays: calculateNumDays(event.event_start, event.event_end),
-        status: (event.event_status ?? "quoted") as Enums<"event_status">,
-        hslHue: event.hsl_hue,
-        alerts: [],
-        mustBeClean: event.must_be_clean,
-        bleacherUuids: bleacherUuids,
-        goodshuffleUrl: event.goodshuffle_url ?? null,
-        ownerUserUuid: event.created_by_user_uuid ?? null,
-      };
-    });
-    // console.log("dashboardEvents", dashboardEvents);
-
-    // ✅ Sort by setup if exists else eventStart (earliest first)
-    dashboardEvents.sort((a, b) => {
-      const dateA = new Date(a.setupStart || a.eventStart).getTime();
-      const dateB = new Date(b.setupStart || b.eventStart).getTime();
-      return dateA - dateB;
-    });
-    return dashboardEvents;
-  }, [events, addresses, bleacherEvents]);
-}
-
-export function getAddressFromUuid(addressUuid: string | null): AddressData | null {
-  const addresses = useAddressesStore.getState().addresses;
+/**
+ * Looks an address up in the local PowerSync DB.
+ *
+ * A hook, not a bare function, because it used to read a Zustand mirror of the
+ * whole `Addresses` table through `getState()` — a table that silently
+ * truncated at 1000 rows, so roughly half of all lookups returned null.
+ */
+export function useAddressFromUuid(addressUuid: string | null): AddressData | null {
+  const addresses = usePsAddresses();
   if (!addressUuid) return null;
   const address = addresses.find((a) => a.id === addressUuid);
   if (!address) return null;
   return {
     addressUuid: address.id,
-    address: address.street,
-    city: address.city,
-    state: address.state_province,
+    address: address.street ?? "",
+    city: address.city ?? undefined,
+    state: address.state_province ?? undefined,
     postalCode: address.zip_postal ?? undefined,
     lat: address.latitude ?? undefined,
     lng: address.longitude ?? undefined,
@@ -405,9 +218,9 @@ export async function saveWorkTracker(
   });
   trace.mark("alert triage");
 
-  // Not awaited, but it fans out: every connected client re-fetches the whole
-  // WorkTrackers and Addresses tables from Supabase. `fetchTableSetStoreAndCache`
-  // logs what that costs on the receiving side.
+  // Broadcasts over Pusher. Nothing listens any more — the Zustand stores that
+  // used to refetch on it are gone — so this is dead weight until Phase 2 of
+  // `docs/specs/retire-legacy-zustand-sync.md` removes the broadcast itself.
   updateDataBase(["WorkTrackers", "Addresses"]);
   createSuccessToast(["Work Tracker saved"]);
 
@@ -861,12 +674,6 @@ export async function deleteEvent(
   await typedExecute(
     db.updateTable("Events").set({ deleted: 1 }).where("id", "=", eventUuid).compile(),
   );
-
-  // Immediately update local stores so non-PowerSync consumers reflect the change
-  const currentEvents = useEventsStore.getState().events;
-  useEventsStore
-    .getState()
-    .setEvents(currentEvents.map((e) => (e.id === eventUuid ? { ...e, deleted: true } : e)));
 
   createSuccessToast(["Event Deleted"]);
   updateDataBase(["Events"]);

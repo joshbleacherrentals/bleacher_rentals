@@ -14,7 +14,6 @@ export async function updateEvent(
   state: CurrentEventStore,
   supabase: SupabaseClient<Database>,
   user: UserResource | null,
-  bleacherEvents: Tables<"BleacherEvents">[],
 ): Promise<void> {
   if (!supabase) {
     createErrorToast(["No Supabase Client found"]);

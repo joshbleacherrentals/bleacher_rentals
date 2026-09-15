@@ -4,7 +4,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { useRouter } from "next/navigation";
 import { useWorkTrackerAccess, useDriversForWeek } from "../hooks/useDriversForWeek";
 import { useUser } from "@clerk/nextjs";
-import { useUsersStore } from "@/state/userStore";
+import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { useState } from "react";
 import { PaymentStatusButton } from "./PaymentStatusButton";
 import { TotalsMatch } from "./TotalsMatch";
@@ -60,7 +60,7 @@ function formatUnitTotal(
 export function DriverListForWeek({ startDate }: Props) {
   const router = useRouter();
   const { user } = useUser();
-  const users = useUsersStore((s) => s.users);
+  const users = usePsUsers();
   const [showAllDrivers, setShowAllDrivers] = useState(false);
   const [payCurrencyFilter, setPayCurrencyFilter] = useState<PayCurrencyFilter>("ALL");
 

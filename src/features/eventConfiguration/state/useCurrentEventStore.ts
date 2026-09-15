@@ -1,8 +1,6 @@
 "use client";
 
 import { create } from "zustand";
-import { useEventsStore } from "@/state/eventsStore";
-import { calculateBestHue, updateCurrentEventAlerts } from "@/features/dashboard/functions";
 
 export type AddressData = {
   addressUuid: string | null;
@@ -138,18 +136,7 @@ export const useCurrentEventStore = create<CurrentEventStore>((set) => ({
   closeModal: () => set(initialState),
 }));
 
-useCurrentEventStore.subscribe((state) => {
-  // 💥 Update alerts too!
-  // console.log("Update alerts too!");
-  updateCurrentEventAlerts();
-
-  if (state.eventStart === "" || state.hslHue !== null || state.eventEnd === "") return;
-
-  const events = useEventsStore.getState().events;
-  const newHue = calculateBestHue(state, events);
-  // console.log("newHue", newHue);
-
-  if (newHue !== null) {
-    useCurrentEventStore.getState().setField("hslHue", newHue);
-  }
-});
+// Alerts and the colour pick used to be driven from here, imperatively, off
+// Zustand stores that mirrored whole tables over REST. Both now live in
+// `useEventFormAlerts`, which reads PowerSync reactively — see that hook for
+// why the store-mirror path had to go.

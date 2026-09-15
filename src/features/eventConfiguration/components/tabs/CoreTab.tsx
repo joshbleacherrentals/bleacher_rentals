@@ -2,7 +2,7 @@
 import { Toggle } from "../../../../components/Toggle";
 import React, { useEffect } from "react";
 import AddressAutocomplete from "@/components/AddressAutoComplete";
-import { useUsersStore } from "@/state/userStore";
+import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { Dropdown } from "@/components/DropDown";
 import { useCurrentEventStore } from "../../state/useCurrentEventStore";
 import { useScrollToDateStore } from "@/features/dashboard/state/useScrollToDateStore";
@@ -25,7 +25,7 @@ type Props = {
 
 export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
   const currentEventStore = useCurrentEventStore();
-  const users = useUsersStore((s) => s.users);
+  const users = usePsUsers();
   const permissions = useTeamPermissions();
   const accountManagerUserIds = useAccountManagerUserIds();
   const allBleachers = useDashboardBleachersStore((s) => s.data);
@@ -48,7 +48,7 @@ export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
     existingOwnerId: currentEventStore.originalOwnerUserUuid,
   });
   const ownerOptions = filteredUsers.map((u) => ({
-    label: `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email,
+    label: `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email || u.id,
     value: String(u.id),
   }));
 
