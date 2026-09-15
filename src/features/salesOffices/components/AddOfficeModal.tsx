@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
 import { Dropdown } from "@/components/DropDown";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import {
   createSalesOffice,
   updateSalesOffice,
@@ -132,9 +132,12 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
     }
   };
 
-  const addressLabel = address?.street
-    ? `${address.street}${address.city ? `, ${address.city}` : ""}${address.stateProvince ? ` ${address.stateProvince}` : ""}`
-    : "";
+  const addressLabel = formatAddressLine({
+    street: address?.street,
+    city: address?.city,
+    state: address?.stateProvince,
+    postalCode: address?.zipPostal,
+  });
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && resetAndClose()}>

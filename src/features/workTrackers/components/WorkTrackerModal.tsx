@@ -4,7 +4,7 @@ import { Dropdown } from "@/components/DropDown";
 import { BleacherSwapPanel } from "@/features/workTrackers/components/BleacherSwapPanel";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import {
   getAddressFromUuid,
   saveWorkTracker,
@@ -1215,7 +1215,12 @@ export default function WorkTrackerModal({
                                       addressUuid: pickUpAddress?.addressUuid ?? null,
                                     })
                                   }
-                                  initialValue={pickUpAddress?.address || ""}
+                                  initialValue={formatAddressLine({
+                                    street: pickUpAddress?.address,
+                                    city: pickUpAddress?.city,
+                                    state: pickUpAddress?.state,
+                                    postalCode: pickUpAddress?.postalCode,
+                                  })}
                                 />
                                 {canEditFields && (
                                   <AppTooltip content="Populate from last known bleacher location">
@@ -1330,7 +1335,12 @@ export default function WorkTrackerModal({
                                     addressUuid: dropOffAddress?.addressUuid ?? null,
                                   })
                                 }
-                                initialValue={dropOffAddress?.address || ""}
+                                initialValue={formatAddressLine({
+                                  street: dropOffAddress?.address,
+                                  city: dropOffAddress?.city,
+                                  state: dropOffAddress?.state,
+                                  postalCode: dropOffAddress?.postalCode,
+                                })}
                               />
                               {canEditFields && (
                                 <AppTooltip content="Populate from next known bleacher location">

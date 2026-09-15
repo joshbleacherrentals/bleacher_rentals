@@ -16,6 +16,11 @@ import type { VenueAddressFields, VenueFull, VenuePickerValue } from "@/features
 
 export type { VenuePickerValue } from "@/features/venues/types";
 
+// Also what's fed back into AddressAutocomplete's `initialValue` in the edit
+// form below — that must match what AddressAutocomplete itself formats a
+// fresh selection as (see formatAddressLine in AddressAutoComplete.tsx), or
+// its prop-driven reset effect overwrites the field back down to less than
+// what was just picked.
 export function venueAddressLine(address: VenueAddressFields): string {
   return [address.street, address.city, address.stateProvince, address.zipPostal]
     .filter(Boolean)
@@ -35,17 +40,6 @@ type VenuePickerProps = {
    */
   currentEventId?: string | null;
 };
-
-// Includes the zip/postal — this is what actually goes back into the
-// address input as its `initialValue`, which must match what
-// AddressAutocomplete itself formats a fresh selection as, or its
-// prop-driven reset effect overwrites the field back down to less than
-// what was just picked.
-function addressInputValue(address: VenueAddressFields): string {
-  return [address.street, address.city, address.stateProvince, address.zipPostal]
-    .filter(Boolean)
-    .join(", ");
-}
 
 function toAddressFields(data: {
   address: string;
@@ -368,7 +362,7 @@ export function VenuePicker({
                       setEditAddress(toAddressFields(data));
                       setEditDuplicate(null);
                     }}
-                    initialValue={editAddress ? addressInputValue(editAddress) : ""}
+                    initialValue={editAddress ? venueAddressLine(editAddress) : ""}
                   />
                 </div>
                 {editDuplicate && (

@@ -31,6 +31,24 @@ interface AddressData {
   businessName?: string;
 }
 
+/**
+ * The one line an address ever shows in this field: street, city,
+ * state/province, zip/postal — joined with ", ", blank pieces dropped.
+ * Used both for a fresh Google selection (below) and by every caller of
+ * `AddressAutocomplete` to build `initialValue`, so a stored address reads
+ * exactly the same whether it was just picked or loaded from the database.
+ * Building this by hand at a call site is how city/state/zip quietly go
+ * missing from a "prepopulated" address — always go through this instead.
+ */
+export function formatAddressLine(fields: {
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+}): string {
+  return [fields.street, fields.city, fields.state, fields.postalCode].filter(Boolean).join(", ");
+}
+
 interface AddressAutocompleteProps {
   onAddressSelect: (data: AddressData) => void;
   initialValue?: string;
@@ -117,7 +135,7 @@ export default function AddressAutocomplete({
       // name, e.g. "Jester King Brewery, Fitzhugh Road, Austin, TX, USA")
       // with the plain parsed address — this is an address field, not a
       // place-name field.
-      setValue([address, city, state, postalCode].filter(Boolean).join(", "), false);
+      setValue(formatAddressLine({ street: address, city, state, postalCode }), false);
 
       const isPlace = suggestion.types?.some(
         (t: string) => t === "establishment" || t === "point_of_interest",

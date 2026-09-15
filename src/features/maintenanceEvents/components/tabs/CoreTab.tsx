@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect } from "react";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import { useUsersStore } from "@/state/userStore";
 import { Dropdown } from "@/components/DropDown";
 import { useMaintenanceEventStore } from "../../state/useMaintenanceEventStore";
@@ -105,7 +105,12 @@ export const MaintenanceCoreTab = ({ disabled = false }: Props = {}) => {
                 addressUuid: store.addressData?.addressUuid ?? null,
               })
             }
-            initialValue={store.addressData?.address || ""}
+            initialValue={formatAddressLine({
+              street: store.addressData?.address,
+              city: store.addressData?.city,
+              state: store.addressData?.state,
+              postalCode: store.addressData?.postalCode,
+            })}
           />
         </div>
         <div>
