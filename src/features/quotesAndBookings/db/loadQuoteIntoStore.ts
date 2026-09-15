@@ -69,6 +69,14 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
     });
   }
 
+  // Must be set for EventDetailsSection to render the Venue picker as a
+  // linked venue instead of falling back to "manual" (plain address, no
+  // venue link) — see its venuePickerValue derivation.
+  if (data.venue) {
+    store.setField("venueId", data.venue.id);
+    store.setField("venueName", data.venue.name);
+  }
+
   if (data.financeContact) {
     store.setField("useFinanceContact", true);
     store.setField("financeContactId", data.financeContact.id);
