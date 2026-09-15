@@ -1,6 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/../database.types";
-import { updateDataBase } from "@/app/actions/db.actions";
 import { STATUSES } from "@/features/manageTeam/constants";
 
 type TypedSupabaseClient = SupabaseClient<Database>;
@@ -17,7 +16,6 @@ export async function deactivateUser(
 
     if (error) throw error;
 
-    updateDataBase(["Users", "UserStatuses"]);
     return { success: true };
   } catch (error) {
     console.error("Error deactivating user:", error);
@@ -37,7 +35,6 @@ export async function reactivateUser(
 
     if (error) throw error;
 
-    updateDataBase(["Users", "UserStatuses"]);
     return { success: true };
   } catch (error) {
     console.error("Error reactivating user:", error);
@@ -57,7 +54,6 @@ export async function updateUserStatusToInvited(
 
     if (error) throw error;
 
-    updateDataBase(["Users", "UserStatuses"]);
     return { success: true };
   } catch (error) {
     console.error("Error updating user status to invited:", error);
@@ -96,7 +92,6 @@ export async function deleteUser(
     // Ignore error if account manager doesn't exist
     if (amError && amError.code !== "PGRST116") throw amError;
 
-    updateDataBase(["UserStatuses", "Users", "Drivers", "AccountManagers"]);
     return { success: true };
   } catch (error) {
     console.error("Error deactivating user:", error);

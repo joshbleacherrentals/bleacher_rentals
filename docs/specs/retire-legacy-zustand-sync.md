@@ -1,7 +1,14 @@
 # Retire the legacy Zustand/REST/Pusher sync layer
 
-Status: **approved · Phase 1 implemented.** Phase 2 (retiring the Pusher
-broadcast) is specified below and not yet done.
+Status: **approved · both phases implemented.**
+
+Correction to the count used throughout this spec: the broadcast had **18** live
+`updateDataBase(...)` call sites, not 23. The higher figure came from a grep that
+counted five already-commented-out calls in `legacyDb.ts` and
+`webhooks/route.ts`. The 18 are in `dashboard/db/client/db.ts` (8),
+`app/team/_lib/db.ts` (4), `manageTeam/db/userStatusOperations.ts` (4),
+`dashboard/db/client/updateEvent.ts` (1) and `swapBleacherEvents.ts` (1). None
+was awaited, so removing them changed no control flow.
 
 Implementation notes, added after approval:
 

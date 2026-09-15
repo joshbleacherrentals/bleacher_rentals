@@ -1,5 +1,4 @@
 "use client";
-import { updateDataBase } from "@/app/actions/db.actions";
 import { STATUSES } from "../../../features/manageTeam/constants";
 import { createErrorToast, createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -150,7 +149,6 @@ export async function updateUserStatusToInvited(email: string, supabase: Supabas
   if (error) {
     createErrorToastNoThrow(["Failed to update user status to invited.", error.message]);
   } else {
-    updateDataBase(["Users", "UserStatuses"]);
   }
 }
 
@@ -224,7 +222,6 @@ export async function deactivateUser(userUuid: string, supabase: SupabaseClient<
     .eq("id", userUuid);
 
   if (updateError) throw updateError;
-  updateDataBase(["Users", "UserStatuses"]);
 }
 
 export async function reactivateUser(userUuid: string, supabase: SupabaseClient<Database>) {
@@ -236,14 +233,12 @@ export async function reactivateUser(userUuid: string, supabase: SupabaseClient<
     .eq("id", userUuid);
 
   if (updateError) throw updateError;
-  updateDataBase(["Users", "UserStatuses"]);
 }
 
 export async function deleteUser(userUuid: string, supabase: SupabaseClient<Database>) {
   const { error: updateError } = await supabase.from("Users").delete().eq("id", userUuid);
 
   if (updateError) throw updateError;
-  updateDataBase(["UserStatuses", "Users", "UserHomeBases"]);
 }
 
 // export function fetchUsers() {

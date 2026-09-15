@@ -51,7 +51,6 @@ vi.mock("@/lib/powersync/typedQuery", () => ({
   },
 }));
 
-vi.mock("@/app/actions/db.actions", () => ({ updateDataBase: vi.fn() }));
 vi.mock("@/features/alerts/scheduleTriage", () => ({ scheduleTriage: vi.fn() }));
 vi.mock("@/components/toasts/SuccessToast", () => ({
   createSuccessToast: vi.fn(),

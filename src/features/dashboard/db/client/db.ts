@@ -9,7 +9,6 @@ import {
 import { normalizeLostFields } from "@/features/quotesAndBookings/utils/lostReason";
 import { useMemo } from "react";
 import { UserResource } from "@clerk/types";
-import { updateDataBase } from "@/app/actions/db.actions";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Enums } from "../../../../../database.types";
 import {
@@ -218,10 +217,6 @@ export async function saveWorkTracker(
   });
   trace.mark("alert triage");
 
-  // Broadcasts over Pusher. Nothing listens any more — the Zustand stores that
-  // used to refetch on it are gone — so this is dead weight until Phase 2 of
-  // `docs/specs/retire-legacy-zustand-sync.md` removes the broadcast itself.
-  updateDataBase(["WorkTrackers", "Addresses"]);
   createSuccessToast(["Work Tracker saved"]);
 
   trace.end({ workTrackerUuid: savedWorkTrackerUuid, wasInsert });
@@ -287,7 +282,6 @@ export async function moveWorkTracker(params: {
   });
   trace.mark("alert triage");
 
-  updateDataBase(["WorkTrackers"]);
 
   trace.end({ workTrackerUuid: params.workTrackerUuid });
 }
@@ -345,7 +339,6 @@ export async function deleteWorkTracker(
     console.error("[alerts] failed to triage after work tracker delete", e);
   }
 
-  updateDataBase(["WorkTrackers"]);
   createSuccessToast(["Work Tracker deleted"]);
 }
 
@@ -426,7 +419,6 @@ export async function saveSetupTeardownBlock(
       }),
     { duration: 10000 },
   );
-  updateDataBase(["BleacherEvents"]);
 }
 
 export async function saveBlock(
@@ -503,7 +495,6 @@ export async function saveBlock(
       }),
     { duration: 10000 },
   );
-  updateDataBase(["Blocks"]);
 }
 
 export async function deleteBlock(
@@ -570,7 +561,6 @@ export async function deleteBlock(
       }),
     { duration: 10000 },
   );
-  updateDataBase(["Blocks"]);
 }
 
 export async function createEvent(
@@ -650,7 +640,6 @@ export async function createEvent(
   }
 
   createSuccessToast(["Event Created"]);
-  updateDataBase(["Bleachers", "BleacherEvents", "Addresses", "Events"]);
   return event_uuid;
 }
 
@@ -676,5 +665,4 @@ export async function deleteEvent(
   );
 
   createSuccessToast(["Event Deleted"]);
-  updateDataBase(["Events"]);
 }
