@@ -35,6 +35,14 @@ import {
   SCORECARD_TEMPLATES,
 } from "@/features/quotesAndBookings/utils/scorecardTemplates";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Pagination } from "@/components/Pagination";
+import { useLayoutContext } from "@/contexts/LayoutContexts";
+import {
+  clampPage,
+  getTotalPages,
+  slicePage,
+  type PageSize,
+} from "@/features/quotesAndBookings/utils/pagination";
 import {
   filtersToSearchParams,
   searchParamsToFilters,
@@ -70,6 +78,7 @@ export default function QuotesBookingsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { scrollRef } = useLayoutContext();
 
   // Filters/search/showDeleted round-trip through the URL so the browser
   // back button restores them (e.g. after clicking into a quote). Read once
@@ -118,6 +127,19 @@ export default function QuotesBookingsPage() {
   const [showDeleted, setShowDeleted] = useState(urlState.showDeleted);
   const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
   const [searchQuery, setSearchQuery] = useState(urlState.searchQuery);
+  const [page, setPage] = useState(urlState.page);
+  const [pageSize, setPageSize] = useState<PageSize>(urlState.pageSize);
+
+  // A new filter/search is a new question: answer it from page 1, the way a
+  // search engine does. Without this, narrowing a 9-page list while sitting on
+  // page 8 would land on an empty table.
+  const narrowingKey = JSON.stringify([filters, searchQuery, showDeleted]);
+  const lastNarrowingKeyRef = useRef(narrowingKey);
+  useEffect(() => {
+    if (lastNarrowingKeyRef.current === narrowingKey) return;
+    lastNarrowingKeyRef.current = narrowingKey;
+    setPage(1);
+  }, [narrowingKey]);
 
   // Push filter/search/showDeleted state into the URL (replace, not push, so
   // each edit doesn't grow browser history — only "open a quote" should).
@@ -128,7 +150,7 @@ export default function QuotesBookingsPage() {
     isFirstSyncRef.current = false;
     const timeout = setTimeout(() => {
       const nextParams = filtersToSearchParams(
-        { filters, searchQuery, showDeleted },
+        { filters, searchQuery, showDeleted, page, pageSize },
         new URLSearchParams(searchParams.toString()),
       );
       const nextQs = nextParams.toString();
@@ -138,12 +160,29 @@ export default function QuotesBookingsPage() {
     }, delay);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, searchQuery, showDeleted]);
+  }, [filters, searchQuery, showDeleted, page, pageSize]);
 
   const searchedData = useMemo(() => {
     if (!data) return data;
     return searchEvents(data, searchQuery);
   }, [data, searchQuery]);
+
+  // The whole filtered list is already in memory (PowerSync), so a page is a
+  // slice of it. The totals in the column headers stay whole-list on purpose.
+  const totalItems = searchedData?.length ?? 0;
+  const currentPage = clampPage(page, getTotalPages(totalItems, pageSize));
+  const pageData = useMemo(
+    () => (searchedData ? slicePage(searchedData, currentPage, pageSize) : searchedData),
+    [searchedData, currentPage, pageSize],
+  );
+
+  const goToPage = useCallback(
+    (next: number) => {
+      setPage(next);
+      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [scrollRef],
+  );
 
   // Money columns are per-office: a quote out of a Canadian office is shown in
   // C$, and the column totals keep the two currencies apart.
@@ -345,13 +384,26 @@ export default function QuotesBookingsPage() {
 
       <DataTable
         columns={columns}
-        data={searchedData}
+        data={pageData}
         keyExtractor={(event) => event.id}
         emptyMessage="No events found"
         isLoading={isLoading}
         loadingMessage="Loading events..."
         onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
       />
+
+      {!isLoading && totalItems > 0 && (
+        <Pagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          onPageChange={goToPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
     </main>
   );
 }
