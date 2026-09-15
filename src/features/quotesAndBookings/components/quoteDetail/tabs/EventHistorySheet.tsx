@@ -152,16 +152,16 @@ export function EventHistorySheet({
             <p className="text-sm text-gray-400 py-4 text-center">Loading events...</p>
           ) : (
             <Accordion type="multiple" defaultValue={["future", "past"]}>
-              <AccordionItem value="past">
-                <AccordionTrigger>Past Events ({buckets.past.length})</AccordionTrigger>
-                <AccordionContent>
-                  <EventList events={buckets.past} emptyLabel="No past events" />
-                </AccordionContent>
-              </AccordionItem>
               <AccordionItem value="future">
                 <AccordionTrigger>Future Events ({buckets.future.length})</AccordionTrigger>
                 <AccordionContent>
                   <EventList events={buckets.future} emptyLabel="No upcoming events" />
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="past">
+                <AccordionTrigger>Past Events ({buckets.past.length})</AccordionTrigger>
+                <AccordionContent>
+                  <EventList events={buckets.past} emptyLabel="No past events" />
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
