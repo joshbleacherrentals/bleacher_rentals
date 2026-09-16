@@ -74,6 +74,8 @@ export async function createQuoteEvent(
         notes: state.clientFacingNotes || null,
         internal_notes: state.internalNotes || null,
         external_notes: state.clientFacingNotes || null,
+        pickup_instructions: state.pickupInstructions || null,
+        dropoff_instructions: state.dropoffInstructions || null,
         created_by_user_uuid: ownerUserUuid,
         contact_uuid: state.contactId || null,
         finance_contact_uuid: state.financeContactId || null,

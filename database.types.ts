@@ -2143,6 +2143,7 @@ export type Database = {
           created_at: string
           created_by_user_uuid: string | null
           deleted: boolean
+          dropoff_instructions: string | null
           event_end: string
           event_name: string
           event_start: string
@@ -2162,6 +2163,7 @@ export type Database = {
           lost_reason_note: string | null
           must_be_clean: boolean
           notes: string | null
+          pickup_instructions: string | null
           po_number: string | null
           quote_valid_till: string | null
           sales_office_uuid: string | null
@@ -2185,6 +2187,7 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           deleted?: boolean
+          dropoff_instructions?: string | null
           event_end: string
           event_name: string
           event_start: string
@@ -2204,6 +2207,7 @@ export type Database = {
           lost_reason_note?: string | null
           must_be_clean?: boolean
           notes?: string | null
+          pickup_instructions?: string | null
           po_number?: string | null
           quote_valid_till?: string | null
           sales_office_uuid?: string | null
@@ -2227,6 +2231,7 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           deleted?: boolean
+          dropoff_instructions?: string | null
           event_end?: string
           event_name?: string
           event_start?: string
@@ -2246,6 +2251,7 @@ export type Database = {
           lost_reason_note?: string | null
           must_be_clean?: boolean
           notes?: string | null
+          pickup_instructions?: string | null
           po_number?: string | null
           quote_valid_till?: string | null
           sales_office_uuid?: string | null

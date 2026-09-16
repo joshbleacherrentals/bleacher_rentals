@@ -79,6 +79,9 @@ import { ContactPicker, contactDisplayName } from "@/components/ContactPicker";
 import { useContacts } from "@/features/companiesContacts/hooks/useContacts";
 import { getExpectedPocForWorkTracker, type PocDirection } from "../util/resolvePocContact";
 import { describePocPopulateResult, type PocValue } from "../util/pocField";
+import { getExpectedInstructionsForWorkTracker } from "../util/resolveEventInstructionsForWorkTracker";
+import { getAdjacentEventsForWorkTracker } from "../util/resolveAdjacentEventsForWorkTracker";
+import { AdjacentEventCard } from "./AdjacentEventCard";
 import {
   getSelectableWorkTrackerTypes,
   isSingleFieldSetType as computeIsSingleFieldSetType,
@@ -367,6 +370,39 @@ export default function WorkTrackerModal({
     }
   };
 
+  // Populate Pickup/Dropoff Instructions from the nearest event on this
+  // bleacher — see resolveEventInstructionsForWorkTracker for why "past"
+  // reads the neighbour's own pickup_instructions and "future" reads its
+  // own dropoff_instructions (not the opposite-field rule the address/POC
+  // buttons use).
+  const handlePopulatePickupInstructions = async () => {
+    if (!workTracker?.bleacher_uuid || !workTracker?.date) return;
+
+    const result = await getExpectedInstructionsForWorkTracker({
+      bleacherUuid: workTracker.bleacher_uuid,
+      targetDate: workTracker.date,
+      direction: "past",
+    });
+
+    if (result.kind === "ok") {
+      setWorkTracker((prev) => ({ ...prev!, pickup_instructions: result.text }));
+    }
+  };
+
+  const handlePopulateDropoffInstructions = async () => {
+    if (!workTracker?.bleacher_uuid || !workTracker?.date) return;
+
+    const result = await getExpectedInstructionsForWorkTracker({
+      bleacherUuid: workTracker.bleacher_uuid,
+      targetDate: workTracker.date,
+      direction: "future",
+    });
+
+    if (result.kind === "ok") {
+      setWorkTracker((prev) => ({ ...prev!, dropoff_instructions: result.text }));
+    }
+  };
+
   const setPickupPoc = (next: PocValue) =>
     setWorkTracker((prev) => ({
       ...prev!,
@@ -432,6 +468,22 @@ export default function WorkTrackerModal({
     Boolean(expectedPickupStreet) &&
     Boolean(pickUpAddress?.address) &&
     isPickupTransportationMismatch(expectedPickupStreet, pickUpAddress?.address);
+
+  // Previous/Next Event cards — display only, never written to the work
+  // tracker. Recomputed whenever the bleacher or date changes.
+  const { data: adjacentEvents } = useQuery({
+    queryKey: ["work-tracker-adjacent-events", workTracker?.bleacher_uuid, workTracker?.date],
+    enabled: Boolean(workTracker?.bleacher_uuid && workTracker?.date),
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      if (!workTracker?.bleacher_uuid || !workTracker?.date) return null;
+
+      return getAdjacentEventsForWorkTracker({
+        bleacherUuid: workTracker.bleacher_uuid,
+        targetDate: workTracker.date,
+      });
+    },
+  });
 
   const perms = usePermissionsStore();
   const allDashboardBleachers = useDashboardBleachersStore((s) => s.data);
@@ -1073,6 +1125,10 @@ export default function WorkTrackerModal({
                             only type that needs a separate pickup leg. */}
                           {!isSingleFieldSetType && (
                             <div className="flex-1 min-w-0">
+                              <AdjacentEventCard
+                                label="Previous Event"
+                                event={adjacentEvents?.previous ?? null}
+                              />
                               <label className={labelClassName}>Pickup Time</label>
                               <WorkTrackerTimeField
                                 mode={workTracker?.pickup_time_mode}
@@ -1163,7 +1219,20 @@ export default function WorkTrackerModal({
                                   </AppTooltip>
                                 )}
                               </div>
-                              <label className={labelClassName}>Pickup Instructions</label>
+                              <div className="flex items-center justify-between">
+                                <label className={labelClassName}>Pickup Instructions</label>
+                                {canEditFields && (
+                                  <AppTooltip content="Populate from previous event">
+                                    <button
+                                      type="button"
+                                      onClick={handlePopulatePickupInstructions}
+                                      className="text-gray-400 hover:text-darkBlue transition-colors"
+                                    >
+                                      <LocateFixed className="h-5 w-5" />
+                                    </button>
+                                  </AppTooltip>
+                                )}
+                              </div>
                               <textarea
                                 className="w-full text-sm border p-1 rounded bg-white"
                                 placeholder="Pickup Instructions"
@@ -1199,6 +1268,18 @@ export default function WorkTrackerModal({
                             drop the "Dropoff" prefix. The values still live in the
                             dropoff_* columns either way. */}
                           <div className="flex-1 min-w-0">
+                            {/* Non-Trip types have no separate Pickup column (above), so
+                              this single column shows both cards. */}
+                            {isSingleFieldSetType && (
+                              <AdjacentEventCard
+                                label="Previous Event"
+                                event={adjacentEvents?.previous ?? null}
+                              />
+                            )}
+                            <AdjacentEventCard
+                              label="Next Event"
+                              event={adjacentEvents?.next ?? null}
+                            />
                             <label className={labelClassName}>
                               {isSingleFieldSetType ? "Time" : "Dropoff Time"}
                             </label>
@@ -1283,9 +1364,22 @@ export default function WorkTrackerModal({
                                 </AppTooltip>
                               )}
                             </div>
-                            <label className={labelClassName}>
-                              {isSingleFieldSetType ? "Instructions" : "Dropoff Instructions"}
-                            </label>
+                            <div className="flex items-center justify-between">
+                              <label className={labelClassName}>
+                                {isSingleFieldSetType ? "Instructions" : "Dropoff Instructions"}
+                              </label>
+                              {canEditFields && (
+                                <AppTooltip content="Populate from next event">
+                                  <button
+                                    type="button"
+                                    onClick={handlePopulateDropoffInstructions}
+                                    className="text-gray-400 hover:text-darkBlue transition-colors"
+                                  >
+                                    <LocateFixed className="h-5 w-5" />
+                                  </button>
+                                </AppTooltip>
+                              )}
+                            </div>
                             <textarea
                               className="w-full text-sm border p-1 rounded bg-white"
                               placeholder={

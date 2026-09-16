@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
+import { localDayEndInstant, localDayStartInstant } from "@/features/alerts/util/localDayInstant";
 
 export type PocSource = "event" | "workTracker";
 
@@ -191,7 +192,11 @@ const joinName = (first: string | null, last: string | null): string | null => {
  *
  * Mirrors `getExpectedAddressFullForWorkTracker`: same two sources, same exclusion of the work
  * tracker being edited, so the POC buttons and the address locate buttons always agree on which
- * neighbour is "the" one.
+ * neighbour is "the" one — including fetching at most ONE candidate row per source (via a SQL
+ * date bound + `LIMIT 1`) rather than the bleacher's whole history. `resolvePocContact` is a
+ * max/min selection, so over two candidates it returns exactly what it returned over two
+ * thousand, provided the candidates are chosen with the same predicates — every filter the JS
+ * applies is mirrored in SQL below, same discipline as the address query.
  */
 export async function getExpectedPocForWorkTracker(params: {
   bleacherUuid: string;
@@ -200,26 +205,42 @@ export async function getExpectedPocForWorkTracker(params: {
   direction?: PocDirection;
 }): Promise<PocResolution> {
   const { bleacherUuid, targetDate, excludeWorkTrackerUuid, direction = "past" } = params;
+  const lookingBack = direction === "past";
+
+  let eventQuery = db
+    .selectFrom("BleacherEvents as be")
+    .innerJoin("Events as e", "e.id", "be.event_uuid")
+    .innerJoin("Contacts as c", "c.id", "e.contact_uuid")
+    .select([
+      "e.event_start as eventStart",
+      "e.event_status as eventStatus",
+      "e.contact_uuid as contactUuid",
+      "c.first_name as firstName",
+      "c.last_name as lastName",
+    ])
+    .where("be.bleacher_uuid", "=", bleacherUuid)
+    .where("e.deleted", "=", 0)
+    .where("c.deleted", "=", 0)
+    .where("e.event_status", "=", "booked");
+
+  eventQuery = lookingBack
+    ? eventQuery.where("e.event_start", "<=", localDayEndInstant(targetDate))
+    : eventQuery.where("e.event_start", ">=", localDayStartInstant(targetDate));
 
   const eventRows = await typedGetAll(
-    db
-      .selectFrom("BleacherEvents as be")
-      .innerJoin("Events as e", "e.id", "be.event_uuid")
-      .innerJoin("Contacts as c", "c.id", "e.contact_uuid")
-      .select([
-        "e.event_start as eventStart",
-        "e.event_status as eventStatus",
-        "e.contact_uuid as contactUuid",
-        "c.first_name as firstName",
-        "c.last_name as lastName",
-      ])
-      .where("be.bleacher_uuid", "=", bleacherUuid)
-      .where("e.deleted", "=", 0)
-      .where("c.deleted", "=", 0)
+    eventQuery
+      .orderBy("e.event_start", lookingBack ? "desc" : "asc")
+      .limit(1)
       .compile(),
     expect<EventContactRow>(),
   );
 
+  // The direction decides which end has to qualify — same rule as
+  // getExpectedAddressFullForWorkTracker: looking back, this trip picks up
+  // where the neighbour dropped off; looking forward, the neighbour picks up
+  // from where this trip drops off. A candidate qualifies (D5) with EITHER a
+  // linked contact OR non-blank legacy text — text-only rows still compete
+  // for "nearest" so the query can't silently reach past the true neighbour.
   let wtQuery = db
     .selectFrom("WorkTrackers as wt")
     .leftJoin("Contacts as cp", "cp.id", "wt.pickup_poc_contact_uuid")
@@ -235,13 +256,34 @@ export async function getExpectedPocForWorkTracker(params: {
       "cd.first_name as dropoffFirstName",
       "cd.last_name as dropoffLastName",
     ])
-    .where("wt.bleacher_uuid", "=", bleacherUuid);
+    .where("wt.bleacher_uuid", "=", bleacherUuid)
+    .where("wt.date", lookingBack ? "<=" : ">=", targetDate);
+
+  wtQuery = lookingBack
+    ? wtQuery.where((eb) =>
+        eb.or([
+          eb("wt.dropoff_poc_contact_uuid", "is not", null),
+          eb.and([eb("wt.dropoff_poc", "is not", null), eb("wt.dropoff_poc", "!=", "")]),
+        ]),
+      )
+    : wtQuery.where((eb) =>
+        eb.or([
+          eb("wt.pickup_poc_contact_uuid", "is not", null),
+          eb.and([eb("wt.pickup_poc", "is not", null), eb("wt.pickup_poc", "!=", "")]),
+        ]),
+      );
 
   if (excludeWorkTrackerUuid) {
     wtQuery = wtQuery.where("wt.id", "!=", excludeWorkTrackerUuid);
   }
 
-  const wtRows = await typedGetAll(wtQuery.compile(), expect<WorkTrackerPocRow>());
+  const wtRows = await typedGetAll(
+    wtQuery
+      .orderBy("wt.date", lookingBack ? "desc" : "asc")
+      .limit(1)
+      .compile(),
+    expect<WorkTrackerPocRow>(),
+  );
 
   return resolvePocContact(
     {

@@ -33,6 +33,8 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
   store.setField("quoteValidTill", data.quoteValidTill ?? "");
   store.setField("clientFacingNotes", data.externalNotes ?? data.notes ?? "");
   store.setField("internalNotes", data.internalNotes ?? "");
+  store.setField("pickupInstructions", data.pickupInstructions ?? "");
+  store.setField("dropoffInstructions", data.dropoffInstructions ?? "");
   store.setField("taxPercent", data.taxPercent ?? null);
   store.setField("taxOverrideCents", data.taxAmountCents ?? null);
 

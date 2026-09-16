@@ -238,6 +238,8 @@ const EventsCols = {
   content_hash: column.text,
   contract_hash: column.text,
   venue_uuid: column.text,
+  pickup_instructions: column.text,
+  dropoff_instructions: column.text,
 } satisfies PowerSyncColsFor<"Events">;
 const Events = new Table(EventsCols, {
   indexes: {
