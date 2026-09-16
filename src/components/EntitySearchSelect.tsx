@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { panelPosition } from "./entitySearch/panelPosition";
+import { searchEntities } from "./entitySearch/searchEntities";
 
 type EntitySearchSelectProps<T extends { id: string }> = {
   items: T[];
@@ -84,8 +86,8 @@ function EntityRow<T extends { id: string }>({
  * doesn't resolve to a live item, or an empty-state placeholder card when
  * nothing's picked — that's always what's shown at rest. Clicking it (any
  * state) opens a floating panel right
- * below it with a focused search box, a filtered list of the same card
- * rows, and a "+ Create New ..." row pinned at the bottom; picking a row,
+ * below it with a focused search box, a "+ Create New ..." row pinned at
+ * the top, and a page of matching card rows below it; picking a row,
  * clicking the card again, clicking outside, or Escape all close it back
  * up. Originally built for venues (see docs/specs/venue-history.md §2.3);
  * genericized so contacts (and any future entity) can share the exact same
@@ -114,11 +116,21 @@ export function EntitySearchSelect<T extends { id: string }>({
   // and, via the outside-click check below, to know a click on the card
   // itself isn't "outside" (its own onClick handles the open/close toggle).
   const cardRef = useRef<HTMLDivElement>(null);
-  // The dropdown is a createPortal into document.body — it is not a DOM
+  // The dropdown is a createPortal (see portalTarget below) — it is not a DOM
   // descendant of cardRef, so the outside-click check below needs its own
   // ref to know a click inside the (portaled) panel isn't "outside" either.
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  // Measured after the panel renders, so it can be flipped above the card when it does not fit
+  // below. 0 on the first pass, which reads as "fits" and lands it below — the usual answer.
+  const [panelHeight, setPanelHeight] = useState(0);
+  // Where the floating panel is portaled to. document.body is right for a picker on an ordinary
+  // page, but inside a Radix dialog it is not: Radix puts `pointer-events: none` on the body
+  // while a dialog is open and closes the dialog on a pointer-down outside its content, so a
+  // panel parked on the body renders unclickable and, when it does take a click, shuts the
+  // dialog. Portaling into the dialog's own content element keeps the panel inside it on both
+  // counts — this is what made Venue unusable in New/Edit Contact.
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   // Chrome's address/contact autofill keys off far more than a matching
   // `autocomplete` value — it also reads keywords in nearby placeholder/label
   // text (this box searches by name, email and phone, so it reads as an
@@ -150,16 +162,38 @@ export function EntitySearchSelect<T extends { id: string }>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  useEffect(() => {
-    if (open && cardRef.current) {
-      const rect = cardRef.current.getBoundingClientRect();
-      setPos({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      });
+  useLayoutEffect(() => {
+    if (!open || !cardRef.current) return;
+
+    const card = cardRef.current;
+    const dialog = card.closest<HTMLElement>('[data-slot="dialog-content"]');
+
+    setPortalTarget(dialog ?? document.body);
+    setPos(
+      panelPosition(
+        card.getBoundingClientRect(),
+        dialog
+          ? {
+              rect: dialog.getBoundingClientRect(),
+              scrollTop: dialog.scrollTop,
+              scrollLeft: dialog.scrollLeft,
+            }
+          : null,
+        { x: window.scrollX, y: window.scrollY },
+        { panelHeight, viewportHeight: window.innerHeight },
+      ),
+    );
+  }, [open, panelHeight]);
+
+  // The panel's height depends on how many rows the query leaves, so re-measure as it changes.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelHeight(0);
+      return;
     }
-  }, [open]);
+    const height = dropdownRef.current?.getBoundingClientRect().height ?? 0;
+    if (height > 0) setPanelHeight(height);
+  }, [open, query, items]);
 
   const toggleOpen = () => {
     setOpen((prev) => {
@@ -168,10 +202,7 @@ export function EntitySearchSelect<T extends { id: string }>({
     });
   };
 
-  const q = query.trim().toLowerCase();
-  const filtered = q
-    ? items.filter((item) => getSearchText(item).toLowerCase().includes(q))
-    : items;
+  const { shown, matched, hidden } = searchEntities(items, query, getSearchText);
 
   return (
     <div className="relative w-full">
@@ -247,7 +278,7 @@ export function EntitySearchSelect<T extends { id: string }>({
       </div>
 
       {open &&
-        typeof window !== "undefined" &&
+        portalTarget &&
         createPortal(
           <div
             ref={dropdownRef}
@@ -279,11 +310,20 @@ export function EntitySearchSelect<T extends { id: string }>({
               onFocus={() => setInputReadOnly(false)}
               onTouchStart={() => setInputReadOnly(false)}
             />
+            {/* Pinned, not the last row of the list: with hundreds of items on file nobody
+                scrolls to the bottom to find it. */}
+            <div
+              className="px-3 py-2 text-sm font-medium text-darkBlue hover:bg-gray-50 cursor-pointer border-b"
+              onClick={() => {
+                setOpen(false);
+                onCreateNew(query);
+              }}
+            >
+              {createLabel}
+            </div>
             <div className="max-h-72 overflow-y-auto">
-              {filtered.length === 0 && (
-                <p className="px-3 py-2 text-sm text-gray-400">{emptyLabel}</p>
-              )}
-              {filtered.map((item) => (
+              {matched === 0 && <p className="px-3 py-2 text-sm text-gray-400">{emptyLabel}</p>}
+              {shown.map((item) => (
                 <EntityRow
                   key={item.id}
                   item={item}
@@ -299,18 +339,14 @@ export function EntitySearchSelect<T extends { id: string }>({
                   }}
                 />
               ))}
-              <div
-                className="px-3 py-2 text-sm font-medium text-darkBlue hover:bg-gray-50 cursor-pointer border-t"
-                onClick={() => {
-                  setOpen(false);
-                  onCreateNew(query);
-                }}
-              >
-                {createLabel}
-              </div>
+              {hidden > 0 && (
+                <p className="px-3 py-2 text-xs text-gray-400 border-t bg-gray-50/60">
+                  Showing {shown.length} of {matched}. Keep typing to narrow it down.
+                </p>
+              )}
             </div>
           </div>,
-          document.body,
+          portalTarget,
         )}
     </div>
   );

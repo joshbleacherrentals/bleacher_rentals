@@ -3,26 +3,15 @@
 import { useState } from "react";
 import { EntitySearchSelect } from "./EntitySearchSelect";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Dropdown } from "./DropDown";
-import { FIELD_LABEL, TextAreaField, TextField } from "./form/TextField";
-import { createSuccessToast } from "./toasts/SuccessToast";
-import { useTouchedErrors } from "@/lib/validation/useTouchedErrors";
+import { FIELD_LABEL } from "./form/TextField";
 import {
   CreateContactModal,
   type CreatedContact,
 } from "@/features/companiesContacts/components/CreateContactModal";
-import { updateContact } from "@/features/companiesContacts/db/updateContact";
+import { ContactFormFields } from "@/features/companiesContacts/components/ContactFormFields";
+import { useContactForm } from "@/features/companiesContacts/hooks/useContactForm";
 import { softDeleteContact } from "@/features/companiesContacts/db/softDeleteContact";
-import { useCompaniesAll } from "@/features/companiesContacts/hooks/useCompaniesAll";
-import {
-  hasErrors,
-  validateContactForm,
-  type ContactFormValues,
-} from "@/features/companiesContacts/utils/formValidation";
-import {
-  PREFERRED_LANGUAGE_OPTIONS,
-  type PreferredLanguage,
-} from "@/features/companiesContacts/db/preferredLanguage";
+import { createSuccessToast } from "./toasts/SuccessToast";
 import type { ContactOption } from "@/features/companiesContacts/hooks/useContacts";
 import { cn } from "@/lib/utils";
 
@@ -84,8 +73,6 @@ export function ContactPicker({
   fallbackLabel,
   contentClassName,
 }: ContactPickerProps) {
-  const { companies, isLoading: loadingCompanies } = useCompaniesAll();
-
   const selected = contacts.find((c) => c.id === contactId) ?? null;
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -99,25 +86,13 @@ export function ContactPicker({
   // The contact being edited — reachable from a dropdown row, not only the
   // current selection, so tracked independently of `contactId`.
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
-  const [values, setValues] = useState<ContactFormValues>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-  });
-  const [notes, setNotes] = useState("");
-  const [companyUuid, setCompanyUuid] = useState<string | null>(null);
-  const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage>("english");
-  const [editSaving, setEditSaving] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
 
-  const errors = validateContactForm(values);
-  const { errorFor, markTouched, markAllTouched, reset: resetTouched } = useTouchedErrors(errors);
-
-  const setValue = (key: keyof ContactFormValues) => (value: string) =>
-    setValues((prev) => ({ ...prev, [key]: value }));
-
-  const companyOptions = companies.map((c) => ({ label: c.companyName, value: c.id }));
+  // ContactOption is exactly what the shared form seeds from, so the picker
+  // edits through the same form as the Companies & Contacts page — venue and
+  // all. See docs/specs/companies-contacts-forms.md.
+  const editingContact = contacts.find((c) => c.id === editingContactId) ?? null;
+  const form = useContactForm({ contact: editingContact });
 
   const openCreate = (query: string) => {
     setCreateQuery(query);
@@ -139,51 +114,29 @@ export function ContactPicker({
   };
 
   const openEdit = (id: string) => {
-    const contact = contacts.find((c) => c.id === id);
-    if (!contact) return;
+    if (!contacts.some((c) => c.id === id)) return;
     setEditingContactId(id);
-    setValues({
-      firstName: contact.firstName,
-      lastName: contact.lastName ?? "",
-      email: contact.email ?? "",
-      phone: contact.phone ?? "",
-    });
-    setNotes(contact.notes ?? "");
-    setCompanyUuid(contact.companyUuid);
-    setPreferredLanguage(contact.preferredLanguage);
     setEditStep("form");
-    resetTouched();
     setEditOpen(true);
   };
 
-  const canSaveEdit = !hasErrors(errors) && !editSaving;
-
   const commitContactEdit = async () => {
-    markAllTouched(["firstName", "lastName", "email", "phone"]);
-    if (!editingContactId || !canSaveEdit) return;
-    setEditSaving(true);
-    try {
-      await updateContact(editingContactId, { ...values, notes, companyUuid, preferredLanguage });
-      createSuccessToast(["Contact updated."]);
-      // Editing a contact always selects it, whether reached from the
-      // current selection's own pencil or from a dropdown row.
-      onSelect({
-        id: editingContactId,
-        firstName: values.firstName,
-        lastName: values.lastName || null,
-        email: values.email || null,
-        phone: values.phone || null,
-        companyUuid,
-        defaultVenueId: contacts.find((c) => c.id === editingContactId)?.defaultVenueId ?? null,
-        notes: notes || null,
-        preferredLanguage,
-      });
-      setEditOpen(false);
-    } catch {
-      /* error toast shown by updateContact */
-    } finally {
-      setEditSaving(false);
-    }
+    const saved = await form.submit();
+    if (!saved) return;
+    // Editing a contact always selects it, whether reached from the
+    // current selection's own pencil or from a dropdown row.
+    onSelect({
+      id: saved.id,
+      firstName: saved.firstName,
+      lastName: saved.lastName || null,
+      email: saved.email || null,
+      phone: saved.phone || null,
+      companyUuid: saved.companyUuid,
+      defaultVenueId: saved.defaultVenueUuid,
+      notes: saved.notes || null,
+      preferredLanguage: saved.preferredLanguage,
+    });
+    setEditOpen(false);
   };
 
   const commitDeleteContact = async () => {
@@ -244,7 +197,7 @@ export function ContactPicker({
       {/* Edit Contact — confirming a delete is just another view inside
           this same Dialog, not a second overlay. */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className={cn("sm:max-w-md", contentClassName)}>
+        <DialogContent className={cn("sm:max-w-md max-h-[85vh] overflow-y-auto", contentClassName)}>
           {editStep === "form" && (
             <>
               <DialogHeader>
@@ -254,67 +207,13 @@ export function ContactPicker({
                 <p className="text-xs text-gray-500">
                   This updates the contact everywhere it's used, including other quotes.
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <TextField
-                    label="First Name"
-                    required
-                    value={values.firstName}
-                    onChange={setValue("firstName")}
-                    onBlur={() => markTouched("firstName")}
-                    error={errorFor("firstName")}
-                  />
-                  <TextField
-                    label="Last Name"
-                    value={values.lastName}
-                    onChange={setValue("lastName")}
-                    onBlur={() => markTouched("lastName")}
-                    error={errorFor("lastName")}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <TextField
-                    label="Email"
-                    type="email"
-                    value={values.email}
-                    onChange={setValue("email")}
-                    onBlur={() => markTouched("email")}
-                    error={errorFor("email")}
-                  />
-                  <TextField
-                    label="Phone"
-                    type="tel"
-                    value={values.phone}
-                    onChange={setValue("phone")}
-                    onBlur={() => markTouched("phone")}
-                    error={errorFor("phone")}
-                  />
-                </div>
-                <div>
-                  <label className={FIELD_LABEL}>Company</label>
-                  <Dropdown
-                    options={companyOptions}
-                    selected={companyUuid}
-                    onSelect={setCompanyUuid}
-                    placeholder={loadingCompanies ? "Loading..." : "Select company..."}
-                    disabled={loadingCompanies}
-                  />
-                </div>
-                <div>
-                  <label className={FIELD_LABEL}>Quote Language</label>
-                  <Dropdown
-                    options={PREFERRED_LANGUAGE_OPTIONS}
-                    selected={preferredLanguage}
-                    onSelect={(v) => setPreferredLanguage(v as PreferredLanguage)}
-                    placeholder="Select language..."
-                  />
-                </div>
-                <TextAreaField label="Notes" value={notes} onChange={setNotes} />
+                <ContactFormFields form={form} contentClassName={contentClassName} />
               </div>
               <div className="flex justify-between items-center pt-2">
                 <button
                   type="button"
                   onClick={() => setEditStep("confirmDelete")}
-                  disabled={editSaving || deleteSaving}
+                  disabled={form.saving || deleteSaving}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md disabled:opacity-40"
                 >
                   Delete Contact
@@ -330,10 +229,10 @@ export function ContactPicker({
                   <button
                     type="button"
                     onClick={commitContactEdit}
-                    disabled={!canSaveEdit}
+                    disabled={!form.canSave}
                     className="px-4 py-1.5 text-sm font-medium text-white bg-darkBlue rounded-md hover:bg-lightBlue disabled:opacity-40"
                   >
-                    {editSaving ? "Saving…" : "Save Contact"}
+                    {form.saving ? "Saving…" : "Save Contact"}
                   </button>
                 </div>
               </div>
