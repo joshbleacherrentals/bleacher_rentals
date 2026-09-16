@@ -4,7 +4,7 @@ import { Dropdown } from "@/components/DropDown";
 import { BleacherSwapPanel } from "@/features/workTrackers/components/BleacherSwapPanel";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
+import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import {
   useAddressFromUuid,
   saveWorkTracker,
@@ -74,7 +74,9 @@ import {
   getExpectedAddressFullForWorkTracker,
   isPickupTransportationMismatch,
 } from "@/features/alerts/util/workTrackerTransportation";
-import { PocSelect } from "./PocSelect";
+import { getUpcomingWindowEnd } from "@/features/alerts/util/getUpcomingWindow";
+import { ContactPicker, contactDisplayName } from "@/components/ContactPicker";
+import { useContacts } from "@/features/companiesContacts/hooks/useContacts";
 import { getExpectedPocForWorkTracker, type PocDirection } from "../util/resolvePocContact";
 import { describePocPopulateResult, type PocValue } from "../util/pocField";
 import {
@@ -153,6 +155,9 @@ export default function WorkTrackerModal({
 
   // Fetch available work tracker types (local-first via PowerSync)
   const { types: workTrackerTypes } = useWorkTrackerTypes();
+
+  // For the Pickup/Dropoff POC pickers below.
+  const { contacts: pocContacts } = useContacts();
 
   const selectedWorkTrackerType = workTrackerTypes.find(
     (t) => t.id === workTracker?.work_tracker_type_uuid,
@@ -1175,11 +1180,25 @@ export default function WorkTrackerModal({
                               <label className={labelClassName}>Pickup POC</label>
                               <div className="flex flex-row gap-2 items-center">
                                 <div className="flex-1 min-w-0">
-                                  <PocSelect
-                                    contactUuid={workTracker?.pickup_poc_contact_uuid ?? null}
-                                    pocText={workTracker?.pickup_poc ?? null}
-                                    onChange={setPickupPoc}
-                                    placeholder="Pickup POC"
+                                  <ContactPicker
+                                    label=""
+                                    contactId={workTracker?.pickup_poc_contact_uuid ?? null}
+                                    contacts={pocContacts}
+                                    fallbackLabel={workTracker?.pickup_poc ?? null}
+                                    onSelect={(contact) =>
+                                      setPickupPoc({
+                                        contactUuid: contact.id,
+                                        pocText: contactDisplayName(contact),
+                                      })
+                                    }
+                                    onClear={() =>
+                                      setPickupPoc({ contactUuid: null, pocText: null })
+                                    }
+                                    placeholder="Search contacts..."
+                                    // WorkTrackerModal isn't a Radix dialog: it paints its own
+                                    // z-[2000] overlay, so the picker's dialogs need raising past
+                                    // it — matches the z-[2101] its save-confirm dialog uses.
+                                    contentClassName="z-[2101]"
                                   />
                                 </div>
                                 {canEditFields && (
@@ -1205,18 +1224,21 @@ export default function WorkTrackerModal({
                                 )}
                               </div>
                               <div className="flex flex-row gap-2 items-center">
-                                <div className="w-full" data-testid="pickup-address-field">
-                                  <AddressAutocomplete
-                                    className="bg-white"
-                                    onAddressSelect={(data) =>
-                                      setPickUpAddress({
-                                        ...data,
-                                        addressUuid: pickUpAddress?.addressUuid ?? null,
-                                      })
-                                    }
-                                    initialValue={pickUpAddress?.address || ""}
-                                  />
-                                </div>
+                                <AddressAutocomplete
+                                  className="bg-white"
+                                  onAddressSelect={(data) =>
+                                    setPickUpAddress({
+                                      ...data,
+                                      addressUuid: pickUpAddress?.addressUuid ?? null,
+                                    })
+                                  }
+                                  initialValue={formatAddressLine({
+                                    street: pickUpAddress?.address,
+                                    city: pickUpAddress?.city,
+                                    state: pickUpAddress?.state,
+                                    postalCode: pickUpAddress?.postalCode,
+                                  })}
+                                />
                                 {canEditFields && (
                                   <AppTooltip content="Populate from last known bleacher location">
                                     <button
@@ -1288,11 +1310,22 @@ export default function WorkTrackerModal({
                             </label>
                             <div className="flex flex-row gap-2 items-center">
                               <div className="flex-1 min-w-0">
-                                <PocSelect
-                                  contactUuid={workTracker?.dropoff_poc_contact_uuid ?? null}
-                                  pocText={workTracker?.dropoff_poc ?? null}
-                                  onChange={setDropoffPoc}
-                                  placeholder={isSingleFieldSetType ? "POC" : "Dropoff POC"}
+                                <ContactPicker
+                                  label=""
+                                  contactId={workTracker?.dropoff_poc_contact_uuid ?? null}
+                                  contacts={pocContacts}
+                                  fallbackLabel={workTracker?.dropoff_poc ?? null}
+                                  onSelect={(contact) =>
+                                    setDropoffPoc({
+                                      contactUuid: contact.id,
+                                      pocText: contactDisplayName(contact),
+                                    })
+                                  }
+                                  onClear={() =>
+                                    setDropoffPoc({ contactUuid: null, pocText: null })
+                                  }
+                                  placeholder="Search contacts..."
+                                  contentClassName="z-[2101]"
                                 />
                               </div>
                               {canEditFields && (
@@ -1311,18 +1344,21 @@ export default function WorkTrackerModal({
                               {isSingleFieldSetType ? "Address" : "Dropoff Address"}
                             </label>
                             <div className="flex flex-row gap-2 items-center">
-                              <div className="w-full" data-testid="dropoff-address-field">
-                                <AddressAutocomplete
-                                  className="bg-white"
-                                  onAddressSelect={(data) =>
-                                    setDropOffAddress({
-                                      ...data,
-                                      addressUuid: dropOffAddress?.addressUuid ?? null,
-                                    })
-                                  }
-                                  initialValue={dropOffAddress?.address || ""}
-                                />
-                              </div>
+                              <AddressAutocomplete
+                                className="bg-white"
+                                onAddressSelect={(data) =>
+                                  setDropOffAddress({
+                                    ...data,
+                                    addressUuid: dropOffAddress?.addressUuid ?? null,
+                                  })
+                                }
+                                initialValue={formatAddressLine({
+                                  street: dropOffAddress?.address,
+                                  city: dropOffAddress?.city,
+                                  state: dropOffAddress?.state,
+                                  postalCode: dropOffAddress?.postalCode,
+                                })}
+                              />
                               {canEditFields && (
                                 <AppTooltip content="Populate from next known bleacher location">
                                   <button

@@ -23,6 +23,7 @@ export const TRACKED_FIELDS = [
   "contact_uuid",
   "finance_contact_uuid",
   "address_uuid",
+  "venue_uuid",
   "sales_office_uuid",
   "terms_and_conditions_uuid",
   "quote_valid_till",
@@ -47,6 +48,7 @@ export const FIELD_LABELS: Record<string, string> = {
   contact_uuid: "Contact",
   finance_contact_uuid: "Finance Contact",
   address_uuid: "Address",
+  venue_uuid: "Venue",
   sales_office_uuid: "Sales Office",
   terms_and_conditions_uuid: "Terms & Conditions",
   quote_valid_till: "Quote Valid Till",
@@ -73,6 +75,7 @@ const UUID_FIELDS_TO_SKIP_RAW = new Set([
   "terms_and_conditions_uuid",
   "created_by_user_uuid",
   "address_uuid",
+  "venue_uuid",
 ]);
 
 const CENTS_FIELDS = new Set(["tax_amount_cents", "contract_revenue_cents"]);

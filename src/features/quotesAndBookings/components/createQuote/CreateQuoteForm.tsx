@@ -18,7 +18,6 @@ import { NotesSection } from "./sections/NotesSection";
 import { PaymentScheduleSection } from "./sections/PaymentScheduleSection";
 import { TermsSection } from "./sections/TermsSection";
 import { AddLineItemModal } from "./modals/AddLineItemModal";
-import { NewContactModal } from "./modals/NewContactModal";
 import { EditPaymentScheduleModal } from "./modals/EditPaymentScheduleModal";
 import { createQuoteEvent } from "../../db/createQuoteEvent";
 import { updateQuoteEvent } from "../../db/updateQuoteEvent";
@@ -302,7 +301,6 @@ export function CreateQuoteForm() {
       </div>
 
       <AddLineItemModal />
-      <NewContactModal />
       <EditPaymentScheduleModal />
       <UnsavedChangesDialog
         open={guard.isBlocking}

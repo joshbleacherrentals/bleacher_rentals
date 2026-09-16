@@ -42,6 +42,12 @@ export type CreateQuoteState = {
   eventName: string;
   eventAddress: string;
   eventAddressData: AddressFields | null;
+  // Set when eventAddress/eventAddressData came from picking a Venue; null
+  // when the address was typed/edited directly ("manual" — see
+  // docs/specs/venue-history.md §2.3). Independent of eventAddressData, which
+  // always holds the resolved address either way.
+  venueId: string | null;
+  venueName: string;
   eventStart: string;
   eventEnd: string;
   eventTypeId: string | null;
@@ -72,7 +78,6 @@ export type CreateQuoteState = {
   attachPdfViaEmail: boolean;
 
   // Modals
-  isNewContactModalOpen: boolean;
   isAddLineItemModalOpen: boolean;
   isEditPaymentScheduleModalOpen: boolean;
 };
@@ -110,6 +115,8 @@ const initialState: CreateQuoteState = {
   eventName: "",
   eventAddress: "",
   eventAddressData: null,
+  venueId: null,
+  venueName: "",
   eventStart: "",
   eventEnd: "",
   eventTypeId: null,
@@ -131,7 +138,6 @@ const initialState: CreateQuoteState = {
   termsDocumentId: null,
   attachPdfViaEmail: false,
 
-  isNewContactModalOpen: false,
   isAddLineItemModalOpen: false,
   isEditPaymentScheduleModalOpen: false,
 };
@@ -199,6 +205,7 @@ const TRACKED_KEYS: (keyof CreateQuoteState)[] = [
   "eventStart",
   "eventEnd",
   "contactId",
+  "venueId",
   "salesOfficeId",
   "lineItems",
   "paymentInstallments",

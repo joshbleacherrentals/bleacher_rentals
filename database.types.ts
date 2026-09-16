@@ -698,6 +698,7 @@ export type Database = {
           company_uuid: string | null
           created_at: string
           created_by_user_uuid: string | null
+          default_venue_uuid: string | null
           deleted: boolean
           email: string | null
           first_name: string
@@ -711,6 +712,7 @@ export type Database = {
           company_uuid?: string | null
           created_at?: string
           created_by_user_uuid?: string | null
+          default_venue_uuid?: string | null
           deleted?: boolean
           email?: string | null
           first_name: string
@@ -724,6 +726,7 @@ export type Database = {
           company_uuid?: string | null
           created_at?: string
           created_by_user_uuid?: string | null
+          default_venue_uuid?: string | null
           deleted?: boolean
           email?: string | null
           first_name?: string
@@ -746,6 +749,13 @@ export type Database = {
             columns: ["created_by_user_uuid"]
             isOneToOne: false
             referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Contacts_default_venue_uuid_fkey"
+            columns: ["default_venue_uuid"]
+            isOneToOne: false
+            referencedRelation: "Venues"
             referencedColumns: ["id"]
           },
         ]
@@ -2163,6 +2173,7 @@ export type Database = {
           ten_row: number | null
           terms_and_conditions_uuid: string | null
           total_seats: number | null
+          venue_uuid: string | null
         }
         Insert: {
           address_uuid?: string | null
@@ -2204,6 +2215,7 @@ export type Database = {
           ten_row?: number | null
           terms_and_conditions_uuid?: string | null
           total_seats?: number | null
+          venue_uuid?: string | null
         }
         Update: {
           address_uuid?: string | null
@@ -2245,6 +2257,7 @@ export type Database = {
           ten_row?: number | null
           terms_and_conditions_uuid?: string | null
           total_seats?: number | null
+          venue_uuid?: string | null
         }
         Relationships: [
           {
@@ -2294,6 +2307,13 @@ export type Database = {
             columns: ["terms_and_conditions_uuid"]
             isOneToOne: false
             referencedRelation: "TermsAndConditions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Events_venue_uuid_fkey"
+            columns: ["venue_uuid"]
+            isOneToOne: false
+            referencedRelation: "Venues"
             referencedColumns: ["id"]
           },
         ]
@@ -3909,6 +3929,48 @@ export type Database = {
             columns: ["qbo_connection_uuid"]
             isOneToOne: false
             referencedRelation: "QboConnections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      Venues: {
+        Row: {
+          address_uuid: string
+          created_at: string
+          created_by_user_uuid: string | null
+          deleted: boolean
+          id: string
+          name: string
+        }
+        Insert: {
+          address_uuid: string
+          created_at?: string
+          created_by_user_uuid?: string | null
+          deleted?: boolean
+          id?: string
+          name: string
+        }
+        Update: {
+          address_uuid?: string
+          created_at?: string
+          created_by_user_uuid?: string | null
+          deleted?: boolean
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "Venues_address_uuid_fkey"
+            columns: ["address_uuid"]
+            isOneToOne: false
+            referencedRelation: "Addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Venues_created_by_user_uuid_fkey"
+            columns: ["created_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
             referencedColumns: ["id"]
           },
         ]

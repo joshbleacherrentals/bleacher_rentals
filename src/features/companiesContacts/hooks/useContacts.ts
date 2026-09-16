@@ -3,7 +3,13 @@
 import { useMemo } from "react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
+import { toPreferredLanguage, type PreferredLanguage } from "../db/preferredLanguage";
 
+// Data shape for @/components/ContactPicker. Lighter than ContactFull
+// (useContactsAll.ts) in one way — no joined companyName — but adds
+// defaultVenueId, which the picker's callers use to auto-fill a venue
+// field. Shared across features (quotesAndBookings' Client Info section,
+// workTrackers' pickup/dropoff POC) rather than living under either one.
 export type ContactRow = {
   id: string;
   first_name: string | null;
@@ -11,6 +17,9 @@ export type ContactRow = {
   email: string | null;
   phone: string | null;
   company_uuid: string | null;
+  default_venue_uuid: string | null;
+  notes: string | null;
+  preferred_language: string | null;
 };
 
 export type ContactOption = {
@@ -20,6 +29,9 @@ export type ContactOption = {
   email: string | null;
   phone: string | null;
   companyUuid: string | null;
+  defaultVenueId: string | null;
+  notes: string | null;
+  preferredLanguage: PreferredLanguage;
 };
 
 export function useContacts(): { contacts: ContactOption[]; isLoading: boolean } {
@@ -27,7 +39,17 @@ export function useContacts(): { contacts: ContactOption[]; isLoading: boolean }
     () =>
       db
         .selectFrom("Contacts")
-        .select(["id", "first_name", "last_name", "email", "phone", "company_uuid"])
+        .select([
+          "id",
+          "first_name",
+          "last_name",
+          "email",
+          "phone",
+          "company_uuid",
+          "default_venue_uuid",
+          "notes",
+          "preferred_language",
+        ])
         .where("deleted", "=", 0)
         .orderBy("first_name")
         .compile(),
@@ -45,6 +67,9 @@ export function useContacts(): { contacts: ContactOption[]; isLoading: boolean }
         email: c.email,
         phone: c.phone,
         companyUuid: c.company_uuid,
+        defaultVenueId: c.default_venue_uuid,
+        notes: c.notes,
+        preferredLanguage: toPreferredLanguage(c.preferred_language),
       })),
     [data],
   );

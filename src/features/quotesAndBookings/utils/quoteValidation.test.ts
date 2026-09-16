@@ -81,7 +81,7 @@ describe("validateQuoteForSend", () => {
     if (!result.ok) {
       expect(result.errors[0]).toContain("Sales Office");
       expect(result.errors[0]).toContain("Contact");
-      expect(result.errors[0]).toContain("Event Address");
+      expect(result.errors[0]).toContain("Venue");
       expect(result.errors[0]).toContain("Event Type");
       expect(result.errors[0]).toContain("Line Items");
       expect(result.errors[0]).toContain("Terms and Conditions");

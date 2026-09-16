@@ -28,6 +28,11 @@ export type CurrentEventState = {
   originalOwnerUserUuid: string | null;
   eventName: string;
   addressData: AddressData | null;
+  // Set when addressData came from picking a Venue; null when the address
+  // was typed/edited directly ("manual" / detached — see
+  // docs/specs/venue-history.md §2.3, §3.5).
+  venueUuid: string | null;
+  venueName: string;
   seats: number | null;
   sevenRow: number | null;
   tenRow: number | null;
@@ -87,6 +92,8 @@ const initialState: CurrentEventState = {
   originalOwnerUserUuid: null,
   eventName: "",
   addressData: null,
+  venueUuid: null,
+  venueName: "",
   seats: 0,
   sevenRow: 0,
   tenRow: 0,

@@ -8,6 +8,9 @@ import { formatLostReason } from "../../../utils/lostReason";
 import { DateTime } from "luxon";
 import { useMemo, useState, useEffect } from "react";
 import { ExternalLink, FileText } from "lucide-react";
+import { ContactHistorySheet } from "./ContactHistorySheet";
+import { VenueHistorySheet } from "./VenueHistorySheet";
+import { VenueCard } from "@/components/VenueCard";
 
 type SignatureInfo = {
   signerName: string;
@@ -191,6 +194,8 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
   const { lineItems, isLoading } = useEventLineItems(quote.id);
   const currency = useEventCurrency(quote.id);
   const [signature, setSignature] = useState<SignatureInfo>(null);
+  const [contactSheetOpen, setContactSheetOpen] = useState(false);
+  const [venueSheetOpen, setVenueSheetOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/contracts/${quote.id}`)
@@ -298,9 +303,13 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
               <>
                 <div>
                   <span className="text-gray-500">Contact:</span>{" "}
-                  <span className="font-medium text-darkBlue">
+                  <button
+                    type="button"
+                    onClick={() => setContactSheetOpen(true)}
+                    className="font-medium text-darkBlue hover:underline"
+                  >
                     {quote.contact.firstName} {quote.contact.lastName ?? ""}
-                  </span>
+                  </button>
                 </div>
                 {quote.contact.email && (
                   <div>
@@ -340,15 +349,40 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
         </div>
       </div>
 
-      {/* Venue */}
+      {/* Venue — read-only here: clicking opens the event history for this
+          venue, never an editor. Editing only happens from the Edit Quote
+          page / dashboard event modal's VenuePicker. */}
       {quote.address && (
         <div>
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Venue</h3>
-          <p className="text-sm">
-            {quote.address.street}
-            <br />
-            {quote.address.zipPostal ?? ""}
-          </p>
+          <VenueCard
+            value={
+              quote.venue
+                ? {
+                    mode: "venue",
+                    venueId: quote.venue.id,
+                    name: quote.venue.name,
+                    address: {
+                      street: quote.address.street,
+                      city: quote.address.city,
+                      stateProvince: quote.address.stateProvince,
+                      zipPostal: quote.address.zipPostal ?? "",
+                    },
+                  }
+                : {
+                    mode: "manual",
+                    venueId: null,
+                    address: {
+                      street: quote.address.street,
+                      city: quote.address.city,
+                      stateProvince: quote.address.stateProvince,
+                      zipPostal: quote.address.zipPostal ?? "",
+                    },
+                  }
+            }
+            onClick={quote.venue ? () => setVenueSheetOpen(true) : undefined}
+            className="max-w-sm"
+          />
         </div>
       )}
 
@@ -406,6 +440,24 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
           />
         )}
       </div>
+
+      {quote.contact && (
+        <ContactHistorySheet
+          contactId={quote.contact.id}
+          contactName={`${quote.contact.firstName} ${quote.contact.lastName ?? ""}`.trim()}
+          open={contactSheetOpen}
+          onOpenChange={setContactSheetOpen}
+        />
+      )}
+
+      {quote.venue && (
+        <VenueHistorySheet
+          venueId={quote.venue.id}
+          venueName={quote.venue.name}
+          open={venueSheetOpen}
+          onOpenChange={setVenueSheetOpen}
+        />
+      )}
     </div>
   );
 }

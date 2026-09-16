@@ -45,7 +45,11 @@ export function validateQuoteForSend(state: SendValidationState): QuoteValidatio
   if (!state.salesOfficeId) missing.push("Sales Office");
   if (!state.contactId) missing.push("Contact");
   if (!state.eventName.trim()) missing.push("Event Name");
-  if (!state.eventAddressData) missing.push("Event Address");
+  // "Venue" here just means an address is set — via a linked Venue or a
+  // manually-typed one ("detached", see docs/specs/venue-history.md §2.3).
+  // Only the label changed; a manual address is just as sendable as one
+  // backed by a Venue record.
+  if (!state.eventAddressData) missing.push("Venue");
   if (!state.eventTypeId) missing.push("Event Type");
   if (!state.eventStart) missing.push("Event Start");
   if (!state.eventEnd) missing.push("Event End");

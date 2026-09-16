@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
+import { parseQboApiResponse } from "@/features/quickbooks-integration/parseQboApiResponse";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { DateTime } from "luxon";
@@ -185,10 +186,10 @@ export function CreateBillModal({
         }),
       });
 
-      const data = await response.json();
+      const data = await parseQboApiResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create bill");
+        throw new Error((data.error as string) || "Failed to create bill");
       }
 
       // Invalidate the drivers query to refresh the list
@@ -205,7 +206,7 @@ export function CreateBillModal({
       ]);
 
       // Call onSuccess with the bill ID and close
-      onSuccess(data.billId);
+      onSuccess(data.billId as string);
       onClose();
     } catch (error: any) {
       console.error("Error creating bill:", error);

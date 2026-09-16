@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect } from "react";
-import AddressAutocomplete from "@/components/AddressAutoComplete";
 import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
+import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import { Dropdown } from "@/components/DropDown";
 import { useMaintenanceEventStore } from "../../state/useMaintenanceEventStore";
 import { useScrollToDateStore } from "@/features/dashboard/state/useScrollToDateStore";
@@ -105,7 +105,12 @@ export const MaintenanceCoreTab = ({ disabled = false }: Props = {}) => {
                 addressUuid: store.addressData?.addressUuid ?? null,
               })
             }
-            initialValue={store.addressData?.address || ""}
+            initialValue={formatAddressLine({
+              street: store.addressData?.address,
+              city: store.addressData?.city,
+              state: store.addressData?.state,
+              postalCode: store.addressData?.postalCode,
+            })}
           />
         </div>
         <div>
