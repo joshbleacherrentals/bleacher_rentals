@@ -1,4 +1,4 @@
-import { LocateFixed, X, Trash2, Calculator, Pencil, AlertTriangle } from "lucide-react";
+import { LocateFixed, X, Trash2, AlertTriangle } from "lucide-react";
 import { AppTooltip } from "@/components/AppTooltip";
 import { Dropdown } from "@/components/DropDown";
 import { BleacherSwapPanel } from "@/features/workTrackers/components/BleacherSwapPanel";
@@ -59,8 +59,8 @@ import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery, typedGetAll } from "@/lib/powersync/typedQuery";
 import { startTrace, type PerfTrace } from "@/lib/perf/perfTrace";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import WorkTrackerLineItemsTab from "./WorkTrackerLineItemsTab";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import WorkTrackerLineItemsTab, { formatMoney } from "./WorkTrackerLineItemsTab";
 import {
   calculateWorkTrackerLineItemsTotalCents,
   fetchWorkTrackerLineItems,
@@ -83,7 +83,7 @@ import {
   getSelectableWorkTrackerTypes,
   isSingleFieldSetType as computeIsSingleFieldSetType,
 } from "../util/workTrackerTypeDisplay";
-import { WorkTrackerTypeSelect } from "./WorkTrackerTypeSelect";
+import { WorkTrackerTabsHeader } from "./WorkTrackerTabsHeader";
 import { WorkTrackerTimeField } from "./WorkTrackerTimeField";
 
 type WorkTrackerModalProps = {
@@ -129,9 +129,6 @@ export default function WorkTrackerModal({
   const [pickUpAddress, setPickUpAddress] = useState<AddressData | null>(pickupAddress);
   const [dropOffAddress, setDropOffAddress] = useState<AddressData | null>(dropoffAddress);
 
-  const [payInput, setPayInput] = useState(
-    selectedWorkTracker?.pay_cents != null ? (selectedWorkTracker?.pay_cents / 100).toFixed(2) : "",
-  );
   const [initialStatus, setInitialStatus] = useState<Tables<"WorkTrackers">["status"]>(
     selectedWorkTracker?.status ?? "draft",
   );
@@ -235,18 +232,7 @@ export default function WorkTrackerModal({
   useEffect(() => {
     setWorkTracker(selectedWorkTracker);
     setInitialStatus(selectedWorkTracker?.status ?? "draft");
-    setPayInput(
-      selectedWorkTracker?.pay_cents != null
-        ? (selectedWorkTracker?.pay_cents / 100).toFixed(2)
-        : "",
-    );
   }, [selectedWorkTracker]);
-
-  // useEffect(() => {
-  //   if (workTracker?.pay_cents != null) {
-  //     setPayInput((workTracker.pay_cents / 100).toFixed(2));
-  //   }
-  // }, [workTracker?.pay_cents]);
 
   // console.log("selectedWorkTracker WorkTrackerModal", selectedWorkTracker);
 
@@ -568,11 +554,6 @@ export default function WorkTrackerModal({
         nextPickupAddress,
         nextDropoffAddress,
       );
-      setPayInput(
-        fetchedWorkTracker.workTracker && fetchedWorkTracker.workTracker.pay_cents != null
-          ? (fetchedWorkTracker.workTracker.pay_cents / 100).toFixed(2)
-          : "",
-      );
       setPickUpAddress(nextPickupAddress);
       setDropOffAddress(nextDropoffAddress);
     }
@@ -619,11 +600,14 @@ export default function WorkTrackerModal({
         changeType,
         workTracker?.status ?? "draft",
       );
+      // Pay is always overwritten with the current line items total on save —
+      // it's shown read-only in the UI, never hand-edited.
       // Merge distance/duration from the Google Maps leg into the tracker before saving
       const trackerToSave = workTracker
         ? {
             ...workTracker,
             status: resolvedStatus,
+            pay_cents: lineItemsTotalCents,
             distance_meters:
               leg?.distanceMeters != null
                 ? Math.round(leg.distanceMeters)
@@ -718,31 +702,6 @@ export default function WorkTrackerModal({
   //   }
   // };
 
-  function handlePayChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value;
-
-    // Allow empty input for backspacing
-    if (raw === "") {
-      setPayInput("");
-      setWorkTracker((prev) => ({ ...prev!, pay_cents: null }));
-      return;
-    }
-
-    // Only allow numbers with max 2 decimals
-    const validFormat = /^\d*\.?\d{0,2}$/;
-    if (!validFormat.test(raw)) return;
-
-    setPayInput(raw);
-
-    const parsed = parseFloat(raw);
-    if (!isNaN(parsed)) {
-      setWorkTracker((prev) => ({
-        ...prev!,
-        pay_cents: Math.round(parsed * 100),
-      }));
-    }
-  }
-
   // The same breakdown the button applies, so the tooltip always shows the work
   // that clicking would actually do.
   const payBreakdown = useMemo(
@@ -793,14 +752,6 @@ export default function WorkTrackerModal({
     () => calculateWorkTrackerLineItemsTotalCents(lineItems),
     [lineItems],
   );
-
-  const handleCalculatePay = () => {
-    setPayInput((lineItemsTotalCents / 100).toFixed(2));
-    setWorkTracker((prev) => ({
-      ...prev!,
-      pay_cents: lineItemsTotalCents,
-    }));
-  };
 
   const labelClassName = "block text-sm font-medium text-gray-700 mt-1";
   const inputClassName = "w-full p-2 border rounded bg-white";
@@ -951,44 +902,22 @@ export default function WorkTrackerModal({
                 preserve their current workflow step.
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <Tabs defaultValue="details">
-                <div className="flex items-center justify-between">
-                  <TabsList>
-                    <TabsTrigger value="details">Details</TabsTrigger>
-                    <TabsTrigger value="line-items">Line Items</TabsTrigger>
-                  </TabsList>
-                  {/* Work Tracker Type — its own color-coded switch rather than a form
-                    field, since the choice drives which fields the Details tab shows
-                    (Trip's separate Pickup/Dropoff sections vs. everything else's
-                    single field set). */}
-                  <div className="flex items-center gap-2">
-                    <WorkTrackerTypeSelect
-                      types={selectableWorkTrackerTypes}
-                      selectedId={workTracker?.work_tracker_type_uuid}
-                      onSelect={(id) =>
-                        setWorkTracker((prev) => ({
-                          ...prev!,
-                          work_tracker_type_uuid: id,
-                        }))
-                      }
-                      disabled={!canEditFields}
-                    />
-                    {/* QBO account assignment for the 3 fixed types now lives on its
-                      own admin-only page, not a modal here. */}
-                    {permissions.isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => setShowLeaveToEditTypesConfirm(true)}
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                      >
-                        <Pencil className="h-3 w-3" />
-                        Edit types
-                      </button>
-                    )}
-                  </div>
-                </div>
+            <Tabs defaultValue="details" className="flex-1 min-h-0">
+              <WorkTrackerTabsHeader
+                types={selectableWorkTrackerTypes}
+                selectedTypeId={workTracker?.work_tracker_type_uuid}
+                onSelectType={(id) =>
+                  setWorkTracker((prev) => ({
+                    ...prev!,
+                    work_tracker_type_uuid: id,
+                  }))
+                }
+                disabled={!canEditFields}
+                isAdmin={permissions.isAdmin}
+                onEditTypesClick={() => setShowLeaveToEditTypesConfirm(true)}
+              />
 
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 <TabsContent value="details">
                   {/*
                   min-w-0 is load-bearing: browsers give <fieldset> a UA
@@ -1128,30 +1057,6 @@ export default function WorkTrackerModal({
                           }
                           rows={4}
                         />
-                        <label className={labelClassName}>Pay</label>
-                        <div className="flex flex-row gap-2 items-center">
-                          <input
-                            type="number"
-                            className={inputClassName}
-                            step="0.01"
-                            min="0"
-                            value={payInput}
-                            onChange={handlePayChange}
-                            placeholder="0.00"
-                          />
-                          {canEditFields && (
-                            <AppTooltip
-                              content={`Set pay to line items total: $${(
-                                lineItemsTotalCents / 100
-                              ).toFixed(2)}`}
-                            >
-                              <Calculator
-                                className="h-5 w-5 hover:h-6 hover:w-6 transition-all cursor-pointer text-darkBlue hover:text-lightBlue"
-                                onClick={handleCalculatePay}
-                              />
-                            </AppTooltip>
-                          )}
-                        </div>
                       </div>
 
                       {/* Columns 2 & 3: Pickup, Dropoff, and Map */}
@@ -1461,8 +1366,8 @@ export default function WorkTrackerModal({
                     isLoading={isLineItemsLoading}
                   />
                 </TabsContent>
-              </Tabs>
-            </div>
+              </div>
+            </Tabs>
 
             <div className="mt-4 shrink-0 flex justify-between items-center gap-2">
               {canEditFields && !isInProgress && workTracker?.id && workTracker.id !== "-1" && (
@@ -1475,6 +1380,12 @@ export default function WorkTrackerModal({
                 </button>
               )}
               <div className="flex-1" />
+              {lineItems.length > 0 && (
+                <span className="text-sm">
+                  <span className="font-semibold">Total</span>{" "}
+                  <span className="font-bold">{formatMoney(lineItemsTotalCents)}</span>
+                </span>
+              )}
               <BillOfLadingButton
                 workTracker={workTracker}
                 pickUpAddress={pickUpAddress}
