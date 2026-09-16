@@ -1,7 +1,7 @@
 // components/Dropdown.tsx
 "use client";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 
@@ -33,10 +33,16 @@ export function Dropdown<T>({
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number | undefined;
+  }>({
     top: 0,
     left: 0,
     width: 0,
+    maxHeight: undefined,
   });
 
   useEffect(() => {
@@ -62,15 +68,33 @@ export function Dropdown<T>({
     return () => window.removeEventListener("scroll", close, true);
   }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen && ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      setDropdownPos({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      });
-    }
+  // Runs after the (still-invisible, opacity-animating-in) list has mounted so
+  // scrollHeight reflects its real, uncapped content height — lets us flip the
+  // list above the button when there isn't room below, instead of letting it
+  // run off the bottom of the viewport with no way to scroll to it (the
+  // scroll-closes-the-menu behavior above means the page itself can't be
+  // scrolled to reveal it).
+  useLayoutEffect(() => {
+    if (!isOpen || !ref.current) return;
+    const buttonRect = ref.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const margin = 8;
+    const spaceBelow = viewportHeight - buttonRect.bottom - margin;
+    const spaceAbove = buttonRect.top - margin;
+    const listHeight = listRef.current?.scrollHeight ?? 0;
+
+    const openUpward = listHeight > spaceBelow && spaceAbove > spaceBelow;
+    const available = openUpward ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(120, Math.min(available, viewportHeight * 0.6));
+
+    setDropdownPos({
+      top:
+        (openUpward ? buttonRect.top - Math.min(listHeight, maxHeight) : buttonRect.bottom) +
+        window.scrollY,
+      left: buttonRect.left + window.scrollX,
+      width: buttonRect.width,
+      maxHeight,
+    });
   }, [isOpen]);
 
   const rawLabel = options.find((option) => option.value === selected)?.label;
@@ -126,6 +150,7 @@ export function Dropdown<T>({
                   top: dropdownPos.top,
                   left: dropdownPos.left,
                   width: dropdownPos.width,
+                  maxHeight: dropdownPos.maxHeight,
                   pointerEvents: "auto",
                 }}
               >
