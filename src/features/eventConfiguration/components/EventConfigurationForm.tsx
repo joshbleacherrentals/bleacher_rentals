@@ -197,6 +197,7 @@ export const EventConfigurationForm = ({
             return (
               <button
                 key={tab}
+                data-testid={`event-tab-${tab}`}
                 className={`px-2.5 mb-2 rounded-t border-b-2 cursor-pointer ${
                   activeTab === tab ? "border-darkBlue font-semibold" : "border-transparent"
                 } ${

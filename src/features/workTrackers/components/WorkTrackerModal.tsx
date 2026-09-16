@@ -1218,16 +1218,18 @@ export default function WorkTrackerModal({
                                 )}
                               </div>
                               <div className="flex flex-row gap-2 items-center">
-                                <AddressAutocomplete
-                                  className="bg-white"
-                                  onAddressSelect={(data) =>
-                                    setPickUpAddress({
-                                      ...data,
-                                      addressUuid: pickUpAddress?.addressUuid ?? null,
-                                    })
-                                  }
-                                  initialValue={pickUpAddress?.address || ""}
-                                />
+                                <div className="w-full" data-testid="pickup-address-field">
+                                  <AddressAutocomplete
+                                    className="bg-white"
+                                    onAddressSelect={(data) =>
+                                      setPickUpAddress({
+                                        ...data,
+                                        addressUuid: pickUpAddress?.addressUuid ?? null,
+                                      })
+                                    }
+                                    initialValue={pickUpAddress?.address || ""}
+                                  />
+                                </div>
                                 {canEditFields && (
                                   <AppTooltip content="Populate from last known bleacher location">
                                     <button
@@ -1322,16 +1324,18 @@ export default function WorkTrackerModal({
                               {isSingleFieldSetType ? "Address" : "Dropoff Address"}
                             </label>
                             <div className="flex flex-row gap-2 items-center">
-                              <AddressAutocomplete
-                                className="bg-white"
-                                onAddressSelect={(data) =>
-                                  setDropOffAddress({
-                                    ...data,
-                                    addressUuid: dropOffAddress?.addressUuid ?? null,
-                                  })
-                                }
-                                initialValue={dropOffAddress?.address || ""}
-                              />
+                              <div className="w-full" data-testid="dropoff-address-field">
+                                <AddressAutocomplete
+                                  className="bg-white"
+                                  onAddressSelect={(data) =>
+                                    setDropOffAddress({
+                                      ...data,
+                                      addressUuid: dropOffAddress?.addressUuid ?? null,
+                                    })
+                                  }
+                                  initialValue={dropOffAddress?.address || ""}
+                                />
+                              </div>
                               {canEditFields && (
                                 <AppTooltip content="Populate from next known bleacher location">
                                   <button

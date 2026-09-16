@@ -262,21 +262,23 @@ export const CoreTab = ({ showSetupTeardown, disabled = false }: Props) => {
           onChange={(e) => currentEventStore.setField("goodshuffleUrl", e.target.value)}
         />
         <label className="block text-sm font-medium text-black/70 mt-1">Owner</label>
-        <Dropdown
-          options={ownerOptions}
-          selected={
-            currentEventStore.ownerUserUuid ? String(currentEventStore.ownerUserUuid) : undefined
-          }
-          onSelect={(val) => {
-            if (!val) {
-              currentEventStore.setField("ownerUserUuid", null);
-            } else {
-              currentEventStore.setField("ownerUserUuid", val as string);
+        <div data-testid="event-owner-select">
+          <Dropdown
+            options={ownerOptions}
+            selected={
+              currentEventStore.ownerUserUuid ? String(currentEventStore.ownerUserUuid) : undefined
             }
-          }}
-          placeholder="Select owner"
-          disabled={disabled}
-        />
+            onSelect={(val) => {
+              if (!val) {
+                currentEventStore.setField("ownerUserUuid", null);
+              } else {
+                currentEventStore.setField("ownerUserUuid", val as string);
+              }
+            }}
+            placeholder="Select owner"
+            disabled={disabled}
+          />
+        </div>
       </div>
     </div>
   );
