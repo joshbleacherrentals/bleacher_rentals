@@ -8,8 +8,11 @@ export type PanelHost = {
 };
 
 export type PanelLayout = {
-  /** Measured height of the rendered panel; 0 before the first measurement. */
-  panelHeight: number;
+  /**
+   * How tall the panel would be if nothing constrained it — its full content, list included.
+   * 0 before the first measurement, which is read as "as tall as it is allowed to get".
+   */
+  contentHeight: number;
   viewportHeight: number;
 };
 
@@ -20,19 +23,39 @@ export type PanelPosition = {
   left: number;
   width: number;
   placement: Placement;
+  /** Cap for the panel's height; its list scrolls inside whatever is left. */
+  maxHeight: number;
 };
 
+/** Breathing room between the card and the panel. */
+const CARD_GAP = 4;
+
 /**
- * Where EntitySearchSelect's floating panel goes: directly under its card, as wide as it, and
- * flipped above the card when the panel would not fit below.
+ * Room left between the panel and the edge it stops against. Bigger than CARD_GAP on purpose: a
+ * panel flush against the bottom of the screen reads as if it carries on past it.
+ */
+const EDGE_MARGIN = 16;
+
+/** However much room there is, a panel taller than this is unwieldy. */
+export const PANEL_MAX_HEIGHT = 384;
+
+/** Below this a panel shows nothing useful, so it is allowed to overlap rather than shrink. */
+const PANEL_MIN_HEIGHT = 120;
+
+/**
+ * Where EntitySearchSelect's floating panel goes and how tall it may be: directly under its card
+ * and as wide as it, flipped above when it would not fit below, and always capped to the room on
+ * the side it ends up on, stopping short of the edge — a panel that overflows its dialog gets its
+ * search box clipped off, and one flush against the bottom of the screen reads as if it carries
+ * on past it. Both are worse than a shorter list that scrolls.
  *
  * `host` is the dialog the picker sits in, when it sits in one — the panel is then positioned in
- * that dialog's own coordinate space (it scrolls independently of the page) and the room below is
+ * that dialog's own coordinate space (it scrolls independently of the page) and the room is
  * measured against the dialog, not the whole page. `null` means the panel is parked on the body,
  * where page scroll is what counts.
  *
  * When the panel fits on neither side it stays below, because flipping to an equally cramped
- * position only moves the problem. The panel is clipped by whatever scrolls it in that case.
+ * position only moves the problem.
  */
 export function panelPosition(
   card: Rect,
@@ -46,26 +69,31 @@ export function panelPosition(
     ? Math.min(host.rect.bottom, layout.viewportHeight)
     : layout.viewportHeight;
   const topEdge = host ? Math.max(host.rect.top, 0) : 0;
-  const spaceBelow = bottomEdge - card.bottom;
-  const spaceAbove = card.top - topEdge;
+  const spaceBelow = bottomEdge - card.bottom - CARD_GAP - EDGE_MARGIN;
+  const spaceAbove = card.top - topEdge - CARD_GAP - EDGE_MARGIN;
 
-  const placement: Placement =
-    layout.panelHeight > spaceBelow && spaceAbove > spaceBelow ? "above" : "below";
-  const cardEdge = placement === "above" ? card.top - layout.panelHeight : card.bottom;
+  const wanted = Math.min(layout.contentHeight || PANEL_MAX_HEIGHT, PANEL_MAX_HEIGHT);
+  const placement: Placement = wanted > spaceBelow && spaceAbove > spaceBelow ? "above" : "below";
+
+  const maxHeight = Math.max(placement === "above" ? spaceAbove : spaceBelow, PANEL_MIN_HEIGHT);
+  const height = Math.min(wanted, maxHeight);
+  const edge = placement === "above" ? card.top - CARD_GAP - height : card.bottom + CARD_GAP;
 
   if (host) {
     return {
-      top: cardEdge - host.rect.top + host.scrollTop,
+      top: edge - host.rect.top + host.scrollTop,
       left: card.left - host.rect.left + host.scrollLeft,
       width: card.width,
       placement,
+      maxHeight,
     };
   }
 
   return {
-    top: cardEdge + pageScroll.y,
+    top: edge + pageScroll.y,
     left: card.left + pageScroll.x,
     width: card.width,
     placement,
+    maxHeight,
   };
 }

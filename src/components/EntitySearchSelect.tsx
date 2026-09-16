@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { panelPosition } from "./entitySearch/panelPosition";
+import { panelPosition, PANEL_MAX_HEIGHT } from "./entitySearch/panelPosition";
 import { searchEntities } from "./entitySearch/searchEntities";
 
 type EntitySearchSelectProps<T extends { id: string }> = {
@@ -120,10 +120,13 @@ export function EntitySearchSelect<T extends { id: string }>({
   // descendant of cardRef, so the outside-click check below needs its own
   // ref to know a click inside the (portaled) panel isn't "outside" either.
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
-  // Measured after the panel renders, so it can be flipped above the card when it does not fit
-  // below. 0 on the first pass, which reads as "fits" and lands it below — the usual answer.
-  const [panelHeight, setPanelHeight] = useState(0);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, maxHeight: PANEL_MAX_HEIGHT });
+  // The scrollable list inside the panel — measured together with the panel to work out how tall
+  // the panel would be with nothing constraining it.
+  const listRef = useRef<HTMLDivElement>(null);
+  // That unconstrained height. Kept across closes: the previous value is a good estimate for the
+  // next open, so its very first frame already sits on the right side of the card.
+  const [contentHeight, setContentHeight] = useState(0);
   // Where the floating panel is portaled to. document.body is right for a picker on an ordinary
   // page, but inside a Radix dialog it is not: Radix puts `pointer-events: none` on the body
   // while a dialog is open and closes the dialog on a pointer-down outside its content, so a
@@ -162,10 +165,10 @@ export function EntitySearchSelect<T extends { id: string }>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  useLayoutEffect(() => {
-    if (!open || !cardRef.current) return;
-
+  const updatePosition = useCallback(() => {
     const card = cardRef.current;
+    if (!card) return;
+
     const dialog = card.closest<HTMLElement>('[data-slot="dialog-content"]');
 
     setPortalTarget(dialog ?? document.body);
@@ -180,20 +183,81 @@ export function EntitySearchSelect<T extends { id: string }>({
             }
           : null,
         { x: window.scrollX, y: window.scrollY },
-        { panelHeight, viewportHeight: window.innerHeight },
+        { contentHeight, viewportHeight: window.innerHeight },
       ),
     );
-  }, [open, panelHeight]);
+  }, [contentHeight]);
 
-  // The panel's height depends on how many rows the query leaves, so re-measure as it changes.
   useLayoutEffect(() => {
-    if (!open) {
-      setPanelHeight(0);
-      return;
-    }
-    const height = dropdownRef.current?.getBoundingClientRect().height ?? 0;
-    if (height > 0) setPanelHeight(height);
-  }, [open, query, items]);
+    if (!open) return;
+    updatePosition();
+  }, [open, updatePosition]);
+
+  /**
+   * Closes the panel when anything moves the card out from under it.
+   *
+   * The panel is portaled out of the card's own subtree, so scrolling a container between them —
+   * a form section, say, rather than the page — slides the card away and leaves the panel behind.
+   * `capture` is what picks those up: scroll does not bubble. Scrolling the panel's own list is
+   * not that, and is ignored.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const closeOnScroll = (e: Event) => {
+      const target = e.target as Node | null;
+      if (target && dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const closeOnResize = () => setOpen(false);
+
+    window.addEventListener("scroll", closeOnScroll, true);
+    window.addEventListener("resize", closeOnResize);
+    return () => {
+      window.removeEventListener("scroll", closeOnScroll, true);
+      window.removeEventListener("resize", closeOnResize);
+    };
+  }, [open]);
+
+  /**
+   * How tall the panel would be if `maxHeight` were not capping it: what is on screen, with the
+   * list's visible height swapped for its full scroll height. Measuring the rendered height
+   * instead would be circular — the cap would make the panel look like it fits wherever it was
+   * put, and it would never flip.
+   */
+  const measureContent = useCallback(() => {
+    const panel = dropdownRef.current;
+    if (!panel) return;
+    const list = listRef.current;
+    const height = list
+      ? panel.offsetHeight - list.clientHeight + list.scrollHeight
+      : panel.offsetHeight;
+    if (height > 0) setContentHeight(height);
+  }, []);
+
+  /**
+   * Measures the moment the panel lands in the DOM.
+   *
+   * A layout effect is too early for the first open: the panel only renders once `portalTarget`
+   * is set, which is itself a state update from the effect above, so on the first pass there is
+   * no node to measure — which is why the first open used to ignore a flip and every open after
+   * it got one. A callback ref runs when the node actually mounts, on every open. React attaches
+   * children's refs before the parent's, so the list is already there.
+   */
+  const attachPanel = useCallback(
+    (node: HTMLDivElement | null) => {
+      dropdownRef.current = node;
+      if (node) measureContent();
+    },
+    [measureContent],
+  );
+
+  // The content also shrinks as a query shortens the list, and the node stays mounted through
+  // that, so re-measure on its own.
+  useLayoutEffect(() => {
+    if (!open) return;
+    measureContent();
+  }, [open, query, items, measureContent]);
 
   const toggleOpen = () => {
     setOpen((prev) => {
@@ -234,7 +298,10 @@ export function EntitySearchSelect<T extends { id: string }>({
               <button
                 type="button"
                 onClick={(e) => {
+                  // stopPropagation keeps the card's own toggle from firing, so the panel has to
+                  // be closed here — an edit dialog opening over a panel left standing was a bug.
                   e.stopPropagation();
+                  setOpen(false);
                   onEdit(selected.id);
                 }}
                 aria-label="Edit"
@@ -246,6 +313,7 @@ export function EntitySearchSelect<T extends { id: string }>({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  setOpen(false);
                   onClear();
                 }}
                 aria-label="Clear"
@@ -264,6 +332,7 @@ export function EntitySearchSelect<T extends { id: string }>({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                setOpen(false);
                 onClear();
               }}
               aria-label="Clear"
@@ -281,9 +350,15 @@ export function EntitySearchSelect<T extends { id: string }>({
         portalTarget &&
         createPortal(
           <div
-            ref={dropdownRef}
-            className="absolute bg-white border shadow-lg rounded z-[9999] overflow-hidden"
-            style={{ top: pos.top, left: pos.left, width: pos.width, position: "absolute" }}
+            ref={attachPanel}
+            className="absolute bg-white border shadow-lg rounded z-[9999] overflow-hidden flex flex-col"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              width: pos.width,
+              maxHeight: pos.maxHeight,
+              position: "absolute",
+            }}
           >
             <input
               ref={inputRef}
@@ -296,7 +371,7 @@ export function EntitySearchSelect<T extends { id: string }>({
                 }
               }}
               placeholder={placeholder}
-              className="w-full p-2 border-b text-sm focus:outline-none"
+              className="w-full shrink-0 p-2 border-b text-sm focus:outline-none"
               // Belt-and-suspenders against Chrome's address/contact autofill:
               // "new-password" is the one autoComplete hint it reliably never
               // fills; readOnly (stripped on first real focus/touch, below) is
@@ -313,7 +388,7 @@ export function EntitySearchSelect<T extends { id: string }>({
             {/* Pinned, not the last row of the list: with hundreds of items on file nobody
                 scrolls to the bottom to find it. */}
             <div
-              className="px-3 py-2 text-sm font-medium text-darkBlue hover:bg-gray-50 cursor-pointer border-b"
+              className="shrink-0 px-3 py-2 text-sm font-medium text-darkBlue hover:bg-gray-50 cursor-pointer border-b"
               onClick={() => {
                 setOpen(false);
                 onCreateNew(query);
@@ -321,7 +396,7 @@ export function EntitySearchSelect<T extends { id: string }>({
             >
               {createLabel}
             </div>
-            <div className="max-h-72 overflow-y-auto">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto">
               {matched === 0 && <p className="px-3 py-2 text-sm text-gray-400">{emptyLabel}</p>}
               {shown.map((item) => (
                 <EntityRow

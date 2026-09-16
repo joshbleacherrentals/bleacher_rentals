@@ -332,8 +332,10 @@ Three things came out of trying the form against real data.
    portals into the dialog's own content element when there is one (`panelPosition` does the
    coordinate math, and is unit-tested), and to the body otherwise. Since a dialog clips what it
    contains, the panel is measured after it renders and flips above the card when it does not fit
-   below — room is counted against the dialog and the viewport, whichever ends sooner. When it
-   fits on neither side it stays below, because flipping would only move the problem.
+   below — room is counted against the dialog and the viewport, whichever ends sooner. It is also
+   capped to the room on whichever side it lands on, with the list scrolling inside that, since a
+   panel that overflows its dialog gets its search box clipped off the top. When it fits on
+   neither side it stays below, because flipping would only move the problem.
 2. **Company is now a picker, not a select.** `CompanyPicker` uses the same `EntitySearchSelect`
    shell as `VenuePicker` and `ContactPicker`: search, "+ Create New Company" inside the panel
    (the separate "+ New" button is gone) and a pencil on every row that opens Edit Company. Both
