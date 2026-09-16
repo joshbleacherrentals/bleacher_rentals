@@ -5,9 +5,11 @@ import { useUser } from "@clerk/nextjs";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import {
+  attentionByTracker,
   countWithdrawn,
   countWithdrawnByDriver,
   countWithdrawnByWeek,
+  type AttentionReason,
   type WithdrawnTrackerRow,
 } from "../util/withdrawnTrackers";
 import {
@@ -79,14 +81,14 @@ export function useWithdrawnTrackers(): { rows: WithdrawnTrackerRow[]; isLoading
   return { rows: data ?? [], isLoading };
 }
 
-/** Total declined + abandoned trackers in my zones, all time. Feeds the sidebar badge. */
+/** Total trackers needing attention (declined, abandoned, bleacher swapped) in my zones, all time. Feeds the sidebar badge. */
 export function useWithdrawnCount(): number {
   const { rows } = useWithdrawnTrackers();
   return useMemo(() => countWithdrawn(rows), [rows]);
 }
 
 /**
- * Declined + abandoned per week in my zones, keyed by the Monday of the
+ * Trackers needing attention per week in my zones, keyed by the Monday of the
  * tracker's own date. A week with none is absent, not 0.
  */
 export function useWithdrawnCountsByWeek(): Map<string, number> {
@@ -95,10 +97,19 @@ export function useWithdrawnCountsByWeek(): Map<string, number> {
 }
 
 /**
- * Declined + abandoned per driver for one week, keyed by driver uuid. Pass the
+ * Trackers needing attention per driver for one week, keyed by driver uuid. Pass the
  * Monday the week starts on; a driver with none is absent, not 0.
  */
 export function useWithdrawnCountsByDriver(weekStart: string | null): Map<string, number> {
   const { rows } = useWithdrawnTrackers();
   return useMemo(() => countWithdrawnByDriver(rows, weekStart), [rows, weekStart]);
+}
+
+/**
+ * Why each tracker in my zones needs attention, keyed by tracker id — marks the
+ * individual rows on a driver's week so a count of 2 points at two trackers.
+ */
+export function useAttentionByTracker(): Map<string, AttentionReason> {
+  const { rows } = useWithdrawnTrackers();
+  return useMemo(() => attentionByTracker(rows), [rows]);
 }

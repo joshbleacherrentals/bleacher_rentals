@@ -106,7 +106,7 @@ export function YearlyWeeksList({ year }: Props) {
               <div className="flex items-center gap-2">
                 <WithdrawnBadgeSlot
                   count={withdrawnByWeek.get(row.week_start) ?? 0}
-                  label={`${withdrawnByWeek.get(row.week_start) ?? 0} work trackers declined or abandoned this week`}
+                  label={`${withdrawnByWeek.get(row.week_start) ?? 0} work trackers need your attention this week`}
                 />
                 <span className="font-medium">{label}</span>
               </div>

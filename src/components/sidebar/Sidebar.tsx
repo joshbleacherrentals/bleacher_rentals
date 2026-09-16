@@ -22,7 +22,7 @@ const SideBar = () => {
   // maintainer, so who is nagged is decided in one place, not here.
   const unseenInspections = useUnseenInspectionCount();
   const badges = { "/annual-inspections": unseenInspections };
-  // Trackers the drivers in my zones declined or abandoned, for all time. The
+  // Trackers the drivers in my zones declined, abandoned or swapped a bleacher on, for all time. The
   // hook answers 0 to anyone who is not an active account manager, so an admin
   // without zones is not nagged about work that is nobody's to re-cover.
   const withdrawnTrackers = useWithdrawnCount();
@@ -94,7 +94,7 @@ function renderItem(
             item.key === "work-trackers" && withdrawnTrackers > 0
               ? {
                   count: withdrawnTrackers,
-                  label: `${withdrawnTrackers} work trackers declined or abandoned by your drivers`,
+                  label: `${withdrawnTrackers} work trackers by your drivers need your attention`,
                   testId: "sidebar-withdrawn-badge",
                 }
               : undefined

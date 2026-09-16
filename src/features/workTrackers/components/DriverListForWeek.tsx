@@ -183,7 +183,7 @@ export function DriverListForWeek({ startDate }: Props) {
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <WithdrawnBadgeSlot
                     count={withdrawnByDriver.get(row.driver_uuid) ?? 0}
-                    label={`${withdrawnByDriver.get(row.driver_uuid) ?? 0} work trackers declined or abandoned by this driver this week`}
+                    label={`${withdrawnByDriver.get(row.driver_uuid) ?? 0} work trackers by this driver need your attention this week`}
                   />
                   <span className="flex items-center gap-1.5 truncate">
                     {row.first_name + " " + row.last_name}

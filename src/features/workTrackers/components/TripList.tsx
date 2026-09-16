@@ -12,6 +12,8 @@ import {
 import { useWorkTrackersForWeek } from "../hooks/useWorkTrackersForWeek";
 import { isCanadianAddress, isUsaAddress } from "../util/addressCountry";
 import WorkTrackerStatusBadge from "./WorkTrackerStatusBadge";
+import { useAttentionByTracker } from "../db/withdrawnTrackers";
+import { AttentionMark } from "./AttentionMark";
 
 type Props = {
   userUuid: string;
@@ -21,6 +23,7 @@ type Props = {
 
 export function TripList({ userUuid, startDate, onSelectWorkTracker }: Props) {
   const { data, isLoading, error } = useWorkTrackersForWeek(userUuid, startDate);
+  const attentionByTracker = useAttentionByTracker();
   let financialTotals;
   let travelTotals;
   if (data) {
@@ -67,7 +70,10 @@ export function TripList({ userUuid, startDate, onSelectWorkTracker }: Props) {
             }`}
           >
             <th className={`w-0 whitespace-nowrap px-2 ${className}`}>
-              <WorkTrackerStatusBadge status={row.workTracker.status} showText={false} />
+              <span className="flex items-center gap-1.5">
+                <WorkTrackerStatusBadge status={row.workTracker.status} showText={false} />
+                <AttentionMark reason={attentionByTracker.get(row.workTracker.id)} />
+              </span>
             </th>
             <th className={`w-[7%] ${className}`}>{row.workTracker.date}</th>
             <th className={`w-[6%] ${className}`}>{row.bleacherNumber}</th>

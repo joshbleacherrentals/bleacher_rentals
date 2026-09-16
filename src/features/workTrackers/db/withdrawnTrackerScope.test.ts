@@ -44,7 +44,7 @@ describe("withdrawnTrackersQuery", () => {
     expect(compiled.sql).toContain('"driver_uuid" in (select');
     expect(compiled.sql).toContain('"DriverZones"');
     expect(compiled.sql).toContain('"AccountManagerZones"');
-    expect(compiled.parameters).toEqual(["declined", "abandoned", "am-1"]);
+    expect(compiled.parameters).toEqual(["declined", "abandoned", "cancelled", "am-1"]);
   });
 
   it("returns no rows at all for a user with no zones", () => {
@@ -52,6 +52,20 @@ describe("withdrawnTrackersQuery", () => {
 
     expect(compiled.sql).toContain('"driver_uuid" = ?');
     expect(compiled.sql).not.toContain('"DriverZones"');
-    expect(compiled.parameters).toEqual(["declined", "abandoned", NO_DRIVER_MATCH]);
+    expect(compiled.parameters).toEqual(["declined", "abandoned", "cancelled", NO_DRIVER_MATCH]);
+  });
+
+  it("also asks for trackers run with a different bleacher than assigned", () => {
+    const compiled = withdrawnTrackersQuery({ kind: "zones", accountManagerUuid: "am-1" });
+
+    expect(compiled.sql).toContain('"wt"."id" as "id"');
+    expect(compiled.sql).toContain('"bleacher_uuid" as "bleacher_uuid"');
+    expect(compiled.sql).toContain('"actual_bleacher_uuid" as "actual_bleacher_uuid"');
+    expect(compiled.sql).toContain('"actual_bleacher_uuid" is not null');
+    // `is not`, not `!=`: a swap onto a tracker with no assigned bleacher is still a swap,
+    // and `!=` against NULL would quietly drop it.
+    expect(compiled.sql).toContain('"actual_bleacher_uuid" is not "wt"."bleacher_uuid"');
+    expect(compiled.sql).toContain('"status" != ?');
+    expect(compiled.parameters).toEqual(["declined", "abandoned", "cancelled", "am-1"]);
   });
 });

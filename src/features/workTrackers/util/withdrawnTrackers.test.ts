@@ -6,15 +6,23 @@ import {
   countWithdrawn,
   countWithdrawnByWeek,
   countWithdrawnByDriver,
+  attentionByTracker,
   type WithdrawnTrackerRow,
 } from "./withdrawnTrackers";
 
 const row = (over: Partial<WithdrawnTrackerRow> = {}): WithdrawnTrackerRow => ({
+  id: "wt-1",
   driver_uuid: "driver-1",
   date: "2026-09-09",
   status: "abandoned",
+  bleacher_uuid: "b-assigned",
+  actual_bleacher_uuid: null,
   ...over,
 });
+
+/** A tracker the driver ran with a different bleacher than the one assigned. */
+const swapped = (over: Partial<WithdrawnTrackerRow> = {}): WithdrawnTrackerRow =>
+  row({ status: "accepted", actual_bleacher_uuid: "b-other", ...over });
 
 describe("isWithdrawnStatus", () => {
   it("accepts the two statuses a driver can walk away with", () => {
@@ -145,5 +153,74 @@ describe("countWithdrawnByDriver", () => {
   it("leaves a driver who withdrew from nothing absent rather than zero", () => {
     const counts = countWithdrawnByDriver([row({ driver_uuid: "driver-1" })], "2026-09-07");
     expect(counts.has("driver-2")).toBe(false);
+  });
+});
+
+describe("bleacher swaps share the same counts", () => {
+  it("adds swapped trackers to withdrawals in the sidebar, the week and the driver", () => {
+    const rows = [
+      row({ date: "2026-09-07" }),
+      row({ date: "2026-09-08" }),
+      row({ date: "2026-09-09", status: "declined" }),
+      swapped({ date: "2026-09-10" }),
+      swapped({ date: "2026-09-13", status: "completed" }),
+    ];
+
+    expect(countWithdrawn(rows)).toBe(5);
+    expect(countWithdrawnByWeek(rows).get("2026-09-07")).toBe(5);
+    expect(countWithdrawnByDriver(rows, "2026-09-07").get("driver-1")).toBe(5);
+  });
+
+  it("drops a swap once the manager makes the two bleachers match", () => {
+    const rows = [swapped()];
+    expect(countWithdrawn(rows)).toBe(1);
+
+    // Either side can move: the actual set to the assigned, or the assigned to the actual.
+    expect(countWithdrawn([swapped({ actual_bleacher_uuid: "b-assigned" })])).toBe(0);
+    expect(countWithdrawn([swapped({ bleacher_uuid: "b-other" })])).toBe(0);
+  });
+
+  it("does not count a tracker the driver has not confirmed yet", () => {
+    expect(countWithdrawn([row({ status: "accepted", actual_bleacher_uuid: null })])).toBe(0);
+  });
+
+  it("counts a swap on a tracker with no assigned bleacher", () => {
+    expect(countWithdrawn([swapped({ bleacher_uuid: null })])).toBe(1);
+  });
+
+  it("does not count a swap on a cancelled tracker", () => {
+    expect(countWithdrawn([swapped({ status: "cancelled" })])).toBe(0);
+  });
+
+  it("counts a tracker that is both abandoned and swapped once", () => {
+    const rows = [swapped({ status: "abandoned" })];
+    expect(countWithdrawn(rows)).toBe(1);
+    expect(countWithdrawnByWeek(rows).get("2026-09-07")).toBe(1);
+    expect(countWithdrawnByDriver(rows, "2026-09-07").get("driver-1")).toBe(1);
+  });
+});
+
+describe("attentionByTracker", () => {
+  it("names the reason each tracker on a driver's week needs attention", () => {
+    const reasons = attentionByTracker([
+      row({ id: "wt-declined", status: "declined" }),
+      row({ id: "wt-abandoned", status: "abandoned" }),
+      swapped({ id: "wt-swapped" }),
+      swapped({ id: "wt-fixed", actual_bleacher_uuid: "b-assigned" }),
+      row({ id: "wt-quiet", status: "completed" }),
+    ]);
+
+    expect(reasons.get("wt-declined")).toBe("declined");
+    expect(reasons.get("wt-abandoned")).toBe("abandoned");
+    expect(reasons.get("wt-swapped")).toBe("bleacher_swap");
+    expect(reasons.has("wt-fixed")).toBe(false);
+    expect(reasons.has("wt-quiet")).toBe(false);
+  });
+
+  it("reports a tracker that is both abandoned and swapped by its status", () => {
+    // Once the work is handed back, which bleacher went out is the smaller problem.
+    const reasons = attentionByTracker([swapped({ id: "wt-1", status: "abandoned" })]);
+    expect(reasons.get("wt-1")).toBe("abandoned");
+    expect(reasons.size).toBe(1);
   });
 });

@@ -30,11 +30,59 @@ export function isWithdrawnStatus(status: string | null | undefined): status is 
  * of the local table, out of these rows, and out of all three counts at once.
  */
 export type WithdrawnTrackerRow = {
+  id: string;
   driver_uuid: string | null;
   /** The tracker's own work date (`WorkTrackers.date`), not when it was withdrawn. */
   date: string | null;
   status: string | null;
+  bleacher_uuid: string | null;
+  /** What really left the yard; NULL until the driver confirms. See bleacherSwap.ts. */
+  actual_bleacher_uuid: string | null;
 };
+
+/**
+ * Whether a tracker belongs in the account manager's count: the driver walked
+ * away from it, or the driver took a different bleacher than the one assigned.
+ *
+ * One predicate for both, so a tracker that is abandoned *and* swapped is still
+ * one tracker to look at, counted once. A swap drops out as soon as the manager
+ * makes the two bleachers match. An unconfirmed tracker (actual NULL) is not a
+ * swap, and a cancelled one has nothing left to reconcile.
+ */
+export function needsAttention(row: WithdrawnTrackerRow): boolean {
+  return attentionReason(row) != null;
+}
+
+export type AttentionReason = WithdrawnStatus | "bleacher_swap";
+
+/**
+ * Why a tracker needs attention, or null when it does not. A withdrawal wins
+ * over a swap: once the work is handed back, which bleacher went out is moot.
+ */
+export function attentionReason(row: WithdrawnTrackerRow): AttentionReason | null {
+  if (isWithdrawnStatus(row.status)) return row.status;
+  if (row.status === "cancelled") return null;
+  if (row.actual_bleacher_uuid != null && row.actual_bleacher_uuid !== row.bleacher_uuid) {
+    return "bleacher_swap";
+  }
+  return null;
+}
+
+/**
+ * The reason per tracker id, for marking the individual rows on a driver's week
+ * — built from the same rows as the counts, so a driver showing 2 has exactly
+ * two marked trackers. A tracker needing nothing is absent.
+ */
+export function attentionByTracker(
+  rows: readonly WithdrawnTrackerRow[],
+): Map<string, AttentionReason> {
+  const reasons = new Map<string, AttentionReason>();
+  for (const row of rows) {
+    const reason = attentionReason(row);
+    if (reason) reasons.set(row.id, reason);
+  }
+  return reasons;
+}
 
 /**
  * Monday of the week the date falls in — the same bucketing the work tracker
@@ -50,7 +98,7 @@ export function weekStartOf(date: string | null | undefined): string | null {
 
 /** Total withdrawals in the given rows, for all time. */
 export function countWithdrawn(rows: readonly WithdrawnTrackerRow[]): number {
-  return rows.reduce((total, row) => (isWithdrawnStatus(row.status) ? total + 1 : total), 0);
+  return rows.reduce((total, row) => (needsAttention(row) ? total + 1 : total), 0);
 }
 
 /**
@@ -61,7 +109,7 @@ export function countWithdrawn(rows: readonly WithdrawnTrackerRow[]): number {
 export function countWithdrawnByWeek(rows: readonly WithdrawnTrackerRow[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const row of rows) {
-    if (!isWithdrawnStatus(row.status)) continue;
+    if (!needsAttention(row)) continue;
     const weekStart = weekStartOf(row.date);
     if (!weekStart) continue;
     counts.set(weekStart, (counts.get(weekStart) ?? 0) + 1);
@@ -79,7 +127,7 @@ export function countWithdrawnByDriver(
 ): Map<string, number> {
   const counts = new Map<string, number>();
   for (const row of rows) {
-    if (!isWithdrawnStatus(row.status)) continue;
+    if (!needsAttention(row)) continue;
     if (!row.driver_uuid) continue;
     if (weekStart && weekStartOf(row.date) !== weekStart) continue;
     counts.set(row.driver_uuid, (counts.get(row.driver_uuid) ?? 0) + 1);

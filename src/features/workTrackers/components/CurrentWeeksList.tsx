@@ -123,7 +123,7 @@ export function CurrentWeeksList() {
               <div className="flex items-center gap-2">
                 <WithdrawnBadgeSlot
                   count={withdrawnByWeek.get(row.week_start) ?? 0}
-                  label={`${withdrawnByWeek.get(row.week_start) ?? 0} work trackers declined or abandoned this week`}
+                  label={`${withdrawnByWeek.get(row.week_start) ?? 0} work trackers need your attention this week`}
                 />
                 <div className="flex flex-col">
                   <span className="font-semibold text-base">{label}</span>

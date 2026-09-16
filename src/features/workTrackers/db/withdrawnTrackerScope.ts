@@ -30,7 +30,8 @@ export function resolveWithdrawnScope(input: {
 }
 
 /**
- * Every tracker a driver in this scope declined or abandoned, for all time.
+ * Every tracker in this scope that needs the manager's attention, for all time:
+ * declined or abandoned by the driver, or run with a different bleacher than assigned.
  *
  * One query behind all three counts — the total, the per-week and the
  * per-driver — so the three numbers are arithmetic on the same rows and cannot
@@ -41,8 +42,25 @@ export function resolveWithdrawnScope(input: {
 export function withdrawnTrackersQuery(scope: WithdrawnScope) {
   const base = db
     .selectFrom("WorkTrackers as wt")
-    .select(["wt.driver_uuid as driver_uuid", "wt.date as date", "wt.status as status"])
-    .where("wt.status", "in", [...WITHDRAWN_STATUSES]);
+    .select([
+      "wt.id as id",
+      "wt.driver_uuid as driver_uuid",
+      "wt.date as date",
+      "wt.status as status",
+      "wt.bleacher_uuid as bleacher_uuid",
+      "wt.actual_bleacher_uuid as actual_bleacher_uuid",
+    ])
+    // Mirrors `needsAttention` in withdrawnTrackers.ts — change the two together.
+    .where((eb) =>
+      eb.or([
+        eb("wt.status", "in", [...WITHDRAWN_STATUSES]),
+        eb.and([
+          eb("wt.actual_bleacher_uuid", "is not", null),
+          eb("wt.actual_bleacher_uuid", "is not", eb.ref("wt.bleacher_uuid")),
+          eb("wt.status", "!=", "cancelled"),
+        ]),
+      ]),
+    );
 
   if (scope.kind === "none") {
     return base.where("wt.driver_uuid", "=", NO_DRIVER_MATCH).compile();
