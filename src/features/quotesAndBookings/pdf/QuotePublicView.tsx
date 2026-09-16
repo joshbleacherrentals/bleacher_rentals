@@ -92,13 +92,30 @@ export function QuotePublicView({
           </div>
         </div>
 
-        {/* Contact row */}
-        {data.contact && (
-          <div className="px-4 sm:px-8 py-4 border-b">
-            <p className="font-bold text-sm mb-1">{s.contact}</p>
-            <p className="text-sm">{data.contact.name}</p>
-            {data.contact.email && <p className="text-sm text-gray-600">{data.contact.email}</p>}
-            {data.contact.phone && <p className="text-sm text-gray-600">{data.contact.phone}</p>}
+        {/* Contact + Customer company row */}
+        {(data.contact || data.customerCompany) && (
+          <div className="px-4 sm:px-8 py-4 border-b grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {data.contact && (
+              <div>
+                <p className="font-bold text-sm mb-1">{s.contact}</p>
+                <p className="text-sm">{data.contact.name}</p>
+                {data.contact.email && (
+                  <p className="text-sm text-gray-600">{data.contact.email}</p>
+                )}
+                {data.contact.phone && (
+                  <p className="text-sm text-gray-600">{data.contact.phone}</p>
+                )}
+              </div>
+            )}
+            {data.customerCompany && (
+              <div>
+                <p className="font-bold text-sm mb-1">{s.customerCompany}</p>
+                <p className="text-sm">{data.customerCompany.name}</p>
+                {data.customerCompany.address && (
+                  <p className="text-sm text-gray-600">{data.customerCompany.address}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

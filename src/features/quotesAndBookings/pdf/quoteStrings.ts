@@ -50,6 +50,7 @@ export const quoteStrings = {
   },
   phonePrefix: { en: "P:", fr: "T :" },
   contact: { en: "Contact", fr: "Personne-ressource" },
+  customerCompany: { en: "Company", fr: "Entreprise" },
 
   // ── Quote tab: line items table ──────────────────────────────────────
   rentalItems: { en: "Rental Items", fr: "Articles en location" },

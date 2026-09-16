@@ -27,6 +27,7 @@ function quote(language: QuoteLanguage): QuoteDocumentData {
       website: "www.BleacherRentals.com",
     },
     contact: { name: "Marie Tremblay", email: "marie@example.com", phone: "555-0199" },
+    customerCompany: null,
     poNumber: "PO-77",
     venue: {
       name: "Festival de Jazz",
@@ -112,6 +113,29 @@ describe("QuotePublicView — English (regression guard)", () => {
 
   it("tells the client where to send an e-transfer", () => {
     expect(html).toContain("e-transfers to payments@bleacherrentals.com");
+  });
+});
+
+describe("QuotePublicView — customer company", () => {
+  it("does not render a company block when the contact has no company", () => {
+    const html = render("en");
+    expect(html).not.toContain(">Company<");
+  });
+
+  it("renders the customer's company name and address when present", () => {
+    const data = quote("en");
+    data.customerCompany = { name: "Acme Events Inc.", address: "12 Main St, Montreal, QC" };
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toContain(">Company<");
+    expect(html).toContain("Acme Events Inc.");
+    expect(html).toContain("12 Main St, Montreal, QC");
+  });
+
+  it("renders the company name without an address line when the address is empty", () => {
+    const data = quote("en");
+    data.customerCompany = { name: "Acme Events Inc.", address: "" };
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toContain("Acme Events Inc.");
   });
 });
 
