@@ -141,6 +141,12 @@ export default function WorkTrackerModal({
   // tracker types' QuickBooks accounts on their own admin-only page.
   const [showLeaveToEditTypesConfirm, setShowLeaveToEditTypesConfirm] = useState(false);
   const initialSnapshotRef = useRef<WorkTrackerSnapshot | null>(null);
+  // True once the user has actually edited a line item (add/update/remove) —
+  // distinct from the automatic reconciliation effects, which call setLineItems
+  // directly and don't set this. Lets handleSaveClick treat line-item-only
+  // edits as a real change, since the field snapshot below never sees line
+  // items — they live in their own table.
+  const [lineItemsDirty, setLineItemsDirty] = useState(false);
   const pendingChangeTypeRef = useRef<WorkTrackerChangeType>("none");
   // `${bleacher_uuid}|${date}` of the draft whose fields were already auto-populated.
   const autoPopulatedKeyRef = useRef<string | null>(null);
@@ -232,6 +238,7 @@ export default function WorkTrackerModal({
   useEffect(() => {
     setWorkTracker(selectedWorkTracker);
     setInitialStatus(selectedWorkTracker?.status ?? "draft");
+    setLineItemsDirty(false);
   }, [selectedWorkTracker]);
 
   // console.log("selectedWorkTracker WorkTrackerModal", selectedWorkTracker);
@@ -810,7 +817,7 @@ export default function WorkTrackerModal({
 
     const hasStatusChange = (workTracker?.status ?? "draft") !== initialStatus;
 
-    if (fieldChangeType === "none" && !hasStatusChange) {
+    if (fieldChangeType === "none" && !hasStatusChange && !lineItemsDirty) {
       createErrorToast(["No changes to save."]);
       return;
     }
@@ -1354,14 +1361,15 @@ export default function WorkTrackerModal({
                 <TabsContent value="line-items">
                   <WorkTrackerLineItemsTab
                     lineItems={lineItems}
-                    onChange={(items) =>
+                    onChange={(items) => {
+                      setLineItemsDirty(true);
                       setLineItems(
                         reconcileRequirementLineItems(items, {
                           setupRequired: !!workTracker?.setup_required,
                           teardownRequired: !!workTracker?.teardown_required,
                         }),
-                      )
-                    }
+                      );
+                    }}
                     canEdit={canEditFields}
                     isLoading={isLineItemsLoading}
                   />
