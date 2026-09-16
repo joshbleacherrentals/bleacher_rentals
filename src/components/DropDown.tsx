@@ -32,6 +32,7 @@ export function Dropdown<T>({
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({
     top: 0,
     left: 0,
@@ -53,7 +54,10 @@ export function Dropdown<T>({
   // leaves it hanging over the wrong control. Close instead of chasing.
   useEffect(() => {
     if (!isOpen) return;
-    const close = () => setIsOpen(false);
+    const close = (event: Event) => {
+      if (listRef.current && listRef.current.contains(event.target as Node)) return;
+      setIsOpen(false);
+    };
     window.addEventListener("scroll", close, true);
     return () => window.removeEventListener("scroll", close, true);
   }, [isOpen]);
@@ -110,6 +114,7 @@ export function Dropdown<T>({
           <AnimatePresence>
             {isOpen && !disabled && (
               <motion.ul
+                ref={listRef}
                 initial={{ opacity: 0, scale: 0.95, y: -5 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -5 }}
