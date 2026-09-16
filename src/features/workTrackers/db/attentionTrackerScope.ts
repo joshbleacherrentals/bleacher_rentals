@@ -1,9 +1,9 @@
 import { db } from "@/components/providers/SystemProvider";
-import { WITHDRAWN_STATUSES } from "../util/withdrawnTrackers";
+import { WITHDRAWN_STATUSES } from "../util/attentionTrackers";
 import { driverUuidsInAccountManagerZones, NO_DRIVER_MATCH } from "./driverZoneScope";
 
 /**
- * Who a withdrawal count belongs to.
+ * Who an attention count belongs to.
  *
  * Deliberately *not* `resolveDriverScope` from driverZoneScope.ts, even though
  * both answer a question about zones. That one decides which drivers a user may
@@ -13,16 +13,16 @@ import { driverUuidsInAccountManagerZones, NO_DRIVER_MATCH } from "./driverZoneS
  * an admin with no zones is shown no number, and the See All Drivers toggle
  * does not widen the count out from under the badge next to each driver.
  */
-export type WithdrawnScope =
+export type AttentionScope =
   /** Count only drivers sharing a zone with this account manager. */
   | { kind: "zones"; accountManagerUuid: string }
   /** Not an active account manager — there is no number to show. */
   | { kind: "none" };
 
-export function resolveWithdrawnScope(input: {
+export function resolveAttentionScope(input: {
   isAdmin: boolean;
   accountManagerUuid: string | null;
-}): WithdrawnScope {
+}): AttentionScope {
   if (input.accountManagerUuid) {
     return { kind: "zones", accountManagerUuid: input.accountManagerUuid };
   }
@@ -39,7 +39,7 @@ export function resolveWithdrawnScope(input: {
  * is a plain function rather than something built inside a hook: the filter can
  * be asserted without a database or a React tree.
  */
-export function withdrawnTrackersQuery(scope: WithdrawnScope) {
+export function attentionTrackersQuery(scope: AttentionScope) {
   const base = db
     .selectFrom("WorkTrackers as wt")
     .select([
@@ -50,7 +50,7 @@ export function withdrawnTrackersQuery(scope: WithdrawnScope) {
       "wt.bleacher_uuid as bleacher_uuid",
       "wt.actual_bleacher_uuid as actual_bleacher_uuid",
     ])
-    // Mirrors `needsAttention` in withdrawnTrackers.ts — change the two together.
+    // Mirrors `needsAttention` in attentionTrackers.ts — change the two together.
     .where((eb) =>
       eb.or([
         eb("wt.status", "in", [...WITHDRAWN_STATUSES]),

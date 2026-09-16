@@ -29,7 +29,7 @@ export function isWithdrawnStatus(status: string | null | undefined): status is 
  * can never disagree with each other: a tracker deleted in Supabase drops out
  * of the local table, out of these rows, and out of all three counts at once.
  */
-export type WithdrawnTrackerRow = {
+export type AttentionTrackerRow = {
   id: string;
   driver_uuid: string | null;
   /** The tracker's own work date (`WorkTrackers.date`), not when it was withdrawn. */
@@ -49,7 +49,7 @@ export type WithdrawnTrackerRow = {
  * makes the two bleachers match. An unconfirmed tracker (actual NULL) is not a
  * swap, and a cancelled one has nothing left to reconcile.
  */
-export function needsAttention(row: WithdrawnTrackerRow): boolean {
+export function needsAttention(row: AttentionTrackerRow): boolean {
   return attentionReason(row) != null;
 }
 
@@ -59,7 +59,7 @@ export type AttentionReason = WithdrawnStatus | "bleacher_swap";
  * Why a tracker needs attention, or null when it does not. A withdrawal wins
  * over a swap: once the work is handed back, which bleacher went out is moot.
  */
-export function attentionReason(row: WithdrawnTrackerRow): AttentionReason | null {
+export function attentionReason(row: AttentionTrackerRow): AttentionReason | null {
   if (isWithdrawnStatus(row.status)) return row.status;
   if (row.status === "cancelled") return null;
   if (row.actual_bleacher_uuid != null && row.actual_bleacher_uuid !== row.bleacher_uuid) {
@@ -74,7 +74,7 @@ export function attentionReason(row: WithdrawnTrackerRow): AttentionReason | nul
  * two marked trackers. A tracker needing nothing is absent.
  */
 export function attentionByTracker(
-  rows: readonly WithdrawnTrackerRow[],
+  rows: readonly AttentionTrackerRow[],
 ): Map<string, AttentionReason> {
   const reasons = new Map<string, AttentionReason>();
   for (const row of rows) {
@@ -96,17 +96,17 @@ export function weekStartOf(date: string | null | undefined): string | null {
   return parsed.startOf("week").toISODate();
 }
 
-/** Total withdrawals in the given rows, for all time. */
-export function countWithdrawn(rows: readonly WithdrawnTrackerRow[]): number {
+/** Total trackers needing attention in the given rows, for all time. */
+export function countAttention(rows: readonly AttentionTrackerRow[]): number {
   return rows.reduce((total, row) => (needsAttention(row) ? total + 1 : total), 0);
 }
 
 /**
- * Withdrawals per week, keyed by Monday. A week with none is absent from the
+ * Trackers needing attention per week, keyed by Monday. A week with none is absent from the
  * map rather than present as 0 — the caller renders a badge for what is there
  * and nothing for what is not, so "no key" and "no badge" are the same thing.
  */
-export function countWithdrawnByWeek(rows: readonly WithdrawnTrackerRow[]): Map<string, number> {
+export function countAttentionByWeek(rows: readonly AttentionTrackerRow[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const row of rows) {
     if (!needsAttention(row)) continue;
@@ -118,11 +118,11 @@ export function countWithdrawnByWeek(rows: readonly WithdrawnTrackerRow[]): Map<
 }
 
 /**
- * Withdrawals per driver. Pass `weekStart` (a Monday) to count only that week —
+ * Trackers needing attention per driver. Pass `weekStart` (a Monday) to count only that week —
  * what the week's driver list needs; omit it to count a driver's whole history.
  */
-export function countWithdrawnByDriver(
-  rows: readonly WithdrawnTrackerRow[],
+export function countAttentionByDriver(
+  rows: readonly AttentionTrackerRow[],
   weekStart?: string | null,
 ): Map<string, number> {
   const counts = new Map<string, number>();

@@ -15,7 +15,7 @@ test.describe("Declined & abandoned counts (account manager)", () => {
   test("the sidebar counts every withdrawal in my zones, for all time", async ({ page }) => {
     await page.goto("/work-trackers");
 
-    await expect(page.locator("[data-testid=sidebar-withdrawn-badge]")).toHaveText("2", {
+    await expect(page.locator("[data-testid=sidebar-attention-badge]")).toHaveText("2", {
       timeout: 30_000,
     });
   });
@@ -25,7 +25,7 @@ test.describe("Declined & abandoned counts (account manager)", () => {
 
     const weekRow = page.getByRole("row", { name: /September 14/ });
     await expect(weekRow).toBeVisible({ timeout: 30_000 });
-    await expect(weekRow.locator("[data-testid=withdrawn-badge]")).toHaveText("2");
+    await expect(weekRow.locator("[data-testid=attention-badge]")).toHaveText("2");
   });
 
   test("each driver in the week carries their own count for that week", async ({ page }) => {
@@ -33,7 +33,7 @@ test.describe("Declined & abandoned counts (account manager)", () => {
 
     const driverRow = page.getByRole("row", { name: /Withdrawal Driver/ });
     await expect(driverRow).toBeVisible({ timeout: 30_000 });
-    await expect(driverRow.locator("[data-testid=withdrawn-badge]")).toHaveText("2");
+    await expect(driverRow.locator("[data-testid=attention-badge]")).toHaveText("2");
   });
 
   test("a week with no withdrawals carries no badge at all", async ({ page }) => {
@@ -41,6 +41,6 @@ test.describe("Declined & abandoned counts (account manager)", () => {
 
     const thisWeek = page.getByRole("row", { name: /This Week/ });
     await expect(thisWeek).toBeVisible({ timeout: 30_000 });
-    await expect(thisWeek.locator("[data-testid=withdrawn-badge]")).toHaveCount(0);
+    await expect(thisWeek.locator("[data-testid=attention-badge]")).toHaveCount(0);
   });
 });

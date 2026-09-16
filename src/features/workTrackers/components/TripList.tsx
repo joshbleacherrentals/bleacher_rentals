@@ -12,7 +12,7 @@ import {
 import { useWorkTrackersForWeek } from "../hooks/useWorkTrackersForWeek";
 import { isCanadianAddress, isUsaAddress } from "../util/addressCountry";
 import WorkTrackerStatusBadge from "./WorkTrackerStatusBadge";
-import { useAttentionByTracker } from "../db/withdrawnTrackers";
+import { useAttentionByTracker } from "../db/attentionTrackers";
 import { AttentionMark } from "./AttentionMark";
 
 type Props = {

@@ -8,7 +8,7 @@ import { useUserAccess } from "@/features/userAccess/client";
 import { useSidebarItems, type SidebarItemConfig } from "./useSidebarItems";
 import { useHasUnreadChangelog } from "@/features/changelog/hooks/useHasUnreadChangelog";
 import { useUnseenInspectionCount } from "@/features/annualInspections/db/annualInspections";
-import { useWithdrawnCount } from "@/features/workTrackers/db/withdrawnTrackers";
+import { useAttentionCount } from "@/features/workTrackers/db/attentionTrackers";
 
 const SideBar = () => {
   const access = useUserAccess();
@@ -25,7 +25,7 @@ const SideBar = () => {
   // Trackers the drivers in my zones declined, abandoned or swapped a bleacher on, for all time. The
   // hook answers 0 to anyone who is not an active account manager, so an admin
   // without zones is not nagged about work that is nobody's to re-cover.
-  const withdrawnTrackers = useWithdrawnCount();
+  const attentionTrackers = useAttentionCount();
 
   return (
     <div
@@ -34,7 +34,7 @@ const SideBar = () => {
     >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden pt-2">
         {items.map((item) =>
-          renderItem(item, pathname, hasUnreadChangelog, badges, withdrawnTrackers),
+          renderItem(item, pathname, hasUnreadChangelog, badges, attentionTrackers),
         )}
       </nav>
     </div>
@@ -79,7 +79,7 @@ function renderItem(
   pathname: string,
   hasUnreadChangelog: boolean,
   badges: Record<string, number>,
-  withdrawnTrackers: number,
+  attentionTrackers: number,
 ) {
   switch (item.type) {
     case "button":
@@ -91,11 +91,11 @@ function renderItem(
           icon={item.icon}
           showIndicator={item.key === "changelog" && hasUnreadChangelog}
           badge={
-            item.key === "work-trackers" && withdrawnTrackers > 0
+            item.key === "work-trackers" && attentionTrackers > 0
               ? {
-                  count: withdrawnTrackers,
-                  label: `${withdrawnTrackers} work trackers by your drivers need your attention`,
-                  testId: "sidebar-withdrawn-badge",
+                  count: attentionTrackers,
+                  label: `${attentionTrackers} work trackers by your drivers need your attention`,
+                  testId: "sidebar-attention-badge",
                 }
               : undefined
           }
@@ -115,7 +115,7 @@ function renderItem(
       return (
         <SideNavSection key={item.key} item={item} pathname={pathname}>
           {item.children.map((child) =>
-            renderItem(child, pathname, hasUnreadChangelog, badges, withdrawnTrackers),
+            renderItem(child, pathname, hasUnreadChangelog, badges, attentionTrackers),
           )}
         </SideNavSection>
       );

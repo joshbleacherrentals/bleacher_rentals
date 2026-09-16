@@ -1,6 +1,6 @@
 "use client";
 
-import type { AttentionReason } from "../util/withdrawnTrackers";
+import type { AttentionReason } from "../util/attentionTrackers";
 
 const REASON_LABELS: Record<AttentionReason, string> = {
   declined: "Needs attention: declined by the driver",

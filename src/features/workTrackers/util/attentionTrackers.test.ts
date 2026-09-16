@@ -3,14 +3,14 @@ import {
   WITHDRAWN_STATUSES,
   isWithdrawnStatus,
   weekStartOf,
-  countWithdrawn,
-  countWithdrawnByWeek,
-  countWithdrawnByDriver,
+  countAttention,
+  countAttentionByWeek,
+  countAttentionByDriver,
   attentionByTracker,
-  type WithdrawnTrackerRow,
-} from "./withdrawnTrackers";
+  type AttentionTrackerRow,
+} from "./attentionTrackers";
 
-const row = (over: Partial<WithdrawnTrackerRow> = {}): WithdrawnTrackerRow => ({
+const row = (over: Partial<AttentionTrackerRow> = {}): AttentionTrackerRow => ({
   id: "wt-1",
   driver_uuid: "driver-1",
   date: "2026-09-09",
@@ -21,7 +21,7 @@ const row = (over: Partial<WithdrawnTrackerRow> = {}): WithdrawnTrackerRow => ({
 });
 
 /** A tracker the driver ran with a different bleacher than the one assigned. */
-const swapped = (over: Partial<WithdrawnTrackerRow> = {}): WithdrawnTrackerRow =>
+const swapped = (over: Partial<AttentionTrackerRow> = {}): AttentionTrackerRow =>
   row({ status: "accepted", actual_bleacher_uuid: "b-other", ...over });
 
 describe("isWithdrawnStatus", () => {
@@ -59,14 +59,14 @@ describe("weekStartOf", () => {
   });
 });
 
-describe("countWithdrawn", () => {
+describe("countAttention", () => {
   it("is zero when nothing was declined or abandoned", () => {
-    expect(countWithdrawn([])).toBe(0);
+    expect(countAttention([])).toBe(0);
   });
 
   it("counts declined and abandoned together", () => {
     expect(
-      countWithdrawn([
+      countAttention([
         row({ status: "declined" }),
         row({ status: "abandoned" }),
         row({ driver_uuid: "driver-2", status: "declined" }),
@@ -75,24 +75,24 @@ describe("countWithdrawn", () => {
   });
 
   it("ignores any other status that reaches it", () => {
-    expect(countWithdrawn([row({ status: "cancelled" }), row({ status: "abandoned" })])).toBe(1);
+    expect(countAttention([row({ status: "cancelled" }), row({ status: "abandoned" })])).toBe(1);
   });
 
   it("counts a tracker with no date — the total is for all time", () => {
-    expect(countWithdrawn([row({ date: null })])).toBe(1);
+    expect(countAttention([row({ date: null })])).toBe(1);
   });
 
   it("drops back as trackers are deleted, and to zero when the last one goes", () => {
     const rows = [row(), row({ driver_uuid: "driver-2" })];
-    expect(countWithdrawn(rows)).toBe(2);
-    expect(countWithdrawn(rows.slice(1))).toBe(1);
-    expect(countWithdrawn([])).toBe(0);
+    expect(countAttention(rows)).toBe(2);
+    expect(countAttention(rows.slice(1))).toBe(1);
+    expect(countAttention([])).toBe(0);
   });
 });
 
-describe("countWithdrawnByWeek", () => {
+describe("countAttentionByWeek", () => {
   it("groups by the Monday of the tracker's own date", () => {
-    const counts = countWithdrawnByWeek([
+    const counts = countAttentionByWeek([
       row({ date: "2026-09-07", status: "declined" }),
       row({ date: "2026-09-13", status: "abandoned" }),
       row({ date: "2026-09-14", status: "abandoned" }),
@@ -102,27 +102,27 @@ describe("countWithdrawnByWeek", () => {
     expect(counts.get("2026-09-14")).toBe(1);
   });
 
-  it("leaves a week with nothing withdrawn absent rather than zero", () => {
-    const counts = countWithdrawnByWeek([row({ date: "2026-09-07" })]);
+  it("leaves a week with nothing needing attention absent rather than zero", () => {
+    const counts = countAttentionByWeek([row({ date: "2026-09-07" })]);
     expect(counts.has("2026-09-14")).toBe(false);
     expect(counts.get("2026-09-14")).toBeUndefined();
   });
 
   it("skips a tracker with no date — it belongs to no week", () => {
-    const counts = countWithdrawnByWeek([row({ date: null }), row({ date: "2026-09-07" })]);
+    const counts = countAttentionByWeek([row({ date: null }), row({ date: "2026-09-07" })]);
     expect(counts.size).toBe(1);
     expect(counts.get("2026-09-07")).toBe(1);
   });
 
-  it("ignores statuses that are not a driver withdrawal", () => {
-    const counts = countWithdrawnByWeek([row({ date: "2026-09-07", status: "completed" })]);
+  it("ignores statuses that need no attention", () => {
+    const counts = countAttentionByWeek([row({ date: "2026-09-07", status: "completed" })]);
     expect(counts.size).toBe(0);
   });
 });
 
-describe("countWithdrawnByDriver", () => {
+describe("countAttentionByDriver", () => {
   it("counts each driver separately inside one week", () => {
-    const counts = countWithdrawnByDriver(
+    const counts = countAttentionByDriver(
       [
         row({ driver_uuid: "driver-1", date: "2026-09-07", status: "declined" }),
         row({ driver_uuid: "driver-1", date: "2026-09-09", status: "abandoned" }),
@@ -137,7 +137,7 @@ describe("countWithdrawnByDriver", () => {
   });
 
   it("counts every week when no week is given", () => {
-    const counts = countWithdrawnByDriver([
+    const counts = countAttentionByDriver([
       row({ driver_uuid: "driver-1", date: "2026-09-07" }),
       row({ driver_uuid: "driver-1", date: "2026-09-14" }),
     ]);
@@ -146,12 +146,12 @@ describe("countWithdrawnByDriver", () => {
   });
 
   it("skips a tracker with no driver — nobody to blame it on", () => {
-    const counts = countWithdrawnByDriver([row({ driver_uuid: null })]);
+    const counts = countAttentionByDriver([row({ driver_uuid: null })]);
     expect(counts.size).toBe(0);
   });
 
   it("leaves a driver who withdrew from nothing absent rather than zero", () => {
-    const counts = countWithdrawnByDriver([row({ driver_uuid: "driver-1" })], "2026-09-07");
+    const counts = countAttentionByDriver([row({ driver_uuid: "driver-1" })], "2026-09-07");
     expect(counts.has("driver-2")).toBe(false);
   });
 });
@@ -166,37 +166,37 @@ describe("bleacher swaps share the same counts", () => {
       swapped({ date: "2026-09-13", status: "completed" }),
     ];
 
-    expect(countWithdrawn(rows)).toBe(5);
-    expect(countWithdrawnByWeek(rows).get("2026-09-07")).toBe(5);
-    expect(countWithdrawnByDriver(rows, "2026-09-07").get("driver-1")).toBe(5);
+    expect(countAttention(rows)).toBe(5);
+    expect(countAttentionByWeek(rows).get("2026-09-07")).toBe(5);
+    expect(countAttentionByDriver(rows, "2026-09-07").get("driver-1")).toBe(5);
   });
 
   it("drops a swap once the manager makes the two bleachers match", () => {
     const rows = [swapped()];
-    expect(countWithdrawn(rows)).toBe(1);
+    expect(countAttention(rows)).toBe(1);
 
     // Either side can move: the actual set to the assigned, or the assigned to the actual.
-    expect(countWithdrawn([swapped({ actual_bleacher_uuid: "b-assigned" })])).toBe(0);
-    expect(countWithdrawn([swapped({ bleacher_uuid: "b-other" })])).toBe(0);
+    expect(countAttention([swapped({ actual_bleacher_uuid: "b-assigned" })])).toBe(0);
+    expect(countAttention([swapped({ bleacher_uuid: "b-other" })])).toBe(0);
   });
 
   it("does not count a tracker the driver has not confirmed yet", () => {
-    expect(countWithdrawn([row({ status: "accepted", actual_bleacher_uuid: null })])).toBe(0);
+    expect(countAttention([row({ status: "accepted", actual_bleacher_uuid: null })])).toBe(0);
   });
 
   it("counts a swap on a tracker with no assigned bleacher", () => {
-    expect(countWithdrawn([swapped({ bleacher_uuid: null })])).toBe(1);
+    expect(countAttention([swapped({ bleacher_uuid: null })])).toBe(1);
   });
 
   it("does not count a swap on a cancelled tracker", () => {
-    expect(countWithdrawn([swapped({ status: "cancelled" })])).toBe(0);
+    expect(countAttention([swapped({ status: "cancelled" })])).toBe(0);
   });
 
   it("counts a tracker that is both abandoned and swapped once", () => {
     const rows = [swapped({ status: "abandoned" })];
-    expect(countWithdrawn(rows)).toBe(1);
-    expect(countWithdrawnByWeek(rows).get("2026-09-07")).toBe(1);
-    expect(countWithdrawnByDriver(rows, "2026-09-07").get("driver-1")).toBe(1);
+    expect(countAttention(rows)).toBe(1);
+    expect(countAttentionByWeek(rows).get("2026-09-07")).toBe(1);
+    expect(countAttentionByDriver(rows, "2026-09-07").get("driver-1")).toBe(1);
   });
 });
 
