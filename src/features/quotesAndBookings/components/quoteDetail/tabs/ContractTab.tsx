@@ -11,6 +11,7 @@ import { ExternalLink, FileText } from "lucide-react";
 import { ContactHistorySheet } from "./ContactHistorySheet";
 import { VenueHistorySheet } from "./VenueHistorySheet";
 import { VenueCard } from "@/components/VenueCard";
+import { LineItemDescription } from "../../LineItemDescription";
 
 type SignatureInfo = {
   signerName: string;
@@ -47,6 +48,12 @@ function categorizeItems(items: EventLineItemRow[]): CategorizedItems {
   return result;
 }
 
+/**
+ * Numbers never wrap and keep a gap from their neighbour, so a long item description is what
+ * gives up width — not "$5,000.00" running into the quantity beside it.
+ */
+const NUMBER_CELL = "text-right whitespace-nowrap pl-6";
+
 function ItemSection({
   title,
   items,
@@ -67,10 +74,10 @@ function ItemSection({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-gray-500 text-xs uppercase tracking-wide">
-            <th className="py-2 font-medium">Item</th>
-            <th className="py-2 font-medium text-right">Qty</th>
-            <th className="py-2 font-medium text-right">Unit Price</th>
-            <th className="py-2 font-medium text-right">Total</th>
+            <th className="py-2 pr-4 font-medium">Item</th>
+            <th className={`py-2 font-medium ${NUMBER_CELL}`}>Qty</th>
+            <th className={`py-2 font-medium ${NUMBER_CELL}`}>Unit Price</th>
+            <th className={`py-2 font-medium ${NUMBER_CELL}`}>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -79,18 +86,18 @@ function ItemSection({
             const isDiscount = lineTotal < 0;
             return (
               <tr key={li.id} className={`border-b ${isDiscount ? "text-red-600" : ""}`}>
-                <td className="py-2">
+                <td className="py-2 pr-4">
                   <span className="font-medium">{li.header}</span>
                   {li.bleacherTypeName && (
                     <span className="text-gray-400 ml-1 text-xs">({li.bleacherTypeName})</span>
                   )}
-                  {li.description && (
-                    <span className="block text-xs text-gray-400">{li.description}</span>
-                  )}
+                  <LineItemDescription description={li.description} className="mt-0.5" />
                 </td>
-                <td className="py-2 text-right">{li.quantity}</td>
-                <td className="py-2 text-right">{formatMoney(li.valueCents, currency)}</td>
-                <td className="py-2 text-right font-medium">{formatMoney(lineTotal, currency)}</td>
+                <td className={`py-2 ${NUMBER_CELL}`}>{li.quantity}</td>
+                <td className={`py-2 ${NUMBER_CELL}`}>{formatMoney(li.valueCents, currency)}</td>
+                <td className={`py-2 font-medium ${NUMBER_CELL}`}>
+                  {formatMoney(lineTotal, currency)}
+                </td>
               </tr>
             );
           })}

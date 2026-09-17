@@ -29,6 +29,8 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     notes: null,
     internalNotes: null,
     externalNotes: null,
+    pickupInstructions: null,
+    dropoffInstructions: null,
     contractRevenueCents: null,
     eventTypeUuid: null,
     quoteValidTill: null,

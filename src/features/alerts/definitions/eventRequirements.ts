@@ -58,7 +58,10 @@ export const eventRequirements: AlertDefinition = {
     );
 
     const event = eventRows[0];
-    console.log("[QUOTE_TRIAGE] eventRequirements event:", event ? JSON.stringify(event) : "NOT FOUND");
+    console.log(
+      "[QUOTE_TRIAGE] eventRequirements event:",
+      event ? JSON.stringify(event) : "NOT FOUND",
+    );
     if (!event) return null;
 
     const assignedRows = await typedGetAll(
@@ -100,8 +103,16 @@ export const eventRequirements: AlertDefinition = {
           .compile(),
         expect<LineItemRow>(),
       );
-      console.log("[QUOTE_TRIAGE] eventRequirements lineItems:", lineItems.length, lineItems.map(li => `${li.type_name}:qty${li.quantity}:bt${li.bleacher_type_uuid}`));
-      console.log("[QUOTE_TRIAGE] eventRequirements assignedBleachers:", assignedRows.length, assignedRows.map(b => `type${b.bleacher_type_uuid}:rows${b.bleacher_rows}`));
+      console.log(
+        "[QUOTE_TRIAGE] eventRequirements lineItems:",
+        lineItems.length,
+        lineItems.map((li) => `${li.type_name}:qty${li.quantity}:bt${li.bleacher_type_uuid}`),
+      );
+      console.log(
+        "[QUOTE_TRIAGE] eventRequirements assignedBleachers:",
+        assignedRows.length,
+        assignedRows.map((b) => `type${b.bleacher_type_uuid}:rows${b.bleacher_rows}`),
+      );
 
       if (lineItems.length > 0) {
         const mismatches: string[] = [];
@@ -162,7 +173,10 @@ export const eventRequirements: AlertDefinition = {
 
     if (event.lenient) {
       if (!event.seats) return alerts;
-      const totalAssignedSeats = assignedBleachers.reduce((sum, b) => sum + b.bleacher_seats, 0);
+      const totalAssignedSeats = assignedBleachers.reduce(
+        (sum, b) => sum + (b.bleacher_seats ?? 0),
+        0,
+      );
       if (totalAssignedSeats !== event.seats) {
         alerts.push(
           makeAlert(`Seat mismatch: ${event.seats} required, ${totalAssignedSeats} assigned.`),

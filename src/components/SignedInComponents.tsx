@@ -1,7 +1,6 @@
 "use client";
 import Header from "@/components/Header";
 import SideBar from "@/components/sidebar/Sidebar";
-import useSupabaseSubscriptions from "@/hooks/useSupabaseSubscriptions";
 import { SignOutButton } from "@clerk/nextjs";
 import { Button } from "./ui/button";
 import { useRef, useMemo, useEffect } from "react";
@@ -21,7 +20,6 @@ import { EventConfigModal } from "@/features/eventConfiguration/components/Event
 
 export function SignedInComponents({ children }: { children: React.ReactNode }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  useSupabaseSubscriptions();
   const access = useUserAccess();
 
   const config = useMemo(
@@ -53,8 +51,12 @@ export function SignedInComponents({ children }: { children: React.ReactNode }) 
         isAdmin: access.roles.includes("admin"),
         isAccountManager: access.roles.includes("account_manager"),
         accountManagerId: access.accountManagerId,
-        accountManagerZoneIds: amZoneRows?.filter((r) => r.zone_uuid != null).map((r) => r.zone_uuid!) ?? [],
-        leadZoneIds: amZoneRows?.filter((r) => r.zone_uuid != null && r.is_lead === 1).map((r) => r.zone_uuid!) ?? [],
+        accountManagerZoneIds:
+          amZoneRows?.filter((r) => r.zone_uuid != null).map((r) => r.zone_uuid!) ?? [],
+        leadZoneIds:
+          amZoneRows
+            ?.filter((r) => r.zone_uuid != null && r.is_lead === 1)
+            .map((r) => r.zone_uuid!) ?? [],
         userId: access.userId,
       });
     }

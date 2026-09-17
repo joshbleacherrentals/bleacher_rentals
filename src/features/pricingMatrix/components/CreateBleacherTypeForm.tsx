@@ -6,6 +6,8 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createBleacherType } from "../db/bleacherTypeCrud";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
+import { normalizeDescription } from "../utils/normalizeDescription";
+import { BleacherTypeDescriptionField } from "./BleacherTypeDescriptionField";
 
 export function CreateBleacherTypeForm() {
   const router = useRouter();
@@ -13,6 +15,7 @@ export function CreateBleacherTypeForm() {
   const [name, setName] = useState("");
   const [rowCount, setRowCount] = useState("");
   const [roofType, setRoofType] = useState<"canopy" | "none">("none");
+  const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async () => {
@@ -27,7 +30,12 @@ export function CreateBleacherTypeForm() {
     setSaving(true);
     try {
       const id = await createBleacherType(
-        { name: name.trim(), row_count: parseInt(rowCount), roof_type: roofType },
+        {
+          name: name.trim(),
+          row_count: parseInt(rowCount),
+          roof_type: roofType,
+          description: normalizeDescription(description),
+        },
         supabase,
       );
       router.push(`/pricing-matrix/${id}`);
@@ -82,6 +90,8 @@ export function CreateBleacherTypeForm() {
           </select>
         </div>
       </div>
+
+      <BleacherTypeDescriptionField value={description} onChange={setDescription} />
 
       <div className="flex justify-end">
         <button

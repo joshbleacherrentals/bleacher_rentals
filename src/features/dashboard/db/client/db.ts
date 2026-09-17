@@ -1,5 +1,3 @@
-import { useBleachersStore } from "@/state/bleachersStore";
-import { useHomeBasesStore } from "@/state/homeBaseStore";
 import { toast } from "sonner";
 import React from "react";
 import { createErrorToast, ErrorToast } from "@/components/toasts/ErrorToast";
@@ -8,16 +6,10 @@ import {
   AddressData,
   CurrentEventStore,
 } from "../../../eventConfiguration/state/useCurrentEventStore";
-import { useAddressesStore } from "@/state/addressesStore";
 import { normalizeLostFields } from "@/features/quotesAndBookings/utils/lostReason";
-import { useEventsStore } from "@/state/eventsStore";
-import { useBleacherEventsStore } from "@/state/bleacherEventStore";
 import { useMemo } from "react";
 import { UserResource } from "@clerk/types";
-import { updateDataBase } from "@/app/actions/db.actions";
-import { useBlocksStore } from "@/state/blocksStore";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { useWorkTrackersStore } from "@/state/workTrackersStore";
 import { Enums } from "../../../../../database.types";
 import {
   DashboardBleacher,
@@ -35,7 +27,12 @@ import {
   insertDriverNotification,
 } from "@/features/workTrackers/db/notifications";
 import { db } from "@/components/providers/SystemProvider";
-import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { usePsAddresses } from "@/features/dashboard/db/hooks/powersync/usePsAddresses";
+import { typedExecute, typedExecuteBatch, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { startTrace } from "@/lib/perf/perfTrace";
+import { planWorkTrackerSave } from "@/features/workTrackers/db/planWorkTrackerSave";
+import { scheduleTriage } from "@/features/alerts/scheduleTriage";
+import { triage } from "@/features/alerts/triage";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { buildActualBleacherUpdate } from "@/features/workTrackers/util/bleacherSwap";
 import {
@@ -50,250 +47,23 @@ import {
 // 🔁 4. Enrich each event with its address from the addresses store.
 // ✅ 5. Add those events as the events field in each DashboardBleacher.
 
-export function fetchBleachers() {
-  const bleachers = useBleachersStore((s) => s.bleachers);
-  const homeBases = useHomeBasesStore((s) => s.homeBases);
-  const addresses = useAddressesStore((s) => s.addresses);
-  const events = useEventsStore((s) => s.events);
-  const bleacherEvents = useBleacherEventsStore((s) => s.bleacherEvents);
-  const blocks = useBlocksStore((s) => s.blocks);
-  const workTrackers = useWorkTrackersStore((s) => s.workTrackers);
-
-  return useMemo(() => {
-    // console.log("fetchBleachers (dashboard)");
-    if (!bleachers) return [];
-
-    const formattedBleachers: DashboardBleacher[] = bleachers
-      .map((bleacher) => {
-        const homeBase = homeBases.find((base) => base.id === bleacher.summer_home_base_uuid);
-        const winterHomeBase = homeBases.find((base) => base.id === bleacher.winter_home_base_uuid);
-
-        const relatedWorkTrackers = workTrackers.filter((wt) => wt.bleacher_uuid === bleacher.id);
-
-        const relatedBlocks: DashboardBlock[] = blocks
-          .filter((block) => block.bleacher_uuid === bleacher.id)
-          .map((block) => ({
-            blockUuid: block.id,
-            bleacherUuid: bleacher.id,
-            text: block.text ?? "",
-            date: block.date ?? "",
-          }));
-
-        // ✅ Find all bleacherEvents for this bleacher
-        const relatedBleacherEvents = bleacherEvents.filter(
-          (be) => be.bleacher_uuid === bleacher.id,
-        );
-
-        // ✅ Map event_ids to full DashboardEvent objects
-        const relatedEvents: DashboardEvent[] = relatedBleacherEvents
-          .map((be) => {
-            const event = events.find((e) => e.id === be.event_uuid);
-            if (!event) return null;
-
-            const address = addresses.find((a) => a.id === event.address_uuid);
-
-            return {
-              eventUuid: event.id,
-              bleacherEventUuid: be.id,
-              eventName: event.event_name,
-              addressData: address
-                ? {
-                    addressUuid: address.id,
-                    address: address.street,
-                    city: address.city,
-                    state: address.state_province,
-                    postalCode: address.zip_postal ?? undefined,
-                  }
-                : null,
-              seats: event.total_seats,
-              sevenRow: event.seven_row,
-              tenRow: event.ten_row,
-              fifteenRow: event.fifteen_row,
-              bleacherRequirements: [],
-              setupStart: event.setup_start ?? "",
-              setupText: be.setup_text,
-              setupConfirmed: be.setup_confirmed,
-              sameDaySetup: !event.setup_start, // if setup_start is null, assume same-day
-              eventStart: event.event_start,
-              eventEnd: event.event_end,
-              teardownEnd: event.teardown_end ?? "",
-              teardownText: be.teardown_text,
-              teardownConfirmed: be.teardown_confirmed,
-              sameDayTeardown: !event.teardown_end, // same logic
-              lenient: event.lenient,
-              token: "", // not needed or included here
-              selectedStatus: event.event_status,
-              notes: event.notes ?? "",
-              numDays: calculateNumDays(event.event_start, event.event_end),
-              status: event.event_status,
-              hslHue: event.hsl_hue,
-              alerts: [],
-              mustBeClean: event.must_be_clean,
-              bleacherUuids: bleacherEvents
-                .filter((be) => be.event_uuid === event.id)
-                .map((be) => be.bleacher_uuid),
-              goodshuffleUrl: event.goodshuffle_url ?? null,
-              ownerUserUuid: event.created_by_user_uuid ?? null,
-            };
-          })
-          .filter((e) => e !== null) as DashboardEvent[]; // filter out nulls
-
-        return {
-          bleacherUuid: bleacher.id,
-          bleacherNumber: bleacher.bleacher_number,
-          bleacherRows: bleacher.bleacher_rows,
-          bleacherSeats: bleacher.bleacher_seats,
-          summerHomeBase: {
-            homeBaseUuid: homeBase?.id ?? "",
-            homeBaseName: homeBase?.home_base_name ?? "",
-          },
-          winterHomeBase: {
-            homeBaseUuid: winterHomeBase?.id ?? "",
-            homeBaseName: winterHomeBase?.home_base_name ?? "",
-          },
-          events: relatedEvents,
-          blocks: relatedBlocks,
-          relatedWorkTrackers: relatedWorkTrackers.map((wt) => ({
-            workTrackerUuid: wt.id,
-            date: wt.date ?? "",
-          })),
-        };
-      })
-      .sort((a, b) => b.bleacherNumber - a.bleacherNumber);
-    // console.log("formattedBleachers", formattedBleachers);
-
-    return formattedBleachers;
-  }, [bleachers, homeBases, addresses, events, bleacherEvents, blocks]);
-}
-
-export function fetchDashboardEvents() {
-  const events = useEventsStore((s) => s.events);
-  const addresses = useAddressesStore((s) => s.addresses);
-  const bleacherEvents = useBleacherEventsStore((s) => s.bleacherEvents);
-  return useMemo(() => {
-    if (!events) return [];
-
-    const activeEvents = events.filter((e) => !e.deleted);
-
-    const dashboardEvents: DashboardEvent[] = activeEvents.map((event) => {
-      const address = addresses.find((a) => a.id === event.address_uuid);
-
-      // ✅ Filter out null values from bleacher UUIDs
-      const eventBleachers = bleacherEvents.filter((be) => be.event_uuid === event.id);
-      const bleacherUuids = eventBleachers
-        .map((be) => be.bleacher_uuid)
-        .filter((uuid): uuid is string => uuid !== null); // Type guard to remove nulls
-
-      return {
-        eventUuid: event.id,
-        bleacherEventUuid: "-1", // unused
-        eventName: event.event_name,
-        addressData: address
-          ? {
-              addressUuid: address.id,
-              address: address.street,
-              city: address.city,
-              state: address.state_province,
-              postalCode: address.zip_postal ?? undefined,
-            }
-          : null,
-        seats: event.total_seats,
-        sevenRow: event.seven_row,
-        tenRow: event.ten_row,
-        fifteenRow: event.fifteen_row,
-        bleacherRequirements: [],
-        setupStart: event.setup_start ?? "",
-        setupText: null, // unused
-        setupConfirmed: false, // unused
-        sameDaySetup: !event.setup_start,
-        eventStart: event.event_start,
-        eventEnd: event.event_end,
-        teardownEnd: event.teardown_end ?? "",
-        teardownText: null, // unused
-        teardownConfirmed: false, // unused
-        sameDayTeardown: !event.teardown_end,
-        lenient: event.lenient,
-        token: "", // unused
-        selectedStatus: (event.event_status ?? "quoted") as Enums<"event_status">,
-        notes: event.notes ?? "",
-        numDays: calculateNumDays(event.event_start, event.event_end),
-        status: (event.event_status ?? "quoted") as Enums<"event_status">,
-        hslHue: event.hsl_hue,
-        alerts: [],
-        mustBeClean: event.must_be_clean,
-        bleacherUuids: bleacherUuids,
-        goodshuffleUrl: event.goodshuffle_url ?? null,
-        ownerUserUuid: event.created_by_user_uuid ?? null,
-      };
-    });
-    // console.log("dashboardEvents", dashboardEvents);
-
-    // ✅ Sort by setup if exists else eventStart (earliest first)
-    dashboardEvents.sort((a, b) => {
-      const dateA = new Date(a.setupStart || a.eventStart).getTime();
-      const dateB = new Date(b.setupStart || b.eventStart).getTime();
-      return dateA - dateB;
-    });
-    return dashboardEvents;
-  }, [events, addresses, bleacherEvents]);
-}
-
-async function saveAddress(
-  address: AddressData | null,
-  addressUuid: string | null,
-): Promise<string | null> {
-  if (!address) return null;
-
-  if (addressUuid) {
-    await typedExecute(
-      db
-        .updateTable("Addresses")
-        .set({
-          city: address.city ?? "",
-          state_province: address.state ?? "",
-          street: address.address ?? "",
-          zip_postal: address.postalCode ?? "",
-          latitude: address.lat ?? null,
-          longitude: address.lng ?? null,
-          country: address.country ?? null,
-          place_id: address.placeId ?? null,
-        })
-        .where("id", "=", addressUuid)
-        .compile(),
-    );
-    return addressUuid;
-  } else {
-    const id = crypto.randomUUID();
-    await typedExecute(
-      db
-        .insertInto("Addresses")
-        .values({
-          id,
-          city: address.city ?? "",
-          state_province: address.state ?? "",
-          street: address.address ?? "",
-          zip_postal: address.postalCode ?? "",
-          latitude: address.lat ?? null,
-          longitude: address.lng ?? null,
-          country: address.country ?? null,
-          place_id: address.placeId ?? null,
-        })
-        .compile(),
-    );
-    return id;
-  }
-}
-
-export function getAddressFromUuid(addressUuid: string | null): AddressData | null {
-  const addresses = useAddressesStore.getState().addresses;
+/**
+ * Looks an address up in the local PowerSync DB.
+ *
+ * A hook, not a bare function, because it used to read a Zustand mirror of the
+ * whole `Addresses` table through `getState()` — a table that silently
+ * truncated at 1000 rows, so roughly half of all lookups returned null.
+ */
+export function useAddressFromUuid(addressUuid: string | null): AddressData | null {
+  const addresses = usePsAddresses();
   if (!addressUuid) return null;
   const address = addresses.find((a) => a.id === addressUuid);
   if (!address) return null;
   return {
     addressUuid: address.id,
-    address: address.street,
-    city: address.city,
-    state: address.state_province,
+    address: address.street ?? "",
+    city: address.city ?? undefined,
+    state: address.state_province ?? undefined,
     postalCode: address.zip_postal ?? undefined,
     lat: address.latitude ?? undefined,
     lng: address.longitude ?? undefined,
@@ -363,15 +133,13 @@ export async function saveWorkTracker(
   }
   // const payCents = Math.round(payInput * 100);
 
-  let pickUpAddressUuid: string | null = workTracker.pickup_address_uuid;
-  let dropOffAddressUuid: string | null = workTracker.dropoff_address_uuid;
-  pickUpAddressUuid = await saveAddress(pickUpAddress, pickUpAddressUuid);
-  dropOffAddressUuid = await saveAddress(dropOffAddress, dropOffAddressUuid);
+  const trace = startTrace("saveWorkTracker");
 
   const wasInsert = workTracker.id === "-1";
-  let savedWorkTrackerUuid = workTracker.id;
-  let previousBleacherUuid: string | null = null;
 
+  // Reads first, because the plan below needs their answers and nothing may sit
+  // between the plan and its single commit.
+  let previousBleacherUuid: string | null = null;
   if (!wasInsert) {
     const previousRows = await typedGetAll(
       db
@@ -384,79 +152,13 @@ export async function saveWorkTracker(
     );
     previousBleacherUuid = previousRows[0]?.bleacher_uuid ?? null;
   }
+
   const previousStatus = options?.previousStatus ?? "draft";
   const changeType = options?.changeType;
   const effectiveStatus =
     changeType === undefined
       ? workTracker.status
       : resolveStatusOnSave(previousStatus, changeType, workTracker.status);
-  const pickupAddressText = toNotificationAddress(
-    pickUpAddress,
-    options?.previousPickupAddress ?? "an unknown pickup location",
-  );
-  const pickupCityText = toNotificationCity(pickUpAddress, options?.previousPickupCity);
-  const dropoffAddressText = toNotificationAddress(
-    dropOffAddress,
-    options?.previousDropoffAddress ?? "an unknown dropoff location",
-  );
-  const dropoffCityText = toNotificationCity(dropOffAddress, options?.previousDropoffCity);
-
-  const wtFields = {
-    date: workTracker.date,
-    pickup_address_uuid: pickUpAddressUuid,
-    pickup_poc: workTracker.pickup_poc,
-    pickup_poc_contact_uuid: workTracker.pickup_poc_contact_uuid,
-    // pickup_time/dropoff_time (legacy free-text columns, kept only for the
-    // driver app) are no longer written from the web app — they're kept in
-    // sync from pickup_time_mode/start/end by the sync_work_tracker_time_text() DB trigger.
-    pickup_time_mode: workTracker.pickup_time_mode,
-    pickup_time_start: workTracker.pickup_time_start,
-    pickup_time_end: workTracker.pickup_time_end,
-    pickup_instructions: workTracker.pickup_instructions,
-    teardown_required: workTracker.teardown_required ? 1 : 0,
-    dropoff_address_uuid: dropOffAddressUuid,
-    dropoff_poc: workTracker.dropoff_poc,
-    dropoff_poc_contact_uuid: workTracker.dropoff_poc_contact_uuid,
-    dropoff_time_mode: workTracker.dropoff_time_mode,
-    dropoff_time_start: workTracker.dropoff_time_start,
-    dropoff_time_end: workTracker.dropoff_time_end,
-    dropoff_instructions: workTracker.dropoff_instructions,
-    setup_required: workTracker.setup_required ? 1 : 0,
-    notes: workTracker.notes,
-    pay_cents: workTracker.pay_cents,
-    bleacher_uuid: workTracker.bleacher_uuid,
-    // Both columns always move together: reverting to the assigned bleacher has
-    // to clear the reason in the same UPDATE, or the row keeps a reason for a
-    // swap that no longer exists.
-    ...buildActualBleacherUpdate({
-      assignedBleacherUuid: workTracker.bleacher_uuid,
-      nextActualBleacherUuid: workTracker.actual_bleacher_uuid,
-      nextReason: workTracker.bleacher_change_reason,
-    }),
-    internal_notes: workTracker.internal_notes,
-    driver_uuid: workTracker.driver_uuid,
-    status: effectiveStatus,
-    work_tracker_type_uuid: workTracker.work_tracker_type_uuid,
-    distance_meters: workTracker.distance_meters,
-    drive_minutes: workTracker.drive_minutes,
-    project_number: workTracker.project_number,
-  };
-
-  if (!wasInsert) {
-    await typedExecute(
-      db.updateTable("WorkTrackers").set(wtFields).where("id", "=", workTracker.id).compile(),
-    );
-  } else {
-    savedWorkTrackerUuid = crypto.randomUUID();
-    const createdByUserUuid =
-      workTracker.created_by_user_uuid ?? usePermissionsStore.getState().userId ?? null;
-    await typedExecute(
-      db
-        .insertInto("WorkTrackers")
-        .values({ id: savedWorkTrackerUuid, ...wtFields, created_by_user_uuid: createdByUserUuid })
-        .compile(),
-    );
-  }
 
   const notification =
     changeType === undefined ||
@@ -464,35 +166,60 @@ export async function saveWorkTracker(
       ? buildTripStatusNotification({
           previousStatus: wasInsert ? "draft" : previousStatus,
           nextStatus: effectiveStatus,
-          pickupAddress: pickupAddressText,
-          pickupCity: pickupCityText,
-          dropoffAddress: dropoffAddressText,
-          dropoffCity: dropoffCityText,
+          pickupAddress: toNotificationAddress(
+            pickUpAddress,
+            options?.previousPickupAddress ?? "an unknown pickup location",
+          ),
+          pickupCity: toNotificationCity(pickUpAddress, options?.previousPickupCity),
+          dropoffAddress: toNotificationAddress(
+            dropOffAddress,
+            options?.previousDropoffAddress ?? "an unknown dropoff location",
+          ),
+          dropoffCity: toNotificationCity(dropOffAddress, options?.previousDropoffCity),
           date: workTracker.date,
         })
       : null;
 
-  if (notification) {
-    const driverUserUuid =
-      options?.driverUserUuid ?? (await fetchDriverUserUuidByDriverUuid(workTracker.driver_uuid));
+  const notificationUserUuid = notification
+    ? (options?.driverUserUuid ?? (await fetchDriverUserUuidByDriverUuid(workTracker.driver_uuid)))
+    : null;
+  trace.mark("reads");
 
-    if (driverUserUuid) {
-      await insertDriverNotification(driverUserUuid, notification);
-    }
-  }
+  // Addresses, the tracker row and the driver notification used to be three or
+  // four separate transactions, each one an IndexedDB round-trip that also woke
+  // every watched query on the tables it touched. They are one transaction now;
+  // `planWorkTrackerSave` explains why generating the ids up front is what made
+  // that possible.
+  const plan = planWorkTrackerSave({
+    workTracker,
+    pickUpAddress,
+    dropOffAddress,
+    effectiveStatus,
+    createdByUserUuid:
+      workTracker.created_by_user_uuid ?? usePermissionsStore.getState().userId ?? null,
+    notification,
+    notificationUserUuid,
+    newId: () => crypto.randomUUID(),
+  });
 
-  try {
-    const { triage } = await import("@/features/alerts/triage");
-    await triage("WorkTrackers", {
-      id: savedWorkTrackerUuid,
-      previous_bleacher_uuid: previousBleacherUuid,
-    });
-  } catch (e) {
-    console.error("[alerts] failed to triage after work tracker save", e);
-  }
+  await typedExecuteBatch(plan.statements);
+  const savedWorkTrackerUuid = plan.workTrackerUuid;
+  trace.mark(wasInsert ? "insert tracker" : "update tracker");
 
-  updateDataBase(["WorkTrackers", "Addresses"]);
+  // Not awaited: the alert cascade is advisory work that nothing below depends
+  // on. `scheduleTriage` documents the trade-off. The phase label is unchanged
+  // so traces stay comparable with the ones captured before this change — it
+  // now measures scheduling, and the cascade reports its own trace when it
+  // finishes.
+  scheduleTriage("WorkTrackers", {
+    id: savedWorkTrackerUuid,
+    previous_bleacher_uuid: previousBleacherUuid,
+  });
+  trace.mark("alert triage");
+
   createSuccessToast(["Work Tracker saved"]);
+
+  trace.end({ workTrackerUuid: savedWorkTrackerUuid, wasInsert });
 
   return savedWorkTrackerUuid;
 }
@@ -512,6 +239,7 @@ export async function moveWorkTracker(params: {
   date?: string | null;
 }): Promise<void> {
   const nextStatus = params.previousStatus === "accepted" ? "released" : params.previousStatus;
+  const trace = startTrace("moveWorkTracker");
 
   await typedExecute(
     db
@@ -524,6 +252,7 @@ export async function moveWorkTracker(params: {
       .where("id", "=", params.workTrackerUuid)
       .compile(),
   );
+  trace.mark("update tracker");
 
   if (shouldSendDriverNotification("un-accept", params.previousStatus, false, nextStatus)) {
     const notification = buildTripStatusNotification({
@@ -545,18 +274,16 @@ export async function moveWorkTracker(params: {
       }
     }
   }
+  trace.mark("driver notification");
 
-  try {
-    const { triage } = await import("@/features/alerts/triage");
-    await triage("WorkTrackers", {
-      id: params.workTrackerUuid,
-      previous_bleacher_uuid: params.previousBleacherUuid,
-    });
-  } catch (e) {
-    console.error("[alerts] failed to triage after work tracker move", e);
-  }
+  scheduleTriage("WorkTrackers", {
+    id: params.workTrackerUuid,
+    previous_bleacher_uuid: params.previousBleacherUuid,
+  });
+  trace.mark("alert triage");
 
-  updateDataBase(["WorkTrackers"]);
+
+  trace.end({ workTrackerUuid: params.workTrackerUuid });
 }
 
 export async function deleteWorkTracker(
@@ -603,14 +330,15 @@ export async function deleteWorkTracker(
   const deleteQuery = db.deleteFrom("WorkTrackers").where("id", "=", workTrackerUuid).compile();
   await typedExecute(deleteQuery);
 
+  // Still awaited: deletion triage removes alerts for a row that is going away,
+  // and it is not dedup-keyed the way the save cascade is. Only the lazy import
+  // is dropped here.
   try {
-    const { triage } = await import("@/features/alerts/triage");
     await triage("WorkTrackers_deleted", { id: workTrackerUuid, bleacher_uuid: bleacherUuid });
   } catch (e) {
     console.error("[alerts] failed to triage after work tracker delete", e);
   }
 
-  updateDataBase(["WorkTrackers"]);
   createSuccessToast(["Work Tracker deleted"]);
 }
 
@@ -691,7 +419,6 @@ export async function saveSetupTeardownBlock(
       }),
     { duration: 10000 },
   );
-  updateDataBase(["BleacherEvents"]);
 }
 
 export async function saveBlock(
@@ -768,7 +495,6 @@ export async function saveBlock(
       }),
     { duration: 10000 },
   );
-  updateDataBase(["Blocks"]);
 }
 
 export async function deleteBlock(
@@ -835,7 +561,6 @@ export async function deleteBlock(
       }),
     { duration: 10000 },
   );
-  updateDataBase(["Blocks"]);
 }
 
 export async function createEvent(
@@ -915,7 +640,6 @@ export async function createEvent(
   }
 
   createSuccessToast(["Event Created"]);
-  updateDataBase(["Bleachers", "BleacherEvents", "Addresses", "Events"]);
   return event_uuid;
 }
 
@@ -940,12 +664,5 @@ export async function deleteEvent(
     db.updateTable("Events").set({ deleted: 1 }).where("id", "=", eventUuid).compile(),
   );
 
-  // Immediately update local stores so non-PowerSync consumers reflect the change
-  const currentEvents = useEventsStore.getState().events;
-  useEventsStore
-    .getState()
-    .setEvents(currentEvents.map((e) => (e.id === eventUuid ? { ...e, deleted: true } : e)));
-
   createSuccessToast(["Event Deleted"]);
-  updateDataBase(["Events"]);
 }

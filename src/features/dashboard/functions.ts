@@ -7,17 +7,11 @@ import {
   CurrentEventStore,
   useCurrentEventStore,
 } from "../eventConfiguration/state/useCurrentEventStore";
-import { useEventsStore } from "@/state/eventsStore";
-import { useBleacherEventsStore } from "@/state/bleacherEventStore";
-import { useBleachersStore } from "@/state/bleachersStore";
 import { UserResource } from "@clerk/types";
 import { PROVINCES, ROW_OPTIONS, STATES } from "@/types/Constants";
 import { Tables } from "../../../database.types";
 import { DashboardBleacher } from "../dashboard/types";
-import { alertDefinitions } from "@/features/alerts/registry";
-import { InMemoryAlertContext } from "@/features/alerts/types";
-import { useWorkTrackersStore } from "@/state/workTrackersStore";
-import { useAddressesStore } from "@/state/addressesStore";
+import type { PsEventRow } from "@/features/dashboard/db/hooks/powersync/usePsEvents";
 
 export function checkEventFormRules(
   createEventPayload: CurrentEventStore,
@@ -100,7 +94,7 @@ export const calculateNumDays = (start: string, end: string): number => {
 
 export function calculateBestHue(
   currentEvent: CurrentEventStore,
-  events: Tables<"Events">[],
+  events: PsEventRow[],
 ): number | null {
   if (!currentEvent.eventStart || !currentEvent.eventEnd) return null;
 
@@ -115,6 +109,8 @@ export function calculateBestHue(
   windowEnd.setMonth(currentEnd.getMonth() + 2);
 
   const eventsWithinRange = events.filter((event) => {
+    // Nullable in the local table, unlike the Supabase row type this used to take.
+    if (!event.event_start || !event.event_end) return false;
     const eventStart = new Date(event.event_start);
     const eventEnd = new Date(event.event_end);
 
@@ -162,46 +158,6 @@ export function calculateBestHue(
   // console.log("newHue (unrounded)", newHue);
 
   return Math.round(newHue);
-}
-
-export function updateCurrentEventAlerts() {
-  const state = useCurrentEventStore.getState();
-  const events = useEventsStore.getState().events;
-  const bleacherEvents = useBleacherEventsStore.getState().bleacherEvents;
-  const bleachers = useBleachersStore.getState().bleachers;
-
-  // Only calculate if necessary
-  if (!state.eventStart || !state.eventEnd) return;
-
-  const oldAlerts = state.alerts;
-  const workTrackers = useWorkTrackersStore.getState().workTrackers;
-  const addresses = useAddressesStore.getState().addresses;
-  const context: InMemoryAlertContext = {
-    event: state,
-    allEvents: events,
-    allBleacherEvents: bleacherEvents,
-    allWorkTrackers: workTrackers,
-    allBleachers: bleachers,
-    allAddresses: addresses,
-  };
-  const computedAlerts = alertDefinitions
-    .filter((d) => d.evaluateInMemory)
-    .flatMap((d) => d.evaluateInMemory!(context));
-
-  // Preserve transportation alerts set by useEventFormTransportationAlerts (PS-driven hook)
-  const existingTransportAlerts = oldAlerts.filter((a) => a.title === "No Transportation");
-  const newAlerts = [...computedAlerts, ...existingTransportAlerts];
-
-  const oldMessages = oldAlerts.map((a) => a.message);
-  const newMessages = newAlerts.map((a) => a.message);
-  const isDifferent =
-    oldMessages.length !== newMessages.length ||
-    oldMessages.some((m, i) => m !== newMessages[i]) ||
-    oldAlerts.some((a, i) => a.entity_description !== newAlerts[i]?.entity_description);
-
-  if (isDifferent) {
-    useCurrentEventStore.getState().setField("alerts", newAlerts);
-  }
 }
 
 // export function isUserPermitted(stateProv: string, user: UserResource | null): string | null {

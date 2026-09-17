@@ -15,6 +15,26 @@ export type QuoteLineItem = {
   total: number;
 };
 
+/**
+ * An `EventLineItems` row as the quote shows it. The description is the copy
+ * saved on the line item when it was added, never the bleacher type's current text.
+ */
+export function toQuoteLineItem(li: {
+  header: string;
+  description: string | null;
+  quantity: number | null;
+  value_cents: number;
+}): QuoteLineItem {
+  const qty = li.quantity ?? 1;
+  return {
+    label: li.header,
+    description: li.description ?? "",
+    qty,
+    unitPrice: li.value_cents,
+    total: qty * li.value_cents,
+  };
+}
+
 export type QuotePaymentInstallment = {
   id: string;
   dueDate: string;
@@ -51,11 +71,21 @@ export type QuoteDocumentData = {
     website: string;
   };
 
-  // Client contact
+  // Client contact. Resolved from Events.finance_contact_uuid when set,
+  // otherwise Events.contact_uuid — see docs/specs/quote-preferred-language.md
+  // sibling logic in buildQuoteDocumentData.
   contact: {
     name: string;
     email: string;
     phone: string;
+  } | null;
+
+  // The resolved contact's company (finance contact's company takes priority
+  // over the regular contact's company). Null whenever that contact has no
+  // Contacts.company_uuid — never rendered as an empty block.
+  customerCompany: {
+    name: string;
+    address: string;
   } | null;
 
   // Purchase Order number (from client, set after payment)
@@ -123,6 +153,61 @@ function formatCents(cents: number): number {
   return cents;
 }
 
+/** The shape of a Contacts row nested with its Companies/Addresses join. */
+type ContactWithCompany = {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  company_uuid?: string | null;
+  Companies?: {
+    company_name?: string | null;
+    Addresses?: {
+      street?: string | null;
+      city?: string | null;
+      state_province?: string | null;
+      zip_postal?: string | null;
+    } | null;
+  } | null;
+} | null;
+
+/**
+ * Some Addresses rows already store one fully composed address in `street`
+ * (multiple commas) rather than split across street/city/state/zip. Appending
+ * city/state/zip in that case would duplicate the address, so it's returned
+ * as-is instead.
+ */
+export function combineAddressLine(
+  street: string | null | undefined,
+  city: string | null | undefined,
+  state: string | null | undefined,
+  zip: string | null | undefined,
+): string {
+  const streetValue = street ?? "";
+  if (streetValue.split(",").length > 2) {
+    return streetValue;
+  }
+  return [streetValue, city, state, zip].filter(Boolean).join(", ");
+}
+
+/**
+ * The company to show for a quote's contact, or null when that contact has
+ * no Contacts.company_uuid — a bare empty block is never rendered.
+ */
+export function buildCustomerCompany(
+  contact: ContactWithCompany,
+): QuoteDocumentData["customerCompany"] {
+  if (!contact?.company_uuid) return null;
+
+  const company = contact.Companies;
+  const addr = company?.Addresses;
+
+  return {
+    name: company?.company_name ?? "",
+    address: combineAddressLine(addr?.street, addr?.city, addr?.state_province, addr?.zip_postal),
+  };
+}
+
 function getSupabaseAdmin() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -169,7 +254,18 @@ export async function buildQuoteDocumentData(
         street, city, state_province, zip_postal
       ),
       Contacts!Events_contact_uuid_fkey (
-        first_name, last_name, email, phone, preferred_language
+        first_name, last_name, email, phone, preferred_language, company_uuid,
+        Companies (
+          company_name,
+          Addresses!Companies_billing_address_uuid_fkey ( street, city, state_province, zip_postal )
+        )
+      ),
+      financeContact:Contacts!Events_finance_contact_uuid_fkey (
+        first_name, last_name, email, phone, company_uuid,
+        Companies (
+          company_name,
+          Addresses!Companies_billing_address_uuid_fkey ( street, city, state_province, zip_postal )
+        )
       ),
       Users!Events_created_by_user_uuid_fkey (
         first_name, last_name, email
@@ -186,6 +282,10 @@ export async function buildQuoteDocumentData(
 
   const addr = event.Addresses as any;
   const contact = event.Contacts as any;
+  const financeContact = (event as any).financeContact as any;
+  // The finance contact — and their company — replaces the regular contact
+  // wherever a quote shows "who the client is" when set.
+  const effectiveContact = financeContact ?? contact;
   const user = event.Users as any;
 
   // Parallel fetch: salesOffice, lineItems, installments, terms, signature
@@ -273,13 +373,7 @@ export async function buildQuoteDocumentData(
 
   // Process line items
   const lineItemRows = lineItemResult.data;
-  const lineItems: QuoteLineItem[] = (lineItemRows ?? []).map((li: any) => ({
-    label: li.header,
-    description: li.description ?? "",
-    qty: li.quantity ?? 1,
-    unitPrice: li.value_cents,
-    total: (li.quantity ?? 1) * li.value_cents,
-  }));
+  const lineItems: QuoteLineItem[] = (lineItemRows ?? []).map(toQuoteLineItem);
 
   // Process installments. The status a client reads on this document is derived
   // from the payments, not from PaymentInstallments.status — that flag is a
@@ -357,13 +451,15 @@ export async function buildQuoteDocumentData(
       website: "www.BleacherRentals.com",
     },
 
-    contact: contact
+    contact: effectiveContact
       ? {
-          name: `${contact.first_name ?? ""} ${contact.last_name ?? ""}`.trim(),
-          email: contact.email ?? "",
-          phone: contact.phone ?? "",
+          name: `${effectiveContact.first_name ?? ""} ${effectiveContact.last_name ?? ""}`.trim(),
+          email: effectiveContact.email ?? "",
+          phone: effectiveContact.phone ?? "",
         }
       : null,
+
+    customerCompany: buildCustomerCompany(effectiveContact),
 
     poNumber: (event as any).po_number ?? null,
 

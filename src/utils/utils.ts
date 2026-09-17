@@ -1,5 +1,3 @@
-import { useHomeBasesStore } from "@/state/homeBaseStore";
-import { SelectHomeBase } from "@/types/tables/HomeBases";
 import { redirect } from "next/navigation";
 
 /**
@@ -11,23 +9,4 @@ import { redirect } from "next/navigation";
  */
 export function encodedRedirect(type: "error" | "success", path: string, message: string) {
   return redirect(`${path}?${type}=${encodeURIComponent(message)}`);
-}
-
-export function getHomeBaseUuidByName(name: string): string | null {
-  const homeBases = useHomeBasesStore.getState().homeBases;
-
-  const match = homeBases.find(
-    (hb) => hb.home_base_name.trim().toLowerCase() === name.trim().toLowerCase(),
-  );
-
-  return match?.id ?? null;
-}
-
-export function getHomeBaseOptions() {
-  const homeBases = useHomeBasesStore((s) => s.homeBases) as SelectHomeBase[];
-
-  return homeBases.map((homeBase) => ({
-    value: homeBase.id,
-    label: homeBase.home_base_name,
-  }));
 }

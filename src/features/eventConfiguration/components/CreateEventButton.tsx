@@ -2,7 +2,7 @@ import { Minus, Plus, X, ChevronDown, Wrench, Handshake } from "lucide-react";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useUser } from "@clerk/nextjs";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
-import { useUsersStore } from "@/state/userStore";
+import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { useCurrentEventStore } from "../state/useCurrentEventStore";
 import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useState, useRef, useEffect } from "react";
@@ -19,7 +19,7 @@ export const CreateEventButton = () => {
   const maintenanceStore = useMaintenanceEventStore();
   const subrentalsStore = useSubrentalEventStore();
   const { user } = useUser();
-  const users = useUsersStore((s) => s.users);
+  const users = usePsUsers();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

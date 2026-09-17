@@ -51,6 +51,11 @@ export type CreateQuoteState = {
   eventStart: string;
   eventEnd: string;
   eventTypeId: string | null;
+  // Notes for the driver about this venue at two different moments — NOT the
+  // two ends of one truck trip like the identically-named WorkTrackers
+  // columns. See docs/specs/event-pickup-dropoff-instructions.md D1.
+  pickupInstructions: string;
+  dropoffInstructions: string;
 
   // Currency
   currency: Currency;
@@ -120,6 +125,8 @@ const initialState: CreateQuoteState = {
   eventStart: "",
   eventEnd: "",
   eventTypeId: null,
+  pickupInstructions: "",
+  dropoffInstructions: "",
 
   currency: "USD",
 
@@ -204,6 +211,8 @@ const TRACKED_KEYS: (keyof CreateQuoteState)[] = [
   "lostReasonNote",
   "eventStart",
   "eventEnd",
+  "pickupInstructions",
+  "dropoffInstructions",
   "contactId",
   "venueId",
   "salesOfficeId",

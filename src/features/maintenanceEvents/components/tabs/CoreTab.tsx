@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect } from "react";
+import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
-import { useUsersStore } from "@/state/userStore";
 import { Dropdown } from "@/components/DropDown";
 import { useMaintenanceEventStore } from "../../state/useMaintenanceEventStore";
 import { useScrollToDateStore } from "@/features/dashboard/state/useScrollToDateStore";
@@ -26,7 +26,7 @@ type Props = {
 export const MaintenanceCoreTab = ({ disabled = false }: Props = {}) => {
   const store = useMaintenanceEventStore();
   const supabase = useClerkSupabaseClient();
-  const users = useUsersStore((s) => s.users);
+  const users = usePsUsers();
   const permissions = useTeamPermissions();
   const accountManagerUserIds = useAccountManagerUserIds();
   const filteredUsers = filterOwnerOptions({
@@ -38,7 +38,7 @@ export const MaintenanceCoreTab = ({ disabled = false }: Props = {}) => {
     inactiveStatusUuid: STATUSES.inactive,
   });
   const ownerOptions = filteredUsers.map((u) => ({
-    label: `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email,
+    label: `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email || u.id,
     value: String(u.id),
   }));
 

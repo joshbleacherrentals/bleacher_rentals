@@ -7,6 +7,7 @@ export type PsBleacherRow = {
   bleacher_number: number | null;
   bleacher_rows: number | null;
   bleacher_seats: number | null;
+  bleacher_type_uuid: string | null;
   linxup_device_id: string | null;
   summer_account_manager_uuid: string | null;
   winter_account_manager_uuid: string | null;
@@ -23,6 +24,7 @@ const compiled = db
     "b.bleacher_number",
     "b.bleacher_rows",
     "b.bleacher_seats",
+    "b.bleacher_type_uuid",
     "b.linxup_device_id",
     "b.summer_account_manager_uuid",
     "b.winter_account_manager_uuid",
@@ -35,7 +37,18 @@ const compiled = db
   .orderBy("b.bleacher_number", "asc")
   .compile();
 
+/**
+ * The full query result, including `isLoading`.
+ *
+ * `usePsBleachers` collapses that to an array, which cannot tell "no rows yet"
+ * from "no rows at all". Anything that draws a conclusion from emptiness — an
+ * alert calculation, most of all, where an empty list reads as "no problems" —
+ * must use this and wait.
+ */
+export function usePsBleachersQuery() {
+  return useTypedQuery(compiled, expect<PsBleacherRow>());
+}
+
 export function usePsBleachers() {
-  const { data } = useTypedQuery(compiled, expect<PsBleacherRow>());
-  return data ?? [];
+  return usePsBleachersQuery().data ?? [];
 }
