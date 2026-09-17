@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 import { AlertsDropDown } from "@/features/alerts/components/AlertsDropDown";
+import { CurrentSprintHeaderLink } from "@/app/roadmap/_lib/components/CurrentSprintHeaderLink";
 import { ProductDropDown } from "@/features/changelog/components/ProductDropDown";
 import { EventChatNotificationsDropDown } from "@/features/eventChat/components/EventChatNotificationsDropDown";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
@@ -53,6 +54,7 @@ const Header = () => {
           />
           <div className="flex items-center mr-2 relative">
             <div className="flex items-center  mr-4">
+              <CurrentSprintHeaderLink />
               <ProductDropDown />
             </div>
             {showChatNotifications && (
