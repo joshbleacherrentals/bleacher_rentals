@@ -15,7 +15,7 @@ type BleacherFilterSortOptions = {
   optimizationMode: boolean;
 };
 
-function getRowKey(b: Bleacher): string {
+export function getRowKey(b: Bleacher): string {
   return b.isSubrentalRow ? `${b.bleacherUuid}:${b.zoneUuid}` : b.bleacherUuid;
 }
 
