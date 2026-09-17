@@ -1,9 +1,11 @@
 // components/Dropdown.tsx
 "use client";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { panelPosition, PANEL_MAX_HEIGHT, type Placement } from "./entitySearch/panelPosition";
+import { estimateListHeight } from "./dropdown/estimateListHeight";
 
 type DropdownOption<T> = {
   label: string;
@@ -32,11 +34,16 @@ export function Dropdown<T>({
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({
-    top: 0,
-    left: 0,
-    width: 0,
-  });
+  const listRef = useRef<HTMLUListElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    placement: Placement;
+  }>({ top: 0, left: 0, width: 0, maxHeight: PANEL_MAX_HEIGHT, placement: "below" });
+  // The list's full height, scrolled-off part included. 0 until it has rendered once.
+  const [measuredHeight, setMeasuredHeight] = useState(0);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -58,16 +65,36 @@ export function Dropdown<T>({
     return () => window.removeEventListener("scroll", close, true);
   }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen && ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      setDropdownPos({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      });
-    }
-  }, [isOpen]);
+  // Opens below the button, or above it when there is not enough room below (the same rule the
+  // venue and contact pickers use), and caps the list to that room so its last options stay
+  // reachable by scrolling instead of running off the screen.
+  useLayoutEffect(() => {
+    if (!isOpen || !ref.current) return;
+    const { placement, ...pos } = panelPosition(
+      ref.current.getBoundingClientRect(),
+      null,
+      { x: window.scrollX, y: window.scrollY },
+      {
+        contentHeight: estimateListHeight(options.length, measuredHeight),
+        viewportHeight: window.innerHeight,
+      },
+    );
+    setDropdownPos({ ...pos, placement });
+  }, [isOpen, options.length, measuredHeight]);
+
+  // Measured once the list has its real width, still before paint. Measuring as it mounts read it
+  // at the previous width — 0 on the first open — where every label wraps word by word, so the
+  // list looked several times taller than it is and an upward list floated far above its button.
+  // scrollHeight ignores the height cap and the open animation's scale.
+  useLayoutEffect(() => {
+    const node = listRef.current;
+    if (!isOpen || !node || dropdownPos.width === 0) return;
+    const height = node.scrollHeight + (node.offsetHeight - node.clientHeight);
+    if (height > 0 && height !== measuredHeight) setMeasuredHeight(height);
+  }, [isOpen, dropdownPos.width, options, measuredHeight]);
+
+  // The list slides out of the button, whichever side of it that is.
+  const slideFrom = dropdownPos.placement === "above" ? 5 : -5;
 
   const rawLabel = options.find((option) => option.value === selected)?.label;
   const selectedLabel = rawLabel
@@ -110,17 +137,20 @@ export function Dropdown<T>({
           <AnimatePresence>
             {isOpen && !disabled && (
               <motion.ul
-                initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                ref={listRef}
+                initial={{ opacity: 0, scale: 0.95, y: slideFrom }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                exit={{ opacity: 0, scale: 0.95, y: slideFrom }}
                 transition={{ duration: 0.15 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                className="absolute z-[9999] bg-white border border-gray-200 rounded shadow-lg overflow-y-auto max-h-[60vh]"
+                className="absolute z-[9999] bg-white border border-gray-200 rounded shadow-lg overflow-y-auto"
                 style={{
                   position: "absolute",
                   top: dropdownPos.top,
                   left: dropdownPos.left,
                   width: dropdownPos.width,
+                  maxHeight: dropdownPos.maxHeight,
+                  transformOrigin: dropdownPos.placement === "above" ? "bottom" : "top",
                   pointerEvents: "auto",
                 }}
               >
