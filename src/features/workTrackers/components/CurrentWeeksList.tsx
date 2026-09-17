@@ -7,8 +7,8 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useCrossBorderWeekStarts } from "../hooks/useCrossBorderWeekStarts";
-import { useWithdrawnCountsByWeek } from "../db/withdrawnTrackers";
-import { WithdrawnBadgeSlot } from "./WithdrawnBadgeSlot";
+import { useAttentionCountsByWeek } from "../db/attentionTrackers";
+import { AttentionBadgeSlot } from "./AttentionBadgeSlot";
 
 type WeekGroup = {
   week_start: string | null;
@@ -64,7 +64,7 @@ export function CurrentWeeksList() {
   }, []);
 
   const crossBorderWeekStarts = useCrossBorderWeekStarts(dateRange.start, dateRange.end);
-  const withdrawnByWeek = useWithdrawnCountsByWeek();
+  const attentionByWeek = useAttentionCountsByWeek();
 
   const query = useMemo(() => {
     return db
@@ -121,9 +121,9 @@ export function CurrentWeeksList() {
           >
             <td className="py-2 px-3 text-left">
               <div className="flex items-center gap-2">
-                <WithdrawnBadgeSlot
-                  count={withdrawnByWeek.get(row.week_start) ?? 0}
-                  label={`${withdrawnByWeek.get(row.week_start) ?? 0} work trackers declined or abandoned this week`}
+                <AttentionBadgeSlot
+                  count={attentionByWeek.get(row.week_start) ?? 0}
+                  label={`${attentionByWeek.get(row.week_start) ?? 0} work trackers need your attention this week`}
                 />
                 <div className="flex flex-col">
                   <span className="font-semibold text-base">{label}</span>

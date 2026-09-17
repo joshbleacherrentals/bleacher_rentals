@@ -19,6 +19,8 @@ export type LineItem = {
   overridePrice: boolean;
   discountType: DiscountType;
   discountValue: number;
+  /** Copied from the bleacher type when the item is added; read-only on the quote. */
+  description: string | null;
 };
 
 // Matches public."Addresses" table

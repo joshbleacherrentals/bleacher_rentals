@@ -7,6 +7,7 @@ import { calculateTotals } from "../utils/calculateTotals";
 import { normalizeLostFields } from "../utils/lostReason";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute } from "@/lib/powersync/typedQuery";
+import { toEventLineItemValues } from "./toEventLineItemValues";
 
 export async function createQuoteEvent(
   state: CreateQuoteState,
@@ -117,13 +118,7 @@ export async function createQuoteEvent(
           .insertInto("EventLineItems")
           .values({
             id: crypto.randomUUID(),
-            event_uuid: eventUuid,
-            header: li.label,
-            description: null,
-            bleacher_type_uuid: li.bleacherTypeUuid || null,
-            value_cents: li.category === "discounts" ? li.lineTotalCents : li.unitPriceCents,
-            quantity: li.qty,
-            currency: state.currency,
+            ...toEventLineItemValues(li, eventUuid, state.currency),
             is_template: 0,
             deleted: 0,
           } as any)

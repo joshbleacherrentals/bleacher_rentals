@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { panelPosition, PANEL_MAX_HEIGHT, type Placement } from "./entitySearch/panelPosition";
+import { estimateListHeight } from "./dropdown/estimateListHeight";
 
 type DropdownOption<T> = {
   label: string;
@@ -37,13 +39,11 @@ export function Dropdown<T>({
     top: number;
     left: number;
     width: number;
-    maxHeight: number | undefined;
-  }>({
-    top: 0,
-    left: 0,
-    width: 0,
-    maxHeight: undefined,
-  });
+    maxHeight: number;
+    placement: Placement;
+  }>({ top: 0, left: 0, width: 0, maxHeight: PANEL_MAX_HEIGHT, placement: "below" });
+  // The list's full height, scrolled-off part included. 0 until it has rendered once.
+  const [measuredHeight, setMeasuredHeight] = useState(0);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -68,34 +68,36 @@ export function Dropdown<T>({
     return () => window.removeEventListener("scroll", close, true);
   }, [isOpen]);
 
-  // Runs after the (still-invisible, opacity-animating-in) list has mounted so
-  // scrollHeight reflects its real, uncapped content height — lets us flip the
-  // list above the button when there isn't room below, instead of letting it
-  // run off the bottom of the viewport with no way to scroll to it (the
-  // scroll-closes-the-menu behavior above means the page itself can't be
-  // scrolled to reveal it).
+  // Opens below the button, or above it when there is not enough room below (the same rule the
+  // venue and contact pickers use), and caps the list to that room so its last options stay
+  // reachable by scrolling instead of running off the screen.
   useLayoutEffect(() => {
     if (!isOpen || !ref.current) return;
-    const buttonRect = ref.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const margin = 8;
-    const spaceBelow = viewportHeight - buttonRect.bottom - margin;
-    const spaceAbove = buttonRect.top - margin;
-    const listHeight = listRef.current?.scrollHeight ?? 0;
+    const { placement, ...pos } = panelPosition(
+      ref.current.getBoundingClientRect(),
+      null,
+      { x: window.scrollX, y: window.scrollY },
+      {
+        contentHeight: estimateListHeight(options.length, measuredHeight),
+        viewportHeight: window.innerHeight,
+      },
+    );
+    setDropdownPos({ ...pos, placement });
+  }, [isOpen, options.length, measuredHeight]);
 
-    const openUpward = listHeight > spaceBelow && spaceAbove > spaceBelow;
-    const available = openUpward ? spaceAbove : spaceBelow;
-    const maxHeight = Math.max(120, Math.min(available, viewportHeight * 0.6));
+  // Measured once the list has its real width, still before paint. Measuring as it mounts read it
+  // at the previous width — 0 on the first open — where every label wraps word by word, so the
+  // list looked several times taller than it is and an upward list floated far above its button.
+  // scrollHeight ignores the height cap and the open animation's scale.
+  useLayoutEffect(() => {
+    const node = listRef.current;
+    if (!isOpen || !node || dropdownPos.width === 0) return;
+    const height = node.scrollHeight + (node.offsetHeight - node.clientHeight);
+    if (height > 0 && height !== measuredHeight) setMeasuredHeight(height);
+  }, [isOpen, dropdownPos.width, options, measuredHeight]);
 
-    setDropdownPos({
-      top:
-        (openUpward ? buttonRect.top - Math.min(listHeight, maxHeight) : buttonRect.bottom) +
-        window.scrollY,
-      left: buttonRect.left + window.scrollX,
-      width: buttonRect.width,
-      maxHeight,
-    });
-  }, [isOpen]);
+  // The list slides out of the button, whichever side of it that is.
+  const slideFrom = dropdownPos.placement === "above" ? 5 : -5;
 
   const rawLabel = options.find((option) => option.value === selected)?.label;
   const selectedLabel = rawLabel
@@ -139,18 +141,19 @@ export function Dropdown<T>({
             {isOpen && !disabled && (
               <motion.ul
                 ref={listRef}
-                initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                initial={{ opacity: 0, scale: 0.95, y: slideFrom }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                exit={{ opacity: 0, scale: 0.95, y: slideFrom }}
                 transition={{ duration: 0.15 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                className="absolute z-[9999] bg-white border border-gray-200 rounded shadow-lg overflow-y-auto max-h-[60vh]"
+                className="absolute z-[9999] bg-white border border-gray-200 rounded shadow-lg overflow-y-auto"
                 style={{
                   position: "absolute",
                   top: dropdownPos.top,
                   left: dropdownPos.left,
                   width: dropdownPos.width,
                   maxHeight: dropdownPos.maxHeight,
+                  transformOrigin: dropdownPos.placement === "above" ? "bottom" : "top",
                   pointerEvents: "auto",
                 }}
               >

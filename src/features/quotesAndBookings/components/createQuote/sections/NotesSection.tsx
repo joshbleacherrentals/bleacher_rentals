@@ -1,6 +1,7 @@
 "use client";
 
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
+import { NOTES_TEXTAREA_CLASS } from "./notesTextarea";
 
 export function NotesSection() {
   const clientFacingNotes = useCreateQuoteStore((s) => s.clientFacingNotes);
@@ -18,8 +19,7 @@ export function NotesSection() {
           value={clientFacingNotes}
           onChange={(e) => setField("clientFacingNotes", e.target.value)}
           placeholder="Visible to client..."
-          rows={3}
-          className="w-full px-3 py-2 border rounded text-sm resize-none"
+          className={NOTES_TEXTAREA_CLASS}
         />
       </div>
       <div className="mb-4">
@@ -30,8 +30,7 @@ export function NotesSection() {
           value={internalNotes}
           onChange={(e) => setField("internalNotes", e.target.value)}
           placeholder="Internal team notes..."
-          rows={3}
-          className="w-full px-3 py-2 border rounded text-sm resize-none"
+          className={NOTES_TEXTAREA_CLASS}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">

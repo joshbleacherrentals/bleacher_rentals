@@ -10,6 +10,8 @@ import { updateBleacherType, softDeleteBleacherType } from "../db/bleacherTypeCr
 import { PricingGrid } from "./PricingGrid";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
+import { normalizeDescription } from "../utils/normalizeDescription";
+import { BleacherTypeDescriptionField } from "./BleacherTypeDescriptionField";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +28,7 @@ type BtRow = {
   name: string | null;
   row_count: number | null;
   roof_type: string | null;
+  description: string | null;
 };
 
 export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string }) {
@@ -39,7 +42,7 @@ export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string 
     () =>
       db
         .selectFrom("BleacherTypes")
-        .select(["id", "name", "row_count", "roof_type"])
+        .select(["id", "name", "row_count", "roof_type", "description"])
         .where("id", "=", bleacherTypeId)
         .compile(),
     [bleacherTypeId],
@@ -51,6 +54,7 @@ export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string 
   const [name, setName] = useState("");
   const [rowCount, setRowCount] = useState("");
   const [roofType, setRoofType] = useState<"canopy" | "none">("none");
+  const [description, setDescription] = useState("");
   const [formLoaded, setFormLoaded] = useState(false);
 
   useEffect(() => {
@@ -58,6 +62,7 @@ export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string 
       setName(bt.name ?? "");
       setRowCount(String(bt.row_count ?? ""));
       setRoofType((bt.roof_type as "canopy" | "none") ?? "none");
+      setDescription(bt.description ?? "");
       setFormLoaded(true);
     }
   }, [bt, formLoaded]);
@@ -71,7 +76,12 @@ export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string 
     try {
       await updateBleacherType(
         bleacherTypeId,
-        { name: name.trim(), row_count: parseInt(rowCount) || 0, roof_type: roofType },
+        {
+          name: name.trim(),
+          row_count: parseInt(rowCount) || 0,
+          roof_type: roofType,
+          description: normalizeDescription(description),
+        },
         supabase,
       );
       createSuccessToast(["Bleacher type updated."]);
@@ -125,9 +135,7 @@ export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string 
       {/* Bleacher Type Info */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-            Bleacher Type
-          </h2>
+          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Bleacher Type</h2>
           <button
             onClick={() => setShowDelete(true)}
             className="inline-flex items-center gap-1 text-xs font-medium text-red-600 border border-red-300 rounded px-2 py-1 hover:bg-red-50 transition cursor-pointer"
@@ -168,6 +176,10 @@ export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string 
           </div>
         </div>
 
+        <div className="mt-4">
+          <BleacherTypeDescriptionField value={description} onChange={setDescription} />
+        </div>
+
         <div className="mt-3 flex justify-end">
           <button
             onClick={handleSave}
@@ -184,12 +196,18 @@ export function BleacherTypeDetail({ bleacherTypeId }: { bleacherTypeId: string 
       <PricingGrid bleacherTypeId={bleacherTypeId} />
 
       {/* Delete confirm */}
-      <AlertDialog open={showDelete} onOpenChange={(open) => { if (!open) setShowDelete(false); }}>
+      <AlertDialog
+        open={showDelete}
+        onOpenChange={(open) => {
+          if (!open) setShowDelete(false);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete bleacher type?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will soft-delete &quot;{bt.name}&quot; and hide it from lists. Existing bleachers using this type won&apos;t be affected.
+              This will soft-delete &quot;{bt.name}&quot; and hide it from lists. Existing bleachers
+              using this type won&apos;t be affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

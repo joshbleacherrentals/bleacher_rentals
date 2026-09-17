@@ -20,6 +20,7 @@ const lineItem: LineItem = {
   overridePrice: false,
   discountType: "fixed",
   discountValue: 0,
+  description: null,
 };
 
 describe("draftSaveDefaults", () => {

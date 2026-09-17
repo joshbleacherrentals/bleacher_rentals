@@ -15,8 +15,8 @@ test.describe("Declined & abandoned counts (admin with no zones)", () => {
     // passes simply because nothing has rendered yet.
     await expect(page.locator("tbody tr").first()).toBeVisible({ timeout: 30_000 });
 
-    await expect(page.locator("[data-testid=sidebar-withdrawn-badge]")).toHaveCount(0);
-    await expect(page.locator("[data-testid=withdrawn-badge]")).toHaveCount(0);
+    await expect(page.locator("[data-testid=sidebar-attention-badge]")).toHaveCount(0);
+    await expect(page.locator("[data-testid=attention-badge]")).toHaveCount(0);
   });
 
   test("no count against any driver inside a week", async ({ page }) => {
@@ -24,6 +24,6 @@ test.describe("Declined & abandoned counts (admin with no zones)", () => {
 
     const driverRow = page.getByRole("row", { name: /Withdrawal Driver/ });
     await expect(driverRow).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator("[data-testid=withdrawn-badge]")).toHaveCount(0);
+    await expect(page.locator("[data-testid=attention-badge]")).toHaveCount(0);
   });
 });

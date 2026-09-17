@@ -45,6 +45,7 @@ const contact = {
   email: "marie@example.com",
   notes: "",
   companyUuid: null,
+  defaultVenueUuid: null,
 };
 
 describe("updateContact", () => {
@@ -62,5 +63,20 @@ describe("updateContact", () => {
     await updateContact("contact-1", contact);
 
     expect(executed[0].parameters).toContain("english");
+  });
+});
+
+describe("updateContact default venue", () => {
+  it("persists the default venue", async () => {
+    await updateContact("contact-1", { ...contact, defaultVenueUuid: "venue-9" });
+
+    expect(executed[0].sql).toContain('"default_venue_uuid" = ?');
+    expect(executed[0].parameters).toContain("venue-9");
+  });
+
+  it("persists a cleared default venue as null", async () => {
+    await updateContact("contact-1", { ...contact, defaultVenueUuid: null });
+
+    expect(executed[0].sql).toContain('"default_venue_uuid" = ?');
   });
 });

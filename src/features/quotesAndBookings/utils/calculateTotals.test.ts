@@ -10,6 +10,7 @@ const makeLineItem = (overrides: Partial<LineItem>): LineItem => ({
   qty: 1,
   unitPriceCents: 0,
   lineTotalCents: 0,
+  description: null,
   overridePrice: false,
   discountType: "percentage",
   discountValue: 0,
@@ -41,9 +42,7 @@ describe("calculateTotals", () => {
   });
 
   it("applies tax percent to taxable amount", () => {
-    const items = [
-      makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 10000 }),
-    ];
+    const items = [makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 10000 })];
     const result = calculateTotals(items, 8.25);
     expect(result.subtotal).toBe(10000);
     expect(result.taxAmount).toBe(825);
@@ -64,18 +63,14 @@ describe("calculateTotals", () => {
   });
 
   it("handles null taxPercent as 0%", () => {
-    const items = [
-      makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 5000 }),
-    ];
+    const items = [makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 5000 })];
     const result = calculateTotals(items, null);
     expect(result.taxAmount).toBe(0);
     expect(result.total).toBe(5000);
   });
 
   it("handles 0% tax", () => {
-    const items = [
-      makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 5000 }),
-    ];
+    const items = [makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 5000 })];
     const result = calculateTotals(items, 0);
     expect(result.taxAmount).toBe(0);
     expect(result.total).toBe(5000);
@@ -93,9 +88,7 @@ describe("calculateTotals", () => {
   });
 
   it("handles fractional tax rate (8.875%)", () => {
-    const items = [
-      makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 10000 }),
-    ];
+    const items = [makeLineItem({ id: "1", category: "bleachers", lineTotalCents: 10000 })];
     const result = calculateTotals(items, 8.875);
     expect(result.taxAmount).toBe(887.5);
     expect(result.total).toBe(10887.5);

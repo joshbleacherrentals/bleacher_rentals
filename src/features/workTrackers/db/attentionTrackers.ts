@@ -5,29 +5,31 @@ import { useUser } from "@clerk/nextjs";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import {
-  countWithdrawn,
-  countWithdrawnByDriver,
-  countWithdrawnByWeek,
-  type WithdrawnTrackerRow,
-} from "../util/withdrawnTrackers";
+  attentionByTracker,
+  countAttention,
+  countAttentionByDriver,
+  countAttentionByWeek,
+  type AttentionReason,
+  type AttentionTrackerRow,
+} from "../util/attentionTrackers";
 import {
-  resolveWithdrawnScope,
-  withdrawnTrackersQuery,
-  type WithdrawnScope,
-} from "./withdrawnTrackerScope";
+  resolveAttentionScope,
+  attentionTrackersQuery,
+  type AttentionScope,
+} from "./attentionTrackerScope";
 
 const NO_CLERK_USER = "__no_clerk_user__";
 
 type ScopeRow = { is_admin: number | null; account_manager_uuid: string | null };
 
 /**
- * The signed-in user's withdrawal scope: the zones they manage, or nothing.
+ * The signed-in user's attention scope: the zones they manage, or nothing.
  *
  * Resolved from the local DB rather than passed in, so the sidebar, the week
  * list and the driver list all arrive at the same scope without threading the
  * account manager uuid through three unrelated component trees.
  */
-export function useWithdrawnScope(): WithdrawnScope {
+export function useAttentionScope(): AttentionScope {
   const { user } = useUser();
   const clerkUserId = user?.id ?? NO_CLERK_USER;
 
@@ -50,7 +52,7 @@ export function useWithdrawnScope(): WithdrawnScope {
 
   return useMemo(
     () =>
-      resolveWithdrawnScope({
+      resolveAttentionScope({
         isAdmin: !!row?.is_admin,
         accountManagerUuid: row?.account_manager_uuid ?? null,
       }),
@@ -69,36 +71,45 @@ export function useWithdrawnScope(): WithdrawnScope {
  * every count that mentioned it drops in the same tick; delete the last one and
  * the badge disappears on its own.
  */
-export function useWithdrawnTrackers(): { rows: WithdrawnTrackerRow[]; isLoading: boolean } {
-  const scope = useWithdrawnScope();
+export function useAttentionTrackers(): { rows: AttentionTrackerRow[]; isLoading: boolean } {
+  const scope = useAttentionScope();
 
-  const compiled = useMemo(() => withdrawnTrackersQuery(scope), [scope]);
+  const compiled = useMemo(() => attentionTrackersQuery(scope), [scope]);
 
-  const { data, isLoading } = useTypedQuery(compiled, expect<WithdrawnTrackerRow>());
+  const { data, isLoading } = useTypedQuery(compiled, expect<AttentionTrackerRow>());
 
   return { rows: data ?? [], isLoading };
 }
 
-/** Total declined + abandoned trackers in my zones, all time. Feeds the sidebar badge. */
-export function useWithdrawnCount(): number {
-  const { rows } = useWithdrawnTrackers();
-  return useMemo(() => countWithdrawn(rows), [rows]);
+/** Total trackers needing attention (declined, abandoned, bleacher swapped) in my zones, all time. Feeds the sidebar badge. */
+export function useAttentionCount(): number {
+  const { rows } = useAttentionTrackers();
+  return useMemo(() => countAttention(rows), [rows]);
 }
 
 /**
- * Declined + abandoned per week in my zones, keyed by the Monday of the
+ * Trackers needing attention per week in my zones, keyed by the Monday of the
  * tracker's own date. A week with none is absent, not 0.
  */
-export function useWithdrawnCountsByWeek(): Map<string, number> {
-  const { rows } = useWithdrawnTrackers();
-  return useMemo(() => countWithdrawnByWeek(rows), [rows]);
+export function useAttentionCountsByWeek(): Map<string, number> {
+  const { rows } = useAttentionTrackers();
+  return useMemo(() => countAttentionByWeek(rows), [rows]);
 }
 
 /**
- * Declined + abandoned per driver for one week, keyed by driver uuid. Pass the
+ * Trackers needing attention per driver for one week, keyed by driver uuid. Pass the
  * Monday the week starts on; a driver with none is absent, not 0.
  */
-export function useWithdrawnCountsByDriver(weekStart: string | null): Map<string, number> {
-  const { rows } = useWithdrawnTrackers();
-  return useMemo(() => countWithdrawnByDriver(rows, weekStart), [rows, weekStart]);
+export function useAttentionCountsByDriver(weekStart: string | null): Map<string, number> {
+  const { rows } = useAttentionTrackers();
+  return useMemo(() => countAttentionByDriver(rows, weekStart), [rows, weekStart]);
+}
+
+/**
+ * Why each tracker in my zones needs attention, keyed by tracker id — marks the
+ * individual rows on a driver's week so a count of 2 points at two trackers.
+ */
+export function useAttentionByTracker(): Map<string, AttentionReason> {
+  const { rows } = useAttentionTrackers();
+  return useMemo(() => attentionByTracker(rows), [rows]);
 }

@@ -49,10 +49,18 @@ export function ContactsTab() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50/80 border-b border-gray-100">
               <tr>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Name</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Email</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Phone</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Company</th>
+                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Email
+                </th>
+                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Phone
+                </th>
+                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Company
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -67,7 +75,7 @@ export function ContactsTab() {
                   </td>
                   <td className="px-4 py-3 text-gray-500">{contact.email ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{contact.phone ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-500">{contact.companyName ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-500">{contact.company?.companyName ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

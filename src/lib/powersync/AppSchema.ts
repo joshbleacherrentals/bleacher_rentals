@@ -840,6 +840,7 @@ const BleacherTypesCols = {
   created_at: column.text,
   created_by_user_uuid: column.text,
   deleted: column.integer,
+  description: column.text,
   name: column.text,
   roof_type: column.text,
   row_count: column.integer,
