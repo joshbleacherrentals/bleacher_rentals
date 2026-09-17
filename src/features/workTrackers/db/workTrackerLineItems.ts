@@ -1,5 +1,6 @@
 import { db } from "@/components/providers/SystemProvider";
-import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { typedExecuteBatch, typedGetAll, expect } from "@/lib/powersync/typedQuery";
+import { startTrace } from "@/lib/perf/perfTrace";
 import { Database } from "../../../../database.types";
 
 export type WorkTrackerLineItemType = Database["public"]["Enums"]["work_tracker_line_item_type"];
@@ -150,15 +151,18 @@ export async function syncWorkTrackerLineItems(
   workTrackerUuid: string,
   items: DraftWorkTrackerLineItem[],
 ): Promise<void> {
-  await typedExecute(
+  const trace = startTrace("syncWorkTrackerLineItems");
+
+  // One transaction, not 1 + N. This is awaited before the modal closes, so it
+  // is the only part of a save the user actually waits for — and under
+  // IDBBatchAtomicVFS each separate statement was its own IndexedDB round-trip
+  // (measured: `delete existing` 639ms, `insert 2 items` 973ms).
+  const statements = [
     db
       .deleteFrom("WorkTrackerLineItems")
       .where("work_tracker_uuid", "=", workTrackerUuid)
       .compile(),
-  );
-
-  for (const item of items) {
-    await typedExecute(
+    ...items.map((item) =>
       db
         .insertInto("WorkTrackerLineItems")
         .values({
@@ -172,6 +176,12 @@ export async function syncWorkTrackerLineItems(
           is_automatically_managed: item.isAutomaticallyManaged ? 1 : 0,
         })
         .compile(),
-    );
-  }
+    ),
+  ];
+  trace.mark(`plan ${items.length} items`);
+
+  await typedExecuteBatch(statements);
+  trace.mark(`commit (${statements.length} statements)`);
+
+  trace.end({ workTrackerUuid });
 }

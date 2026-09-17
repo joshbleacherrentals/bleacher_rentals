@@ -11,6 +11,7 @@ type UpdateContactParams = {
   companyUuid: string | null;
   // Language this contact's quotes render in. See docs/specs/quote-preferred-language.md.
   preferredLanguage?: PreferredLanguage;
+  defaultVenueUuid: string | null;
 };
 
 export async function updateContact(id: string, params: UpdateContactParams): Promise<void> {
@@ -25,6 +26,7 @@ export async function updateContact(id: string, params: UpdateContactParams): Pr
         notes: params.notes || null,
         company_uuid: params.companyUuid,
         preferred_language: params.preferredLanguage ?? "english",
+        default_venue_uuid: params.defaultVenueUuid,
       })
       .where("id", "=", id)
       .compile(),

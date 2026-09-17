@@ -6,7 +6,6 @@ import { Dropdown } from "@/components/DropDown";
 import CentsInput from "@/components/CentsInput";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import {
-  calculateWorkTrackerLineItemsTotalCents,
   WORK_TRACKER_LINE_ITEM_TYPES,
   WORK_TRACKER_LINE_ITEM_TYPE_LABELS,
   WorkTrackerLineItemType,
@@ -23,7 +22,7 @@ function centsToDollars(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
-function formatMoney(cents: number): string {
+export function formatMoney(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
@@ -215,8 +214,6 @@ export default function WorkTrackerLineItemsTab({
   canEdit: boolean;
   isLoading?: boolean;
 }) {
-  const totalCents = calculateWorkTrackerLineItemsTotalCents(lineItems);
-
   const updateItem = (id: string, patch: Partial<DraftWorkTrackerLineItem>) => {
     onChange(lineItems.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
@@ -266,13 +263,6 @@ export default function WorkTrackerLineItemsTab({
               {canEdit && <AddLineItemRow onAdd={addItem} />}
             </tbody>
           </table>
-
-          {lineItems.length > 0 && (
-            <div className="mt-3 flex justify-end gap-8 text-sm">
-              <span className="font-semibold">Total</span>
-              <span className="font-bold w-24 text-right">{formatMoney(totalCents)}</span>
-            </div>
-          )}
         </div>
       )}
     </div>

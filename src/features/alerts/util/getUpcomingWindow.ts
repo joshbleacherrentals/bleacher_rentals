@@ -16,3 +16,15 @@ export function todayStart(): string {
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
 }
+
+/**
+ * Same window as `getUpcomingWindowEnd`, expressed as an instant so it can be
+ * compared against timestamp columns (`Events.event_start`) the way
+ * `todayStart()` is. The date-shaped string cannot: `"2026-09-27T20:00:00Z"`
+ * sorts after `"2026-09-27"`, so every event on the closing day would be
+ * dropped from the window.
+ */
+export function upcomingWindowEndInstant(): string {
+  const [year, month, day] = getUpcomingWindowEnd().split("-").map(Number);
+  return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString();
+}

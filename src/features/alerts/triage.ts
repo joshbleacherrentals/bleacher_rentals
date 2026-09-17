@@ -4,9 +4,13 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../../../database.types";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
-import { syncAlert, deleteAllAlertsForEntity } from "./engine";
+import { syncAlert, planAlert, deleteAllAlertsForEntity } from "./engine";
+import { typedExecuteBatch } from "@/lib/powersync/typedQuery";
+import type { CompiledQuery } from "kysely";
 import { getDefinitionsForEntity } from "./registry";
-import { todayStart, getUpcomingWindowEnd } from "./util/getUpcomingWindow";
+import { todayStart, upcomingWindowEndInstant } from "./util/getUpcomingWindow";
+import { perfNote, startTrace } from "@/lib/perf/perfTrace";
+import { runCascade } from "./cascadeQueue";
 
 type TriageTable = "Events" | "Events_deleted" | "WorkTrackers" | "WorkTrackers_deleted";
 
@@ -217,11 +221,37 @@ async function triageEventDeleted(
   }
 }
 
+/**
+ * Bleachers a tracker has been moved off since the last cascade started.
+ *
+ * Collapsing a burst would otherwise lose them: dragging A → B → C faster than
+ * one cascade completes leaves the trailing run knowing only about A and C, and
+ * the events sitting on B would keep a stale transportation alert until the
+ * nightly cron. Each run drains the set, so requests arriving mid-run are picked
+ * up by the trailing run rather than dropped.
+ */
+const pendingPreviousBleachers = new Map<string, Set<string>>();
+
 async function triageWorkTrackerSaved(
   workTrackerUuid: string,
   previousBleacherUuid: string | null,
   supabase?: SupabaseClient<Database>,
 ): Promise<void> {
+  if (previousBleacherUuid) {
+    const pending = pendingPreviousBleachers.get(workTrackerUuid) ?? new Set<string>();
+    pending.add(previousBleacherUuid);
+    pendingPreviousBleachers.set(workTrackerUuid, pending);
+  }
+
+  return runCascade(workTrackerUuid, () => runWorkTrackerCascade(workTrackerUuid, supabase));
+}
+
+async function runWorkTrackerCascade(
+  workTrackerUuid: string,
+  supabase?: SupabaseClient<Database>,
+): Promise<void> {
+  const previousBleacherUuids = pendingPreviousBleachers.get(workTrackerUuid) ?? new Set<string>();
+  pendingPreviousBleachers.delete(workTrackerUuid);
   const rows = await typedGetAll(
     db
       .selectFrom("WorkTrackers as wt")
@@ -234,15 +264,23 @@ async function triageWorkTrackerSaved(
   const wt = rows[0];
   if (!wt) return;
 
+  const trace = startTrace("triageWorkTrackerSaved");
+
+  // Every statement the cascade derives is collected and committed once, at the
+  // end. Writing them as they were derived meant ~100 transactions, each an
+  // IndexedDB round-trip that also woke every watched query on the table.
+  const statements: CompiledQuery<any>[] = [];
+
   // 1. Run work_tracker-level alerts on this work tracker
   const wtDefs = getDefinitionsForEntity("work_tracker");
   for (const def of wtDefs) {
-    await syncAlert(def, wt.id, supabase);
+    statements.push(...(await planAlert(def, wt.id, supabase)));
   }
+  trace.mark(`work_tracker defs (${wtDefs.length})`);
 
   // 2. Find upcoming bleacher_events for this bleacher (ripple effect on transportation)
   const bleacherUuids = [
-    ...new Set([previousBleacherUuid, wt.bleacher_uuid].filter(Boolean)),
+    ...new Set([...previousBleacherUuids, wt.bleacher_uuid].filter(Boolean)),
   ] as string[];
   if (bleacherUuids.length > 0) {
     const beDefs = getDefinitionsForEntity("bleacher_event");
@@ -254,16 +292,30 @@ async function triageWorkTrackerSaved(
         .where("be.bleacher_uuid", "in", bleacherUuids)
         .where("e.deleted", "=", 0)
         .where("e.event_start", ">=", todayStart())
+        // Bounded to the same window the cron job and the work tracker
+        // definitions use: outside it no alert can fire, so evaluating events a
+        // year out was pure cost. This bound is the multiplier on every save.
+        .where("e.event_start", "<=", upcomingWindowEndInstant())
         .compile(),
       expect<RelatedBeRow>(),
     );
 
+    perfNote(
+      `alert ripple: ${relatedBEs.length} in-window bleacher_events × ${beDefs.length} defs = ${relatedBEs.length * beDefs.length} sequential syncAlert calls`,
+    );
+
     for (const rbe of relatedBEs) {
       for (const def of beDefs) {
-        await syncAlert(def, rbe.id, supabase);
+        statements.push(...(await planAlert(def, rbe.id, supabase)));
       }
     }
+    trace.mark(`bleacher_event defs (${relatedBEs.length * beDefs.length} calls)`);
   }
+
+  await typedExecuteBatch(statements);
+  trace.mark(`commit (${statements.length} statements)`);
+
+  trace.end({ workTrackerUuid, bleacherUuids, statements: statements.length });
 }
 
 async function triageWorkTrackerDeleted(

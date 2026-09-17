@@ -1,7 +1,6 @@
 import { CurrentEventStore } from "../../../eventConfiguration/state/useCurrentEventStore";
 import { UserResource } from "@clerk/types";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
-import { updateDataBase } from "@/app/actions/db.actions";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database, Tables, TablesInsert } from "../../../../../database.types";
@@ -17,7 +16,6 @@ export async function updateEvent(
   state: CurrentEventStore,
   supabase: SupabaseClient<Database>,
   user: UserResource | null,
-  bleacherEvents: Tables<"BleacherEvents">[],
 ): Promise<void> {
   if (!supabase) {
     createErrorToast(["No Supabase Client found"]);
@@ -133,7 +131,6 @@ export async function updateEvent(
   await updateBleacherEvents(state);
 
   createSuccessToast(["Event Updated"]);
-  updateDataBase(["Bleachers", "BleacherEvents", "Addresses", "Venues", "Events"]);
 }
 
 async function updateBleacherEvents(state: CurrentEventStore) {

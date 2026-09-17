@@ -4,13 +4,13 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { useRouter } from "next/navigation";
 import { useWorkTrackerAccess, useDriversForWeek } from "../hooks/useDriversForWeek";
 import { useUser } from "@clerk/nextjs";
-import { useUsersStore } from "@/state/userStore";
+import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { useState } from "react";
 import { PaymentStatusButton } from "./PaymentStatusButton";
 import { TotalsMatch } from "./TotalsMatch";
 import { DateTime } from "luxon";
-import { useWithdrawnCountsByDriver } from "../db/withdrawnTrackers";
-import { WithdrawnBadgeSlot } from "./WithdrawnBadgeSlot";
+import { useAttentionCountsByDriver } from "../db/attentionTrackers";
+import { AttentionBadgeSlot } from "./AttentionBadgeSlot";
 import {
   PAY_CURRENCIES,
   parsePayCurrencyFilter,
@@ -60,7 +60,7 @@ function formatUnitTotal(
 export function DriverListForWeek({ startDate }: Props) {
   const router = useRouter();
   const { user } = useUser();
-  const users = useUsersStore((s) => s.users);
+  const users = usePsUsers();
   const [showAllDrivers, setShowAllDrivers] = useState(false);
   const [payCurrencyFilter, setPayCurrencyFilter] = useState<PayCurrencyFilter>("ALL");
 
@@ -83,7 +83,7 @@ export function DriverListForWeek({ startDate }: Props) {
   // Always scoped to my own zones, even while "See All Drivers" is on: the
   // badge answers "what do I have to re-cover", which does not widen just
   // because the list does.
-  const withdrawnByDriver = useWithdrawnCountsByDriver(startDate);
+  const attentionByDriver = useAttentionCountsByDriver(startDate);
 
   const hasAccess = !!accessData && (accessData.isAdmin || accessData.isAccountManager);
 
@@ -181,9 +181,9 @@ export function DriverListForWeek({ startDate }: Props) {
             <td className="py-1 px-3 text-left">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <WithdrawnBadgeSlot
-                    count={withdrawnByDriver.get(row.driver_uuid) ?? 0}
-                    label={`${withdrawnByDriver.get(row.driver_uuid) ?? 0} work trackers declined or abandoned by this driver this week`}
+                  <AttentionBadgeSlot
+                    count={attentionByDriver.get(row.driver_uuid) ?? 0}
+                    label={`${attentionByDriver.get(row.driver_uuid) ?? 0} work trackers by this driver need your attention this week`}
                   />
                   <span className="flex items-center gap-1.5 truncate">
                     {row.first_name + " " + row.last_name}

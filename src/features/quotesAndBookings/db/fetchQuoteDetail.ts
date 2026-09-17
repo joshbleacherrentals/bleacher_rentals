@@ -14,6 +14,8 @@ export type QuoteDetail = {
   notes: string | null;
   internalNotes: string | null;
   externalNotes: string | null;
+  pickupInstructions: string | null;
+  dropoffInstructions: string | null;
   contractRevenueCents: number | null;
   eventTypeUuid: string | null;
   quoteValidTill: string | null;
@@ -69,6 +71,8 @@ type Row = {
   notes: string | null;
   internal_notes: string | null;
   external_notes: string | null;
+  pickup_instructions: string | null;
+  dropoff_instructions: string | null;
   contract_revenue_cents: number | null;
   event_type_uuid: string | null;
   quote_valid_till: string | null;
@@ -122,6 +126,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
       "e.notes as notes",
       "e.internal_notes as internal_notes",
       "e.external_notes as external_notes",
+      "e.pickup_instructions as pickup_instructions",
+      "e.dropoff_instructions as dropoff_instructions",
       "e.contract_revenue_cents as contract_revenue_cents",
       "e.event_type_uuid as event_type_uuid",
       "e.quote_valid_till as quote_valid_till",
@@ -175,6 +181,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
     notes: r.notes,
     internalNotes: r.internal_notes,
     externalNotes: r.external_notes,
+    pickupInstructions: r.pickup_instructions,
+    dropoffInstructions: r.dropoff_instructions,
     contractRevenueCents: r.contract_revenue_cents,
     eventTypeUuid: r.event_type_uuid,
     quoteValidTill: r.quote_valid_till,

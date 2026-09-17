@@ -238,6 +238,8 @@ const EventsCols = {
   content_hash: column.text,
   contract_hash: column.text,
   venue_uuid: column.text,
+  pickup_instructions: column.text,
+  dropoff_instructions: column.text,
 } satisfies PowerSyncColsFor<"Events">;
 const Events = new Table(EventsCols, {
   indexes: {
@@ -838,6 +840,7 @@ const BleacherTypesCols = {
   created_at: column.text,
   created_by_user_uuid: column.text,
   deleted: column.integer,
+  description: column.text,
   name: column.text,
   roof_type: column.text,
   row_count: column.integer,

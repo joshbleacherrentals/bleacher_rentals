@@ -15,6 +15,7 @@ import { normalizeLostFields } from "../utils/lostReason";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
+import { toEventLineItemValues } from "./toEventLineItemValues";
 
 type OldEventRow = {
   event_name: string | null;
@@ -34,6 +35,8 @@ type OldEventRow = {
   notes: string | null;
   internal_notes: string | null;
   external_notes: string | null;
+  pickup_instructions: string | null;
+  dropoff_instructions: string | null;
   tax_percent: number | null;
   tax_amount_cents: number | null;
   contract_revenue_cents: number | null;
@@ -148,6 +151,8 @@ export async function updateQuoteEvent(
         "notes",
         "internal_notes",
         "external_notes",
+        "pickup_instructions",
+        "dropoff_instructions",
         "tax_percent",
         "tax_amount_cents",
         "contract_revenue_cents",
@@ -198,6 +203,8 @@ export async function updateQuoteEvent(
     notes: state.clientFacingNotes || null,
     internal_notes: state.internalNotes || null,
     external_notes: state.clientFacingNotes || null,
+    pickup_instructions: state.pickupInstructions || null,
+    dropoff_instructions: state.dropoffInstructions || null,
     created_by_user_uuid: state.ownerUserUuid ?? currentUserUuid ?? null,
     contact_uuid: state.contactId || null,
     finance_contact_uuid: state.financeContactId || null,
@@ -264,13 +271,7 @@ export async function updateQuoteEvent(
   if (state.lineItems.length > 0) {
     const rows = state.lineItems.map((li) => ({
       id: crypto.randomUUID(),
-      event_uuid: eventId,
-      header: li.label,
-      description: null,
-      bleacher_type_uuid: li.bleacherTypeUuid || null,
-      value_cents: li.category === "discounts" ? li.lineTotalCents : li.unitPriceCents,
-      quantity: li.qty,
-      currency: state.currency,
+      ...toEventLineItemValues(li, eventId, state.currency),
       is_template: false,
       deleted: false,
     }));

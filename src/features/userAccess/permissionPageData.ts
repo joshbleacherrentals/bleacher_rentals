@@ -247,16 +247,16 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
-    label: "Declined & Abandoned Work Tracker Counts",
+    label: "Work Tracker Attention Counts",
     description:
-      "The red count next to Work Trackers in the sidebar, next to each week on the Work Trackers page, and next to each driver inside a week. It counts trackers a driver declined (never took the work on) or abandoned (took it on and handed it back) — not the ones the office cancelled.",
+      "The red count next to Work Trackers in the sidebar, next to each week on the Work Trackers page, and next to each driver inside a week. It counts trackers a driver declined (never took the work on) or abandoned (took it on and handed it back), plus trackers where the driver took a different bleacher than the one assigned. Cancelled trackers are never counted. A tracker that is both is counted once.",
     category: "Day to Day Operations",
     roles: {
       admin: custom(
         "Only counted when the admin is also an active account manager, and then only for the drivers in their own zones. An admin with no zones is shown no count at all — the number is a nag about work somebody has to re-cover, and a company-wide total is not something one person can act on.",
       ),
       account_manager: custom(
-        "Counts every tracker declined or abandoned by a driver who shares a zone with them, for all time, however long ago the trip was. The count is always their own zones, even while 'See All Drivers' is switched on. It drops as those trackers are deleted, and the badge disappears once the last one is gone.",
+        "Counts every tracker declined, abandoned or run with a different bleacher by a driver who shares a zone with them, for all time, however long ago the trip was. The count is always their own zones, even while 'See All Drivers' is switched on. It drops as those trackers are deleted, and a bleacher swap drops out as soon as they open the tracker and make the assigned and actual bleacher the same. The badge disappears once the last one is gone.",
       ),
       developer: none(
         "Unable to even access the pages where the counts are shown, and developer is only meant to work on the developer roadmap.",
@@ -265,7 +265,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "A viewer manages no zones, so there is no work for them to re-cover and no count is shown. A viewer who is also an active account manager is counted as that account manager, for their own zones.",
       ),
       driver: none(
-        "The driver's own withdrawals are reported to the account managers of their zones, not back to them in the mobile app.",
+        "The driver's own withdrawals and bleacher swaps are reported to the account managers of their zones, not back to them in the mobile app.",
       ),
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
@@ -422,6 +422,30 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Unable to even access the pages where they can see work tracker types, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(
+        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      ),
+    },
+  },
+  {
+    label: "Pricing Matrix",
+    description:
+      "This applies to the Pricing Matrix page under Configuration: bleacher types (name, row count, roof type, description) and their prices. A bleacher type's description is copied onto a quote's line item when that type is added, so editing it later does not change quotes that already have it.",
+    category: "Configuration",
+    roles: {
+      admin: full(
+        "Able to create, edit, and delete bleacher types — including their description — and set their prices.",
+      ),
+      account_manager: none(
+        "Account managers can't see this page. They see each bleacher type's description when adding a line item to a quote, and on the quote itself, but cannot change it.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see bleacher types, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Viewers do not have access to the web configuration pages. They see a line item's description on quotes they can open.",
+      ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",

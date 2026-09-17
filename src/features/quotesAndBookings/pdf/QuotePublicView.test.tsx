@@ -27,6 +27,7 @@ function quote(language: QuoteLanguage): QuoteDocumentData {
       website: "www.BleacherRentals.com",
     },
     contact: { name: "Marie Tremblay", email: "marie@example.com", phone: "555-0199" },
+    customerCompany: null,
     poNumber: "PO-77",
     venue: {
       name: "Festival de Jazz",
@@ -115,6 +116,29 @@ describe("QuotePublicView — English (regression guard)", () => {
   });
 });
 
+describe("QuotePublicView — customer company", () => {
+  it("does not render a company block when the contact has no company", () => {
+    const html = render("en");
+    expect(html).not.toContain(">Company<");
+  });
+
+  it("renders the customer's company name and address when present", () => {
+    const data = quote("en");
+    data.customerCompany = { name: "Acme Events Inc.", address: "12 Main St, Montreal, QC" };
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toContain(">Company<");
+    expect(html).toContain("Acme Events Inc.");
+    expect(html).toContain("12 Main St, Montreal, QC");
+  });
+
+  it("renders the company name without an address line when the address is empty", () => {
+    const data = quote("en");
+    data.customerCompany = { name: "Acme Events Inc.", address: "" };
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toContain("Acme Events Inc.");
+  });
+});
+
 describe("QuotePublicView — French", () => {
   const html = render("fr");
 
@@ -153,5 +177,23 @@ describe("QuotePublicView — French", () => {
     expect(html).toContain("Festival de Jazz");
     expect(html).toContain("Merci!");
     expect(html).toContain("INV-1042");
+  });
+});
+
+describe("QuotePublicView — line item description", () => {
+  it("shows a bleacher's saved description with its paragraphs and bullet lines", () => {
+    const data = quote("en");
+    data.lineItems[0].description = "Seats 300.\n\nIncludes:\n- guard rails";
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toMatch(
+      /<span class="[^"]*whitespace-pre-line[^"]*">Seats 300\.\n\nIncludes:\n- guard rails<\/span>/,
+    );
+  });
+
+  it("shows no description block when the line item has none", () => {
+    const data = quote("en");
+    data.lineItems[0].description = "";
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toContain('<span class="font-medium">Bleacher 15 row</span></td>');
   });
 });

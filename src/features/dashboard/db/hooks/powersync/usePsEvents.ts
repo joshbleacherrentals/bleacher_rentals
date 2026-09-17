@@ -53,7 +53,18 @@ const compiled = db
   .where("e.event_status", "!=", "lost")
   .compile();
 
+/**
+ * The full query result, including `isLoading`.
+ *
+ * `usePsEvents` collapses that to an array, which cannot tell "no rows yet"
+ * from "no rows at all". Anything that draws a conclusion from emptiness — an
+ * alert calculation, most of all, where an empty list reads as "no problems" —
+ * must use this and wait.
+ */
+export function usePsEventsQuery() {
+  return useTypedQuery(compiled, expect<PsEventRow>());
+}
+
 export function usePsEvents() {
-  const { data } = useTypedQuery(compiled, expect<PsEventRow>());
-  return data ?? [];
+  return usePsEventsQuery().data ?? [];
 }

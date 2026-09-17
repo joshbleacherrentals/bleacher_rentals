@@ -4,6 +4,7 @@ import { AlertDefinition } from "../types";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
 import { resolveAddress } from "@/utils/resolveAddress";
+import { localDayEndInstant } from "../util/localDayInstant";
 
 type BeRow = {
   bleacher_uuid: string | null;
@@ -65,6 +66,16 @@ export const bleacherTransportation: AlertDefinition = {
         .where("be2.bleacher_uuid", "=", be.bleacher_uuid)
         .where("be2.id", "!=", bleacherEventUuid)
         .where("e2.deleted", "=", 0)
+        // Only the single nearest candidate is needed: `resolveAddress` is a
+        // max selection. Every filter it applies in JS is mirrored here, because
+        // with LIMIT 1 a row rejected in JS yields null rather than letting the
+        // next-nearest win.
+        .where("e2.event_status", "=", "booked")
+        .where("a2.street", "is not", null)
+        .where("a2.street", "!=", "")
+        .where("e2.event_start", "<=", localDayEndInstant(be.event_start))
+        .orderBy("e2.event_start", "desc")
+        .limit(1)
         .compile(),
       expect<SiblingBeRow>(),
     );
@@ -73,9 +84,15 @@ export const bleacherTransportation: AlertDefinition = {
     const wtRows = await typedGetAll(
       db
         .selectFrom("WorkTrackers as wt")
-        .leftJoin("Addresses as a", "a.id", "wt.dropoff_address_uuid")
+        .innerJoin("Addresses as a", "a.id", "wt.dropoff_address_uuid")
         .select(["wt.date as date", "a.street as dropoffAddress"])
         .where("wt.bleacher_uuid", "=", be.bleacher_uuid)
+        .where("a.street", "is not", null)
+        .where("a.street", "!=", "")
+        // Compared against the raw event_start string, exactly as the JS does.
+        .where("wt.date", "<=", be.event_start)
+        .orderBy("wt.date", "desc")
+        .limit(1)
         .compile(),
       expect<WtAddrRow>(),
     );

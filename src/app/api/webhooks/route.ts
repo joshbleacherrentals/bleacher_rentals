@@ -2,7 +2,6 @@ import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { createServiceRoleClient } from "@/utils/supabase/server";
-// import { updateDataBase } from "@/app/actions/db.actions";
 import { STATUSES } from "@/features/manageTeam/constants";
 
 export async function POST(req: Request) {

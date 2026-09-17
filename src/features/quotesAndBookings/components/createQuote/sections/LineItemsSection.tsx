@@ -10,6 +10,7 @@ import { LineItem, DiscountType } from "../../../types/quoteTypes";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { AppTooltip } from "@/components/AppTooltip";
+import { LineItemDescription } from "../../LineItemDescription";
 
 const discountTypeOptions = [
   { label: "%", value: "percentage" as DiscountType },
@@ -210,6 +211,12 @@ export function LineItemsSection() {
                             onChange={(e) => handleUpdate(item.id, { label: e.target.value })}
                             className="w-full h-8 px-2 border rounded text-sm"
                           />
+                          {cat === "bleachers" && (
+                            <LineItemDescription
+                              description={item.description}
+                              className="mt-1 px-2"
+                            />
+                          )}
                         </td>
 
                         {cat === "bleachers" && (
