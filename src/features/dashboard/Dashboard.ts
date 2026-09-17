@@ -18,7 +18,8 @@ import { ResizeManager } from "./util/ResizeManager";
 import { useDashboardBleachersStore } from "./state/useDashboardBleachersStore";
 import { useDashboardEventsStore } from "./state/useDashboardEventsStore";
 import type { DashboardFilterState } from "../dashboardOptions/types";
-import { filterEvents, filterSortPixiBleachers } from "../dashboardOptions/util";
+import { filterEvents, filterSortPixiBleachers, getRowKey } from "../dashboardOptions/util";
+import { filterSubrentalRowsByDateWindow } from "./util/subrentalRowVisibility";
 import { useCurrentEventStore } from "../eventConfiguration/state/useCurrentEventStore";
 import { useMaintenanceEventStore } from "../maintenanceEvents/state/useMaintenanceEventStore";
 import { useSubrentalEventStore } from "../subrentals/state/useSubrentalEventStore";
@@ -27,6 +28,9 @@ import { useTooltipStore } from "./state/useTooltipStore";
 import { resolveAddress } from "../../utils/resolveAddress";
 import { useScrollToDateStore } from "./state/useScrollToDateStore";
 import { useAlertCountsStore } from "./state/useAlertCountsStore";
+
+/** How long the horizontal scroll must settle before subrental rows are re-evaluated. */
+const SUBRENTAL_WINDOW_DEBOUNCE_MS = 120;
 
 export class Dashboard {
   // Grids
@@ -59,6 +63,15 @@ export class Dashboard {
   private unsubSubrental?: () => void;
   private unsubAlertCounts?: () => void;
   private bleachers: Bleacher[] = [];
+  /** Rows before the subrental date-window filter — re-filtered on horizontal scroll. */
+  private unwindowedBleachers: Bleacher[] = [];
+  /** Row keys of the subrental rows currently shown, to detect when the set actually changes. */
+  private subrentalWindowSignature = "";
+  /** Bleachers pinned by an open form — their rows ignore the subrental date window. */
+  private pinnedBleacherUuids: ReadonlySet<string> = new Set();
+  /** Last known horizontal scroll position, also valid before the grids exist. */
+  private lastScrollX = 0;
+  private subrentalWindowTimeout: ReturnType<typeof setTimeout> | null = null;
   private events: DashboardEvent[] = [];
   private dates: string[] = [];
   private contentColumns = 0;
@@ -127,7 +140,22 @@ export class Dashboard {
         ? filterEvents(allEvents, this.filters.stateProvinces)
         : allEvents;
 
-    this.bleachers = filteredBleachers;
+    this.pinnedBleacherUuids = new Set(
+      currentEvent.isFormExpanded ? (currentEvent.bleacherUuids ?? []) : [],
+    );
+
+    // Seed the scroll position so the first subrental window can be computed before the grids
+    // exist — either the restored scroll or the centered position initGrids will apply.
+    this.lastScrollX =
+      typeof opts?.initialScrollX === "number" && opts.initialScrollX >= 0
+        ? opts.initialScrollX
+        : Math.max(
+            0,
+            (contentColumns * CELL_WIDTH - (app.screen.width - BLEACHER_COLUMN_WIDTH)) / 2,
+          );
+
+    this.unwindowedBleachers = filteredBleachers;
+    this.bleachers = this.applySubrentalWindow(filteredBleachers);
     this.events = filteredEvents;
 
     this.initGrids(opts);
@@ -328,8 +356,15 @@ export class Dashboard {
         ? filterEvents(allEvents, filters.stateProvinces)
         : allEvents;
 
+    const anyFormExpanded =
+      currentEvent.isFormExpanded ||
+      maintenanceEvent.isFormExpanded ||
+      subrentalEvent.isFormExpanded;
+    this.pinnedBleacherUuids = new Set(anyFormExpanded ? alwaysInclude : []);
+
     // Update snapshots
-    this.bleachers = filteredBleachers;
+    this.unwindowedBleachers = filteredBleachers;
+    this.bleachers = this.applySubrentalWindow(filteredBleachers);
     this.events = filteredEvents;
     this.rebuildGrids(); // rebuild grids no matter what for now. Removes any animations for displaying new components.
   }
@@ -513,15 +548,91 @@ export class Dashboard {
   }
 
   /**
+   * First and last dates currently on screen, used to decide which subrental rows are shown.
+   */
+  private visibleDateWindow(): { start: string | undefined; end: string | undefined } {
+    if (this.dates.length === 0) return { start: undefined, end: undefined };
+
+    const scrollX = this.mainGrid?.getCurrentScrollX?.() ?? this.lastScrollX;
+    const viewportWidth = this.app.screen.width - BLEACHER_COLUMN_WIDTH;
+    const firstCol = Math.max(0, Math.floor(scrollX / CELL_WIDTH));
+    const lastCol = Math.min(
+      this.dates.length - 1,
+      Math.ceil((scrollX + viewportWidth) / CELL_WIDTH) - 1,
+    );
+    if (lastCol < firstCol) return { start: undefined, end: undefined };
+
+    return { start: this.dates[firstCol], end: this.dates[lastCol] };
+  }
+
+  /**
+   * Drops subrental rows whose subrentals are more than two weeks away from the visible dates,
+   * and records the resulting set so scrolling only rebuilds when it actually changes.
+   */
+  private applySubrentalWindow(bleachers: Bleacher[]): Bleacher[] {
+    const { start, end } = this.visibleDateWindow();
+    const windowed = filterSubrentalRowsByDateWindow(
+      bleachers,
+      start,
+      end,
+      this.pinnedBleacherUuids,
+    );
+    this.subrentalWindowSignature = windowed
+      .filter((b) => b.isSubrentalRow)
+      .map(getRowKey)
+      .join("|");
+    return windowed;
+  }
+
+  /**
+   * Re-evaluates the subrental rows for the current scroll position; rebuilds only when the set of
+   * visible subrental rows changed.
+   */
+  private refreshSubrentalWindow() {
+    if (this.yAxis !== "Bleachers") return;
+
+    const previousRows = this.bleachers;
+    const previousSignature = this.subrentalWindowSignature;
+    const windowed = this.applySubrentalWindow(this.unwindowedBleachers);
+    if (this.subrentalWindowSignature === previousSignature) return;
+
+    this.bleachers = windowed;
+    this.rebuildGrids({ previousRows });
+  }
+
+  /**
+   * Keeps the row at the top of the viewport in place when rows appear or disappear above it,
+   * instead of holding the raw pixel offset (which makes the content jump).
+   */
+  private anchoredScrollY(previousRows: Bleacher[], scrollY: number): number {
+    const topIndex = Math.floor(scrollY / CELL_HEIGHT);
+    const offsetWithinRow = scrollY - topIndex * CELL_HEIGHT;
+
+    const newIndexByKey = new Map(this.bleachers.map((b, i) => [getRowKey(b), i]));
+
+    // Anchor on the topmost previously visible row that survived; if the top row itself
+    // disappeared, fall through to the next one down.
+    for (let i = topIndex; i < previousRows.length; i++) {
+      const newIndex = newIndexByKey.get(getRowKey(previousRows[i]));
+      if (newIndex === undefined) continue;
+      const rowsBelowTop = i - topIndex;
+      return Math.max(0, (newIndex - rowsBelowTop) * CELL_HEIGHT + offsetWithinRow);
+    }
+
+    return scrollY;
+  }
+
+  /**
    * Tear down and rebuild grids and renderers using latest store-filtered data.
    * Preserves current scroll positions.
    */
-  private rebuildGrids() {
+  private rebuildGrids(opts?: { previousRows?: Bleacher[] }) {
     // Preserve scroll positions
     const x = (this.mainGrid as any)?.getCurrentScrollX?.() ?? 0;
     const y = (this.mainGrid as any)?.getCurrentScrollY?.() ?? 0;
+    const targetY = opts?.previousRows ? this.anchoredScrollY(opts.previousRows, y) : y;
     this.teardownGrids();
-    this.initGrids({ initialScrollX: x, initialScrollY: y });
+    this.initGrids({ initialScrollX: x, initialScrollY: targetY });
   }
 
   /** Remove grids from stage and destroy them safely */
@@ -639,6 +750,15 @@ export class Dashboard {
 
       // Update tooltip on scroll so it resolves the new cell under cursor
       this.updateTooltip();
+
+      // Subrental rows come and go with the visible dates — wait for the scroll to settle so we
+      // rebuild the grids once instead of on every scroll event.
+      this.lastScrollX = scrollX;
+      if (this.subrentalWindowTimeout) clearTimeout(this.subrentalWindowTimeout);
+      this.subrentalWindowTimeout = setTimeout(() => {
+        this.subrentalWindowTimeout = null;
+        this.refreshSubrentalWindow();
+      }, SUBRENTAL_WINDOW_DEBOUNCE_MS);
     });
 
     // Horizontal centering moved to constructor after potential initialScrollX check
@@ -671,6 +791,10 @@ export class Dashboard {
    * Clean up resources
    */
   destroy() {
+    try {
+      if (this.subrentalWindowTimeout) clearTimeout(this.subrentalWindowTimeout);
+      this.subrentalWindowTimeout = null;
+    } catch {}
     try {
       this.resizeManager?.destroy();
     } catch {}
