@@ -1,14 +1,9 @@
 "use client";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
-import { useBleacherTypes } from "../../../hooks/useBleacherTypes";
+import { useBleacherTypes, BleacherTypeOption } from "../../../hooks/useBleacherTypes";
 import { usePriceLookup } from "../../../hooks/usePriceLookup";
 import {
   DISCOUNT_TEMPLATES,
@@ -16,6 +11,11 @@ import {
   CUSTOM_SERVICE_TEMPLATES,
 } from "../../../data/mockData";
 import { LineItem } from "../../../types/quoteTypes";
+import { newBleacherLineItem } from "../../../utils/newBleacherLineItem";
+import { LineItemDescription } from "../../LineItemDescription";
+
+/** Each tab's list fills what the dialog has left and scrolls inside it. */
+const TAB_LIST_CLASS = "min-h-0 overflow-y-auto -mx-6 px-6";
 
 function formatCents(cents: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -48,23 +48,12 @@ export function AddLineItemModal() {
   const canLookupPrice = !!eventTypeId && !!eventStart && !!eventEnd;
   const duration = eventStart && eventEnd ? findDuration(eventStart, eventEnd) : null;
 
-  const addBleacher = (bt: { id: string; name: string }) => {
-    const priceCents =
-      canLookupPrice ? lookupPrice(bt.id, eventTypeId!, eventStart, eventEnd, currency) : null;
+  const addBleacher = (bt: BleacherTypeOption) => {
+    const priceCents = canLookupPrice
+      ? lookupPrice(bt.id, eventTypeId!, eventStart, eventEnd, currency)
+      : null;
 
-    const item: LineItem = {
-      id: crypto.randomUUID(),
-      category: "bleachers",
-      label: bt.name,
-      bleacherTypeUuid: bt.id,
-      qty: 1,
-      unitPriceCents: priceCents ?? 0,
-      lineTotalCents: priceCents ?? 0,
-      overridePrice: priceCents === null,
-      discountType: "percentage",
-      discountValue: 0,
-    };
-    addLineItem(item);
+    addLineItem(newBleacherLineItem(bt, priceCents));
     close();
   };
 
@@ -87,6 +76,7 @@ export function AddLineItemModal() {
       overridePrice: false,
       discountType: template.defaultType,
       discountValue: template.defaultValue,
+      description: null,
     };
     addLineItem(item);
     close();
@@ -107,6 +97,7 @@ export function AddLineItemModal() {
       overridePrice: false,
       discountType: "percentage",
       discountValue: 0,
+      description: null,
     };
     addLineItem(item);
     close();
@@ -114,16 +105,18 @@ export function AddLineItemModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="sm:max-w-lg">
+      {/* Header, tabs and Cancel stay put while only the template list scrolls: a long list of
+          bleacher types used to push the dialog past the bottom of the screen. */}
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Add Line Item</DialogTitle>
         </DialogHeader>
 
-        <p className="text-sm text-gray-500 mb-2">
+        <p className="text-sm text-gray-500">
           Select a template to add. You can edit all values inline after adding.
         </p>
 
-        <Tabs defaultValue="bleachers">
+        <Tabs defaultValue="bleachers" className="flex-1 min-h-0">
           <TabsList className="w-full">
             <TabsTrigger value="bleachers">Bleachers</TabsTrigger>
             <TabsTrigger value="discounts">Discounts</TabsTrigger>
@@ -131,7 +124,7 @@ export function AddLineItemModal() {
             <TabsTrigger value="custom_service">Custom Service</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="bleachers">
+          <TabsContent value="bleachers" className={TAB_LIST_CLASS}>
             {!canLookupPrice && (
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
                 Set event type and dates to see prices from the pricing matrix.
@@ -149,11 +142,15 @@ export function AddLineItemModal() {
                     onClick={() => addBleacher(bt)}
                     className="w-full flex items-center justify-between p-3 border rounded hover:bg-gray-50 transition cursor-pointer text-left"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-medium text-sm">{bt.name}</div>
                       <div className="text-xs text-gray-500">{bt.rowCount} rows</div>
+                      <LineItemDescription
+                        description={bt.description}
+                        className="mt-1 line-clamp-3"
+                      />
                     </div>
-                    <div className="text-right text-xs text-gray-500">
+                    <div className="shrink-0 pl-3 text-right text-xs text-gray-500">
                       {priceCents !== null ? (
                         <div>
                           <span className="font-medium text-gray-700">
@@ -180,7 +177,7 @@ export function AddLineItemModal() {
             </div>
           </TabsContent>
 
-          <TabsContent value="discounts">
+          <TabsContent value="discounts" className={TAB_LIST_CLASS}>
             <div className="space-y-2 mt-2">
               {DISCOUNT_TEMPLATES.map((t) => (
                 <button
@@ -201,7 +198,7 @@ export function AddLineItemModal() {
             </div>
           </TabsContent>
 
-          <TabsContent value="logistics">
+          <TabsContent value="logistics" className={TAB_LIST_CLASS}>
             <div className="space-y-2 mt-2">
               {LOGISTICS_TEMPLATES.map((t) => (
                 <button
@@ -220,7 +217,7 @@ export function AddLineItemModal() {
             </div>
           </TabsContent>
 
-          <TabsContent value="custom_service">
+          <TabsContent value="custom_service" className={TAB_LIST_CLASS}>
             <div className="space-y-2 mt-2">
               {CUSTOM_SERVICE_TEMPLATES.map((t) => (
                 <button
@@ -240,7 +237,7 @@ export function AddLineItemModal() {
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-end border-t pt-4">
           <button
             onClick={close}
             className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-sm hover:bg-gray-50 transition cursor-pointer"

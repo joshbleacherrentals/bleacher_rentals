@@ -4,6 +4,7 @@ import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useMemo } from "react";
 import type { Sprint, SprintWithCounts } from "../types";
+import { pickCurrentSprint, type SprintDates } from "../util/pickCurrentSprint";
 
 type SprintRow = {
   id: string;
@@ -166,4 +167,28 @@ export function useAllSprintsMap(): Map<string, string> {
     }
     return map;
   }, [data]);
+}
+
+function localToday(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** The sprint running today; see pickCurrentSprint for how gaps between sprints resolve. */
+export function useCurrentSprint() {
+  const compiled = useMemo(
+    () =>
+      db
+        .selectFrom("RoadmapSprints")
+        .select(["id", "quarter_id", "start_date", "end_date"])
+        .where("start_date", "<=", localToday())
+        .orderBy("start_date", "desc")
+        .limit(1)
+        .compile(),
+    [],
+  );
+
+  const { data } = useTypedQuery(compiled, expect<SprintDates>());
+  return pickCurrentSprint(data ?? [], localToday());
 }

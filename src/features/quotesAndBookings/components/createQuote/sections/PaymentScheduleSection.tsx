@@ -1,11 +1,25 @@
 "use client";
 
 import { useMemo } from "react";
-import { Pencil } from "lucide-react";
+import { CalendarClock, CalendarPlus, Pencil } from "lucide-react";
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { calculateTotals } from "../../../utils/calculateTotals";
+import { installmentPercent, scheduleBalance } from "../../../utils/scheduleBalance";
 
+function formatDueDate(dueDate: string | null | undefined): string {
+  if (!dueDate) return "No date";
+  return new Date(dueDate + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
+ * The schedule sits in its own card, with its edit button inside it and labelled with what it
+ * edits: a bare pencil in the section header, right under the totals, read as editing a price.
+ */
 export function PaymentScheduleSection() {
   const lineItems = useCreateQuoteStore((s) => s.lineItems);
   const currency = useCreateQuoteStore((s) => s.currency);
@@ -23,67 +37,93 @@ export function PaymentScheduleSection() {
   // The schedule is optional: nothing is shown (or saved) until the manager
   // explicitly saves one in the Edit modal. So we render the store value
   // directly — empty means "no schedule set".
-  const scheduledCents = installments.reduce((sum, i) => sum + i.amountCents, 0);
-  const isBalanced = scheduledCents === totalCents;
+  const balance = scheduleBalance(installments, totalCents);
+  const openEditor = () => setField("isEditPaymentScheduleModalOpen", true);
+  const money = (cents: number) => formatCurrency(cents / 100, currency);
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-          Payment Schedule
-        </h2>
+      <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+        Payment Schedule
+      </h2>
+      <p className="text-sm text-gray-500 mb-3">
+        When the client pays the quote total, split into installments with due dates.
+      </p>
+
+      {balance.status === "empty" ? (
         <button
           type="button"
-          onClick={() => setField("isEditPaymentScheduleModalOpen", true)}
-          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition cursor-pointer"
+          onClick={openEditor}
+          className="w-full flex items-center gap-4 rounded-lg border-2 border-dashed border-gray-300 bg-white px-4 py-5 text-left hover:border-darkBlue hover:bg-blue-50/40 transition cursor-pointer group"
         >
-          <Pencil className="w-3 h-3" />
-          Edit
+          <CalendarClock className="w-8 h-8 shrink-0 text-gray-400 group-hover:text-darkBlue transition" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-gray-700">No payment schedule yet</div>
+            <div className="text-xs text-gray-500">
+              Optional. Split {money(totalCents)} into installments, e.g. a deposit on signing and
+              the balance before the event.
+            </div>
+          </div>
+          <span className="shrink-0 flex items-center gap-1.5 rounded-sm bg-darkBlue px-3 py-2 text-sm font-semibold text-white group-hover:bg-lightBlue transition">
+            <CalendarPlus className="w-4 h-4" />
+            Set up schedule
+          </span>
         </button>
-      </div>
-
-      {installments.length === 0 ? (
-        <p className="text-sm text-gray-400 italic">
-          No payment schedule set. Click Edit to add installments.
-        </p>
       ) : (
-        <div className="space-y-2">
-          <div className="rounded border border-gray-200 divide-y divide-gray-100">
-            {installments.map((inst, idx) => (
-              <div
-                key={inst.id}
-                className="flex items-center justify-between px-3 py-2 text-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-xs w-5">#{idx + 1}</span>
-                  <span className="font-medium">
-                    {inst.dueDate
-                      ? new Date(inst.dueDate + "T00:00:00").toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : "No date"}
-                  </span>
-                </div>
-                <span className="font-semibold">
-                  {formatCurrency(inst.amountCents / 100, currency)}
-                </span>
-              </div>
-            ))}
+        <div className="rounded-lg border border-gray-200 bg-white">
+          <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+            <span className="text-sm font-medium text-gray-700">
+              {installments.length} {installments.length === 1 ? "installment" : "installments"}
+            </span>
+            <button
+              type="button"
+              onClick={openEditor}
+              className="flex items-center gap-1.5 rounded-sm border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit schedule
+            </button>
           </div>
 
-          {/* Summary row */}
-          <div className="flex justify-between text-sm px-3">
-            <span className="font-medium text-gray-500">Scheduled Total</span>
-            <span className={`font-semibold ${isBalanced ? "text-green-600" : "text-red-600"}`}>
-              {formatCurrency(scheduledCents / 100, currency)}
-              {!isBalanced && (
-                <span className="text-xs font-normal ml-2">
-                  ({scheduledCents > totalCents ? "+" : ""}
-                  {formatCurrency((scheduledCents - totalCents) / 100, currency)} vs total)
-                </span>
-              )}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500">
+                <th className="px-4 py-2 text-left font-medium w-12">#</th>
+                <th className="px-4 py-2 text-left font-medium">Due date</th>
+                <th className="px-4 py-2 text-right font-medium">Share</th>
+                <th className="px-4 py-2 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {installments.map((inst, idx) => (
+                <tr key={inst.id}>
+                  <td className="px-4 py-2 text-gray-400">{idx + 1}</td>
+                  <td className="px-4 py-2 font-medium">{formatDueDate(inst.dueDate)}</td>
+                  <td className="px-4 py-2 text-right text-gray-500">
+                    {installmentPercent(inst.amountCents, totalCents)}%
+                  </td>
+                  <td className="px-4 py-2 text-right font-semibold">{money(inst.amountCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div
+            className={`flex items-center justify-between gap-3 rounded-b-lg border-t px-4 py-2 text-sm ${
+              balance.status === "balanced"
+                ? "border-green-200 bg-green-50 text-green-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            <span className="font-medium">
+              {balance.status === "balanced"
+                ? "Matches the quote total"
+                : balance.status === "short"
+                  ? `${money(balance.diffCents)} of the total is not scheduled`
+                  : `${money(balance.diffCents)} more than the quote total`}
+            </span>
+            <span className="font-semibold">
+              {money(installments.reduce((sum, i) => sum + i.amountCents, 0))} / {money(totalCents)}
             </span>
           </div>
         </div>

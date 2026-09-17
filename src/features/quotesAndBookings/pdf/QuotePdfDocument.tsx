@@ -237,6 +237,14 @@ export function QuotePdfDocument({ data }: { data: QuoteDocumentData }) {
               {data.contact.phone ? (
                 <Text style={styles.infoText}>{data.contact.phone}</Text>
               ) : null}
+              {data.customerCompany ? (
+                <View style={{ marginTop: 4 }}>
+                  <Text style={styles.infoBold}>{data.customerCompany.name}</Text>
+                  {data.customerCompany.address ? (
+                    <Text style={styles.infoText}>{data.customerCompany.address}</Text>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           )}
           <View style={styles.infoBlock}>

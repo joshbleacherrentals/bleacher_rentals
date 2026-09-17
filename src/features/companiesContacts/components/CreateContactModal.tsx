@@ -1,37 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { SearchableSelect } from "@/components/SearchableSelect";
-import { Dropdown } from "@/components/DropDown";
-import { FIELD_LABEL, TextAreaField, TextField } from "@/components/form/TextField";
-import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import { useTouchedErrors } from "@/lib/validation/useTouchedErrors";
-import { useCompaniesAll } from "../hooks/useCompaniesAll";
-import { useContactsAll } from "../hooks/useContactsAll";
-import { createContact } from "../db/createContact";
-import { CreateCompanyModal } from "./CreateCompanyModal";
-import { DuplicateWarning } from "./DuplicateWarning";
-import { findContactDuplicates } from "../utils/findDuplicates";
-import { hasErrors, validateContactForm, type ContactFormValues } from "../utils/formValidation";
-import { PREFERRED_LANGUAGE_OPTIONS, type PreferredLanguage } from "../db/preferredLanguage";
-import { VenuePicker, type VenuePickerValue } from "@/components/VenuePicker";
+import { useContactForm, type SavedContact } from "../hooks/useContactForm";
+import { ContactFormFields } from "./ContactFormFields";
 
-export type CreatedContact = {
-  id: string;
-  displayName: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  companyUuid: string | null;
-  companyName: string;
-  notes: string;
-  preferredLanguage: PreferredLanguage;
-  defaultVenueUuid: string | null;
-};
-
-const CONTACT_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
+export type CreatedContact = SavedContact;
 
 type Props = {
   isOpen: boolean;
@@ -49,10 +22,8 @@ type Props = {
    */
   contentClassName?: string;
   /**
-   * Whatever was typed in a search box before hitting "+ Create New
-   * Contact" — seeds First/Last Name (split on the first space) so the
-   * caller doesn't have to retype it. Applied once each time the modal
-   * opens; free to edit afterwards either way.
+   * Whatever was typed in a search box before hitting "+ Create New Contact" — seeds First/Last
+   * Name (split on the first space) so the caller doesn't have to retype it.
    */
   initialQuery?: string;
 };
@@ -64,230 +35,51 @@ export function CreateContactModal({
   contentClassName,
   initialQuery,
 }: Props) {
-  const { companies, isLoading } = useCompaniesAll();
-  const { contacts } = useContactsAll();
-  const [createCompanyOpen, setCreateCompanyOpen] = useState(false);
-  const [values, setValues] = useState<ContactFormValues>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-  });
-  const [companyUuid, setCompanyUuid] = useState<string | null>(null);
-  const [notes, setNotes] = useState("");
-  const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage>("english");
-  const [venue, setVenue] = useState<VenuePickerValue>({
-    mode: "empty",
-    venueId: null,
-    address: null,
-  });
-  const [saving, setSaving] = useState(false);
-
-  const errors = validateContactForm(values);
-  const { errorFor, markTouched, markAllTouched, reset: resetTouched } = useTouchedErrors(errors);
-
-  const setValue = (key: keyof ContactFormValues) => (value: string) =>
-    setValues((prev) => ({ ...prev, [key]: value }));
-
-  useEffect(() => {
-    if (!isOpen || !initialQuery?.trim()) return;
-    const [first, ...rest] = initialQuery.trim().split(/\s+/);
-    setValues((prev) => ({ ...prev, firstName: first, lastName: rest.join(" ") }));
-    // Intentionally keyed on `isOpen` only — seeds once per open, not on
-    // every keystroke into `initialQuery` from the caller.
-  }, [isOpen]);
-
-  const reset = () => {
-    setValues({ firstName: "", lastName: "", email: "", phone: "" });
-    setCompanyUuid(null);
-    setNotes("");
-    setPreferredLanguage("english");
-    setVenue({ mode: "empty", venueId: null, address: null });
-    resetTouched();
-  };
+  const form = useContactForm({ contact: null, initialQuery });
 
   const handleClose = () => {
-    reset();
+    form.reset();
     onClose();
   };
 
-  const companyOptions = companies.map((c) => ({
-    label: c.companyName,
-    value: c.id,
-    searchValue: `${c.email ?? ""} ${c.phone ?? ""} ${c.address}`,
-  }));
-
-  const selectedCompanyName = companies.find((c) => c.id === companyUuid)?.companyName ?? "";
-
-  const duplicateContacts = findContactDuplicates(contacts, values);
-  const duplicateLabels = duplicateContacts.map(
-    (c) => `${c.firstName} ${c.lastName ?? ""}`.trim() + (c.email ? ` (${c.email})` : ""),
-  );
-
-  const canSave = !hasErrors(errors) && !saving && duplicateContacts.length === 0;
-
   const handleSave = async () => {
-    markAllTouched(CONTACT_FIELDS);
-    if (!canSave) return;
-
-    setSaving(true);
-    try {
-      const displayName = `${values.firstName} ${values.lastName}`.trim();
-      const id = await createContact({
-        ...values,
-        notes,
-        companyUuid,
-        preferredLanguage,
-        defaultVenueUuid: venue.mode === "venue" ? venue.venueId : null,
-      });
-      createSuccessToast([`Contact "${displayName}" created.`]);
-      onCreated?.({
-        id,
-        displayName,
-        firstName: values.firstName,
-        lastName: values.lastName,
-        email: values.email,
-        phone: values.phone,
-        companyUuid,
-        companyName: selectedCompanyName,
-        notes,
-        preferredLanguage,
-        defaultVenueUuid: venue.mode === "venue" ? venue.venueId : null,
-      });
-      handleClose();
-    } catch {
-      /* error toast shown by createContact */
-    } finally {
-      setSaving(false);
-    }
+    const saved = await form.submit();
+    if (!saved) return;
+    onCreated?.(saved);
+    handleClose();
   };
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className={`sm:max-w-md p-0 gap-0 rounded-xl ${contentClassName ?? ""}`}>
-          {/* Header */}
-          <div className="px-6 pt-6 pb-4 border-b border-gray-100">
-            <DialogHeader>
-              <DialogTitle className="text-base font-semibold text-gray-900">
-                New Contact
-              </DialogTitle>
-            </DialogHeader>
-          </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent
+        className={`sm:max-w-md max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-xl ${contentClassName ?? ""}`}
+      >
+        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-gray-900">New Contact</DialogTitle>
+          </DialogHeader>
+        </div>
 
-          {/* Body */}
-          <div className="px-6 py-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <TextField
-                label="First Name"
-                required
-                value={values.firstName}
-                onChange={setValue("firstName")}
-                onBlur={() => markTouched("firstName")}
-                error={errorFor("firstName")}
-                placeholder="Jane"
-              />
-              <TextField
-                label="Last Name"
-                value={values.lastName}
-                onChange={setValue("lastName")}
-                onBlur={() => markTouched("lastName")}
-                error={errorFor("lastName")}
-                placeholder="Smith"
-              />
-            </div>
+        <div className="px-6 py-4">
+          <ContactFormFields form={form} contentClassName={contentClassName} />
+        </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <TextField
-                label="Email"
-                type="email"
-                value={values.email}
-                onChange={setValue("email")}
-                onBlur={() => markTouched("email")}
-                error={errorFor("email")}
-                placeholder="jane@company.com"
-              />
-              <TextField
-                label="Phone"
-                type="tel"
-                value={values.phone}
-                onChange={setValue("phone")}
-                onBlur={() => markTouched("phone")}
-                error={errorFor("phone")}
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-
-            <DuplicateWarning matches={duplicateLabels} kind="contact" severity="block" />
-
-            <div>
-              <label className={FIELD_LABEL}>Quote Language</label>
-              <Dropdown
-                options={PREFERRED_LANGUAGE_OPTIONS}
-                selected={preferredLanguage}
-                onSelect={(value) => setPreferredLanguage(value as PreferredLanguage)}
-                placeholder="Select language..."
-              />
-            </div>
-
-            <div>
-              <label className={FIELD_LABEL}>Company</label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <SearchableSelect
-                    options={companyOptions}
-                    selected={companyUuid}
-                    onSelect={setCompanyUuid}
-                    placeholder={isLoading ? "Loading..." : "Select company..."}
-                    searchPlaceholder="Search by name, email, phone or address..."
-                    emptyMessage="No companies found."
-                    disabled={isLoading}
-                  />
-                </div>
-                <button
-                  onClick={() => setCreateCompanyOpen(true)}
-                  className="h-9 px-3 text-sm font-medium text-darkBlue border border-gray-200 rounded-md hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap bg-gray-50"
-                >
-                  + New
-                </button>
-              </div>
-            </div>
-
-            <VenuePicker value={venue} onChange={setVenue} />
-
-            <TextAreaField
-              label="Notes"
-              value={notes}
-              onChange={setNotes}
-              placeholder="Additional notes..."
-            />
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
-            <button
-              onClick={handleClose}
-              className="px-4 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!canSave}
-              className="px-4 py-1.5 text-sm font-medium text-white bg-darkBlue rounded-md hover:bg-lightBlue transition-colors cursor-pointer disabled:opacity-40"
-            >
-              {saving ? "Saving…" : "Save Contact"}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <CreateCompanyModal
-        isOpen={createCompanyOpen}
-        onClose={() => setCreateCompanyOpen(false)}
-        onCreated={(company) => setCompanyUuid(company.id)}
-        contentClassName={contentClassName ? "z-[2102]" : undefined}
-      />
-    </>
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
+          <button
+            onClick={handleClose}
+            className="px-4 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!form.canSave}
+            className="px-4 py-1.5 text-sm font-medium text-white bg-darkBlue rounded-md hover:bg-lightBlue transition-colors cursor-pointer disabled:opacity-40"
+          >
+            {form.saving ? "Saving…" : "Save Contact"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

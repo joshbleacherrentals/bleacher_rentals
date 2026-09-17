@@ -1,10 +1,12 @@
 "use client";
 
 import { db } from "@/components/providers/SystemProvider";
-import { expect, typedExecute, typedGetAll } from "@/lib/powersync/typedQuery";
+import { expect, typedExecute, typedExecuteBatch, typedGetAll } from "@/lib/powersync/typedQuery";
+import type { CompiledQuery } from "kysely";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../../../database.types";
 import { AlertDefinition, AlertEntityType, AlertPayload } from "./types";
+import { dbOpCounts, formatDuration, perfVerbose } from "@/lib/perf/perfTrace";
 
 type AlertRow = {
   id: string;
@@ -15,17 +17,22 @@ type AlertRow = {
 type IdRow = { id: string };
 
 /**
- * Syncs alerts for a given entity+title against the local PowerSync DB.
- * Deletes stale alerts, updates changed descriptions, inserts new ones.
- * PowerSync replicates all changes up to Supabase automatically.
+ * Builds the statements that would bring `Alerts`/`UserAlerts` in line with the
+ * given payloads, without touching the DB.
+ *
+ * Splitting planning from execution is what lets a whole cascade commit as one
+ * transaction: the caller collects the plans of every alert it evaluated and
+ * applies them together. Statements come back in foreign-key-safe order —
+ * deletes (UserAlerts before Alerts), then updates, then inserts (Alerts before
+ * its UserAlerts).
  */
-export async function syncAlertsForEntity(
+export async function planAlertsForEntity(
   title: string,
   entityUuid: string,
   entityType: AlertEntityType,
   alerts: AlertPayload[],
   recipientUuids: string[],
-): Promise<void> {
+): Promise<CompiledQuery<any>[]> {
   const myAlerts = alerts.filter((a) => a.title === title);
 
   let existing: AlertRow[];
@@ -46,7 +53,7 @@ export async function syncAlertsForEntity(
     );
   } catch (err) {
     console.error(`[${title}] failed to fetch existing alerts`, err);
-    return;
+    return [];
   }
 
   const existingMessages = new Set(existing.map((a) => a.message ?? ""));
@@ -59,14 +66,16 @@ export async function syncAlertsForEntity(
     return match && match.entity_description !== a.entity_description;
   });
 
+  const statements: CompiledQuery<any>[] = [];
+
   for (const alert of toDelete) {
-    await typedExecute(db.deleteFrom("UserAlerts").where("alert_uuid", "=", alert.id).compile());
-    await typedExecute(db.deleteFrom("Alerts").where("id", "=", alert.id).compile());
+    statements.push(db.deleteFrom("UserAlerts").where("alert_uuid", "=", alert.id).compile());
+    statements.push(db.deleteFrom("Alerts").where("id", "=", alert.id).compile());
   }
 
   for (const alert of toUpdate) {
     const match = existing.find((e) => e.message === alert.message)!;
-    await typedExecute(
+    statements.push(
       db
         .updateTable("Alerts")
         .set({ entity_description: alert.entity_description } as any)
@@ -78,7 +87,7 @@ export async function syncAlertsForEntity(
   const uniqueRecipients = [...new Set(recipientUuids.filter(Boolean))];
   for (const alert of toInsert) {
     const alertId = crypto.randomUUID();
-    await typedExecute(
+    statements.push(
       db
         .insertInto("Alerts")
         .values({
@@ -92,18 +101,33 @@ export async function syncAlertsForEntity(
         .compile(),
     );
     for (const userUuid of uniqueRecipients) {
-      await typedExecute(
+      statements.push(
         db
           .insertInto("UserAlerts")
-          .values({
-            id: crypto.randomUUID(),
-            alert_uuid: alertId,
-            user_uuid: userUuid,
-          } as any)
+          .values({ id: crypto.randomUUID(), alert_uuid: alertId, user_uuid: userUuid } as any)
           .compile(),
       );
     }
   }
+
+  return statements;
+}
+
+/**
+ * Syncs alerts for a given entity+title against the local PowerSync DB.
+ * Deletes stale alerts, updates changed descriptions, inserts new ones.
+ * PowerSync replicates all changes up to Supabase automatically.
+ */
+export async function syncAlertsForEntity(
+  title: string,
+  entityUuid: string,
+  entityType: AlertEntityType,
+  alerts: AlertPayload[],
+  recipientUuids: string[],
+): Promise<void> {
+  await typedExecuteBatch(
+    await planAlertsForEntity(title, entityUuid, entityType, alerts, recipientUuids),
+  );
 }
 
 /**
@@ -165,17 +189,24 @@ export async function deleteAllAlertsForEntity(entityUuid: string): Promise<void
  * The `supabase` client is still needed for `definition.evaluate()` and
  * `definition.recipients()` which query Supabase for evaluation logic.
  */
-export async function syncAlert(
+/**
+ * Evaluates a single AlertDefinition and returns the statements needed to bring
+ * the DB in line with the result, without writing anything.
+ *
+ * This is the form a cascade uses: it evaluates dozens of definitions and
+ * commits all of their statements in one transaction.
+ */
+export async function planAlert(
   definition: AlertDefinition,
   entityUuid: string,
   supabase?: SupabaseClient<Database>,
-): Promise<void> {
-  console.log(`[QUOTE_TRIAGE] syncAlert: evaluating "${definition.title}" for ${entityUuid}`);
+): Promise<CompiledQuery<any>[]> {
+  // Per-call timing is opt-in (`localStorage.perfTrace = "1"`): there can be
+  // hundreds of these in one save, and logging them all is itself a cost.
+  const startedAt = performance.now();
+  const startCounts = dbOpCounts();
+
   const result = await definition.evaluate(entityUuid, supabase);
-  console.log(
-    `[QUOTE_TRIAGE] syncAlert: "${definition.title}" result:`,
-    result ? `message="${result.message}"` : "null (no alert)",
-  );
   const alerts: AlertPayload[] = result
     ? [
         {
@@ -188,15 +219,35 @@ export async function syncAlert(
       ]
     : [];
   const recipients = result ? await definition.recipients(entityUuid, supabase) : [];
-  console.log(
-    `[QUOTE_TRIAGE] syncAlert: "${definition.title}" alerts=${alerts.length}, recipients=${recipients.length}`,
-    recipients,
-  );
-  await syncAlertsForEntity(
+
+  const statements = await planAlertsForEntity(
     definition.title,
     entityUuid,
     definition.entityType,
     alerts,
     recipients,
   );
+
+  const endCounts = dbOpCounts();
+  perfVerbose(
+    `planAlert "${definition.title}" ${formatDuration(performance.now() - startedAt)} ` +
+      `(${endCounts.reads - startCounts.reads} reads, ${statements.length} statements planned)`,
+  );
+
+  return statements;
+}
+
+/**
+ * Evaluates a single AlertDefinition for a given entity and writes the result
+ * to the local PowerSync DB (which replicates to Supabase).
+ *
+ * Callers that evaluate many definitions at once should prefer `planAlert` and
+ * commit the collected statements in one transaction.
+ */
+export async function syncAlert(
+  definition: AlertDefinition,
+  entityUuid: string,
+  supabase?: SupabaseClient<Database>,
+): Promise<void> {
+  await typedExecuteBatch(await planAlert(definition, entityUuid, supabase));
 }

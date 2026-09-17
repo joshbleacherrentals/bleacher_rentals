@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { Database } from "../../../../../database.types";
 import { todayStart, getUpcomingWindowEnd } from "@/features/alerts/util/getUpcomingWindow";
 import { AlertEntityType } from "@/features/alerts/types";
-import { evaluateWorkTrackerDraft } from "@/features/alerts/evaluate/workTrackerDraft";
 import { evaluateWorkTrackerPending } from "@/features/alerts/evaluate/workTrackerPending";
 
 function getSupabaseAdmin() {
@@ -123,17 +122,6 @@ export async function GET(req: NextRequest) {
         created_by_user_uuid: wt.created_by_user_uuid,
       };
 
-      const draftResult = evaluateWorkTrackerDraft(wtRow);
-      await syncServerAlert(
-        supabase,
-        wt.id,
-        "work_tracker",
-        "Work Tracker Still in Draft",
-        draftResult?.message ?? null,
-        draftResult?.entityDescription ?? "",
-        recipients,
-      );
-
       const pendingResult = evaluateWorkTrackerPending(wtRow);
       await syncServerAlert(
         supabase,
@@ -144,6 +132,16 @@ export async function GET(req: NextRequest) {
         pendingResult?.entityDescription ?? "",
         recipients,
       );
+    }
+
+    // ── Discontinued alert: purge any leftover "Work Tracker Still in Draft" rows ──
+    const { data: discontinued } = await supabase
+      .from("Alerts")
+      .select("id")
+      .eq("title", "Work Tracker Still in Draft");
+    for (const alert of discontinued ?? []) {
+      await supabase.from("UserAlerts").delete().eq("alert_uuid", alert.id);
+      await supabase.from("Alerts").delete().eq("id", alert.id);
     }
 
     // ── Clean up alerts for past entities ────────────────────────────────────

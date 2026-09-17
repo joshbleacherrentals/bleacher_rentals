@@ -11,7 +11,7 @@ import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient"
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useUser } from "@clerk/nextjs";
-import { useUsersStore } from "@/state/userStore";
+import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { AppTooltip } from "@/components/AppTooltip";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { useDashboardBleachersStore } from "../state/useDashboardBleachersStore";
@@ -34,7 +34,7 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
   const qc = useQueryClient();
   const supabase = useClerkSupabaseClient();
   const { user } = useUser();
-  const users = useUsersStore((s) => s.users);
+  const users = usePsUsers();
   const { isOpen, key, blockUuid, bleacherUuid, date, text, workTrackerUuid, setField, resetForm } =
     useSelectedBlockStore();
 

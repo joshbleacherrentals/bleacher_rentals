@@ -63,6 +63,13 @@ BEGIN
   ASSERT v_count = 7, format('T7 FAIL: expected 7 Prices columns, got %s', v_count);
   RAISE NOTICE 'T7 Prices table structure correct ✓';
 
+  -- T8: BleacherTypes.description is a nullable text column
+  SELECT count(*) INTO v_count FROM information_schema.columns
+  WHERE table_name = 'BleacherTypes' AND column_name = 'description'
+    AND data_type = 'text' AND is_nullable = 'YES';
+  ASSERT v_count = 1, 'T8 FAIL: BleacherTypes.description should be a nullable text column';
+  RAISE NOTICE 'T8 BleacherTypes.description is nullable text ✓';
+
   -- Cleanup
   DELETE FROM "BleacherTypes" WHERE id = bt_id;
 

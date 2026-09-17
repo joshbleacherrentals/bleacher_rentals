@@ -25,7 +25,18 @@ const compiled = db
   ])
   .compile();
 
+/**
+ * The full query result, including `isLoading`.
+ *
+ * `usePsBleacherEvents` collapses that to an array, which cannot tell "no rows yet"
+ * from "no rows at all". Anything that draws a conclusion from emptiness — an
+ * alert calculation, most of all, where an empty list reads as "no problems" —
+ * must use this and wait.
+ */
+export function usePsBleacherEventsQuery() {
+  return useTypedQuery(compiled, expect<PsBleacherEventRow>());
+}
+
 export function usePsBleacherEvents() {
-  const { data } = useTypedQuery(compiled, expect<PsBleacherEventRow>());
-  return data ?? [];
+  return usePsBleacherEventsQuery().data ?? [];
 }

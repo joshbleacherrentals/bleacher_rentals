@@ -1,5 +1,4 @@
 "use client";
-import { updateDataBase } from "@/app/actions/db.actions";
 import { STATUSES } from "../../../features/manageTeam/constants";
 import { createErrorToast, createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -150,44 +149,10 @@ export async function updateUserStatusToInvited(email: string, supabase: Supabas
   if (error) {
     createErrorToastNoThrow(["Failed to update user status to invited.", error.message]);
   } else {
-    updateDataBase(["Users", "UserStatuses"]);
   }
 }
 
 // ------- BleacherUsers helpers -------
-
-export type SimpleOption = { uuid: string; label: string };
-
-export async function fetchBleachersForOptions(
-  supabase: SupabaseClient<Database>,
-  /** When provided, only return bleachers assigned to this account manager */
-  accountManagerId?: string | null,
-): Promise<SimpleOption[]> {
-  if (!supabase) {
-    createErrorToast(["No supabase client found"]);
-  }
-  let query = supabase
-    .from("Bleachers")
-    .select("id, bleacher_number, summer_account_manager_uuid, winter_account_manager_uuid")
-    .eq("deleted", false)
-    .order("bleacher_number", { ascending: true });
-
-  const { data, error } = await query;
-  if (error) {
-    createErrorToastNoThrow(["Failed to fetch bleachers!", error.message]);
-    return [];
-  }
-
-  const filtered = accountManagerId
-    ? (data ?? []).filter(
-        (b: any) =>
-          b.summer_account_manager_uuid === accountManagerId ||
-          b.winter_account_manager_uuid === accountManagerId,
-      )
-    : (data ?? []);
-
-  return filtered.map((b: any) => ({ uuid: b.id, label: String(b.bleacher_number) }));
-}
 
 export async function fetchUserBleacherAssignments(
   userUuid: string,
@@ -257,7 +222,6 @@ export async function deactivateUser(userUuid: string, supabase: SupabaseClient<
     .eq("id", userUuid);
 
   if (updateError) throw updateError;
-  updateDataBase(["Users", "UserStatuses"]);
 }
 
 export async function reactivateUser(userUuid: string, supabase: SupabaseClient<Database>) {
@@ -269,14 +233,12 @@ export async function reactivateUser(userUuid: string, supabase: SupabaseClient<
     .eq("id", userUuid);
 
   if (updateError) throw updateError;
-  updateDataBase(["Users", "UserStatuses"]);
 }
 
 export async function deleteUser(userUuid: string, supabase: SupabaseClient<Database>) {
   const { error: updateError } = await supabase.from("Users").delete().eq("id", userUuid);
 
   if (updateError) throw updateError;
-  updateDataBase(["UserStatuses", "Users", "UserHomeBases"]);
 }
 
 // export function fetchUsers() {

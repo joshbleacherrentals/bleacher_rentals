@@ -1,22 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Dropdown } from "@/components/DropDown";
-import { FIELD_LABEL, TextAreaField, TextField } from "@/components/form/TextField";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import { useTouchedErrors } from "@/lib/validation/useTouchedErrors";
-import { updateContact } from "../db/updateContact";
 import { softDeleteContact } from "../db/softDeleteContact";
-import { useCompaniesAll } from "../hooks/useCompaniesAll";
-import type { ContactFull } from "../hooks/useContactsAll";
+import { useContactForm } from "../hooks/useContactForm";
+import { contactFormSourceOf, type ContactFull } from "../hooks/useContactsAll";
+import { PREFERRED_LANGUAGE_OPTIONS } from "../db/preferredLanguage";
+import { addressDisplayLine } from "../logic/address";
+import { ContactFormFields } from "./ContactFormFields";
 import { DetailField } from "./DetailField";
-import { hasErrors, validateContactForm, type ContactFormValues } from "../utils/formValidation";
-import { PREFERRED_LANGUAGE_OPTIONS, type PreferredLanguage } from "../db/preferredLanguage";
-
-const CONTACT_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
-
-const EMPTY_VALUES: ContactFormValues = { firstName: "", lastName: "", email: "", phone: "" };
 
 type Props = {
   contact: ContactFull | null;
@@ -24,58 +17,24 @@ type Props = {
 };
 
 export function ContactDetailModal({ contact, onClose }: Props) {
-  const { companies, isLoading: loadingCompanies } = useCompaniesAll();
   const [mode, setMode] = useState<"view" | "edit">("view");
-  const [values, setValues] = useState<ContactFormValues>(EMPTY_VALUES);
-  const [notes, setNotes] = useState("");
-  const [companyUuid, setCompanyUuid] = useState<string | null>(null);
-  // Language this contact's quotes render in. See docs/specs/quote-preferred-language.md.
-  const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage>("english");
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const errors = validateContactForm(values);
-  const { errorFor, markTouched, markAllTouched, reset: resetTouched } = useTouchedErrors(errors);
-
-  const setValue = (key: keyof ContactFormValues) => (value: string) =>
-    setValues((prev) => ({ ...prev, [key]: value }));
-
-  useEffect(() => {
-    if (!contact) return;
-    setValues({
-      firstName: contact.firstName,
-      lastName: contact.lastName ?? "",
-      email: contact.email ?? "",
-      phone: contact.phone ?? "",
-    });
-    setNotes(contact.notes ?? "");
-    setCompanyUuid(contact.companyUuid);
-    setPreferredLanguage(contact.preferredLanguage);
-    setMode("view");
-    resetTouched();
-  }, [contact, resetTouched]);
+  const form = useContactForm({ contact: contact ? contactFormSourceOf(contact) : null });
 
   const handleClose = () => {
     setMode("view");
     onClose();
   };
 
-  const canSave = !!contact && !hasErrors(errors) && !saving;
+  const handleCancelEdit = () => {
+    form.reset();
+    setMode("view");
+  };
 
   const handleSave = async () => {
-    markAllTouched(CONTACT_FIELDS);
-    if (!contact || !canSave) return;
-
-    setSaving(true);
-    try {
-      await updateContact(contact.id, { ...values, notes, companyUuid, preferredLanguage });
-      createSuccessToast(["Contact updated."]);
-      setMode("view");
-    } catch {
-      /* error shown by updateContact */
-    } finally {
-      setSaving(false);
-    }
+    const saved = await form.submit();
+    if (saved) setMode("view");
   };
 
   const handleDelete = async () => {
@@ -93,16 +52,14 @@ export function ContactDetailModal({ contact, onClose }: Props) {
     }
   };
 
-  const companyOptions = companies.map((c) => ({ label: c.companyName, value: c.id }));
   const languageLabel = PREFERRED_LANGUAGE_OPTIONS.find(
     (o) => o.value === contact?.preferredLanguage,
   )?.label;
-  const displayCompany =
-    contact?.companyName ?? companies.find((c) => c.id === companyUuid)?.companyName;
+  const venue = contact?.defaultVenue;
 
   return (
     <Dialog open={!!contact} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-md p-0 gap-0 rounded-xl">
+      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-xl">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-gray-100">
           <DialogHeader>
@@ -120,68 +77,25 @@ export function ContactDetailModal({ contact, onClose }: Props) {
             <div className="space-y-1">
               <DetailField label="Email" value={contact?.email} />
               <DetailField label="Phone" value={contact?.phone} />
-              <DetailField label="Company" value={displayCompany} />
+              <DetailField label="Company" value={contact?.company?.companyName} />
               <DetailField label="Language" value={languageLabel} />
+              <div className="flex py-2 border-b border-gray-50 last:border-0">
+                <span className="w-20 flex-shrink-0 text-[11px] font-semibold text-gray-400 uppercase tracking-wider pt-0.5">
+                  Venue
+                </span>
+                {venue ? (
+                  <span className="text-sm text-gray-800">
+                    <span className="font-medium">{venue.name}</span>
+                    <span className="block text-gray-500">{addressDisplayLine(venue.address)}</span>
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-300">—</span>
+                )}
+              </div>
               <DetailField label="Notes" value={contact?.notes} />
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <TextField
-                  label="First Name"
-                  required
-                  value={values.firstName}
-                  onChange={setValue("firstName")}
-                  onBlur={() => markTouched("firstName")}
-                  error={errorFor("firstName")}
-                />
-                <TextField
-                  label="Last Name"
-                  value={values.lastName}
-                  onChange={setValue("lastName")}
-                  onBlur={() => markTouched("lastName")}
-                  error={errorFor("lastName")}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={values.email}
-                  onChange={setValue("email")}
-                  onBlur={() => markTouched("email")}
-                  error={errorFor("email")}
-                />
-                <TextField
-                  label="Phone"
-                  type="tel"
-                  value={values.phone}
-                  onChange={setValue("phone")}
-                  onBlur={() => markTouched("phone")}
-                  error={errorFor("phone")}
-                />
-              </div>
-              <div>
-                <label className={FIELD_LABEL}>Company</label>
-                <Dropdown
-                  options={companyOptions}
-                  selected={companyUuid}
-                  onSelect={setCompanyUuid}
-                  placeholder={loadingCompanies ? "Loading..." : "Select company..."}
-                  disabled={loadingCompanies}
-                />
-              </div>
-              <div>
-                <label className={FIELD_LABEL}>Quote Language</label>
-                <Dropdown
-                  options={PREFERRED_LANGUAGE_OPTIONS}
-                  selected={preferredLanguage}
-                  onSelect={(value) => setPreferredLanguage(value as PreferredLanguage)}
-                  placeholder="Select language..."
-                />
-              </div>
-              <TextAreaField label="Notes" value={notes} onChange={setNotes} />
-            </div>
+            <ContactFormFields form={form} />
           )}
         </div>
 
@@ -213,17 +127,17 @@ export function ContactDetailModal({ contact, onClose }: Props) {
             ) : (
               <>
                 <button
-                  onClick={() => setMode("view")}
+                  onClick={handleCancelEdit}
                   className="px-4 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={!canSave}
+                  disabled={!form.canSave}
                   className="px-4 py-1.5 text-sm font-medium text-white bg-darkBlue rounded-md hover:bg-lightBlue transition-colors cursor-pointer disabled:opacity-40"
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {form.saving ? "Saving…" : "Save"}
                 </button>
               </>
             )}

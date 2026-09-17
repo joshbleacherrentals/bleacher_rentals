@@ -17,12 +17,11 @@ import {
 import { CoreTab } from "./tabs/CoreTab";
 import { DetailsTab } from "./tabs/DetailsTab";
 import { AlertsTab } from "./tabs/AlertsTab";
-import { useBleacherEventsStore } from "@/state/bleacherEventStore";
 import { useCurrentEventStore } from "../state/useCurrentEventStore";
 import { createEvent, deleteEvent } from "@/features/dashboard/db/client/db";
 import { updateEvent } from "@/features/dashboard/db/client/updateEvent";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
-import { useUsersStore } from "@/state/userStore";
+import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { triage } from "@/features/alerts/triage";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { canEditOwnedEntity } from "@/features/userAccess/logic/canEditOwnedEntity";
@@ -30,6 +29,7 @@ import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsS
 import { useDashboardBleachersStore } from "@/features/dashboard/state/useDashboardBleachersStore";
 import { useCreateQuoteStore } from "@/features/quotesAndBookings/state/useCreateQuoteStore";
 import { useEventFormTransportationAlerts } from "../hooks/useEventFormTransportationAlerts";
+import { useEventFormAlerts } from "../hooks/useEventFormAlerts";
 import { useBleacherMismatch } from "../hooks/useBleacherMismatch";
 import { validateLostReason } from "@/features/quotesAndBookings/utils/lostReason";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
@@ -59,11 +59,11 @@ export const EventConfigurationForm = ({
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const supabase = useClerkSupabaseClient();
-  const bleacherEvents = useBleacherEventsStore((s) => s.bleacherEvents);
-  const users = useUsersStore((s) => s.users);
+  const users = usePsUsers();
   const permissions = useTeamPermissions();
   const router = useRouter();
   useEventFormTransportationAlerts();
+  useEventFormAlerts();
   const { hasMismatch: hasDetailsMismatch } = useBleacherMismatch();
 
   const accountManagerZoneIds = usePermissionsStore((s) => s.accountManagerZoneIds);
@@ -94,12 +94,6 @@ export const EventConfigurationForm = ({
     return users.find((u) => u.clerk_user_id === userId)?.id ?? null;
   };
 
-  // Mark global zustand stores stale so useFetchTable re-fetches fresh data;
-  // dashboard data itself is now driven by PowerSync reactive queries.
-  const refreshDashboardStores = () => {
-    useBleacherEventsStore.getState().setStale(true);
-  };
-
   // Marking an event lost is the last moment the reason can be captured, so no
   // save goes through without one. Any other status saves as before.
   const lostReasonBlocks = (state: ReturnType<typeof useCurrentEventStore.getState>): boolean => {
@@ -115,7 +109,6 @@ export const EventConfigurationForm = ({
     try {
       const newEventUuid = await createEvent(state, supabase, user ?? null);
       await triage("Events", { id: newEventUuid }, supabase);
-      refreshDashboardStores();
       currentEventStore.resetForm();
       if (currentEventStore.isModalOpen) {
         currentEventStore.closeModal();
@@ -132,11 +125,10 @@ export const EventConfigurationForm = ({
     if (lostReasonBlocks(state)) return;
     setLoading(true);
     try {
-      await updateEvent(state, supabase, user ?? null, bleacherEvents);
+      await updateEvent(state, supabase, user ?? null);
       if (state.eventUuid) {
         await triage("Events", { id: state.eventUuid }, supabase);
       }
-      refreshDashboardStores();
       currentEventStore.resetForm();
     } catch (error) {
       console.error("Failed to update event:", error);
@@ -153,7 +145,6 @@ export const EventConfigurationForm = ({
         await triage("Events_deleted", { id: state.eventUuid }, supabase);
       }
       await deleteEvent(state.eventUuid, state.addressData?.state ?? "", supabase, user ?? null);
-      refreshDashboardStores();
       currentEventStore.resetForm();
     } catch (error) {
       console.error("Failed to delete event:", error);
@@ -206,6 +197,7 @@ export const EventConfigurationForm = ({
             return (
               <button
                 key={tab}
+                data-testid={`event-tab-${tab}`}
                 className={`px-2.5 mb-2 rounded-t border-b-2 cursor-pointer ${
                   activeTab === tab ? "border-darkBlue font-semibold" : "border-transparent"
                 } ${

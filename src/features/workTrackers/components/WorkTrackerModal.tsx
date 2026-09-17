@@ -1,4 +1,4 @@
-import { LocateFixed, X, Trash2, Calculator, Pencil, AlertTriangle } from "lucide-react";
+import { LocateFixed, X, Trash2, AlertTriangle } from "lucide-react";
 import { AppTooltip } from "@/components/AppTooltip";
 import { Dropdown } from "@/components/DropDown";
 import { BleacherSwapPanel } from "@/features/workTrackers/components/BleacherSwapPanel";
@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AddressAutocomplete, { formatAddressLine } from "@/components/AddressAutoComplete";
 import {
-  getAddressFromUuid,
+  useAddressFromUuid,
   saveWorkTracker,
   deleteWorkTracker,
 } from "../../dashboard/db/client/db";
@@ -15,13 +15,14 @@ import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { Tables } from "../../../../database.types";
-import { fetchBleachersForOptions, fetchDriverPaymentData } from "@/app/team/_lib/db";
+import { fetchDriverPaymentData } from "@/app/team/_lib/db";
+import { readBleacherOptions } from "@/features/workTrackers/db/readBleacherOptions";
 import { toLatLngString, describeDriverPay, describeDeadheadPay } from "../util";
 import RouteMapPreview from "./RouteMapPreview";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import WorkTrackerStatusBadge from "./WorkTrackerStatusBadge";
 import { EditBlock } from "@/features/dashboard/types";
-import { fetchWorkTrackerByUuid } from "@/features/dashboard/db/client/fetchWorkTracker";
+import { readWorkTrackerForModal } from "@/features/dashboard/db/client/readWorkTrackerForModal";
 import { SelectDriver } from "./SelectDriver";
 import { useDrivers } from "../hooks/useDrivers.db";
 import { useWorkTrackerTypes } from "../hooks/useWorkTrackerTypes";
@@ -57,8 +58,9 @@ import { useDashboardBleachersStore } from "@/features/dashboard/state/useDashbo
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery, typedGetAll } from "@/lib/powersync/typedQuery";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import WorkTrackerLineItemsTab from "./WorkTrackerLineItemsTab";
+import { startTrace, type PerfTrace } from "@/lib/perf/perfTrace";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import WorkTrackerLineItemsTab, { formatMoney } from "./WorkTrackerLineItemsTab";
 import {
   calculateWorkTrackerLineItemsTotalCents,
   fetchWorkTrackerLineItems,
@@ -77,11 +79,14 @@ import { ContactPicker, contactDisplayName } from "@/components/ContactPicker";
 import { useContacts } from "@/features/companiesContacts/hooks/useContacts";
 import { getExpectedPocForWorkTracker, type PocDirection } from "../util/resolvePocContact";
 import { describePocPopulateResult, type PocValue } from "../util/pocField";
+import { getExpectedInstructionsForWorkTracker } from "../util/resolveEventInstructionsForWorkTracker";
+import { getAdjacentEventsForWorkTracker } from "../util/resolveAdjacentEventsForWorkTracker";
+import { AdjacentEventCard } from "./AdjacentEventCard";
 import {
   getSelectableWorkTrackerTypes,
   isSingleFieldSetType as computeIsSingleFieldSetType,
 } from "../util/workTrackerTypeDisplay";
-import { WorkTrackerTypeSelect } from "./WorkTrackerTypeSelect";
+import { WorkTrackerTabsHeader } from "./WorkTrackerTabsHeader";
 import { WorkTrackerTimeField } from "./WorkTrackerTimeField";
 
 type WorkTrackerModalProps = {
@@ -106,6 +111,15 @@ export default function WorkTrackerModal({
   const queryClient = useQueryClient();
   const router = useRouter();
 
+  // Started when the modal is handed a tracker, ended below once every query it
+  // blocks on has settled — this is the delay managers actually feel after a drag.
+  const openTraceRef = useRef<PerfTrace | null>(null);
+  const openTraceIdRef = useRef<string | null>(null);
+  if (selectedWorkTracker && openTraceIdRef.current !== selectedWorkTracker.id) {
+    openTraceIdRef.current = selectedWorkTracker.id;
+    openTraceRef.current = startTrace("WorkTrackerModal open → data ready");
+  }
+
   // Fetch drivers with user data using PowerSync
   const { data: drivers = [] } = useDrivers();
   const permissions = useTeamPermissions();
@@ -113,14 +127,11 @@ export default function WorkTrackerModal({
   const [workTracker, setWorkTracker] = useState<Tables<"WorkTrackers"> | null>(
     selectedWorkTracker,
   );
-  const pickupAddress = getAddressFromUuid(selectedWorkTracker?.pickup_address_uuid ?? null);
-  const dropoffAddress = getAddressFromUuid(selectedWorkTracker?.dropoff_address_uuid ?? null);
+  const pickupAddress = useAddressFromUuid(selectedWorkTracker?.pickup_address_uuid ?? null);
+  const dropoffAddress = useAddressFromUuid(selectedWorkTracker?.dropoff_address_uuid ?? null);
   const [pickUpAddress, setPickUpAddress] = useState<AddressData | null>(pickupAddress);
   const [dropOffAddress, setDropOffAddress] = useState<AddressData | null>(dropoffAddress);
 
-  const [payInput, setPayInput] = useState(
-    selectedWorkTracker?.pay_cents != null ? (selectedWorkTracker?.pay_cents / 100).toFixed(2) : "",
-  );
   const [initialStatus, setInitialStatus] = useState<Tables<"WorkTrackers">["status"]>(
     selectedWorkTracker?.status ?? "draft",
   );
@@ -133,6 +144,12 @@ export default function WorkTrackerModal({
   // tracker types' QuickBooks accounts on their own admin-only page.
   const [showLeaveToEditTypesConfirm, setShowLeaveToEditTypesConfirm] = useState(false);
   const initialSnapshotRef = useRef<WorkTrackerSnapshot | null>(null);
+  // True once the user has actually edited a line item (add/update/remove) —
+  // distinct from the automatic reconciliation effects, which call setLineItems
+  // directly and don't set this. Lets handleSaveClick treat line-item-only
+  // edits as a real change, since the field snapshot below never sees line
+  // items — they live in their own table.
+  const [lineItemsDirty, setLineItemsDirty] = useState(false);
   const pendingChangeTypeRef = useRef<WorkTrackerChangeType>("none");
   // `${bleacher_uuid}|${date}` of the draft whose fields were already auto-populated.
   const autoPopulatedKeyRef = useRef<string | null>(null);
@@ -224,18 +241,8 @@ export default function WorkTrackerModal({
   useEffect(() => {
     setWorkTracker(selectedWorkTracker);
     setInitialStatus(selectedWorkTracker?.status ?? "draft");
-    setPayInput(
-      selectedWorkTracker?.pay_cents != null
-        ? (selectedWorkTracker?.pay_cents / 100).toFixed(2)
-        : "",
-    );
+    setLineItemsDirty(false);
   }, [selectedWorkTracker]);
-
-  // useEffect(() => {
-  //   if (workTracker?.pay_cents != null) {
-  //     setPayInput((workTracker.pay_cents / 100).toFixed(2));
-  //   }
-  // }, [workTracker?.pay_cents]);
 
   // console.log("selectedWorkTracker WorkTrackerModal", selectedWorkTracker);
 
@@ -246,7 +253,10 @@ export default function WorkTrackerModal({
   } = useQuery({
     queryKey: ["workTracker", selectedWorkTracker?.id],
     queryFn: async () => {
-      return fetchWorkTrackerByUuid(selectedWorkTracker!.id, supabase);
+      // Read locally: PowerSync already holds the tracker and its addresses, and
+      // the modal only opens for a tracker that is on screen — which means it is
+      // in the local DB. The network version cost 8.31s on a cold cache.
+      return readWorkTrackerForModal(selectedWorkTracker!.id);
     },
     enabled: !!selectedWorkTracker && selectedWorkTracker.id !== "-1",
     refetchOnWindowFocus: false,
@@ -360,6 +370,39 @@ export default function WorkTrackerModal({
     }
   };
 
+  // Populate Pickup/Dropoff Instructions from the nearest event on this
+  // bleacher — see resolveEventInstructionsForWorkTracker for why "past"
+  // reads the neighbour's own pickup_instructions and "future" reads its
+  // own dropoff_instructions (not the opposite-field rule the address/POC
+  // buttons use).
+  const handlePopulatePickupInstructions = async () => {
+    if (!workTracker?.bleacher_uuid || !workTracker?.date) return;
+
+    const result = await getExpectedInstructionsForWorkTracker({
+      bleacherUuid: workTracker.bleacher_uuid,
+      targetDate: workTracker.date,
+      direction: "past",
+    });
+
+    if (result.kind === "ok") {
+      setWorkTracker((prev) => ({ ...prev!, pickup_instructions: result.text }));
+    }
+  };
+
+  const handlePopulateDropoffInstructions = async () => {
+    if (!workTracker?.bleacher_uuid || !workTracker?.date) return;
+
+    const result = await getExpectedInstructionsForWorkTracker({
+      bleacherUuid: workTracker.bleacher_uuid,
+      targetDate: workTracker.date,
+      direction: "future",
+    });
+
+    if (result.kind === "ok") {
+      setWorkTracker((prev) => ({ ...prev!, dropoff_instructions: result.text }));
+    }
+  };
+
   const setPickupPoc = (next: PocValue) =>
     setWorkTracker((prev) => ({
       ...prev!,
@@ -426,10 +469,21 @@ export default function WorkTrackerModal({
     Boolean(pickUpAddress?.address) &&
     isPickupTransportationMismatch(expectedPickupStreet, pickUpAddress?.address);
 
-  const showDraftWarning =
-    workTracker?.status === "draft" &&
-    !!workTracker?.date &&
-    workTracker.date <= getUpcomingWindowEnd();
+  // Previous/Next Event cards — display only, never written to the work
+  // tracker. Recomputed whenever the bleacher or date changes.
+  const { data: adjacentEvents } = useQuery({
+    queryKey: ["work-tracker-adjacent-events", workTracker?.bleacher_uuid, workTracker?.date],
+    enabled: Boolean(workTracker?.bleacher_uuid && workTracker?.date),
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      if (!workTracker?.bleacher_uuid || !workTracker?.date) return null;
+
+      return getAdjacentEventsForWorkTracker({
+        bleacherUuid: workTracker.bleacher_uuid,
+        targetDate: workTracker.date,
+      });
+    },
+  });
 
   const perms = usePermissionsStore();
   const allDashboardBleachers = useDashboardBleachersStore((s) => s.data);
@@ -480,7 +534,8 @@ export default function WorkTrackerModal({
   } = useQuery({
     queryKey: ["bleacherOptions", amFilterId],
     queryFn: async () => {
-      return fetchBleachersForOptions(supabase, amFilterId);
+      // Was a full `Bleachers` table pull over the network on every cold open.
+      return readBleacherOptions(amFilterId);
     },
   });
 
@@ -497,6 +552,20 @@ export default function WorkTrackerModal({
     },
     enabled: !!workTracker?.driver_uuid && !!selectedDriver,
   });
+
+  const modalDataPending =
+    isWorkTrackerLoading || isLineItemsLoading || isBleachersLoading || isDriverPaymentLoading;
+
+  useEffect(() => {
+    if (modalDataPending) return;
+    const trace = openTraceRef.current;
+    if (!trace) return;
+    openTraceRef.current = null;
+    trace.end({
+      workTrackerUuid: openTraceIdRef.current,
+      note: "all blocking queries settled",
+    });
+  }, [modalDataPending]);
 
   // Once types load, set default type for new work trackers that don't yet have one
   useEffect(() => {
@@ -544,11 +613,6 @@ export default function WorkTrackerModal({
         nextPickupAddress,
         nextDropoffAddress,
       );
-      setPayInput(
-        fetchedWorkTracker.workTracker && fetchedWorkTracker.workTracker.pay_cents != null
-          ? (fetchedWorkTracker.workTracker.pay_cents / 100).toFixed(2)
-          : "",
-      );
       setPickUpAddress(nextPickupAddress);
       setDropOffAddress(nextDropoffAddress);
     }
@@ -595,11 +659,14 @@ export default function WorkTrackerModal({
         changeType,
         workTracker?.status ?? "draft",
       );
+      // Pay is always overwritten with the current line items total on save —
+      // it's shown read-only in the UI, never hand-edited.
       // Merge distance/duration from the Google Maps leg into the tracker before saving
       const trackerToSave = workTracker
         ? {
             ...workTracker,
             status: resolvedStatus,
+            pay_cents: lineItemsTotalCents,
             distance_meters:
               leg?.distanceMeters != null
                 ? Math.round(leg.distanceMeters)
@@ -694,31 +761,6 @@ export default function WorkTrackerModal({
   //   }
   // };
 
-  function handlePayChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value;
-
-    // Allow empty input for backspacing
-    if (raw === "") {
-      setPayInput("");
-      setWorkTracker((prev) => ({ ...prev!, pay_cents: null }));
-      return;
-    }
-
-    // Only allow numbers with max 2 decimals
-    const validFormat = /^\d*\.?\d{0,2}$/;
-    if (!validFormat.test(raw)) return;
-
-    setPayInput(raw);
-
-    const parsed = parseFloat(raw);
-    if (!isNaN(parsed)) {
-      setWorkTracker((prev) => ({
-        ...prev!,
-        pay_cents: Math.round(parsed * 100),
-      }));
-    }
-  }
-
   // The same breakdown the button applies, so the tooltip always shows the work
   // that clicking would actually do.
   const payBreakdown = useMemo(
@@ -769,14 +811,6 @@ export default function WorkTrackerModal({
     () => calculateWorkTrackerLineItemsTotalCents(lineItems),
     [lineItems],
   );
-
-  const handleCalculatePay = () => {
-    setPayInput((lineItemsTotalCents / 100).toFixed(2));
-    setWorkTracker((prev) => ({
-      ...prev!,
-      pay_cents: lineItemsTotalCents,
-    }));
-  };
 
   const labelClassName = "block text-sm font-medium text-gray-700 mt-1";
   const inputClassName = "w-full p-2 border rounded bg-white";
@@ -835,7 +869,7 @@ export default function WorkTrackerModal({
 
     const hasStatusChange = (workTracker?.status ?? "draft") !== initialStatus;
 
-    if (fieldChangeType === "none" && !hasStatusChange) {
+    if (fieldChangeType === "none" && !hasStatusChange && !lineItemsDirty) {
       createErrorToast(["No changes to save."]);
       return;
     }
@@ -927,44 +961,22 @@ export default function WorkTrackerModal({
                 preserve their current workflow step.
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <Tabs defaultValue="details">
-                <div className="flex items-center justify-between">
-                  <TabsList>
-                    <TabsTrigger value="details">Details</TabsTrigger>
-                    <TabsTrigger value="line-items">Line Items</TabsTrigger>
-                  </TabsList>
-                  {/* Work Tracker Type — its own color-coded switch rather than a form
-                    field, since the choice drives which fields the Details tab shows
-                    (Trip's separate Pickup/Dropoff sections vs. everything else's
-                    single field set). */}
-                  <div className="flex items-center gap-2">
-                    <WorkTrackerTypeSelect
-                      types={selectableWorkTrackerTypes}
-                      selectedId={workTracker?.work_tracker_type_uuid}
-                      onSelect={(id) =>
-                        setWorkTracker((prev) => ({
-                          ...prev!,
-                          work_tracker_type_uuid: id,
-                        }))
-                      }
-                      disabled={!canEditFields}
-                    />
-                    {/* QBO account assignment for the 3 fixed types now lives on its
-                      own admin-only page, not a modal here. */}
-                    {permissions.isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => setShowLeaveToEditTypesConfirm(true)}
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                      >
-                        <Pencil className="h-3 w-3" />
-                        Edit types
-                      </button>
-                    )}
-                  </div>
-                </div>
+            <Tabs defaultValue="details" className="flex-1 min-h-0">
+              <WorkTrackerTabsHeader
+                types={selectableWorkTrackerTypes}
+                selectedTypeId={workTracker?.work_tracker_type_uuid}
+                onSelectType={(id) =>
+                  setWorkTracker((prev) => ({
+                    ...prev!,
+                    work_tracker_type_uuid: id,
+                  }))
+                }
+                disabled={!canEditFields}
+                isAdmin={permissions.isAdmin}
+                onEditTypesClick={() => setShowLeaveToEditTypesConfirm(true)}
+              />
 
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 <TabsContent value="details">
                   {/*
                   min-w-0 is load-bearing: browsers give <fieldset> a UA
@@ -1060,13 +1072,6 @@ export default function WorkTrackerModal({
                         {/* Status Badge - Account Manager can toggle between draft and released */}
                         <div className="flex items-center gap-2">
                           <label className={labelClassName}>Status</label>
-                          {showDraftWarning && (
-                            <AppTooltip content="This work tracker is still in draft and should be released soon.">
-                              <span className="mt-1 inline-flex text-amber-600">
-                                <AlertTriangle className="h-4 w-4" />
-                              </span>
-                            </AppTooltip>
-                          )}
                         </div>
                         <div className="flex items-center justify-center p-3 bg-gray-50 rounded border">
                           <WorkTrackerStatusBadge
@@ -1111,30 +1116,6 @@ export default function WorkTrackerModal({
                           }
                           rows={4}
                         />
-                        <label className={labelClassName}>Pay</label>
-                        <div className="flex flex-row gap-2 items-center">
-                          <input
-                            type="number"
-                            className={inputClassName}
-                            step="0.01"
-                            min="0"
-                            value={payInput}
-                            onChange={handlePayChange}
-                            placeholder="0.00"
-                          />
-                          {canEditFields && (
-                            <AppTooltip
-                              content={`Set pay to line items total: $${(
-                                lineItemsTotalCents / 100
-                              ).toFixed(2)}`}
-                            >
-                              <Calculator
-                                className="h-5 w-5 hover:h-6 hover:w-6 transition-all cursor-pointer text-darkBlue hover:text-lightBlue"
-                                onClick={handleCalculatePay}
-                              />
-                            </AppTooltip>
-                          )}
-                        </div>
                       </div>
 
                       {/* Columns 2 & 3: Pickup, Dropoff, and Map */}
@@ -1144,6 +1125,10 @@ export default function WorkTrackerModal({
                             only type that needs a separate pickup leg. */}
                           {!isSingleFieldSetType && (
                             <div className="flex-1 min-w-0">
+                              <AdjacentEventCard
+                                label="Previous Event"
+                                event={adjacentEvents?.previous ?? null}
+                              />
                               <label className={labelClassName}>Pickup Time</label>
                               <WorkTrackerTimeField
                                 mode={workTracker?.pickup_time_mode}
@@ -1234,7 +1219,20 @@ export default function WorkTrackerModal({
                                   </AppTooltip>
                                 )}
                               </div>
-                              <label className={labelClassName}>Pickup Instructions</label>
+                              <div className="flex items-center justify-between">
+                                <label className={labelClassName}>Pickup Instructions</label>
+                                {canEditFields && (
+                                  <AppTooltip content="Populate from previous event">
+                                    <button
+                                      type="button"
+                                      onClick={handlePopulatePickupInstructions}
+                                      className="text-gray-400 hover:text-darkBlue transition-colors"
+                                    >
+                                      <LocateFixed className="h-5 w-5" />
+                                    </button>
+                                  </AppTooltip>
+                                )}
+                              </div>
                               <textarea
                                 className="w-full text-sm border p-1 rounded bg-white"
                                 placeholder="Pickup Instructions"
@@ -1270,6 +1268,18 @@ export default function WorkTrackerModal({
                             drop the "Dropoff" prefix. The values still live in the
                             dropoff_* columns either way. */}
                           <div className="flex-1 min-w-0">
+                            {/* Non-Trip types have no separate Pickup column (above), so
+                              this single column shows both cards. */}
+                            {isSingleFieldSetType && (
+                              <AdjacentEventCard
+                                label="Previous Event"
+                                event={adjacentEvents?.previous ?? null}
+                              />
+                            )}
+                            <AdjacentEventCard
+                              label="Next Event"
+                              event={adjacentEvents?.next ?? null}
+                            />
                             <label className={labelClassName}>
                               {isSingleFieldSetType ? "Time" : "Dropoff Time"}
                             </label>
@@ -1354,9 +1364,22 @@ export default function WorkTrackerModal({
                                 </AppTooltip>
                               )}
                             </div>
-                            <label className={labelClassName}>
-                              {isSingleFieldSetType ? "Instructions" : "Dropoff Instructions"}
-                            </label>
+                            <div className="flex items-center justify-between">
+                              <label className={labelClassName}>
+                                {isSingleFieldSetType ? "Instructions" : "Dropoff Instructions"}
+                              </label>
+                              {canEditFields && (
+                                <AppTooltip content="Populate from next event">
+                                  <button
+                                    type="button"
+                                    onClick={handlePopulateDropoffInstructions}
+                                    className="text-gray-400 hover:text-darkBlue transition-colors"
+                                  >
+                                    <LocateFixed className="h-5 w-5" />
+                                  </button>
+                                </AppTooltip>
+                              )}
+                            </div>
                             <textarea
                               className="w-full text-sm border p-1 rounded bg-white"
                               placeholder={
@@ -1432,20 +1455,21 @@ export default function WorkTrackerModal({
                 <TabsContent value="line-items">
                   <WorkTrackerLineItemsTab
                     lineItems={lineItems}
-                    onChange={(items) =>
+                    onChange={(items) => {
+                      setLineItemsDirty(true);
                       setLineItems(
                         reconcileRequirementLineItems(items, {
                           setupRequired: !!workTracker?.setup_required,
                           teardownRequired: !!workTracker?.teardown_required,
                         }),
-                      )
-                    }
+                      );
+                    }}
                     canEdit={canEditFields}
                     isLoading={isLineItemsLoading}
                   />
                 </TabsContent>
-              </Tabs>
-            </div>
+              </div>
+            </Tabs>
 
             <div className="mt-4 shrink-0 flex justify-between items-center gap-2">
               {canEditFields && !isInProgress && workTracker?.id && workTracker.id !== "-1" && (
@@ -1458,6 +1482,12 @@ export default function WorkTrackerModal({
                 </button>
               )}
               <div className="flex-1" />
+              {lineItems.length > 0 && (
+                <span className="text-sm">
+                  <span className="font-semibold">Total</span>{" "}
+                  <span className="font-bold">{formatMoney(lineItemsTotalCents)}</span>
+                </span>
+              )}
               <BillOfLadingButton
                 workTracker={workTracker}
                 pickUpAddress={pickUpAddress}

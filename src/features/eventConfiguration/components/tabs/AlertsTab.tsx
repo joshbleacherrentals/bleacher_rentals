@@ -10,7 +10,7 @@ export const AlertsTab = () => {
       {currentEventStore.alerts?.length > 0 ? (
         currentEventStore.alerts.map((alert, index) => {
           return (
-            <div key={index} className="flex gap-2">
+            <div key={index} className="flex gap-2" data-testid="event-alert">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-red-800 mb-1">
                   {alert.message}
@@ -20,7 +20,10 @@ export const AlertsTab = () => {
           );
         })
       ) : (
-        <div className="flex items-center gap-2 text-green-600 font-medium py-2">
+        <div
+          className="flex items-center gap-2 text-green-600 font-medium py-2"
+          data-testid="event-alerts-empty"
+        >
           <span>No Alerts! Nicely Done</span>
           <CheckCheck />
         </div>

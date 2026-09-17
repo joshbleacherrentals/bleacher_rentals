@@ -8,6 +8,7 @@ import { usePsBleacherEvents } from "@/features/dashboard/db/hooks/powersync/use
 import { usePsWorkTrackers } from "@/features/dashboard/db/hooks/powersync/usePsWorkTrackers";
 import { usePsEvents } from "@/features/dashboard/db/hooks/powersync/usePsEvents";
 import type { AlertPayload } from "@/features/alerts/types";
+import { TRANSPORTATION_ALERT_TITLES, mergeAlertFamily, sameAlertList } from "./alertFamilies";
 
 /**
  * Reactively computes "No Transportation" alerts for the event config form using
@@ -111,17 +112,7 @@ export function useEventFormTransportationAlerts() {
 
   useEffect(() => {
     const store = useCurrentEventStore.getState();
-    const existing = store.alerts;
-
-    // Replace all "No Transportation" alerts with the freshly computed ones
-    const otherAlerts = existing.filter((a) => a.title !== "No Transportation");
-    const merged = [...otherAlerts, ...transportAlerts];
-
-    // Only update the store if the result actually changed
-    const existingKeys = existing.map((a) => a.message).join("|");
-    const mergedKeys = merged.map((a) => a.message).join("|");
-    if (existingKeys !== mergedKeys) {
-      store.setField("alerts", merged);
-    }
+    const merged = mergeAlertFamily(store.alerts, TRANSPORTATION_ALERT_TITLES, transportAlerts);
+    if (!sameAlertList(store.alerts, merged)) store.setField("alerts", merged);
   }, [transportAlerts]);
 }

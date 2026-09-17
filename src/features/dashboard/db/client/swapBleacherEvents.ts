@@ -4,7 +4,6 @@ import { Bleacher, BleacherEvent } from "../../types";
 import { SwapDetail } from "../../state/useSwapStore";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import { updateDataBase } from "@/app/actions/db.actions";
 
 /**
  * Check if two date ranges overlap.
@@ -175,5 +174,4 @@ export async function executeSwap(
   }
 
   createSuccessToast(["Bleacher swap completed successfully"]);
-  updateDataBase(["Bleachers", "BleacherEvents", "Events"]);
 }

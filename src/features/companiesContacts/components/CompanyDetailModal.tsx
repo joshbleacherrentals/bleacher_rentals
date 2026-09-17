@@ -1,74 +1,52 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TextAreaField, TextField } from "@/components/form/TextField";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import { useTouchedErrors } from "@/lib/validation/useTouchedErrors";
-import { updateCompany } from "../db/updateCompany";
 import { softDeleteCompany } from "../db/softDeleteCompany";
 import { useContactsByCompany } from "../hooks/useContactsByCompany";
+import { useCompanyForm } from "../hooks/useCompanyForm";
 import type { CompanyFull } from "../hooks/useCompaniesAll";
+import { addressDisplayLine } from "../logic/address";
+import { isSameAddress } from "../logic/companyForm";
+import { CompanyFormFields } from "./CompanyFormFields";
 import { DetailField } from "./DetailField";
-import { hasErrors, validateCompanyForm, type CompanyFormValues } from "../utils/formValidation";
-
-const COMPANY_FIELDS = ["companyName", "email", "phone"] as const;
-
-const EMPTY_VALUES: CompanyFormValues = { companyName: "", email: "", phone: "" };
 
 type Props = {
   company: CompanyFull | null;
   onClose: () => void;
 };
 
+/** Shipping reads "Same as billing" rather than repeating the same lines. */
+function shippingDisplay(company: CompanyFull | null): string {
+  const shipping = company?.shippingAddress;
+  if (!shipping) return "";
+  const billing = company?.billingAddress;
+  return billing && isSameAddress(billing, shipping)
+    ? "Same as billing"
+    : addressDisplayLine(shipping);
+}
+
 export function CompanyDetailModal({ company, onClose }: Props) {
   const [mode, setMode] = useState<"view" | "edit">("view");
-  const [values, setValues] = useState<CompanyFormValues>(EMPTY_VALUES);
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const form = useCompanyForm(company);
   const linkedContacts = useContactsByCompany(company?.id ?? null);
-
-  const errors = validateCompanyForm(values);
-  const { errorFor, markTouched, markAllTouched, reset: resetTouched } = useTouchedErrors(errors);
-
-  const setValue = (key: keyof CompanyFormValues) => (value: string) =>
-    setValues((prev) => ({ ...prev, [key]: value }));
-
-  useEffect(() => {
-    if (!company) return;
-    setValues({
-      companyName: company.companyName,
-      email: company.email ?? "",
-      phone: company.phone ?? "",
-    });
-    setNotes(company.notes ?? "");
-    setMode("view");
-    resetTouched();
-  }, [company, resetTouched]);
 
   const handleClose = () => {
     setMode("view");
     onClose();
   };
 
-  const canSave = !!company && !hasErrors(errors) && !saving;
+  const handleCancelEdit = () => {
+    form.reset();
+    setMode("view");
+  };
 
   const handleSave = async () => {
-    markAllTouched(COMPANY_FIELDS);
-    if (!company || !canSave) return;
-
-    setSaving(true);
-    try {
-      await updateCompany(company.id, { ...values, notes });
-      createSuccessToast(["Company updated."]);
-      setMode("view");
-    } catch {
-      /* error shown by updateCompany */
-    } finally {
-      setSaving(false);
-    }
+    const saved = await form.submit();
+    if (saved) setMode("view");
   };
 
   const handleDelete = async () => {
@@ -105,6 +83,8 @@ export function CompanyDetailModal({ company, onClose }: Props) {
             <div className="space-y-1">
               <DetailField label="Email" value={company?.email} />
               <DetailField label="Phone" value={company?.phone} />
+              <DetailField label="Billing" value={addressDisplayLine(company?.billingAddress)} />
+              <DetailField label="Shipping" value={shippingDisplay(company)} />
               <DetailField label="Notes" value={company?.notes} />
 
               <div className="pt-3 mt-3 border-t border-gray-100">
@@ -131,35 +111,7 @@ export function CompanyDetailModal({ company, onClose }: Props) {
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              <TextField
-                label="Company Name"
-                required
-                value={values.companyName}
-                onChange={setValue("companyName")}
-                onBlur={() => markTouched("companyName")}
-                error={errorFor("companyName")}
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={values.email}
-                  onChange={setValue("email")}
-                  onBlur={() => markTouched("email")}
-                  error={errorFor("email")}
-                />
-                <TextField
-                  label="Phone"
-                  type="tel"
-                  value={values.phone}
-                  onChange={setValue("phone")}
-                  onBlur={() => markTouched("phone")}
-                  error={errorFor("phone")}
-                />
-              </div>
-              <TextAreaField label="Notes" value={notes} onChange={setNotes} />
-            </div>
+            <CompanyFormFields form={form} />
           )}
         </div>
 
@@ -191,17 +143,17 @@ export function CompanyDetailModal({ company, onClose }: Props) {
             ) : (
               <>
                 <button
-                  onClick={() => setMode("view")}
+                  onClick={handleCancelEdit}
                   className="px-4 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={!canSave}
+                  disabled={!form.canSave}
                   className="px-4 py-1.5 text-sm font-medium text-white bg-darkBlue rounded-md hover:bg-lightBlue transition-colors cursor-pointer disabled:opacity-40"
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {form.saving ? "Saving…" : "Save"}
                 </button>
               </>
             )}

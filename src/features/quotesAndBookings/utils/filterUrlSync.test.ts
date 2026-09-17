@@ -22,6 +22,8 @@ const emptyState: UrlSyncedListState = {
   },
   searchQuery: "",
   showDeleted: false,
+  page: 1,
+  pageSize: 25,
 };
 
 describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
@@ -42,6 +44,8 @@ describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
       },
       searchQuery: "acme corp",
       showDeleted: true,
+      page: 3,
+      pageSize: 50,
     };
 
     const params = filtersToSearchParams(state);
@@ -90,5 +94,38 @@ describe("hasUrlSyncedFilterParams", () => {
   it("is true when at least one owned param is present", () => {
     expect(hasUrlSyncedFilterParams(new URLSearchParams({ q: "acme" }))).toBe(true);
     expect(hasUrlSyncedFilterParams(new URLSearchParams({ showDeleted: "1" }))).toBe(true);
+  });
+});
+
+describe("page / pageSize in the URL", () => {
+  it("round-trips the page and page size so a reload lands on the same page", () => {
+    const params = filtersToSearchParams({ ...emptyState, page: 8, pageSize: 100 });
+    expect(params.get("page")).toBe("8");
+    expect(params.get("pageSize")).toBe("100");
+
+    const parsed = searchParamsToFilters(params);
+    expect(parsed.page).toBe(8);
+    expect(parsed.pageSize).toBe(100);
+  });
+
+  it("keeps the first page and the default size out of the URL", () => {
+    const params = filtersToSearchParams({ ...emptyState, page: 1, pageSize: 25 });
+    expect(params.toString()).toBe("");
+  });
+
+  it("defaults to page 1 at 25 per page when the params are absent or bogus", () => {
+    const absent = searchParamsToFilters(new URLSearchParams());
+    expect(absent.page).toBe(1);
+    expect(absent.pageSize).toBe(25);
+
+    const bogus = searchParamsToFilters(new URLSearchParams({ page: "0", pageSize: "7" }));
+    expect(bogus.page).toBe(1);
+    expect(bogus.pageSize).toBe(25);
+  });
+
+  it("drops a stale page param when the state goes back to page 1", () => {
+    const existing = new URLSearchParams({ page: "8" });
+    const params = filtersToSearchParams({ ...emptyState, page: 1 }, existing);
+    expect(params.get("page")).toBeNull();
   });
 });
