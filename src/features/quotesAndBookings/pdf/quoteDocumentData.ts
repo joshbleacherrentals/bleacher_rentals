@@ -15,6 +15,26 @@ export type QuoteLineItem = {
   total: number;
 };
 
+/**
+ * An `EventLineItems` row as the quote shows it. The description is the copy
+ * saved on the line item when it was added, never the bleacher type's current text.
+ */
+export function toQuoteLineItem(li: {
+  header: string;
+  description: string | null;
+  quantity: number | null;
+  value_cents: number;
+}): QuoteLineItem {
+  const qty = li.quantity ?? 1;
+  return {
+    label: li.header,
+    description: li.description ?? "",
+    qty,
+    unitPrice: li.value_cents,
+    total: qty * li.value_cents,
+  };
+}
+
 export type QuotePaymentInstallment = {
   id: string;
   dueDate: string;
@@ -353,13 +373,7 @@ export async function buildQuoteDocumentData(
 
   // Process line items
   const lineItemRows = lineItemResult.data;
-  const lineItems: QuoteLineItem[] = (lineItemRows ?? []).map((li: any) => ({
-    label: li.header,
-    description: li.description ?? "",
-    qty: li.quantity ?? 1,
-    unitPrice: li.value_cents,
-    total: (li.quantity ?? 1) * li.value_cents,
-  }));
+  const lineItems: QuoteLineItem[] = (lineItemRows ?? []).map(toQuoteLineItem);
 
   // Process installments. The status a client reads on this document is derived
   // from the payments, not from PaymentInstallments.status — that flag is a

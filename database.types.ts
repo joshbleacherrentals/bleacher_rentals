@@ -468,6 +468,7 @@ export type Database = {
           created_at: string
           created_by_user_uuid: string | null
           deleted: boolean
+          description: string | null
           id: string
           name: string
           roof_type: Database["public"]["Enums"]["roof_type"]
@@ -477,6 +478,7 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           deleted?: boolean
+          description?: string | null
           id?: string
           name: string
           roof_type?: Database["public"]["Enums"]["roof_type"]
@@ -486,6 +488,7 @@ export type Database = {
           created_at?: string
           created_by_user_uuid?: string | null
           deleted?: boolean
+          description?: string | null
           id?: string
           name?: string
           roof_type?: Database["public"]["Enums"]["roof_type"]

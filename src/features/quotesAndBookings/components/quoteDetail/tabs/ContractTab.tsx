@@ -11,6 +11,7 @@ import { ExternalLink, FileText } from "lucide-react";
 import { ContactHistorySheet } from "./ContactHistorySheet";
 import { VenueHistorySheet } from "./VenueHistorySheet";
 import { VenueCard } from "@/components/VenueCard";
+import { LineItemDescription } from "../../LineItemDescription";
 
 type SignatureInfo = {
   signerName: string;
@@ -84,9 +85,7 @@ function ItemSection({
                   {li.bleacherTypeName && (
                     <span className="text-gray-400 ml-1 text-xs">({li.bleacherTypeName})</span>
                   )}
-                  {li.description && (
-                    <span className="block text-xs text-gray-400">{li.description}</span>
-                  )}
+                  <LineItemDescription description={li.description} className="mt-0.5" />
                 </td>
                 <td className="py-2 text-right">{li.quantity}</td>
                 <td className="py-2 text-right">{formatMoney(li.valueCents, currency)}</td>

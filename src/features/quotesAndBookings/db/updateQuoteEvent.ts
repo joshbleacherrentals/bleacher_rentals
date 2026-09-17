@@ -15,6 +15,7 @@ import { normalizeLostFields } from "../utils/lostReason";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
+import { toEventLineItemValues } from "./toEventLineItemValues";
 
 type OldEventRow = {
   event_name: string | null;
@@ -264,13 +265,7 @@ export async function updateQuoteEvent(
   if (state.lineItems.length > 0) {
     const rows = state.lineItems.map((li) => ({
       id: crypto.randomUUID(),
-      event_uuid: eventId,
-      header: li.label,
-      description: null,
-      bleacher_type_uuid: li.bleacherTypeUuid || null,
-      value_cents: li.category === "discounts" ? li.lineTotalCents : li.unitPriceCents,
-      quantity: li.qty,
-      currency: state.currency,
+      ...toEventLineItemValues(li, eventId, state.currency),
       is_template: false,
       deleted: false,
     }));

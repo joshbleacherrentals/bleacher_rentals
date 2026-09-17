@@ -429,6 +429,30 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Pricing Matrix",
+    description:
+      "This applies to the Pricing Matrix page under Configuration: bleacher types (name, row count, roof type, description) and their prices. A bleacher type's description is copied onto a quote's line item when that type is added, so editing it later does not change quotes that already have it.",
+    category: "Configuration",
+    roles: {
+      admin: full(
+        "Able to create, edit, and delete bleacher types — including their description — and set their prices.",
+      ),
+      account_manager: none(
+        "Account managers can't see this page. They see each bleacher type's description when adding a line item to a quote, and on the quote itself, but cannot change it.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see bleacher types, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Viewers do not have access to the web configuration pages. They see a line item's description on quotes they can open.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(
+        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      ),
+    },
+  },
+  {
     label: "Manage Inspection Form",
     description:
       "The ability to create and edit the inspection form template that drivers fill out during pickup and drop-off. This applies to the Inspection Form page under Configuration.",

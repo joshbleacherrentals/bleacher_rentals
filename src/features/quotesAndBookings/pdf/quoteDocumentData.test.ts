@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { combineAddressLine, buildCustomerCompany } from "./quoteDocumentData";
+import { combineAddressLine, buildCustomerCompany, toQuoteLineItem } from "./quoteDocumentData";
 
 describe("combineAddressLine", () => {
   it("joins street, city, state and zip", () => {
@@ -66,5 +66,30 @@ describe("buildCustomerCompany", () => {
         Companies: { company_name: "Acme Events Inc." },
       }),
     ).toEqual({ name: "Acme Events Inc.", address: "" });
+  });
+});
+
+describe("toQuoteLineItem", () => {
+  it("carries the saved description, with its line breaks, to the PDF and public page", () => {
+    expect(
+      toQuoteLineItem({
+        header: "15 Row",
+        description: "Seats 300.\n\nIncludes:\n- guard rails",
+        quantity: 2,
+        value_cents: 50000,
+      }),
+    ).toEqual({
+      label: "15 Row",
+      description: "Seats 300.\n\nIncludes:\n- guard rails",
+      qty: 2,
+      unitPrice: 50000,
+      total: 100000,
+    });
+  });
+
+  it("has an empty description when none was saved", () => {
+    expect(
+      toQuoteLineItem({ header: "Delivery", description: null, quantity: null, value_cents: 3000 }),
+    ).toEqual({ label: "Delivery", description: "", qty: 1, unitPrice: 3000, total: 3000 });
   });
 });

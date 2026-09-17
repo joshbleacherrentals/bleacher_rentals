@@ -5,6 +5,7 @@ import { QuoteDocumentData } from "./quoteDocumentData";
 import type { TrackEvent } from "./useQuoteActivityTracker";
 import { formatQuoteDate, formatQuoteDateRange, formatQuoteMoney } from "./quoteFormat";
 import { quoteText } from "./quoteStrings";
+import { LineItemDescription } from "../components/LineItemDescription";
 
 function companyFullAddress(c: QuoteDocumentData["company"]): string {
   const parts = [c.street];
@@ -144,9 +145,7 @@ export function QuotePublicView({
                     <tr key={i} className={i % 2 === 1 ? "bg-gray-50" : ""}>
                       <td className="px-3 py-2 border-b border-gray-100">
                         <span className="font-medium">{item.label}</span>
-                        {item.description && (
-                          <span className="block text-xs text-gray-500">{item.description}</span>
-                        )}
+                        <LineItemDescription description={item.description} />
                       </td>
                       <td className="px-3 py-2 border-b border-gray-100 text-center">{item.qty}</td>
                       <td className="px-3 py-2 border-b border-gray-100 text-right">

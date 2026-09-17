@@ -179,3 +179,21 @@ describe("QuotePublicView — French", () => {
     expect(html).toContain("INV-1042");
   });
 });
+
+describe("QuotePublicView — line item description", () => {
+  it("shows a bleacher's saved description with its paragraphs and bullet lines", () => {
+    const data = quote("en");
+    data.lineItems[0].description = "Seats 300.\n\nIncludes:\n- guard rails";
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toMatch(
+      /<span class="[^"]*whitespace-pre-line[^"]*">Seats 300\.\n\nIncludes:\n- guard rails<\/span>/,
+    );
+  });
+
+  it("shows no description block when the line item has none", () => {
+    const data = quote("en");
+    data.lineItems[0].description = "";
+    const html = renderToStaticMarkup(<QuotePublicView data={data} />);
+    expect(html).toContain('<span class="font-medium">Bleacher 15 row</span></td>');
+  });
+});

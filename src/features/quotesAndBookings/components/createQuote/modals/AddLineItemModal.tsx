@@ -1,14 +1,9 @@
 "use client";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
-import { useBleacherTypes } from "../../../hooks/useBleacherTypes";
+import { useBleacherTypes, BleacherTypeOption } from "../../../hooks/useBleacherTypes";
 import { usePriceLookup } from "../../../hooks/usePriceLookup";
 import {
   DISCOUNT_TEMPLATES,
@@ -16,6 +11,8 @@ import {
   CUSTOM_SERVICE_TEMPLATES,
 } from "../../../data/mockData";
 import { LineItem } from "../../../types/quoteTypes";
+import { newBleacherLineItem } from "../../../utils/newBleacherLineItem";
+import { LineItemDescription } from "../../LineItemDescription";
 
 function formatCents(cents: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -48,23 +45,12 @@ export function AddLineItemModal() {
   const canLookupPrice = !!eventTypeId && !!eventStart && !!eventEnd;
   const duration = eventStart && eventEnd ? findDuration(eventStart, eventEnd) : null;
 
-  const addBleacher = (bt: { id: string; name: string }) => {
-    const priceCents =
-      canLookupPrice ? lookupPrice(bt.id, eventTypeId!, eventStart, eventEnd, currency) : null;
+  const addBleacher = (bt: BleacherTypeOption) => {
+    const priceCents = canLookupPrice
+      ? lookupPrice(bt.id, eventTypeId!, eventStart, eventEnd, currency)
+      : null;
 
-    const item: LineItem = {
-      id: crypto.randomUUID(),
-      category: "bleachers",
-      label: bt.name,
-      bleacherTypeUuid: bt.id,
-      qty: 1,
-      unitPriceCents: priceCents ?? 0,
-      lineTotalCents: priceCents ?? 0,
-      overridePrice: priceCents === null,
-      discountType: "percentage",
-      discountValue: 0,
-    };
-    addLineItem(item);
+    addLineItem(newBleacherLineItem(bt, priceCents));
     close();
   };
 
@@ -87,6 +73,7 @@ export function AddLineItemModal() {
       overridePrice: false,
       discountType: template.defaultType,
       discountValue: template.defaultValue,
+      description: null,
     };
     addLineItem(item);
     close();
@@ -107,6 +94,7 @@ export function AddLineItemModal() {
       overridePrice: false,
       discountType: "percentage",
       discountValue: 0,
+      description: null,
     };
     addLineItem(item);
     close();
@@ -149,11 +137,15 @@ export function AddLineItemModal() {
                     onClick={() => addBleacher(bt)}
                     className="w-full flex items-center justify-between p-3 border rounded hover:bg-gray-50 transition cursor-pointer text-left"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-medium text-sm">{bt.name}</div>
                       <div className="text-xs text-gray-500">{bt.rowCount} rows</div>
+                      <LineItemDescription
+                        description={bt.description}
+                        className="mt-1 line-clamp-3"
+                      />
                     </div>
-                    <div className="text-right text-xs text-gray-500">
+                    <div className="shrink-0 pl-3 text-right text-xs text-gray-500">
                       {priceCents !== null ? (
                         <div>
                           <span className="font-medium text-gray-700">
