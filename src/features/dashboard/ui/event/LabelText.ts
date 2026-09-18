@@ -1,8 +1,7 @@
 import { Container, Text } from "pixi.js";
 import { EventSpanType } from "../../util/Events";
-import { loadEventById } from "../../db/client/loadEventById";
+import { loadEventForModal } from "@/features/eventConfiguration/functions/loadEventForModal";
 import { loadSubrentalEventById } from "../../db/client/loadSubrentalEventById";
-import { supabaseClientRegistry } from "../../util/supabaseClientRegistry";
 
 /**
  * Static event label component without any interactive elements
@@ -60,12 +59,7 @@ export class LabelText extends Container {
       return;
     }
 
-    const supabase = supabaseClientRegistry.getClient();
-    if (!supabase) {
-      console.warn("No Supabase client available");
-      return;
-    }
-    await loadEventById(this.eventInfo.ev.eventUuid, supabase);
+    await loadEventForModal(this.eventInfo.ev.eventUuid, "dashboard");
   }
 
   /**

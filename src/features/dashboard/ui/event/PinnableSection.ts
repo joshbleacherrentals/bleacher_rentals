@@ -4,8 +4,7 @@ import { LabelText } from "./LabelText";
 import { GoodShuffleIcon } from "./GoodShuffleIcon";
 import { AlertBadge } from "./AlertBadge";
 import { Baker } from "../../util/Baker";
-import { loadEventById } from "../../db/client/loadEventById";
-import { supabaseClientRegistry } from "../../util/supabaseClientRegistry";
+import { loadEventForModal } from "@/features/eventConfiguration/functions/loadEventForModal";
 
 /**
  * Event cell label that can render in different modes for optimal caching
@@ -71,14 +70,7 @@ export class PinnableSection extends Container {
       target = target.parent;
     }
 
-    const supabase = supabaseClientRegistry.getClient();
-
-    if (!supabase) {
-      console.warn("No Supabase client available");
-      return;
-    }
-
-    await loadEventById(this.eventInfo.ev.eventUuid, supabase);
+    await loadEventForModal(this.eventInfo.ev.eventUuid, "dashboard");
   }
 
   /**
