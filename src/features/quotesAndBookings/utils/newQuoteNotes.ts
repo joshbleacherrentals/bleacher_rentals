@@ -3,7 +3,7 @@
  * button on the Quotes & Bookings list starts a genuinely new quote.
  */
 export const NEW_QUOTE_CLIENT_NOTES =
-  "**DISCLAIMER\n\nStandard delivery & setup window is 1-3 days before the event starts, pickup 1-3 days after the event ends\nOverdue payments are charged at 2% interest per month.";
+  "Standard delivery & setup window is 1-3 days before the event starts, pickup 1-3 days after the event ends.\n\nOverdue payments are charged at 2% interest per month.";
 
 /**
  * Whether clicking "+ Create Quote" should prefill Client-Facing Notes with
