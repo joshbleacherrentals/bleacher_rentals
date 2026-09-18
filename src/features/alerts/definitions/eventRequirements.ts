@@ -10,9 +10,6 @@ const TITLE = "Event Requirements Not Met";
 type EventRow = {
   event_name: string | null;
   total_seats: number | null;
-  seven_row: number | null;
-  ten_row: number | null;
-  fifteen_row: number | null;
   lenient: number | null;
   street: string | null;
   created_by_user_uuid: string | null;
@@ -43,9 +40,6 @@ export const eventRequirements: AlertDefinition = {
         .select([
           "e.event_name as event_name",
           "e.total_seats as total_seats",
-          "e.seven_row as seven_row",
-          "e.ten_row as ten_row",
-          "e.fifteen_row as fifteen_row",
           "e.lenient as lenient",
           "a.street as street",
           "e.created_by_user_uuid as created_by_user_uuid",
@@ -130,28 +124,9 @@ export const eventRequirements: AlertDefinition = {
         if (mismatches.length > 0) {
           message = `Bleacher mismatch — ${mismatches.join(", ")}.`;
         }
-      } else {
-        // Legacy fallback
-        const sevenRowRequired = event.seven_row ?? 0;
-        const tenRowRequired = event.ten_row ?? 0;
-        const fifteenRowRequired = event.fifteen_row ?? 0;
-
-        const sevenRowAssigned = assignedRows.filter((b) => b.bleacher_rows === 7).length;
-        const tenRowAssigned = assignedRows.filter((b) => b.bleacher_rows === 10).length;
-        const fifteenRowAssigned = assignedRows.filter((b) => b.bleacher_rows === 15).length;
-
-        const mismatches: string[] = [];
-        if (sevenRowAssigned !== sevenRowRequired)
-          mismatches.push(`7-row: ${sevenRowRequired} needed, ${sevenRowAssigned} assigned`);
-        if (tenRowAssigned !== tenRowRequired)
-          mismatches.push(`10-row: ${tenRowRequired} needed, ${tenRowAssigned} assigned`);
-        if (fifteenRowAssigned !== fifteenRowRequired)
-          mismatches.push(`15-row: ${fifteenRowRequired} needed, ${fifteenRowAssigned} assigned`);
-
-        if (mismatches.length > 0) {
-          message = `Bleacher mismatch — ${mismatches.join(", ")}.`;
-        }
       }
+      // No line items means no bleacher-type requirement to check. The old 7/10/15-row counts
+      // on Events are legacy and are deliberately never compared any more.
     }
 
     if (!message) return null;
@@ -196,27 +171,8 @@ export const eventRequirements: AlertDefinition = {
         if (mismatches.length > 0) {
           alerts.push(makeAlert(`Bleacher mismatch — ${mismatches.join(", ")}.`));
         }
-      } else {
-        const sevenRowRequired = event.sevenRow ?? 0;
-        const tenRowRequired = event.tenRow ?? 0;
-        const fifteenRowRequired = event.fifteenRow ?? 0;
-
-        const sevenRowAssigned = assignedBleachers.filter((b) => b.bleacher_rows === 7).length;
-        const tenRowAssigned = assignedBleachers.filter((b) => b.bleacher_rows === 10).length;
-        const fifteenRowAssigned = assignedBleachers.filter((b) => b.bleacher_rows === 15).length;
-
-        const mismatches: string[] = [];
-        if (sevenRowAssigned !== sevenRowRequired)
-          mismatches.push(`7-row: ${sevenRowRequired} needed, ${sevenRowAssigned} assigned`);
-        if (tenRowAssigned !== tenRowRequired)
-          mismatches.push(`10-row: ${tenRowRequired} needed, ${tenRowAssigned} assigned`);
-        if (fifteenRowAssigned !== fifteenRowRequired)
-          mismatches.push(`15-row: ${fifteenRowRequired} needed, ${fifteenRowAssigned} assigned`);
-
-        if (mismatches.length > 0) {
-          alerts.push(makeAlert(`Bleacher mismatch — ${mismatches.join(", ")}.`));
-        }
       }
+      // No bleacher-type requirement means nothing to check — the legacy row counts are ignored.
     }
 
     return alerts;

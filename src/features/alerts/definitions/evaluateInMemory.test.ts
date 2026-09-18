@@ -251,14 +251,12 @@ describe("eventRequirements.evaluateInMemory", () => {
     expect(runRequirements(ctx)[0].message).toContain("Type: 2 needed, 1 assigned");
   });
 
-  it("falls back to row counts when no explicit requirement is set", () => {
-    const ctx = context({ event: currentEvent({ tenRow: 2 }) });
-
-    expect(runRequirements(ctx)[0].message).toContain("10-row: 2 needed, 1 assigned");
-  });
-
-  it("stays silent when row counts match", () => {
-    const ctx = context({ event: currentEvent({ tenRow: 1 }) });
+  it("never reports the old 7/10/15-row counts when no bleacher type is required", () => {
+    // The legacy row-count requirement is gone; "15-row: 0 needed, 2 assigned" must not return.
+    const ctx = context({
+      event: currentEvent({ tenRow: 2, fifteenRow: 0 }),
+      allBleachers: [psBleacher({ bleacher_rows: 15 })],
+    });
 
     expect(runRequirements(ctx)).toEqual([]);
   });
