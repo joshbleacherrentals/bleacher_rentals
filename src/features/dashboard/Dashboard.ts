@@ -576,7 +576,7 @@ export class Dashboard {
   private applySubrentalWindow(bleachers: Bleacher[]): Bleacher[] {
     if (this.filters.hideAllSubrentals) {
       this.subrentalWindowSignature = "";
-      return withoutSubrentalRows(bleachers);
+      return withoutSubrentalRows(bleachers, this.pinnedBleacherUuids);
     }
 
     const { start, end } = this.visibleDateWindow();

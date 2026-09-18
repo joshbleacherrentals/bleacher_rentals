@@ -160,4 +160,15 @@ describe("withoutSubrentalRows", () => {
 
     expect(withoutSubrentalRows([first, inRange, second])).toEqual([first, second]);
   });
+
+  it("keeps the subrental rows of bleachers selected on the open event", () => {
+    const normal = bleacher({ bleacherUuid: "b-1" });
+    const selected = subrentalRow({ bleacherUuid: "b-2" });
+    const notSelected = subrentalRow({ bleacherUuid: "b-3" });
+
+    expect(withoutSubrentalRows([normal, selected, notSelected], new Set(["b-2"]))).toEqual([
+      normal,
+      selected,
+    ]);
+  });
 });
