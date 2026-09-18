@@ -65,3 +65,11 @@ export function filterSubrentalRowsByDateWindow(
       isSubrentalRowVisible(b, visibleStart, visibleEnd),
   );
 }
+
+/**
+ * Drops every subrental row regardless of dates — the "Hide all Subrentals" dashboard option.
+ * Normal rows keep their order.
+ */
+export function withoutSubrentalRows(bleachers: Bleacher[]): Bleacher[] {
+  return bleachers.filter((b) => !b.isSubrentalRow);
+}

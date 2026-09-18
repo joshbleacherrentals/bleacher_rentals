@@ -23,6 +23,7 @@ type SettingsRow = {
   rowsQuickFilter: number | null;
   zoneUuids: string | null;
   showUnassignedZone: number | null;
+  hideAllSubrentals: number | null;
 };
 
 const parseJsonArray = <T>(value: string | null | undefined, fallback: T[]): T[] => {
@@ -96,6 +97,7 @@ export function useDashboardFilterSettings(): {
         "s.rows_quick_filter as rowsQuickFilter",
         "s.zone_uuids as zoneUuids",
         "s.show_unassigned_zone as showUnassignedZone",
+        "s.hide_all_subrentals as hideAllSubrentals",
       ])
       .where("s.user_uuid", "=", userUuidForQuery)
       .limit(1)
@@ -141,6 +143,7 @@ export function useDashboardFilterSettings(): {
         rows_quick_filter: null,
         zone_uuids: "[]",
         show_unassigned_zone: 0,
+        hide_all_subrentals: 0,
       })
       .compile();
 
@@ -177,6 +180,7 @@ export function useDashboardFilterSettings(): {
           : null,
       zoneUuids: parseJsonArray<string>(settingsRow.zoneUuids, []),
       showUnassignedZone: toBool(settingsRow.showUnassignedZone),
+      hideAllSubrentals: toBool(settingsRow.hideAllSubrentals),
     };
   }, [settingsRow]);
 
@@ -231,6 +235,9 @@ export function useDashboardFilterSettings(): {
 
         case "showUnassignedZone":
           return updateDb({ show_unassigned_zone: value ? 1 : 0 });
+
+        case "hideAllSubrentals":
+          return updateDb({ hide_all_subrentals: value ? 1 : 0 });
 
         default:
           return;

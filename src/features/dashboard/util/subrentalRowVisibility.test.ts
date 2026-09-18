@@ -4,6 +4,7 @@ import {
   SUBRENTAL_ROW_PADDING_DAYS,
   filterSubrentalRowsByDateWindow,
   isSubrentalRowVisible,
+  withoutSubrentalRows,
 } from "./subrentalRowVisibility";
 
 function bleacher(overrides: Partial<Bleacher> = {}): Bleacher {
@@ -145,5 +146,18 @@ describe("filterSubrentalRowsByDateWindow", () => {
   it("returns the list untouched when the window is unknown", () => {
     const rows = [bleacher(), subrentalRow()];
     expect(filterSubrentalRowsByDateWindow(rows, undefined, undefined)).toEqual(rows);
+  });
+});
+
+describe("withoutSubrentalRows", () => {
+  it("drops every subrental row, even one inside its own dates, and keeps normal rows in order", () => {
+    const first = bleacher({ bleacherUuid: "b-1" });
+    const inRange = subrentalRow({
+      bleacherUuid: "b-2",
+      subrentalEvents: [pending("2025-03-15", "2025-03-20")],
+    });
+    const second = bleacher({ bleacherUuid: "b-3" });
+
+    expect(withoutSubrentalRows([first, inRange, second])).toEqual([first, second]);
   });
 });

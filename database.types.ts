@@ -1014,6 +1014,7 @@ export type Database = {
         Row: {
           account_manager_uuid: string | null
           created_at: string
+          hide_all_subrentals: boolean
           id: string
           only_show_my_events: boolean
           optimization_mode: boolean
@@ -1034,6 +1035,7 @@ export type Database = {
         Insert: {
           account_manager_uuid?: string | null
           created_at?: string
+          hide_all_subrentals?: boolean
           id?: string
           only_show_my_events?: boolean
           optimization_mode?: boolean
@@ -1054,6 +1056,7 @@ export type Database = {
         Update: {
           account_manager_uuid?: string | null
           created_at?: string
+          hide_all_subrentals?: boolean
           id?: string
           only_show_my_events?: boolean
           optimization_mode?: boolean
