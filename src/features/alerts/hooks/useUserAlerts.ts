@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery, typedExecute } from "@/lib/powersync/typedQuery";
 import { businessToday, hidePastAlerts } from "../util/pastAlerts";
+import { hideOutOfWindowTransportationAlerts } from "../util/transportationWindow";
 
 export type UserAlertRow = {
   userAlertId: string;
@@ -18,6 +19,8 @@ export type UserAlertRow = {
   createdAt: string | null;
   /** The date that decides whether the alert's entity is past; null when not synced locally. */
   entityDate: string | null;
+  /** The entity's start date, which bounds "No Transportation"; null when not synced locally. */
+  entityStartDate: string | null;
 };
 
 // ─── user lookup ─────────────────────────────────────────────────────────────
@@ -64,6 +67,7 @@ export function useUserAlerts() {
         )
         .select((eb) => [
           eb.fn.coalesce("ev.event_end", "bev.event_end", "wt.date").as("entityDate"),
+          eb.fn.coalesce("ev.event_start", "bev.event_start", "wt.date").as("entityStartDate"),
         ])
         .select([
           "ua.id as userAlertId",
@@ -86,7 +90,8 @@ export function useUserAlerts() {
 
   const { data: rawAlerts = [] } = useTypedQuery(alertsQuery, expect<UserAlertRow>());
   // Alerts about something already over are never shown, even before the daily cleanup runs.
-  const allAlerts = hidePastAlerts(rawAlerts, today);
+  // "No Transportation" is narrower still: only events starting inside the booking window.
+  const allAlerts = hideOutOfWindowTransportationAlerts(hidePastAlerts(rawAlerts, today));
 
   // "Active" = not dismissed, or reminder date has arrived
   const activeAlerts = allAlerts.filter(

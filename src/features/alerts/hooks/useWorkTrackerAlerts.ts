@@ -18,6 +18,8 @@ export type WorkTrackerAlertRow = {
   createdAt: string | null;
   /** The work tracker's date; its alerts are hidden once it is past. */
   entityDate: string | null;
+  /** Same date, under the name the shared alert row type uses for its start. */
+  entityStartDate: string | null;
 };
 
 type UserRow = { userUuid: string };
@@ -50,6 +52,7 @@ export function useWorkTrackerAlerts(workTrackerUuid: string | null) {
         .leftJoin("WorkTrackers as wt", "wt.id", "a.entity_uuid")
         .select([
           "wt.date as entityDate",
+          "wt.date as entityStartDate",
           "ua.id as userAlertId",
           "a.id as alertId",
           "a.entity_uuid as entityUuid",

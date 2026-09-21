@@ -10,6 +10,7 @@ import { usePsEvents } from "@/features/dashboard/db/hooks/powersync/usePsEvents
 import type { AlertPayload } from "@/features/alerts/types";
 import { TRANSPORTATION_ALERT_TITLES, mergeAlertFamily, sameAlertList } from "./alertFamilies";
 import { isPastBusinessDate } from "@/features/alerts/util/pastAlerts";
+import { isInTransportationWindow } from "@/features/alerts/util/transportationWindow";
 
 /**
  * Reactively computes "No Transportation" alerts for the event config form using
@@ -37,6 +38,8 @@ export function useEventFormTransportationAlerts() {
     if (!eventStreet || !eventStart || bleacherUuids.length === 0) return [];
     // An event that has ended shows no alerts — see docs/specs/no-past-alerts.md.
     if (isPastBusinessDate(eventEnd)) return [];
+    // And transportation only matters for events starting inside the booking window.
+    if (!isInTransportationWindow(eventStart)) return [];
 
     const result: AlertPayload[] = [];
 
