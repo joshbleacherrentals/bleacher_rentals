@@ -23,6 +23,7 @@ import {
   Mails,
   Sparkles,
   Layers,
+  Activity,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -238,6 +239,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
   },
 
   {
+    type: "button",
+    key: "sync-health",
+    label: "Sync Health",
+    href: "/dev-tools/sync-health",
+    icon: Activity,
+  },
+  {
     type: "section",
     key: "documentation",
     label: "Documentation",
@@ -293,7 +301,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "driver-calendar",
     "documentation",
   ],
-  developer: ["roadmap"],
+  developer: ["roadmap", "sync-health"],
   viewer: [
     "dashboard",
     "quotes-bookings",
