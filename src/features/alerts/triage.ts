@@ -36,7 +36,7 @@ export async function triage(
 ): Promise<void> {
   switch (table) {
     case "Events":
-      await triageEventSaved(row.id, supabase);
+      await triageEventSaved(row.id, supabase, row.removed_bleacher_uuids ?? null);
       break;
     case "Events_deleted":
       await triageEventDeleted(row.id, supabase);
@@ -53,6 +53,14 @@ export async function triage(
 async function triageEventSaved(
   eventUuid: string,
   supabase?: SupabaseClient<Database>,
+  /**
+   * Bleachers this save took OFF the event. Their other events keep alerts derived from a
+   * neighbour that is no longer there — a scheduling conflict with an event that gave the bleacher
+   * up, say — and nothing else would ever re-check them, because the ripple below reads the
+   * event's bleachers as they are AFTER the save. The work tracker path solves the same problem
+   * with `previous_bleacher_uuid`.
+   */
+  removedBleacherUuids: string[] | null = null,
 ): Promise<void> {
   console.log("[QUOTE_TRIAGE] triageEventSaved called for", eventUuid);
   // Soft-delete path: if the event is flagged deleted, handle it as a delete triage.
@@ -85,7 +93,12 @@ async function triageEventSaved(
       .compile(),
     expect<BeRow>(),
   );
-  const bleacherUuids = [...new Set(bes.map((be) => be.bleacher_uuid).filter(Boolean))] as string[];
+  const bleacherUuids = [
+    ...new Set([
+      ...(bes.map((be) => be.bleacher_uuid).filter(Boolean) as string[]),
+      ...(removedBleacherUuids ?? []),
+    ]),
+  ];
   console.log(
     "[QUOTE_TRIAGE] bleacherEvents found:",
     bes.length,
@@ -125,7 +138,7 @@ async function triageEventSaved(
         .where("be.bleacher_uuid", "in", bleacherUuids)
         .where("be.event_uuid", "!=", eventUuid)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", businessToday())
+        .where("e.event_end", ">=", businessToday())
         .compile(),
       expect<RelatedBeRow>(),
     );
@@ -190,7 +203,7 @@ async function triageEventDeleted(
         .where("be.bleacher_uuid", "in", bleacherUuids)
         .where("be.event_uuid", "!=", eventUuid)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", businessToday())
+        .where("e.event_end", ">=", businessToday())
         .compile(),
       expect<RelatedBeRow>(),
     );
@@ -292,7 +305,7 @@ async function runWorkTrackerCascade(
         .select(["be.id as id"])
         .where("be.bleacher_uuid", "in", bleacherUuids)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", businessToday())
+        .where("e.event_end", ">=", businessToday())
         // Bounded to the same window the cron job and the work tracker
         // definitions use: outside it no alert can fire, so evaluating events a
         // year out was pure cost. This bound is the multiplier on every save.
@@ -335,7 +348,7 @@ async function triageWorkTrackerDeleted(
         .select(["be.id as id"])
         .where("be.bleacher_uuid", "=", bleacherUuid)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", businessToday())
+        .where("e.event_end", ">=", businessToday())
         .compile(),
       expect<RelatedBeRow>(),
     );

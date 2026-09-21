@@ -39,6 +39,9 @@ vi.mock("@/lib/powersync/typedQuery", () => ({
     if (compiled.sql.includes('from "BleacherEvents"')) {
       return Promise.resolve([{ id: "be-1" }]);
     }
+    if (compiled.sql.includes('from "Events"')) {
+      return Promise.resolve([{ deleted: 0 }]);
+    }
     return Promise.resolve([]);
   },
   typedExecute: () => Promise.resolve(),
@@ -165,5 +168,33 @@ describe("triage WorkTrackers", () => {
       "plan No Transportation be-1",
       "plan Scheduling Conflict be-1",
     ]);
+  });
+});
+
+describe("triage Events", () => {
+  function eventRipple(): CompiledQuery {
+    const query = reads.find(
+      (r) => r.sql.includes('from "BleacherEvents"') && r.sql.includes('inner join "Events"'),
+    );
+    if (!query) throw new Error("triage never ran the ripple query");
+    return query;
+  }
+
+  it("re-checks the other events of a bleacher this save removed", async () => {
+    // Taking a bleacher off an event leaves its neighbours holding alerts derived from it — a
+    // scheduling conflict with an event that no longer wants the bleacher. By the time triage
+    // runs, this event no longer points at it, so the caller has to say what it removed.
+    await triage("Events", { id: "ev-1", removed_bleacher_uuids: ["bleacher-removed"] });
+
+    expect(eventRipple().parameters).toContain("bleacher-removed");
+  });
+
+  it("bounds the ripple by the event end, so one already under way is still re-checked", async () => {
+    // Bounding on event_start skipped every long event in progress: the bug that left a stale
+    // "Double booked" alert on an event running August to October.
+    await triage("Events", { id: "ev-1", removed_bleacher_uuids: ["bleacher-removed"] });
+
+    expect(eventRipple().sql).toContain('"e"."event_end" >=');
+    expect(eventRipple().sql).not.toContain('"e"."event_start" >=');
   });
 });

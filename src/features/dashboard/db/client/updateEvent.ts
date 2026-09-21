@@ -16,7 +16,7 @@ export async function updateEvent(
   state: CurrentEventStore,
   supabase: SupabaseClient<Database>,
   user: UserResource | null,
-): Promise<void> {
+): Promise<{ removedBleacherUuids: string[] }> {
   if (!supabase) {
     createErrorToast(["No Supabase Client found"]);
   }
@@ -128,12 +128,18 @@ export async function updateEvent(
       .compile(),
   );
 
-  await updateBleacherEvents(state);
+  const { removedBleacherUuids } = await updateBleacherEvents(state);
 
   createSuccessToast(["Event Updated"]);
+
+  // The caller passes these to `triage`: a bleacher taken off this event still needs its other
+  // events re-checked, and by then this event no longer points at it.
+  return { removedBleacherUuids };
 }
 
-async function updateBleacherEvents(state: CurrentEventStore) {
+async function updateBleacherEvents(
+  state: CurrentEventStore,
+): Promise<{ removedBleacherUuids: string[] }> {
   const existingLinks = await typedGetAll(
     db
       .selectFrom("BleacherEvents")
@@ -177,4 +183,6 @@ async function updateBleacherEvents(state: CurrentEventStore) {
         .compile(),
     );
   }
+
+  return { removedBleacherUuids: toDelete };
 }
