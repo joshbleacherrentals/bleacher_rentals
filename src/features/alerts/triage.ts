@@ -8,7 +8,8 @@ import { syncAlert, planAlert, deleteAllAlertsForEntity } from "./engine";
 import { typedExecuteBatch } from "@/lib/powersync/typedQuery";
 import type { CompiledQuery } from "kysely";
 import { getDefinitionsForEntity } from "./registry";
-import { todayStart, upcomingWindowEndInstant } from "./util/getUpcomingWindow";
+import { getUpcomingWindowEnd } from "./util/getUpcomingWindow";
+import { businessToday } from "./util/pastAlerts";
 import { perfNote, startTrace } from "@/lib/perf/perfTrace";
 import { runCascade } from "./cascadeQueue";
 
@@ -124,7 +125,7 @@ async function triageEventSaved(
         .where("be.bleacher_uuid", "in", bleacherUuids)
         .where("be.event_uuid", "!=", eventUuid)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", todayStart())
+        .where("e.event_start", ">=", businessToday())
         .compile(),
       expect<RelatedBeRow>(),
     );
@@ -143,7 +144,7 @@ async function triageEventSaved(
           .selectFrom("WorkTrackers as wt")
           .select(["wt.id as id"])
           .where("wt.bleacher_uuid", "in", bleacherUuids)
-          .where("wt.date", ">=", todayStart())
+          .where("wt.date", ">=", businessToday())
           .compile(),
         expect<WtIdRow>(),
       );
@@ -189,7 +190,7 @@ async function triageEventDeleted(
         .where("be.bleacher_uuid", "in", bleacherUuids)
         .where("be.event_uuid", "!=", eventUuid)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", todayStart())
+        .where("e.event_start", ">=", businessToday())
         .compile(),
       expect<RelatedBeRow>(),
     );
@@ -207,7 +208,7 @@ async function triageEventDeleted(
           .selectFrom("WorkTrackers as wt")
           .select(["wt.id as id"])
           .where("wt.bleacher_uuid", "in", bleacherUuids)
-          .where("wt.date", ">=", todayStart())
+          .where("wt.date", ">=", businessToday())
           .compile(),
         expect<WtIdRow>(),
       );
@@ -291,11 +292,11 @@ async function runWorkTrackerCascade(
         .select(["be.id as id"])
         .where("be.bleacher_uuid", "in", bleacherUuids)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", todayStart())
+        .where("e.event_start", ">=", businessToday())
         // Bounded to the same window the cron job and the work tracker
         // definitions use: outside it no alert can fire, so evaluating events a
         // year out was pure cost. This bound is the multiplier on every save.
-        .where("e.event_start", "<=", upcomingWindowEndInstant())
+        .where("e.event_start", "<=", getUpcomingWindowEnd())
         .compile(),
       expect<RelatedBeRow>(),
     );
@@ -334,7 +335,7 @@ async function triageWorkTrackerDeleted(
         .select(["be.id as id"])
         .where("be.bleacher_uuid", "=", bleacherUuid)
         .where("e.deleted", "=", 0)
-        .where("e.event_start", ">=", todayStart())
+        .where("e.event_start", ">=", businessToday())
         .compile(),
       expect<RelatedBeRow>(),
     );

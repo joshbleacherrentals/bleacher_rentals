@@ -64,9 +64,10 @@ vi.mock("./registry", () => ({
 
 import { triage } from "./triage";
 import { resetCascadeQueue } from "./cascadeQueue";
-import { todayStart, upcomingWindowEndInstant } from "./util/getUpcomingWindow";
+import { getUpcomingWindowEnd } from "./util/getUpcomingWindow";
+import { businessToday } from "./util/pastAlerts";
 
-const TUESDAY_NOON = new Date(2026, 8, 15, 12, 0, 0);
+const TUESDAY_NOON = new Date("2026-09-15T16:00:00Z"); // Tuesday, noon in Toronto
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -93,8 +94,11 @@ describe("triage WorkTrackers", () => {
 
     // Without an upper bound the cascade re-evaluates events a year out, for
     // which no alert can ever fire — the multiplier behind a 14s save.
-    expect(rippleQuery().parameters).toContain(upcomingWindowEndInstant());
-    expect(rippleQuery().parameters).toContain(todayStart());
+    // Both bounds are plain dates: the columns they filter are DATE columns, and an instant as
+    // the lower bound sorted after every row dated today.
+    expect(rippleQuery().parameters).toContain(getUpcomingWindowEnd());
+    expect(rippleQuery().parameters).toContain(businessToday());
+    expect(rippleQuery().parameters).toContain("2026-09-15");
   });
 
   it("still evaluates every bleacher_event definition inside the window", async () => {

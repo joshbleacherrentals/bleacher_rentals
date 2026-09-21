@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery, typedExecute } from "@/lib/powersync/typedQuery";
+import { businessToday, hidePastAlerts } from "../util/pastAlerts";
 
 export type UserAlertRow = {
   userAlertId: string;
@@ -15,6 +16,8 @@ export type UserAlertRow = {
   dismissed: number | null;
   dismissedUntil: string | null;
   createdAt: string | null;
+  /** The date that decides whether the alert's entity is past; null when not synced locally. */
+  entityDate: string | null;
 };
 
 // ─── user lookup ─────────────────────────────────────────────────────────────
@@ -24,7 +27,7 @@ type UserRow = { userUuid: string };
 export function useUserAlerts() {
   const { user } = useUser();
   const clerkUserId = user?.id ?? "__no_clerk_user__";
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = businessToday(); // Toronto YYYY-MM-DD — see docs/specs/no-past-alerts.md
 
   // 1. Resolve Users.id from clerk id
   const userQuery = useMemo(
@@ -47,6 +50,21 @@ export function useUserAlerts() {
       db
         .selectFrom("UserAlerts as ua")
         .innerJoin("Alerts as a", "a.id", "ua.alert_uuid")
+        // The entity's date, per entity type: an event's end, a bleacher event's event end, or a
+        // work tracker's date. Used to hide alerts whose entity is past.
+        .leftJoin("Events as ev", (join) =>
+          join.onRef("ev.id", "=", "a.entity_uuid").on("a.entity_type", "=", "event"),
+        )
+        .leftJoin("BleacherEvents as be", (join) =>
+          join.onRef("be.id", "=", "a.entity_uuid").on("a.entity_type", "=", "bleacher_event"),
+        )
+        .leftJoin("Events as bev", "bev.id", "be.event_uuid")
+        .leftJoin("WorkTrackers as wt", (join) =>
+          join.onRef("wt.id", "=", "a.entity_uuid").on("a.entity_type", "=", "work_tracker"),
+        )
+        .select((eb) => [
+          eb.fn.coalesce("ev.event_end", "bev.event_end", "wt.date").as("entityDate"),
+        ])
         .select([
           "ua.id as userAlertId",
           "a.id as alertId",
@@ -66,7 +84,9 @@ export function useUserAlerts() {
     [userUuid],
   );
 
-  const { data: allAlerts = [] } = useTypedQuery(alertsQuery, expect<UserAlertRow>());
+  const { data: rawAlerts = [] } = useTypedQuery(alertsQuery, expect<UserAlertRow>());
+  // Alerts about something already over are never shown, even before the daily cleanup runs.
+  const allAlerts = hidePastAlerts(rawAlerts, today);
 
   // "Active" = not dismissed, or reminder date has arrived
   const activeAlerts = allAlerts.filter(

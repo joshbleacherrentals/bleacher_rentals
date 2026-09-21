@@ -4514,6 +4514,7 @@ export type Database = {
         Args: { p_ids: string[] }
         Returns: undefined
       }
+      delete_past_alerts: { Args: never; Returns: number }
       drivers_backfill_document: {
         Args: { p_doc_type: string; p_driver_id: string; p_photo_path: string }
         Returns: undefined
