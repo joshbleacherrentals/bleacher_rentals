@@ -255,6 +255,13 @@ const HomeBasesCols = {
 } satisfies PowerSyncColsFor<"HomeBases">;
 const HomeBases = new Table(HomeBasesCols);
 
+/**
+ * The Sync Health columns of Drivers. Office roles get them on Drivers.* like
+ * any other column; a developer with no office role syncs no Drivers rows at
+ * all and gets them on `DriverSyncHealth` (br_powersync/config/sync_rules.yaml).
+ */
+type SyncHealthDriverColumn = "bucket_count" | "sync_version" | "bucket_count_reported_at";
+
 const DriversCols = {
   created_at: column.text,
   /** @deprecated Whole-percent mirror of `tax_dec`, kept for shipped br_driver builds. */
@@ -283,6 +290,9 @@ const DriversCols = {
   insurance_expires_on: column.text,
   license_expires_on: column.text,
   medical_card_expires_on: column.text,
+  bucket_count: column.integer,
+  sync_version: column.integer,
+  bucket_count_reported_at: column.text,
 } satisfies PowerSyncColsFor<"Drivers">;
 const Drivers = new Table(DriversCols, {
   indexes: {
@@ -292,6 +302,30 @@ const Drivers = new Table(DriversCols, {
     vehicle_uuid: ["vehicle_uuid"],
   },
 });
+
+// Sync Health (/dev-tools/sync-health). Client-side names for rows of "Drivers"
+// and "Users" that the sync rules send to developers under an alias: a
+// developer with no office role syncs neither table otherwise, and the alias
+// keeps a developer who IS an office role from getting the same row twice with
+// different columns. Read-only on the web.
+const DriverSyncHealthCols = {
+  user_uuid: column.text,
+  app_version: column.text,
+  app_platform: column.text,
+  bucket_count: column.integer,
+  sync_version: column.integer,
+  bucket_count_reported_at: column.text,
+} satisfies Pick<
+  PowerSyncColsFor<"Drivers">,
+  "user_uuid" | "app_version" | "app_platform" | SyncHealthDriverColumn
+>;
+const DriverSyncHealth = new Table(DriverSyncHealthCols);
+
+const DriverSyncHealthUsersCols = {
+  first_name: column.text,
+  last_name: column.text,
+} satisfies Pick<PowerSyncColsFor<"Users">, "first_name" | "last_name">;
+const DriverSyncHealthUsers = new Table(DriverSyncHealthUsersCols);
 
 const DashboardFilterSettingsCols = {
   created_at: column.text,
@@ -389,6 +423,11 @@ const WorkTrackersCols = {
   bleacher_uuid: column.text,
   actual_bleacher_uuid: column.text,
   bleacher_change_reason: column.text,
+  // Snapshot of a finished trip (addresses, line items, inspections) as JSON
+  // text, written by Postgres triggers for the driver app's Trip History —
+  // see br_driver/docs/specs/sync-bucket-limit.md. Listed so the column map
+  // stays exhaustive; the web app reads the live tables, not this.
+  history_json: column.text,
   driver_uuid: column.text,
   user_uuid: column.text,
   status: column.text,
@@ -1264,6 +1303,8 @@ export const AppSchema = new Schema({
   Events,
   HomeBases,
   Drivers,
+  DriverSyncHealth,
+  DriverSyncHealthUsers,
   DriverZones,
   DamageReports,
   DamageReportPhotos,
