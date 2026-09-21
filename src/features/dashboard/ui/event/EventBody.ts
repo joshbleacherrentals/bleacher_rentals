@@ -3,7 +3,7 @@ import { EventSpanType, EventsUtil } from "../../util/Events";
 import { CELL_HEIGHT, CELL_WIDTH, SUBRENTAL_COLOR } from "@/features/dashboard/values/constants";
 import { Baker } from "../../util/Baker";
 import { BleacherEvent } from "../../types";
-import { loadEventById } from "../../db/client/loadEventById";
+import { loadEventForModal } from "@/features/eventConfiguration/functions/loadEventForModal";
 import { loadMaintenanceEventById } from "../../db/client/loadMaintenanceEventById";
 import { loadSubrentalEventById } from "../../db/client/loadSubrentalEventById";
 import { supabaseClientRegistry } from "../../util/supabaseClientRegistry";
@@ -244,7 +244,7 @@ export class EventBody extends Sprite {
         resolveSubrentalConstraint(ms.bleacherUuids, ms.eventStart, ms.eventEnd),
       );
     } else {
-      await loadEventById(bleacherEvent.eventUuid, supabase);
+      await loadEventForModal(bleacherEvent.eventUuid, "dashboard");
       const es = useCurrentEventStore.getState();
       es.setField(
         "subrentalConstraint",

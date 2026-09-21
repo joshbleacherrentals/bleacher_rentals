@@ -1,6 +1,7 @@
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
 import { useCurrentEventStore } from "../state/useCurrentEventStore";
+import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import type { LostReason } from "@/features/quotesAndBookings/utils/lostReason";
 
 type EventWithAddress = {
@@ -24,6 +25,7 @@ type EventWithAddress = {
   hsl_hue: number | null;
   goodshuffle_url: string | null;
   booked_at: string | null;
+  created_at: string | null;
   created_by_user_uuid: string | null;
   address_id: string | null;
   address_street: string | null;
@@ -80,6 +82,7 @@ export async function loadEventForModal(
         "e.goodshuffle_url",
         "e.created_by_user_uuid",
         "e.booked_at",
+        "e.created_at",
         "a.id as address_id",
         "a.street as address_street",
         "a.city as address_city",
@@ -129,6 +132,11 @@ export async function loadEventForModal(
       bleacherTypeUuid,
       quantity,
     }));
+
+    // Only one dashboard form can be open at a time — close the maintenance form.
+    if (target === "dashboard") {
+      useMaintenanceEventStore.getState().resetForm();
+    }
 
     // Load all event data into the store and open modal
     const store = useCurrentEventStore.getState();
@@ -180,6 +188,7 @@ export async function loadEventForModal(
     setField("goodshuffleUrl", eventData.goodshuffle_url ?? null);
     setField("ownerUserUuid", eventData.created_by_user_uuid ?? null);
     setField("originalOwnerUserUuid", eventData.created_by_user_uuid ?? null);
+    setField("createdAt", eventData.created_at ?? null);
     setField(
       "bookedAt",
       eventData.booked_at ? new Date(eventData.booked_at).toLocaleDateString("en-CA") : null,
