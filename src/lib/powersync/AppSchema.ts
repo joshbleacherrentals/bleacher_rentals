@@ -388,6 +388,11 @@ const WorkTrackersCols = {
   bleacher_uuid: column.text,
   actual_bleacher_uuid: column.text,
   bleacher_change_reason: column.text,
+  // Snapshot of a finished trip (addresses, line items, inspections) as JSON
+  // text, written by Postgres triggers for the driver app's Trip History —
+  // see br_driver/docs/specs/sync-bucket-limit.md. Listed so the column map
+  // stays exhaustive; the web app reads the live tables, not this.
+  history_json: column.text,
   driver_uuid: column.text,
   user_uuid: column.text,
   status: column.text,

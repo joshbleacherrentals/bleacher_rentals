@@ -2460,6 +2460,7 @@ export type Database = {
           attempts: number
           caption: string | null
           created_at: string
+          created_by_driver_uuid: string | null
           gallery_asset_id: string | null
           id: string
           inspection_uuid: string
@@ -2472,6 +2473,7 @@ export type Database = {
           attempts?: number
           caption?: string | null
           created_at?: string
+          created_by_driver_uuid?: string | null
           gallery_asset_id?: string | null
           id?: string
           inspection_uuid: string
@@ -2484,6 +2486,7 @@ export type Database = {
           attempts?: number
           caption?: string | null
           created_at?: string
+          created_by_driver_uuid?: string | null
           gallery_asset_id?: string | null
           id?: string
           inspection_uuid?: string
@@ -2493,6 +2496,13 @@ export type Database = {
           upload_status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "InspectionPhotos_created_by_driver_uuid_fkey"
+            columns: ["created_by_driver_uuid"]
+            isOneToOne: false
+            referencedRelation: "Drivers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "InspectionPhotos_inspection_uuid_fkey"
             columns: ["inspection_uuid"]
@@ -4128,6 +4138,7 @@ export type Database = {
           dropoff_time_end: string | null
           dropoff_time_mode: Database["public"]["Enums"]["work_tracker_time_mode"]
           dropoff_time_start: string | null
+          history_json: Json | null
           id: string
           internal_notes: string | null
           notes: string | null
@@ -4176,6 +4187,7 @@ export type Database = {
           dropoff_time_end?: string | null
           dropoff_time_mode?: Database["public"]["Enums"]["work_tracker_time_mode"]
           dropoff_time_start?: string | null
+          history_json?: Json | null
           id?: string
           internal_notes?: string | null
           notes?: string | null
@@ -4224,6 +4236,7 @@ export type Database = {
           dropoff_time_end?: string | null
           dropoff_time_mode?: Database["public"]["Enums"]["work_tracker_time_mode"]
           dropoff_time_start?: string | null
+          history_json?: Json | null
           id?: string
           internal_notes?: string | null
           notes?: string | null
@@ -4507,6 +4520,10 @@ export type Database = {
     }
     Functions: {
       bleacher_change_reason_label: { Args: { code: string }; Returns: string }
+      build_work_tracker_history: {
+        Args: { tracker: Database["public"]["Tables"]["WorkTrackers"]["Row"] }
+        Returns: Json
+      }
       damage_reports_recompute_photos_uploaded: {
         Args: { p_ids: string[] }
         Returns: undefined
@@ -4514,6 +4531,10 @@ export type Database = {
       drivers_backfill_document: {
         Args: { p_doc_type: string; p_driver_id: string; p_photo_path: string }
         Returns: undefined
+      }
+      format_history_address: {
+        Args: { address_uuid: string }
+        Returns: string
       }
       generate_invoice_number: { Args: never; Returns: number }
       get_current_account_manager_id: { Args: never; Returns: string }
@@ -4529,6 +4550,10 @@ export type Database = {
         Args: { p_event_uuid: string }
         Returns: boolean
       }
+      is_work_tracker_finished: {
+        Args: { tracker: Database["public"]["Tables"]["WorkTrackers"]["Row"] }
+        Returns: boolean
+      }
       recompute_driver_scorecard_bucket: {
         Args: { p_driver: string; p_year: number }
         Returns: undefined
@@ -4539,6 +4564,10 @@ export type Database = {
       }
       recompute_quote_hashes: {
         Args: { p_event_id: string }
+        Returns: undefined
+      }
+      refresh_work_tracker_history: {
+        Args: { tracker_ids: string[] }
         Returns: undefined
       }
       user_can_manage_zone: { Args: { p_zone_uuid: string }; Returns: boolean }
