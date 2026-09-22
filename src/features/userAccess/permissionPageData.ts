@@ -453,6 +453,30 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Contract Templates",
+    description:
+      "This applies to the Terms & Conditions page under Configuration: the contract templates a quote can attach, and which one is the default. The default is the template a brand new quote starts with — anyone building a quote can still pick a different one on the quote itself.",
+    category: "Configuration",
+    roles: {
+      admin: full(
+        "Able to create, edit, and delete contract templates, and to choose which one new quotes start with.",
+      ),
+      account_manager: none(
+        "Account managers can't see this page. They choose a contract template on a quote from the templates admins have created, and a new quote starts on the default.",
+      ),
+      developer: none(
+        "Unable to even access the configuration pages, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Viewers do not have access to the web configuration pages. They see the contract on quotes they can open.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(
+        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      ),
+    },
+  },
+  {
     label: "Manage Inspection Form",
     description:
       "The ability to create and edit the inspection form template that drivers fill out during pickup and drop-off. This applies to the Inspection Form page under Configuration.",

@@ -1067,6 +1067,7 @@ const TermsAndConditionsCols = {
   created_at: column.text,
   created_by_user_uuid: column.text,
   deleted: column.integer,
+  is_default: column.integer,
 } satisfies PowerSyncColsFor<"TermsAndConditions">;
 const TermsAndConditions = new Table(TermsAndConditionsCols);
 

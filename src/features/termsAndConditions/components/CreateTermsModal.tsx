@@ -2,15 +2,9 @@
 
 import { useState } from "react";
 import { RichTextEditor } from "@/app/roadmap/_lib/components/RichTextEditor";
-import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createTermsAndConditions } from "../db/termsAndConditionsDb";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PrimaryButton } from "@/components/PrimaryButton";
 
 type Props = {
@@ -20,7 +14,6 @@ type Props = {
 };
 
 export function CreateTermsModal({ open, onClose, onCreated }: Props) {
-  const supabase = useClerkSupabaseClient();
   const [name, setName] = useState("");
   const [htmlContent, setHtmlContent] = useState("");
   const [saving, setSaving] = useState(false);
@@ -29,7 +22,7 @@ export function CreateTermsModal({ open, onClose, onCreated }: Props) {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await createTermsAndConditions({ name: name.trim(), htmlContent }, supabase);
+      await createTermsAndConditions({ name: name.trim(), htmlContent });
       createSuccessToast(["Contract template created."]);
       setName("");
       setHtmlContent("");
@@ -62,9 +55,7 @@ export function CreateTermsModal({ open, onClose, onCreated }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contract Content
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Contract Content</label>
             <RichTextEditor value={htmlContent} onChange={setHtmlContent} />
           </div>
 

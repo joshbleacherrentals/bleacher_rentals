@@ -3689,6 +3689,7 @@ export type Database = {
           deleted: boolean
           html_content: string
           id: string
+          is_default: boolean
           name: string
         }
         Insert: {
@@ -3697,6 +3698,7 @@ export type Database = {
           deleted?: boolean
           html_content?: string
           id?: string
+          is_default?: boolean
           name: string
         }
         Update: {
@@ -3705,6 +3707,7 @@ export type Database = {
           deleted?: boolean
           html_content?: string
           id?: string
+          is_default?: boolean
           name?: string
         }
         Relationships: [
