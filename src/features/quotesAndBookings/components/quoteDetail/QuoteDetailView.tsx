@@ -26,6 +26,8 @@ import { getAmRoleForZone } from "@/features/userAccess/logic/getAmRoleForZone";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { logQuoteSentLocal } from "../../db/logQuoteSentLocal";
+import { SendQuoteDialog } from "../sendQuote/SendQuoteDialog";
+import { cleanRecipients } from "../../utils/sendQuote";
 // import { requestReview } from "@/features/alerts/requestReview";
 // import { ClipboardCheck } from "lucide-react";
 import { DateTime } from "luxon";
@@ -45,7 +47,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const perms = usePermissionsStore();
 
@@ -143,48 +145,16 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
     setDeleting(false);
   };
 
-  const handleSendToClient = async () => {
-    if (!quote) return;
+  const sendRecipients = cleanRecipients([quote?.contact?.email, quote?.financeContact?.email]);
 
-    const recipientEmails: string[] = [];
-    if (quote.contact?.email) recipientEmails.push(quote.contact.email);
-    if (quote.financeContact?.email) recipientEmails.push(quote.financeContact.email);
-
-    if (recipientEmails.length === 0) {
+  const handleSendToClient = () => {
+    if (sendRecipients.length === 0) {
       createErrorToast([
         "No contact email found. Please add a contact with an email address first.",
       ]);
       return;
     }
-
-    if (!confirm(`Send quote to ${recipientEmails.join(", ")}?`)) return;
-
-    setSending(true);
-    try {
-      const res = await fetch(`/api/quotes/${eventId}/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipientEmails }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Failed (${res.status})`);
-      }
-
-      // Log the send via PowerSync so it records the current user (the sender).
-      await logQuoteSentLocal({
-        eventId,
-        recipientLine: recipientEmails.join(","),
-        currentUserUuid: perms.userId,
-      });
-
-      createSuccessToast([`Quote sent to ${recipientEmails.join(", ")}`]);
-    } catch (err: any) {
-      createErrorToast(["Failed to send quote.", err.message ?? ""]);
-    } finally {
-      setSending(false);
-    }
+    setSendDialogOpen(true);
   };
 
   // Review-gating disabled per boss feedback — all AMs can send quotes
@@ -256,7 +226,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   const deletedAtFormatted = deleteLog?.changed_at
     ? DateTime.fromISO(deleteLog.changed_at).toFormat("MMM d, yyyy 'at' h:mm a")
     : null;
-  const deletedByName = [deleteLog?.first_name, deleteLog?.last_name].filter(Boolean).join(" ") || null;
+  const deletedByName =
+    [deleteLog?.first_name, deleteLog?.last_name].filter(Boolean).join(" ") || null;
 
   return (
     <div>
@@ -365,11 +336,10 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
                 {canSend && (
                   <button
                     onClick={handleSendToClient}
-                    disabled={sending}
-                    className="px-3 py-1.5 text-sm font-semibold text-white bg-darkBlue rounded-sm hover:bg-lightBlue transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-3 py-1.5 text-sm font-semibold text-white bg-darkBlue rounded-sm hover:bg-lightBlue transition cursor-pointer flex items-center gap-1.5"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    {sending ? "Sending..." : "Send To Client"}
+                    Send To Client
                   </button>
                 )}
                 {/* Review-request button disabled per boss feedback — kept for future use
@@ -392,7 +362,11 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
             <ContractTab quote={quote} />
           </TabsContent>
           <TabsContent value="billing">
-            <BillingTab quote={quote} contractTotalCents={contractTotalCents} canEdit={canEditQuote} />
+            <BillingTab
+              quote={quote}
+              contractTotalCents={contractTotalCents}
+              canEdit={canEditQuote}
+            />
           </TabsContent>
           <TabsContent value="files">
             <FilesTab quoteId={quote.id} />
@@ -405,6 +379,19 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
           </TabsContent>
         </div>
       </Tabs>
+      <SendQuoteDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        eventId={eventId}
+        recipientEmails={sendRecipients}
+        onSent={() =>
+          logQuoteSentLocal({
+            eventId,
+            recipientLine: sendRecipients.join(","),
+            currentUserUuid: perms.userId,
+          })
+        }
+      />
     </div>
   );
 }
