@@ -67,6 +67,7 @@ const baseInput = (over: Partial<SalesOfficeInput> = {}): SalesOfficeInput => ({
   quickbookUuid: "qbo-1",
   stripeConnectionUuid: null,
   address: null,
+  paymentInfo: null,
   ...over,
 });
 
@@ -99,6 +100,32 @@ describe("createSalesOffice", () => {
     const addressId = executed[0].parameters[0];
     expect(executed[1].sql).toContain('insert into "SalesOffices"');
     expect(executed[1].parameters).toContain(addressId);
+  });
+});
+
+describe("payment info", () => {
+  it("is saved trimmed when creating an office", async () => {
+    await createSalesOffice(
+      baseInput({ paymentInfo: "  e-transfers to payments@bleacherrentals.com \n" }),
+    );
+    expect(executed[0].sql).toContain('"payment_info"');
+    expect(executed[0].parameters).toContain("e-transfers to payments@bleacherrentals.com");
+  });
+
+  it("is saved as null, not an empty string, when left blank", async () => {
+    await createSalesOffice(baseInput({ paymentInfo: "   " }));
+    expect(executed[0].parameters).not.toContain("   ");
+    expect(executed[0].parameters).not.toContain("");
+  });
+
+  it("is written when updating an office, and can be cleared", async () => {
+    await updateSalesOffice("office-1", null, baseInput({ paymentInfo: "ACH info is attached" }));
+    expect(executed[0].sql).toContain('"payment_info" = ?');
+    expect(executed[0].parameters).toContain("ACH info is attached");
+
+    executed.length = 0;
+    await updateSalesOffice("office-1", null, baseInput({ paymentInfo: "" }));
+    expect(executed[0].parameters).not.toContain("");
   });
 });
 

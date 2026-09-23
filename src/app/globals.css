@@ -249,3 +249,20 @@
     animation: scale-in 300ms;
   }
 }
+
+@layer utilities {
+  @keyframes payment-box-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 3px rgb(239 68 68 / 1);
+    }
+    50% {
+      box-shadow: 0 0 0 3px rgb(239 68 68 / 0.15);
+    }
+  }
+
+  /* Pulsing red outline: points at the part of a preview that is being edited. */
+  .animate-payment-box-pulse {
+    animation: payment-box-pulse 1.2s ease-in-out infinite;
+  }
+}

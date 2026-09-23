@@ -1139,6 +1139,7 @@ const SalesOfficesCols = {
   created_by_user_uuid: column.text,
   deleted: column.integer,
   name: column.text,
+  payment_info: column.text,
   phone: column.text,
   quickbook_uuid: column.text,
   stripe_connection_uuid: column.text,

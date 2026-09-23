@@ -3392,6 +3392,7 @@ export type Database = {
           deleted: boolean
           id: string
           name: string
+          payment_info: string | null
           phone: string | null
           quickbook_uuid: string
           stripe_connection_uuid: string | null
@@ -3403,6 +3404,7 @@ export type Database = {
           deleted?: boolean
           id?: string
           name: string
+          payment_info?: string | null
           phone?: string | null
           quickbook_uuid: string
           stripe_connection_uuid?: string | null
@@ -3414,6 +3416,7 @@ export type Database = {
           deleted?: boolean
           id?: string
           name?: string
+          payment_info?: string | null
           phone?: string | null
           quickbook_uuid?: string
           stripe_connection_uuid?: string | null

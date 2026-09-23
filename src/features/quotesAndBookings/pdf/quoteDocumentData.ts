@@ -70,6 +70,8 @@ export type QuoteDocumentData = {
     phone: string;
     email: string;
     website: string;
+    // The office's own extra payment instructions (SalesOffices.payment_info); null when blank.
+    paymentInfo: string | null;
   };
 
   // Client contact. Resolved from Events.finance_contact_uuid when set,
@@ -300,6 +302,7 @@ export async function buildQuoteDocumentData(
               `
               name,
               phone,
+              payment_info,
               Addresses!SalesOffices_address_uuid_fkey (
                 street, city, state_province, zip_postal
               )
@@ -354,6 +357,7 @@ export async function buildQuoteDocumentData(
   let salesOffice: {
     name: string;
     phone: string | null;
+    paymentInfo: string | null;
     street: string;
     city: string;
     state: string;
@@ -365,6 +369,7 @@ export async function buildQuoteDocumentData(
     salesOffice = {
       name: so.name,
       phone: so.phone ?? null,
+      paymentInfo: so.payment_info?.trim() || null,
       street: soAddr?.street ?? "",
       city: soAddr?.city ?? "",
       state: soAddr?.state_province ?? "",
@@ -456,6 +461,7 @@ export async function buildQuoteDocumentData(
       phone: salesOffice?.phone ?? "",
       email: "office@bleacherrentals.com",
       website: "www.BleacherRentals.com",
+      paymentInfo: salesOffice?.paymentInfo ?? null,
     },
 
     contact: effectiveContact
