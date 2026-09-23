@@ -9,12 +9,15 @@ import {
 } from "@/features/quotesAndBookings/state/useCreateQuoteStore";
 import { newQuoteFieldsToPrefill } from "@/features/quotesAndBookings/utils/newQuoteDefaults";
 import { useTermsAndConditions } from "@/features/termsAndConditions/hooks/useTermsAndConditions";
+import { useCurrentAmDefaultSalesOffice } from "@/features/quotesAndBookings/hooks/useCurrentAmDefaultSalesOffice";
 
 export default function NewQuotePage() {
   const resetForm = useCreateQuoteStore((s) => s.resetForm);
   const editingEventId = useCreateQuoteStore((s) => s.editingEventId);
   // Null until PowerSync has the table, and when no template is marked default.
   const { defaultId: defaultTermsId } = useTermsAndConditions();
+  // Null for admins/non-AMs, or when the current AM has not set one.
+  const defaultSalesOfficeId = useCurrentAmDefaultSalesOffice();
 
   /**
    * Whether a draft was already in progress when this page opened.
@@ -54,6 +57,8 @@ export default function NewQuotePage() {
       currentNotes: store.clientFacingNotes,
       currentTermsId: store.termsDocumentId,
       defaultTermsId,
+      currentSalesOfficeId: store.salesOfficeId,
+      defaultSalesOfficeId,
     });
 
     if (prefill.clientFacingNotes !== undefined) {
@@ -62,9 +67,12 @@ export default function NewQuotePage() {
     if (prefill.termsDocumentId !== undefined) {
       store.setField("termsDocumentId", prefill.termsDocumentId);
     }
+    if (prefill.salesOfficeId !== undefined) {
+      store.setField("salesOfficeId", prefill.salesOfficeId);
+    }
     // A prefilled form is the starting point, not an unsaved change.
     if (Object.keys(prefill).length > 0) captureQuoteBaseline();
-  }, [defaultTermsId]);
+  }, [defaultTermsId, defaultSalesOfficeId]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {

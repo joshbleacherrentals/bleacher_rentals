@@ -12,23 +12,33 @@ export type Database = {
       AccountManagers: {
         Row: {
           created_at: string
+          default_sales_office_uuid: string | null
           id: string
           is_active: boolean
           user_uuid: string | null
         }
         Insert: {
           created_at?: string
+          default_sales_office_uuid?: string | null
           id?: string
           is_active?: boolean
           user_uuid?: string | null
         }
         Update: {
           created_at?: string
+          default_sales_office_uuid?: string | null
           id?: string
           is_active?: boolean
           user_uuid?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "AccountManagers_default_sales_office_uuid_fkey"
+            columns: ["default_sales_office_uuid"]
+            isOneToOne: false
+            referencedRelation: "SalesOffices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "AccountManagers_user_uuid_fkey"
             columns: ["user_uuid"]

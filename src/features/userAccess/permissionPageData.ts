@@ -570,10 +570,10 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Team Management",
     roles: {
       admin: full(
-        "Can view and edit all information for every team member, including changing roles and reassigning drivers between managers.",
+        "Can view and edit all information for every team member, including changing roles, reassigning drivers between managers, and setting an account manager's default sales office.",
       ),
       account_manager: custom(
-        "Can view every team member's profile, but can only edit driver data for drivers assigned to themselves. Can assign an unassigned driver to themselves, but cannot reassign a driver who is already assigned to another manager.",
+        "Can view every team member's profile, but can only edit driver data for drivers assigned to themselves. Can assign an unassigned driver to themselves, but cannot reassign a driver who is already assigned to another manager. Their own default sales office is admin-set only — they can see it but not change it.",
       ),
       developer: none(
         "Developers do not have access to the Team page. This role is limited to the product roadmap.",

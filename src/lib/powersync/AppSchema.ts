@@ -9,6 +9,7 @@ export const WORK_TRACKERS_TABLE = "WorkTrackers";
 
 const AccountManagersCols = {
   created_at: column.text,
+  default_sales_office_uuid: column.text,
   is_active: column.integer,
   user_uuid: column.text,
 } satisfies PowerSyncColsFor<"AccountManagers">;
@@ -1023,8 +1024,8 @@ const EventTypingIndicators = new Table(EventTypingIndicatorsCols, {
 });
 
 const PaymentInstallmentsCols = {
-  percentage_bps: column.integer,
   amount_cents: column.integer,
+  percentage_bps: column.integer,
   created_at: column.text,
   currency: column.text,
   due_date: column.text,
