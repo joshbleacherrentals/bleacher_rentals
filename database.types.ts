@@ -2795,6 +2795,7 @@ export type Database = {
       }
       PaymentInstallments: {
         Row: {
+          amount_cents: number | null
           created_at: string
           currency: Database["public"]["Enums"]["currency"]
           due_date: string
@@ -2803,6 +2804,7 @@ export type Database = {
           percentage_bps: number
         }
         Insert: {
+          amount_cents?: number | null
           created_at?: string
           currency: Database["public"]["Enums"]["currency"]
           due_date: string
@@ -2811,6 +2813,7 @@ export type Database = {
           percentage_bps: number
         }
         Update: {
+          amount_cents?: number | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
           due_date?: string

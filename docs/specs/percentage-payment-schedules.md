@@ -22,9 +22,10 @@ Status: Approved by the user and implemented locally — 2026-09-22.
 - Replace `PaymentInstallments.amount_cents` with integer `percentage_bps`
   (basis points: 5,000 = 50%, 10,000 = 100%). Keep IDs, event links, currency,
   due dates, payment references and existing permissions.
-- Add/backfill the column, update dependent SQL functions, then drop the old
-  amount column in a Supabase migration. Regenerate `database.types.ts` with
-  `npm run gtl`; replace the PowerSync `AppSchema.ts` column with `column.integer`.
+- Add/backfill the column, update dependent SQL functions, then make the old
+  `amount_cents` nullable and mark it deprecated. It is deliberately not dropped, so no
+  saved data is lost. Regenerate `database.types.ts` with `npm run gtl`; add
+  `percentage_bps: column.integer` to `AppSchema.ts` and keep `amount_cents` listed.
   Audit sync projections and registries for explicit column lists.
 - Backfill positive-total quotes using each amount divided by the current quote
   total, not the sum of installments. Balanced schedules get deterministic rounding

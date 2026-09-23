@@ -1,8 +1,7 @@
 \set ON_ERROR_STOP on
 BEGIN;
--- Recreate the old column layout inside a rollback-only transaction, then run
--- the real migration against fixtures. Existing rows are restored by ROLLBACK.
-ALTER TABLE public."PaymentInstallments" ADD COLUMN amount_cents integer;
+-- Recreate the old layout (no percentage_bps, amount_cents NOT NULL) inside a rollback-only
+-- transaction, then run the real migration against fixtures. Existing rows are restored by ROLLBACK.
 UPDATE public."PaymentInstallments" pi SET amount_cents = r.amount_cents
 FROM (SELECT p.id, s.amount_cents FROM public."PaymentInstallments" p
   CROSS JOIN LATERAL public.resolve_payment_schedule(p.event_uuid) s WHERE s.id = p.id) r

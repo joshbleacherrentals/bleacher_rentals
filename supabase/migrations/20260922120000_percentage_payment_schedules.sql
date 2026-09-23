@@ -188,7 +188,12 @@ BEGIN
 END;
 $$;
 
-ALTER TABLE public."PaymentInstallments" DROP COLUMN amount_cents;
+-- Kept, not dropped: existing dollar amounts stay on the rows as history. Nothing reads it any
+-- more (percentage_bps is the term; amounts come from resolve_payment_schedule), so new rows
+-- leave it NULL.
+ALTER TABLE public."PaymentInstallments" ALTER COLUMN amount_cents DROP NOT NULL;
+COMMENT ON COLUMN public."PaymentInstallments".amount_cents IS
+  'Deprecated: superseded by percentage_bps. Historical value only; not maintained.';
 
 -- Percentage-based terms replace fixed terms. Keep invalidation enabled and
 -- report affected signatures; never re-anchor a signature to changed terms.
