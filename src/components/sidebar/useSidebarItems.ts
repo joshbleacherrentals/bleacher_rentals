@@ -99,14 +99,14 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     label: "Quality Assurance",
     icon: ShieldAlert,
     children: [
-      // A maintainer owns the annual inspections and nothing else here; an
-      // account manager owns everything here except the annual inspections.
+      // A maintainer owns the annual inspections plus damage reports and repairs, but not the
+      // inspections list; an account manager owns everything here except the annual inspections.
       // Without per-child roles the dropdown is all-or-nothing, and both would
       // be shown links that bounce them straight back out.
       {
         label: "Damage Reports",
         href: "/damage-reports",
-        roles: ["admin", "account_manager", "viewer"],
+        roles: ["admin", "account_manager", "viewer", "maintainer"],
       },
       { label: "Inspections", href: "/inspections", roles: ["admin", "account_manager", "viewer"] },
       {
@@ -114,7 +114,11 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         href: "/annual-inspections",
         roles: ["admin", "viewer", "maintainer"],
       },
-      { label: "Repairs", href: "/repairs", roles: ["admin", "account_manager", "viewer"] },
+      {
+        label: "Repairs",
+        href: "/repairs",
+        roles: ["admin", "account_manager", "viewer", "maintainer"],
+      },
     ],
   },
   {

@@ -32,7 +32,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Owns the annual inspection of the fleet. Sees the Annual Inspections queue and can open a bleacher to read its inspection history — nothing else on the dashboard. A safe role to hand to whoever keeps the inspections up to date, without giving them anything to break.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can open a bleacher to read its history. Sees nothing else on the dashboard — no quotes, events, payments, or team management.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -309,8 +309,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can view all repair and maintenance events and their details but cannot create, edit, or delete any.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: full(
+        "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page.",
       ),
     },
   },
@@ -335,8 +335,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "Can create damage reports through the mobile app when they notice damage to a bleacher. Can view their own submitted reports but cannot edit or delete them once submitted.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: full(
+        "Can create, view, edit, delete, and restore any damage report and its photos, regardless of who created it. Can see acknowledgements but not add them.",
       ),
     },
   },

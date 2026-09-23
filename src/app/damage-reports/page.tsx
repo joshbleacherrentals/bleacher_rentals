@@ -18,6 +18,7 @@ import {
 import { DamageReportModal, EditDamageReport } from "./DamageReportModal";
 import { useAcknowledgements, type AcknowledgementSummary } from "./_lib/acknowledgements";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
+import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
 import { useUserAccess } from "@/features/userAccess/client";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
@@ -32,7 +33,8 @@ import {
 function DamageReportsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isAdmin } = useTeamPermissions();
+  const { isAdmin, isMaintainer } = useTeamPermissions();
+  const canManage = canManageDamageAndMaintenance({ isAdmin, isMaintainer });
   const access = useUserAccess();
   const isDeveloper = access.status === "active" && access.roles.includes("developer");
   const [showResolved, setShowResolved] = useState(false);
@@ -154,7 +156,7 @@ function DamageReportsContent() {
             </button>
           )}
 
-          {isAdmin && (
+          {canManage && (
             <button
               onClick={() => setShowDeleted((v) => !v)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition cursor-pointer ${
@@ -211,7 +213,7 @@ function DamageReportsContent() {
               report={report}
               acknowledgements={acknowledgementsByReport[report.id]}
               onClick={() => setEditingReport(report)}
-              isAdmin={isAdmin}
+              isAdmin={canManage}
               showDeleted={showDeleted}
               onDelete={() => handleSetDeleted(report.id, true)}
               onRestore={() => handleSetDeleted(report.id, false)}
