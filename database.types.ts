@@ -4140,6 +4140,7 @@ export type Database = {
           drive_minutes: number | null
           driver_uuid: string | null
           dropoff_address_uuid: string | null
+          dropoff_event_uuid: string | null
           dropoff_instructions: string | null
           dropoff_poc: string | null
           dropoff_poc_contact_uuid: string | null
@@ -4153,6 +4154,7 @@ export type Database = {
           notes: string | null
           pay_cents: number | null
           pickup_address_uuid: string | null
+          pickup_event_uuid: string | null
           pickup_instructions: string | null
           pickup_poc: string | null
           pickup_poc_contact_uuid: string | null
@@ -4167,6 +4169,7 @@ export type Database = {
           setup_required: boolean
           started_at: string | null
           status: Database["public"]["Enums"]["worktracker_status"]
+          status_changed_at: string | null
           teardown_required: boolean
           updated_at: string
           user_uuid: string | null
@@ -4189,6 +4192,7 @@ export type Database = {
           drive_minutes?: number | null
           driver_uuid?: string | null
           dropoff_address_uuid?: string | null
+          dropoff_event_uuid?: string | null
           dropoff_instructions?: string | null
           dropoff_poc?: string | null
           dropoff_poc_contact_uuid?: string | null
@@ -4202,6 +4206,7 @@ export type Database = {
           notes?: string | null
           pay_cents?: number | null
           pickup_address_uuid?: string | null
+          pickup_event_uuid?: string | null
           pickup_instructions?: string | null
           pickup_poc?: string | null
           pickup_poc_contact_uuid?: string | null
@@ -4216,6 +4221,7 @@ export type Database = {
           setup_required?: boolean
           started_at?: string | null
           status?: Database["public"]["Enums"]["worktracker_status"]
+          status_changed_at?: string | null
           teardown_required?: boolean
           updated_at?: string
           user_uuid?: string | null
@@ -4238,6 +4244,7 @@ export type Database = {
           drive_minutes?: number | null
           driver_uuid?: string | null
           dropoff_address_uuid?: string | null
+          dropoff_event_uuid?: string | null
           dropoff_instructions?: string | null
           dropoff_poc?: string | null
           dropoff_poc_contact_uuid?: string | null
@@ -4251,6 +4258,7 @@ export type Database = {
           notes?: string | null
           pay_cents?: number | null
           pickup_address_uuid?: string | null
+          pickup_event_uuid?: string | null
           pickup_instructions?: string | null
           pickup_poc?: string | null
           pickup_poc_contact_uuid?: string | null
@@ -4265,6 +4273,7 @@ export type Database = {
           setup_required?: boolean
           started_at?: string | null
           status?: Database["public"]["Enums"]["worktracker_status"]
+          status_changed_at?: string | null
           teardown_required?: boolean
           updated_at?: string
           user_uuid?: string | null
@@ -4308,6 +4317,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "WorkTrackers_dropoff_event_uuid_fkey"
+            columns: ["dropoff_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "Events"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "WorkTrackers_dropoff_poc_contact_uuid_fkey"
             columns: ["dropoff_poc_contact_uuid"]
             isOneToOne: false
@@ -4319,6 +4335,13 @@ export type Database = {
             columns: ["pickup_address_uuid"]
             isOneToOne: false
             referencedRelation: "Addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "WorkTrackers_pickup_event_uuid_fkey"
+            columns: ["pickup_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "Events"
             referencedColumns: ["id"]
           },
           {
