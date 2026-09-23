@@ -7,6 +7,7 @@ import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsS
 import { QuoteDetail } from "../../../db/fetchQuoteDetail";
 import { setEventIsQbo } from "../../../db/setEventIsQbo";
 import { useEventIsQbo } from "../../../hooks/useEventIsQbo";
+import { resolvePaymentSchedule } from "../../../utils/resolvePaymentSchedule";
 import { usePaymentInstallments } from "../../../hooks/usePaymentInstallments";
 import { usePaymentHistory, PaymentHistoryRow } from "../../../hooks/usePaymentHistory";
 import { useEventCurrencyState } from "../../../hooks/useEventCurrency";
@@ -198,7 +199,11 @@ export function BillingTab({
   contractTotalCents: number;
   canEdit: boolean;
 }) {
-  const { installments, isLoading } = usePaymentInstallments(quote.id);
+  const { installments: terms, isLoading, error: scheduleError } = usePaymentInstallments(quote.id);
+  const installments = useMemo(
+    () => resolvePaymentSchedule(terms, Math.max(0, Math.round(contractTotalCents))),
+    [terms, contractTotalCents],
+  );
   const { payments, isLoading: paymentsLoading } = usePaymentHistory(quote.id);
   // Two answers, deliberately: the value paints the tab, the flag gates the
   // one place that writes it (§3.5, E5).
@@ -345,7 +350,9 @@ export function BillingTab({
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
           Payment Schedule
         </h3>
-        {isLoading ? (
+        {scheduleError ? (
+          <p role="alert">Could not load the payment schedule. Please try again.</p>
+        ) : isLoading ? (
           <p className="text-sm text-gray-400 py-4 text-center">Loading payment schedule...</p>
         ) : (
           <PaymentScheduleTable allocation={allocation} currency={currency} />

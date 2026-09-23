@@ -1023,7 +1023,7 @@ const EventTypingIndicators = new Table(EventTypingIndicatorsCols, {
 });
 
 const PaymentInstallmentsCols = {
-  amount_cents: column.integer,
+  percentage_bps: column.integer,
   created_at: column.text,
   currency: column.text,
   due_date: column.text,

@@ -1,3 +1,4 @@
+import { resolvePaymentSchedule } from "../utils/resolvePaymentSchedule";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../database.types";
 import { resolveInvoiceDisplay, buildPublicQuoteUrl } from "../utils/invoiceNumber";
@@ -319,7 +320,7 @@ export async function buildQuoteDocumentData(
       // Payment installments
       supabase
         .from("PaymentInstallments")
-        .select("id, due_date, amount_cents")
+        .select("id, due_date, percentage_bps")
         .eq("event_uuid", eventId)
         .order("due_date"),
 
@@ -375,6 +376,22 @@ export async function buildQuoteDocumentData(
   const lineItemRows = lineItemResult.data;
   const lineItems: QuoteLineItem[] = (lineItemRows ?? []).map(toQuoteLineItem);
 
+  // Calculate totals
+  const subtotalCents = lineItems
+    .filter((li) => li.total >= 0)
+    .reduce((sum, li) => sum + li.total, 0);
+  const discountsCents = lineItems
+    .filter((li) => li.total < 0)
+    .reduce((sum, li) => sum + li.total, 0);
+  const taxableAmount = subtotalCents + discountsCents;
+  const taxPercent = (event as any).tax_percent ?? 0;
+  const taxAmountCents =
+    (event as any).tax_amount_cents ?? Math.round(taxableAmount * (taxPercent / 100));
+  const totalCents = taxableAmount + taxAmountCents;
+
+  if (installmentResult.error || paymentResult.error || lineItemResult.error)
+    throw new Error("Could not load quote payment data.");
+
   // Process installments. The status a client reads on this document is derived
   // from the payments, not from PaymentInstallments.status — that flag is a
   // cache, and it once told a client a $3,600 installment was paid for $1.
@@ -384,11 +401,14 @@ export async function buildQuoteDocumentData(
   // while Stripe collects another. Line items only carry a copy of it.
   const scheduleCurrency = await resolveEventCurrency(supabase, event.sales_office_uuid);
   const allocation = allocatePayments(
-    (installmentResult.data ?? []).map((pi: any) => ({
-      id: pi.id,
-      dueDate: pi.due_date ?? "",
-      amountCents: pi.amount_cents ?? 0,
-    })),
+    resolvePaymentSchedule(
+      (installmentResult.data ?? []).map((pi) => ({
+        id: pi.id,
+        dueDate: pi.due_date ?? "",
+        percentageBps: pi.percentage_bps ?? 0,
+      })),
+      Math.round(totalCents),
+    ),
     ((paymentResult as any).data ?? []).map((ph: any) => ({
       id: ph.id,
       installmentId: ph.installment_id,
@@ -408,19 +428,6 @@ export async function buildQuoteDocumentData(
     status: i.status,
     allocatedCents: i.allocatedCents,
   }));
-
-  // Calculate totals
-  const subtotalCents = lineItems
-    .filter((li) => li.total >= 0)
-    .reduce((sum, li) => sum + li.total, 0);
-  const discountsCents = lineItems
-    .filter((li) => li.total < 0)
-    .reduce((sum, li) => sum + li.total, 0);
-  const taxableAmount = subtotalCents + discountsCents;
-  const taxPercent = (event as any).tax_percent ?? 0;
-  const taxAmountCents =
-    (event as any).tax_amount_cents ?? Math.round(taxableAmount * (taxPercent / 100));
-  const totalCents = taxableAmount + taxAmountCents;
 
   const currency = scheduleCurrency;
 

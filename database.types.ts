@@ -2795,28 +2795,28 @@ export type Database = {
       }
       PaymentInstallments: {
         Row: {
-          amount_cents: number
           created_at: string
           currency: Database["public"]["Enums"]["currency"]
           due_date: string
           event_uuid: string
           id: string
+          percentage_bps: number
         }
         Insert: {
-          amount_cents: number
           created_at?: string
           currency: Database["public"]["Enums"]["currency"]
           due_date: string
           event_uuid: string
           id?: string
+          percentage_bps: number
         }
         Update: {
-          amount_cents?: number
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
           due_date?: string
           event_uuid?: string
           id?: string
+          percentage_bps?: number
         }
         Relationships: [
           {
@@ -4570,6 +4570,10 @@ export type Database = {
         Args: { tracker: Database["public"]["Tables"]["WorkTrackers"]["Row"] }
         Returns: boolean
       }
+      payment_schedule_total_cents: {
+        Args: { p_event_id: string }
+        Returns: number
+      }
       recompute_driver_scorecard_bucket: {
         Args: { p_driver: string; p_year: number }
         Returns: undefined
@@ -4585,6 +4589,13 @@ export type Database = {
       refresh_work_tracker_history: {
         Args: { tracker_ids: string[] }
         Returns: undefined
+      }
+      resolve_payment_schedule: {
+        Args: { p_event_id: string }
+        Returns: {
+          amount_cents: number
+          id: string
+        }[]
       }
       user_can_manage_zone: { Args: { p_zone_uuid: string }; Returns: boolean }
       user_shares_zone_with_driver: {

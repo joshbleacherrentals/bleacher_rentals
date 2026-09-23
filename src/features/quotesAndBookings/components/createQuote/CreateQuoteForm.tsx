@@ -105,8 +105,10 @@ export function CreateQuoteForm() {
       resetForm();
       captureQuoteBaseline(); // form is clean again — no spurious leave prompt
       return eventId;
-    } catch {
-      // Error toast already shown
+    } catch (error) {
+      createErrorToastNoThrow([
+        (error as Error).message || "Could not save the quote. Your draft has been retained.",
+      ]);
       return null;
     } finally {
       setSaving(false);
@@ -152,8 +154,10 @@ export function CreateQuoteForm() {
         // Update store so subsequent saves do UPDATE not INSERT
         useCreateQuoteStore.getState().setField("editingEventId", eventId);
       }
-    } catch {
-      // Error toast already shown
+    } catch (error) {
+      createErrorToastNoThrow([
+        (error as Error).message || "Could not save the quote. Your draft has been retained.",
+      ]);
     } finally {
       setSaving(false);
     }
@@ -211,8 +215,10 @@ export function CreateQuoteForm() {
 
       resetForm();
       router.push(`/quotes-bookings/${eventId}`);
-    } catch {
-      // Error toast already shown
+    } catch (error) {
+      createErrorToastNoThrow([
+        (error as Error).message || "Could not save the quote. Your draft has been retained.",
+      ]);
     } finally {
       setSaving(false);
     }

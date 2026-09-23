@@ -1,3 +1,4 @@
+import { resolvePaymentSchedule } from "../utils/resolvePaymentSchedule";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../database.types";
 import type { Currency } from "../types/quoteTypes";
@@ -100,13 +101,16 @@ export async function loadEventPaymentContext(
       .eq("deleted", false),
     supabase
       .from("PaymentInstallments")
-      .select("id, due_date, amount_cents")
+      .select("id, due_date, percentage_bps")
       .eq("event_uuid", eventId),
     supabase
       .from("PaymentHistory")
       .select("id, installment_id, amount_cents, currency, status, paid_at, created_at")
       .eq("event_uuid", eventId),
   ]);
+
+  if (lineItemResult.error || installmentResult.error || paymentResult.error)
+    throw new Error("Could not load payment data.");
 
   // Totals are computed exactly as buildQuoteDocumentData computes them, so the
   // ceiling here is the same number the client is looking at.
@@ -131,11 +135,14 @@ export async function loadEventPaymentContext(
   }));
 
   const allocation = allocatePayments(
-    (installmentResult.data ?? []).map((i) => ({
-      id: i.id,
-      dueDate: i.due_date ?? "",
-      amountCents: i.amount_cents ?? 0,
-    })),
+    resolvePaymentSchedule(
+      (installmentResult.data ?? []).map((i) => ({
+        id: i.id,
+        dueDate: i.due_date ?? "",
+        percentageBps: i.percentage_bps ?? 0,
+      })),
+      Math.round(totalCents),
+    ),
     payments,
     currency,
   );

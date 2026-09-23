@@ -1,3 +1,4 @@
+import { validatePaymentSchedule } from "../utils/resolvePaymentSchedule";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../../../../database.types";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
@@ -14,6 +15,8 @@ export async function createQuoteEvent(
   supabase: SupabaseClient<Database>,
   currentUserUuid?: string | null,
 ): Promise<string> {
+  const scheduleError = state.scheduleError ?? validatePaymentSchedule(state.paymentInstallments);
+  if (scheduleError) throw new Error(scheduleError);
   // 1. Address / Venue — see docs/specs/venue-history.md §4.
   //    venueId set ("venue" mode): write venue_uuid only, the
   //    events_sync_address_from_venue trigger sets address_uuid from it.
@@ -127,15 +130,7 @@ export async function createQuoteEvent(
     }
   }
 
-  // 4. Sync payment installments — optional; only persisted when the manager
-  // saved a schedule (non-empty). No schedule → nothing written.
-  if (state.paymentInstallments.length > 0) {
-    try {
-      await syncPaymentInstallments(eventUuid, state.paymentInstallments, state.currency);
-    } catch (e) {
-      console.error("Payment installments sync failed (quote still saved):", e);
-    }
-  }
+  await syncPaymentInstallments(eventUuid, state.paymentInstallments, state.currency);
 
   // 5. Log creation via PowerSync local (not Supabase) so it uploads
   //    in the same batch as the Event — avoids FK violation on event_uuid.
