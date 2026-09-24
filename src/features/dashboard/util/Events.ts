@@ -154,10 +154,6 @@ export class EventsUtil {
     const spansByRow = bleachers.map((bleacher, rowIndex) => {
       const spans: EventSpanType[] = [];
 
-      // Check for unresolved damage reports on this bleacher
-      const unresolvedDamage = (bleacher.damageReports ?? []).filter((r) => !r.resolvedAt);
-      const hasDamage = unresolvedDamage.length > 0;
-
       for (const ev of bleacher.bleacherEvents ?? []) {
         // If editing an existing event, exclude persisted spans for that eventUuid
         if (selected?.eventUuid != null && ev.eventUuid === selected.eventUuid) {
@@ -195,7 +191,6 @@ export class EventsUtil {
           const totalAlerts = eventAlerts + beAlerts;
           const enrichedEv = {
             ...ev,
-            ...(hasDamage && { hasDamageAlert: true }),
             ...(totalAlerts > 0 && { alertCount: totalAlerts }),
           };
           spans.push({

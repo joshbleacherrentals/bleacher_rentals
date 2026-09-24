@@ -9,6 +9,7 @@ import { alertDefinitions } from "@/features/alerts/registry";
 import type { AlertPayload, InMemoryAlertContext } from "@/features/alerts/types";
 import { calculateBestHue } from "@/features/dashboard/functions";
 import { mergeAlertFamily, sameAlertList } from "./alertFamilies";
+import { isPastBusinessDate } from "@/features/alerts/util/pastAlerts";
 
 /**
  * Computes the event form's in-memory alerts from live PowerSync data.
@@ -47,6 +48,8 @@ export function useEventFormAlerts() {
   const computed = useMemo<AlertPayload[] | null>(() => {
     if (isLoading) return null;
     if (!event.eventStart || !event.eventEnd) return null;
+    // An event that has ended shows no alerts — see docs/specs/no-past-alerts.md.
+    if (isPastBusinessDate(event.eventEnd)) return [];
 
     const context: InMemoryAlertContext = {
       event,

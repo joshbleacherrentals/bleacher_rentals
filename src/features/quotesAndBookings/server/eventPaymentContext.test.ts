@@ -156,3 +156,25 @@ describe("loadEventPaymentContext", () => {
     expect(ctx?.remainingCents).toBe(0);
   });
 });
+
+it("uses current taxed price with percentage terms while preserving received payments", async () => {
+  const terms = [
+    { id: "i1", due_date: "2026-01-01", percentage_bps: 5000 },
+    { id: "i2", due_date: "2026-02-01", percentage_bps: 5000 },
+  ];
+  const tables = seed({
+    PaymentInstallments: terms,
+    PaymentHistory: [payment({ installment_id: "i1", amount_cents: 11000 })],
+  });
+  expect(await loadEventPaymentContext(fakeSupabase(tables), "evt-1")).toMatchObject({
+    totalCents: 22000,
+    paidCents: 11000,
+    remainingCents: 11000,
+  });
+  tables.EventLineItems = [{ quantity: 2, value_cents: 20000 }];
+  expect(await loadEventPaymentContext(fakeSupabase(tables), "evt-1")).toMatchObject({
+    totalCents: 44000,
+    paidCents: 11000,
+    remainingCents: 33000,
+  });
+});

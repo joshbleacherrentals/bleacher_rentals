@@ -85,13 +85,17 @@ describe("useSidebarItems", () => {
 
   // ═══ Maintainer ═══
 
-  it("maintainer sees Quality Assurance with only Annual Inspections under it", () => {
+  it("maintainer sees Annual Inspections, Damage Reports and Repairs under Quality Assurance — not the inspections list", () => {
     const items = useSidebarItems(["maintainer"]);
     const qa = items.find((i) => i.key === "quality-assurance");
     expect(qa).toBeDefined();
     expect(qa!.type).toBe("dropdown");
     const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
-    expect(children.map((c) => c.href)).toEqual(["/annual-inspections"]);
+    expect(children.map((c) => c.href)).toEqual([
+      "/damage-reports",
+      "/annual-inspections",
+      "/repairs",
+    ]);
   });
 
   it("maintainer sees nothing operational beyond assets — no dashboard or work trackers", () => {

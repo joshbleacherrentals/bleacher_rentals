@@ -24,20 +24,13 @@ export function addDaysISO(iso: string, days: number): string {
  *   - If `eventStart` is not set yet, the second installment also defaults
  *     to `today`.
  *
- * The two halves always sum exactly to `totalCents` (odd remainder goes to
- * the second installment), so the schedule is balanced by construction.
- *
- * This is only a default — the manager can edit every value afterwards.
+ * Percentages stay fixed as the quote total changes.
  */
 export function buildDefaultPaymentSchedule(
-  totalCents: number,
   eventStart: string | null | undefined,
   today: string = todayISO(),
   idFn: () => string = () => crypto.randomUUID(),
 ): PaymentInstallment[] {
-  const firstHalf = Math.floor(totalCents / 2);
-  const secondHalf = totalCents - firstHalf; // keeps the sum exact
-
   let secondDate = today;
   if (eventStart) {
     const sevenDaysBefore = addDaysISO(eventStart, -7);
@@ -45,7 +38,7 @@ export function buildDefaultPaymentSchedule(
   }
 
   return [
-    { id: idFn(), dueDate: today, amountCents: firstHalf },
-    { id: idFn(), dueDate: secondDate, amountCents: secondHalf },
+    { id: idFn(), dueDate: today, percentageBps: 5000 },
+    { id: idFn(), dueDate: secondDate, percentageBps: 5000 },
   ];
 }

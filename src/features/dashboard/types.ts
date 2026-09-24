@@ -71,7 +71,6 @@ export type BleacherEvent = {
   goodshuffleUrl: string | null;
   isMaintenance?: boolean;
   isSubrental?: boolean;
-  hasDamageAlert?: boolean;
   alertCount?: number;
   // Mark spans injected from current selection (not yet persisted)
   isSelected?: boolean;

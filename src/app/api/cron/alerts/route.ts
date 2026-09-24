@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { Database } from "../../../../../database.types";
-import { todayStart, getUpcomingWindowEnd } from "@/features/alerts/util/getUpcomingWindow";
+import { getUpcomingWindowEnd } from "@/features/alerts/util/getUpcomingWindow";
+import { businessToday } from "@/features/alerts/util/pastAlerts";
 import { AlertEntityType } from "@/features/alerts/types";
 import { evaluateWorkTrackerPending } from "@/features/alerts/evaluate/workTrackerPending";
 
@@ -95,7 +96,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const windowStart = todayStart();
+
+    // Cleaning up past alerts is NOT done here: `delete_past_alerts()` runs in Postgres on pg_cron
+    // (docs/specs/no-past-alerts.md). This route keeps the work that needs TypeScript.
+
+    const windowStart = businessToday();
     const windowEnd = getUpcomingWindowEnd();
 
     // ── Work Tracker Alerts ──────────────────────────────────────────────────
@@ -142,45 +147,6 @@ export async function GET(req: NextRequest) {
     for (const alert of discontinued ?? []) {
       await supabase.from("UserAlerts").delete().eq("alert_uuid", alert.id);
       await supabase.from("Alerts").delete().eq("id", alert.id);
-    }
-
-    // ── Clean up alerts for past entities ────────────────────────────────────
-    const { data: staleAlerts } = await supabase
-      .from("Alerts")
-      .select("id, entity_uuid, entity_type");
-
-    for (const alert of staleAlerts ?? []) {
-      if (!alert.entity_uuid) continue;
-
-      let isPast = false;
-      if (alert.entity_type === "event") {
-        const { data: ev } = await supabase
-          .from("Events")
-          .select("event_end")
-          .eq("id", alert.entity_uuid)
-          .single();
-        isPast = !ev || ev.event_end < windowStart;
-      } else if (alert.entity_type === "bleacher_event") {
-        const { data: be } = await supabase
-          .from("BleacherEvents")
-          .select("Events!inner(event_end)")
-          .eq("id", alert.entity_uuid)
-          .single();
-        const ev = be?.Events && !Array.isArray(be.Events) ? be.Events : null;
-        isPast = !ev || ev.event_end < windowStart;
-      } else if (alert.entity_type === "work_tracker") {
-        const { data: wt } = await supabase
-          .from("WorkTrackers")
-          .select("date")
-          .eq("id", alert.entity_uuid)
-          .single();
-        isPast = !wt || (wt.date != null && wt.date < windowStart);
-      }
-
-      if (isPast) {
-        await supabase.from("UserAlerts").delete().eq("alert_uuid", alert.id);
-        await supabase.from("Alerts").delete().eq("id", alert.id);
-      }
     }
 
     return NextResponse.json({ ok: true });

@@ -25,6 +25,7 @@ function quote(language: QuoteLanguage): QuoteDocumentData {
       phone: "555-0100",
       email: "office@bleacherrentals.com",
       website: "www.BleacherRentals.com",
+      paymentInfo: null,
     },
     contact: { name: "Marie Tremblay", email: "marie@example.com", phone: "555-0199" },
     customerCompany: null,
@@ -111,8 +112,23 @@ describe("QuotePublicView — English (regression guard)", () => {
     expect(html).toContain("Invoice #INV-1042");
   });
 
-  it("tells the client where to send an e-transfer", () => {
-    expect(html).toContain("e-transfers to payments@bleacherrentals.com");
+  it("shows the office's own payment info under the cheque details", () => {
+    const withInfo = renderToStaticMarkup(
+      <QuotePublicView
+        data={{
+          ...quote("en"),
+          company: {
+            ...quote("en").company,
+            paymentInfo: "e-transfers to payments@bleacherrentals.com",
+          },
+        }}
+      />,
+    );
+    expect(withInfo).toContain("e-transfers to payments@bleacherrentals.com");
+  });
+
+  it("shows no e-transfer line when the office has no payment info", () => {
+    expect(html.toLowerCase()).not.toContain("transfer");
   });
 });
 
@@ -162,8 +178,16 @@ describe("QuotePublicView — French", () => {
     expect(html).toContain("Taxes (5 %)");
   });
 
-  it("gives the e-transfer address in French", () => {
-    expect(html).toContain("Virements Interac à payments@bleacherrentals.com");
+  it("shows the office's payment info exactly as typed — it is not translated", () => {
+    const withInfo = renderToStaticMarkup(
+      <QuotePublicView
+        data={{
+          ...quote("fr"),
+          company: { ...quote("fr").company, paymentInfo: "Virements Interac à payments@x.com" },
+        }}
+      />,
+    );
+    expect(withInfo).toContain("Virements Interac à payments@x.com");
   });
 
   it("leaves no English chrome behind", () => {

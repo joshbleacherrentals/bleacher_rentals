@@ -22,11 +22,18 @@ describe("mergeRoleConfigs — the maintainer role", () => {
     expect(mergeRoleConfigs(["maintainer"]).allowedPaths).toContain("/assets");
   });
 
-  it("gives a maintainer nothing else — not the dashboard, not the rest of quality assurance", () => {
+  it("lets a maintainer open damage reports and repairs", () => {
+    const config = mergeRoleConfigs(["maintainer"]);
+    expect(config.allowedPaths).toContain("/damage-reports");
+    expect(config.allowedPaths).toContain("/repairs");
+  });
+
+  it("gives a maintainer nothing else — not the dashboard, not the inspections list", () => {
     const config = mergeRoleConfigs(["maintainer"]);
     expect(config.allowedPaths).not.toContain("/dashboard");
     expect(config.allowedPaths).not.toContain("/inspections");
-    expect(config.allowedPaths).not.toContain("/damage-reports");
+    expect(config.allowedPaths).not.toContain("/work-trackers");
+    expect(config.allowedPaths).not.toContain("/quotes-bookings");
   });
 
   it("shows the sidebar to a maintainer", () => {

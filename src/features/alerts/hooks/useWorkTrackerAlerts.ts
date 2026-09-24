@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery, typedExecute } from "@/lib/powersync/typedQuery";
 import { useUser } from "@clerk/nextjs";
+import { businessToday, hidePastAlerts } from "../util/pastAlerts";
 
 export type WorkTrackerAlertRow = {
   userAlertId: string;
@@ -15,6 +16,10 @@ export type WorkTrackerAlertRow = {
   dismissed: number | null;
   dismissedUntil: string | null;
   createdAt: string | null;
+  /** The work tracker's date; its alerts are hidden once it is past. */
+  entityDate: string | null;
+  /** Same date, under the name the shared alert row type uses for its start. */
+  entityStartDate: string | null;
 };
 
 type UserRow = { userUuid: string };
@@ -22,7 +27,7 @@ type UserRow = { userUuid: string };
 export function useWorkTrackerAlerts(workTrackerUuid: string | null) {
   const { user } = useUser();
   const clerkUserId = user?.id ?? "__no_clerk_user__";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = businessToday(); // Toronto YYYY-MM-DD — see docs/specs/no-past-alerts.md
   const entityUuid = workTrackerUuid ?? "__none__";
 
   const userQuery = useMemo(
@@ -44,7 +49,10 @@ export function useWorkTrackerAlerts(workTrackerUuid: string | null) {
       db
         .selectFrom("UserAlerts as ua")
         .innerJoin("Alerts as a", "a.id", "ua.alert_uuid")
+        .leftJoin("WorkTrackers as wt", "wt.id", "a.entity_uuid")
         .select([
+          "wt.date as entityDate",
+          "wt.date as entityStartDate",
           "ua.id as userAlertId",
           "a.id as alertId",
           "a.entity_uuid as entityUuid",
@@ -64,7 +72,8 @@ export function useWorkTrackerAlerts(workTrackerUuid: string | null) {
     [userUuid, entityUuid],
   );
 
-  const { data: allAlerts = [] } = useTypedQuery(alertsQuery, expect<WorkTrackerAlertRow>());
+  const { data: rawAlerts = [] } = useTypedQuery(alertsQuery, expect<WorkTrackerAlertRow>());
+  const allAlerts = hidePastAlerts(rawAlerts, today);
 
   const activeAlerts = allAlerts.filter(
     (a) => !a.dismissed || (a.dismissedUntil !== null && a.dismissedUntil <= today),

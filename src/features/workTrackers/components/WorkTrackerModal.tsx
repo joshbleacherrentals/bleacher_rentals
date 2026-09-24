@@ -620,7 +620,8 @@ export default function WorkTrackerModal({
 
   /**
    * ⌘/Ctrl+click on an empty dashboard cell opens this modal with no popup in between, so the
-   * four locators the user would otherwise press are run for them, once, on open.
+   * locators the user would otherwise press (addresses, POCs and instructions) are run for
+   * them, once, on open.
    *
    * The guard is keyed on bleacher+date rather than a plain "already ran" flag: `workTracker`
    * is seeded by the effect above, so on the first pass it can still hold the previously opened
@@ -645,6 +646,8 @@ export default function WorkTrackerModal({
       handlePopulateDropoffFromNextAddress(),
       handlePopulatePoc("past", { silent: true }),
       handlePopulatePoc("future", { silent: true }),
+      handlePopulatePickupInstructions(),
+      handlePopulateDropoffInstructions(),
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPopulate, selectedWorkTracker, workTracker?.bleacher_uuid, workTracker?.date]);

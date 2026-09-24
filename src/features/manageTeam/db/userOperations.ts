@@ -243,6 +243,7 @@ export async function createUser(
       const { error: amError } = await supabase.from("AccountManagers").insert({
         user_uuid: userUuid,
         is_active: true,
+        default_sales_office_uuid: state.defaultSalesOfficeId,
       });
 
       if (amError) throw amError;
@@ -428,6 +429,7 @@ export async function updateUser(
         const { error: amInsertError } = await supabase.from("AccountManagers").insert({
           user_uuid: userUuid,
           is_active: true,
+          default_sales_office_uuid: state.defaultSalesOfficeId,
         });
 
         if (amInsertError) throw amInsertError;
@@ -435,7 +437,7 @@ export async function updateUser(
         // Reactivate existing account manager
         const { error: amUpdateError } = await supabase
           .from("AccountManagers")
-          .update({ is_active: true })
+          .update({ is_active: true, default_sales_office_uuid: state.defaultSalesOfficeId })
           .eq("user_uuid", userUuid);
 
         if (amUpdateError) throw amUpdateError;
@@ -888,6 +890,7 @@ export async function fetchUserById(
       }
 
       const accountManagerId = accountManager.id;
+      result.defaultSalesOfficeId = accountManager.default_sales_office_uuid ?? null;
 
       // Fetch drivers assigned to this account manager
       const { data: assignedDrivers } = await supabase

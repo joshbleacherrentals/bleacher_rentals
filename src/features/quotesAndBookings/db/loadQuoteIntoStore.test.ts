@@ -79,3 +79,20 @@ describe("loadQuoteIntoStore", () => {
     expect(useCreateQuoteStore.getState().venueId).toBeNull();
   });
 });
+
+it("keeps an existing empty schedule empty", async () => {
+  fetchQuoteDetailMock.mockResolvedValue(makeQuoteDetail());
+  expect(useCreateQuoteStore.getState().paymentInstallments).toHaveLength(2);
+  await loadQuoteIntoStore("event-1");
+  expect(useCreateQuoteStore.getState().paymentInstallments).toEqual([]);
+  expect(useCreateQuoteStore.getState().scheduleDatesAutomatic).toBe(false);
+});
+
+it("retains the draft when installment loading fails", async () => {
+  const { fetchPaymentInstallments } = await import("./paymentInstallments");
+  vi.mocked(fetchPaymentInstallments).mockRejectedValueOnce(new Error("Offline read failed"));
+  fetchQuoteDetailMock.mockResolvedValue(makeQuoteDetail());
+  const before = useCreateQuoteStore.getState().paymentInstallments;
+  expect(await loadQuoteIntoStore("event-1")).toBeNull();
+  expect(useCreateQuoteStore.getState().paymentInstallments).toEqual(before);
+});

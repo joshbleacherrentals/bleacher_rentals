@@ -11,6 +11,9 @@ import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsS
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
 import { STATUSES } from "@/features/manageTeam/constants";
+import { Dropdown } from "@/components/DropDown";
+import { useSalesOffices } from "@/features/quotesAndBookings/hooks/useSalesOffices";
+import { salesOfficeLabel } from "@/features/quotesAndBookings/utils/salesOfficeLabel";
 
 type ZoneRow = { id: string; displayName: string | null; photoPath: string | null };
 type DriverRow = { driverUuid: string; firstName: string | null; lastName: string | null };
@@ -109,6 +112,7 @@ export function AccountManagerPageContent() {
   const roleTabs = useCurrentUserStore((s) => s.roleTabs);
   const existingUserUuid = useCurrentUserStore((s) => s.existingUserUuid);
   const assignedZoneEntries = useCurrentUserStore((s) => s.assignedZoneEntries);
+  const defaultSalesOfficeId = useCurrentUserStore((s) => s.defaultSalesOfficeId);
   const setField = useCurrentUserStore((s) => s.setField);
   const isAdmin = usePermissionsStore((s) => s.isAdmin);
   const accountManagerZoneIds = usePermissionsStore((s) => s.accountManagerZoneIds);
@@ -117,6 +121,8 @@ export function AccountManagerPageContent() {
   const { data: driverRows } = useTypedQuery(compiledDrivers, expect<DriverRow>());
   const zones = zoneRows ?? [];
   const drivers = driverRows ?? [];
+  const { salesOffices, isLoading: loadingOffices } = useSalesOffices();
+  const salesOfficeOptions = salesOffices.map((o) => ({ label: salesOfficeLabel(o), value: o.id }));
 
   const entryMap = useMemo(
     () => new Map(assignedZoneEntries.map((e) => [e.zoneUuid, e])),
@@ -154,6 +160,24 @@ export function AccountManagerPageContent() {
 
   return (
     <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
+      {/* Default sales office */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-1">Default Sales Office</h3>
+        <p className="text-xs text-gray-500 mb-2">
+          Prefills the Sales Office field on this account manager's new quotes. Optional — only
+          admins can set it.
+        </p>
+        <div className="max-w-xs">
+          <Dropdown
+            options={salesOfficeOptions}
+            selected={defaultSalesOfficeId ?? undefined}
+            onSelect={(val) => setField("defaultSalesOfficeId", val)}
+            placeholder={loadingOffices ? "Loading..." : "No default"}
+            disabled={!isAdmin || loadingOffices}
+          />
+        </div>
+      </div>
+
       {/* Header + permission banner */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-1">Zone Assignments</h3>

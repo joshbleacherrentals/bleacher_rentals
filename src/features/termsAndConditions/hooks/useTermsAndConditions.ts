@@ -4,12 +4,14 @@ import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useMemo } from "react";
 
-type Row = {
+export type Row = {
   id: string;
   name: string | null;
   html_content: string | null;
   created_at: string | null;
   deleted: number | null;
+  /** 0/1 locally — PowerSync stores booleans as integers. */
+  is_default: number | null;
 };
 
 export type TermsAndConditionsItem = {
@@ -17,15 +19,23 @@ export type TermsAndConditionsItem = {
   name: string;
   htmlContent: string;
   createdAt: string;
+  /** The template a new quote starts with. At most one is true — see the partial unique index. */
+  isDefault: boolean;
 };
 
-function toItem(r: Row): TermsAndConditionsItem {
+export function toItem(r: Row): TermsAndConditionsItem {
   return {
     id: r.id,
     name: r.name ?? "",
     htmlContent: r.html_content ?? "",
     createdAt: r.created_at ?? "",
+    isDefault: !!r.is_default,
   };
+}
+
+/** The default template's id, or null when none is marked. */
+export function findDefaultId(items: TermsAndConditionsItem[]): string | null {
+  return items.find((t) => t.isDefault)?.id ?? null;
 }
 
 export function useTermsAndConditions() {
@@ -33,7 +43,7 @@ export function useTermsAndConditions() {
     () =>
       db
         .selectFrom("TermsAndConditions")
-        .select(["id", "name", "html_content", "created_at", "deleted"])
+        .select(["id", "name", "html_content", "created_at", "deleted", "is_default"])
         .where("deleted", "=", 0)
         .orderBy("created_at", "desc")
         .compile(),
@@ -43,6 +53,7 @@ export function useTermsAndConditions() {
   const { data, isLoading, error } = useTypedQuery(compiled, expect<Row>());
 
   const items = useMemo<TermsAndConditionsItem[]>(() => (data ?? []).map(toItem), [data]);
+  const defaultId = useMemo(() => findDefaultId(items), [items]);
 
-  return { items, isLoading, error };
+  return { items, defaultId, isLoading, error };
 }

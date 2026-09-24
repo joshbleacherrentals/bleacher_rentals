@@ -78,7 +78,10 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     showSidebar: true,
   },
   developer: {
-    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction"],
+    // The Sync Health page is listed on its own, not as "/dev-tools": the rest
+    // of /dev-tools (Stripe checkout, damage photos, QBO tax) stays admin and
+    // viewer only, and allowedPaths is matched by prefix.
+    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction", "/dev-tools/sync-health"],
     showSidebar: true,
   },
   viewer: {
@@ -108,11 +111,18 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     showSidebar: true,
   },
   maintainer: {
-    // The annual inspection queue is the whole of this role's job. /permissions
-    // so they can read what they are allowed to do, and /changelog so a release
-    // note is not invisible to them; without a dashboard, defaultRedirect falls
-    // through to the first path here, which is the queue.
-    allowedPaths: ["/annual-inspections", "/permissions", "/changelog", "/assets"],
+    // The annual inspection queue is the heart of this role's job, plus damage reports and
+    // repairs (docs/specs/maintainer-damage-and-maintenance.md). /permissions so they can read
+    // what they are allowed to do, and /changelog so a release note is not invisible to them;
+    // without a dashboard, defaultRedirect falls through to the first path here, which is the queue.
+    allowedPaths: [
+      "/annual-inspections",
+      "/damage-reports",
+      "/repairs",
+      "/permissions",
+      "/changelog",
+      "/assets",
+    ],
     showSidebar: true,
   },
   driver: {

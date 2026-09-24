@@ -6,6 +6,7 @@ import type { TrackEvent } from "./useQuoteActivityTracker";
 import { formatQuoteDate, formatQuoteDateRange, formatQuoteMoney } from "./quoteFormat";
 import { quoteText } from "./quoteStrings";
 import { LineItemDescription } from "../components/LineItemDescription";
+import { ChecksPayableBox } from "./ChecksPayableBox";
 
 function companyFullAddress(c: QuoteDocumentData["company"]): string {
   const parts = [c.street];
@@ -22,9 +23,12 @@ function companyFullAddress(c: QuoteDocumentData["company"]): string {
 export function QuotePublicView({
   data,
   track,
+  highlightPaymentBox = false,
 }: {
   data: QuoteDocumentData;
   track?: (event: TrackEvent) => void;
+  /** Only the sales office form's preview turns this on. */
+  highlightPaymentBox?: boolean;
 }) {
   const { currency, language } = data;
   const s = quoteText(language);
@@ -171,15 +175,13 @@ export function QuotePublicView({
           {/* Make checks payable + Totals summary side by side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Left: Make checks payable */}
-            <div className="bg-gray-50 rounded-lg p-5 text-sm text-center">
-              <p className="font-bold mb-2">{s.makeChecksPayableTo}</p>
-              <p>{data.company.name}</p>
-              {data.company.street && (
-                <p className="whitespace-pre-line">{companyFullAddress(data.company)}</p>
-              )}
-              <p className="font-bold mb-2">{s.memoInvoice(data.quoteNumber)}</p>
-              <p className="font-bold mb-2">{s.eTransferNote}</p>
-            </div>
+            <ChecksPayableBox
+              company={data.company}
+              quoteNumber={data.quoteNumber}
+              paymentInfo={data.company.paymentInfo}
+              language={language}
+              highlight={highlightPaymentBox}
+            />
 
             {/* Right: Totals box */}
             <div>

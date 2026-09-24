@@ -2,16 +2,16 @@ import { describe, it, expect } from "vitest";
 import { diffSchedule, describeBlockedRemovals } from "./scheduleDiff";
 import type { PaymentInstallment } from "../types/quoteTypes";
 
-const inst = (id: string, dueDate: string, amountCents: number): PaymentInstallment => ({
+const inst = (id: string, dueDate: string, percentageBps: number): PaymentInstallment => ({
   id,
   dueDate,
-  amountCents,
+  percentageBps,
 });
 
-const existing = (id: string, dueDate: string, amountCents: number, currency = "USD") => ({
+const existing = (id: string, dueDate: string, percentageBps: number, currency = "USD") => ({
   id,
   dueDate,
-  amountCents,
+  percentageBps,
   currency,
 });
 
@@ -27,7 +27,7 @@ describe("diffSchedule", () => {
     expect(diffSchedule([], next, "USD")).toEqual({ toInsert: next, toUpdate: [], toDelete: [] });
   });
 
-  it("updates a row whose date or amount changed, without deleting it", () => {
+  it("updates a row whose date or percentage changed, without deleting it", () => {
     // The whole point: editing a date must not delete and re-insert the row,
     // which would break the payments pointing at it.
     const next = [inst("a", "2026-09-15", 120000)];

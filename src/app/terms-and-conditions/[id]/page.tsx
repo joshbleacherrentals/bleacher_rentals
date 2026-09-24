@@ -9,7 +9,6 @@ import {
   updateTermsAndConditions,
   TermsAndConditionsRow,
 } from "@/features/termsAndConditions/db/termsAndConditionsDb";
-import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { PrimaryButton } from "@/components/PrimaryButton";
 
@@ -20,7 +19,6 @@ export default function TermsAndConditionsDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const supabase = useClerkSupabaseClient();
 
   const [data, setData] = useState<TermsAndConditionsRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +45,7 @@ export default function TermsAndConditionsDetailPage({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateTermsAndConditions(id, { name: name.trim(), htmlContent }, supabase);
+      await updateTermsAndConditions(id, { name: name.trim(), htmlContent });
       createSuccessToast(["Contract template updated."]);
       setEditing(false);
       load();
@@ -107,9 +105,7 @@ export default function TermsAndConditionsDetailPage({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contract Content
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Contract Content</label>
             <RichTextEditor value={htmlContent} onChange={setHtmlContent} />
           </div>
 

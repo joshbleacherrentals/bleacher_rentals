@@ -51,6 +51,7 @@ const baseState: CurrentUserState = {
   assignedDriverUuids: [],
   assignedZoneEntries: [],
   zoneDriverMap: {},
+  defaultSalesOfficeId: null,
   existingUserUuid: null,
   isOpen: false,
   isSubmitting: false,

@@ -43,7 +43,7 @@ function installment(over: object = {}) {
   return {
     id: "i1",
     dueDate: "2026-08-31",
-    amountCents: 270000,
+    percentageBps: 10000,
     currency: "USD",
     ...over,
   };
@@ -119,7 +119,7 @@ describe("BillingTab", () => {
     // The schedule row carries no payment state of its own any more — only the
     // term. "Unpaid" here is derived from PaymentHistory having nothing in it.
     // See docs/specs/payment-does-not-invalidate-signature.md §6.
-    mockInstallments.mockReturnValue([installment({ amountCents: 270000 })]);
+    mockInstallments.mockReturnValue([installment()]);
     mockPayments.mockReturnValue([]);
 
     const html = render(270000);
@@ -130,7 +130,7 @@ describe("BillingTab", () => {
   });
 
   it("shows a partial payment as partial, not paid (Bug 1)", () => {
-    mockInstallments.mockReturnValue([installment({ amountCents: 270000 })]);
+    mockInstallments.mockReturnValue([installment()]);
     mockPayments.mockReturnValue([payment({ amountCents: 100, installmentId: "i1" })]);
 
     const html = render(270000);
@@ -142,7 +142,7 @@ describe("BillingTab", () => {
   });
 
   it("shows a fully covered installment as paid", () => {
-    mockInstallments.mockReturnValue([installment({ amountCents: 270000 })]);
+    mockInstallments.mockReturnValue([installment()]);
     mockPayments.mockReturnValue([payment({ amountCents: 270000, installmentId: "i1" })]);
 
     const html = render(270000);
@@ -199,8 +199,8 @@ describe("BillingTab", () => {
 
   it("names every installment a split payment landed on", () => {
     mockInstallments.mockReturnValue([
-      installment({ id: "i1", dueDate: "2026-08-31", amountCents: 100000 }),
-      installment({ id: "i2", dueDate: "2026-09-16", amountCents: 100000 }),
+      installment({ id: "i1", dueDate: "2026-08-31", percentageBps: 5000 }),
+      installment({ id: "i2", dueDate: "2026-09-16", percentageBps: 5000 }),
     ]);
     mockPayments.mockReturnValue([payment({ amountCents: 150000, installmentId: "i1" })]);
 
@@ -213,7 +213,7 @@ describe("BillingTab", () => {
   });
 
   it("marks money that no installment can absorb as unapplied", () => {
-    mockInstallments.mockReturnValue([installment({ amountCents: 100000 })]);
+    mockInstallments.mockReturnValue([installment()]);
     mockPayments.mockReturnValue([payment({ amountCents: 150000 })]);
 
     const html = render(100000);
@@ -222,7 +222,7 @@ describe("BillingTab", () => {
   });
 
   it("excludes a foreign-currency payment from the balance and says so", () => {
-    mockInstallments.mockReturnValue([installment({ amountCents: 100000 })]);
+    mockInstallments.mockReturnValue([installment()]);
     mockPayments.mockReturnValue([payment({ amountCents: 100000, currency: "CAD" })]);
 
     const html = render(100000);
@@ -342,9 +342,9 @@ describe("BillingTab", () => {
 
     it("stops enumerating Applied To past two pieces instead of widening the column", () => {
       mockInstallments.mockReturnValue([
-        installment({ id: "i1", dueDate: "2026-08-31", amountCents: 100000 }),
-        installment({ id: "i2", dueDate: "2026-09-16", amountCents: 100000 }),
-        installment({ id: "i3", dueDate: "2026-10-01", amountCents: 100000 }),
+        installment({ id: "i1", dueDate: "2026-08-31", percentageBps: 3333 }),
+        installment({ id: "i2", dueDate: "2026-09-16", percentageBps: 3333 }),
+        installment({ id: "i3", dueDate: "2026-10-01", percentageBps: 3334 }),
       ]);
       mockPayments.mockReturnValue([payment({ amountCents: 350000 })]);
 
@@ -364,4 +364,17 @@ describe("BillingTab", () => {
       expect(html).toContain("record a negative amount");
     });
   });
+});
+
+it("recalculates installment dollars when the quote price changes, preserving payments", () => {
+  mockInstallments.mockReturnValue([
+    installment({ id: "i1", percentageBps: 5000 }),
+    installment({ id: "i2", percentageBps: 5000 }),
+  ]);
+  mockPayments.mockReturnValue([payment({ amountCents: 50000, installmentId: "i1" })]);
+  expect(render(100000)).toContain("Paid");
+  const updated = render(200000);
+  expect(updated).toContain("Partial");
+  expect(updated).toContain("$1,000.00");
+  expect(updated).toContain("$1,500.00");
 });

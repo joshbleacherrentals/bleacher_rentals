@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import {
   DummyDriver,
@@ -113,9 +113,18 @@ function addWorkTracker(id: string, date: string, dropoffStreet: string) {
     .run(id, BLEACHER, date, addressId);
 }
 
+// The fixtures use fixed September 2026 dates, and a past event never gets an alert. Pinning
+// "today" before all of them keeps these tests from expiring. Only Date is faked, so timers
+// and promises run normally.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-08-01T12:00:00Z"));
   setupSchema();
   rowCounts.length = 0;
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("bleacherTransportation", () => {
