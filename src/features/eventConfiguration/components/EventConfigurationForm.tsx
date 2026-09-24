@@ -125,9 +125,13 @@ export const EventConfigurationForm = ({
     if (lostReasonBlocks(state)) return;
     setLoading(true);
     try {
-      await updateEvent(state, supabase, user ?? null);
+      const { removedBleacherUuids } = await updateEvent(state, supabase, user ?? null);
       if (state.eventUuid) {
-        await triage("Events", { id: state.eventUuid }, supabase);
+        await triage(
+          "Events",
+          { id: state.eventUuid, removed_bleacher_uuids: removedBleacherUuids },
+          supabase,
+        );
       }
       currentEventStore.resetForm();
     } catch (error) {

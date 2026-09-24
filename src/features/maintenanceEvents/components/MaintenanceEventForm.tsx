@@ -40,12 +40,14 @@ export const MaintenanceEventForm = ({ onCancel }: MaintenanceEventFormProps) =>
   const permissions = useTeamPermissions();
 
   const isEditing = !!store.maintenanceEventUuid;
-  const canEdit = permissions.canCreateUser
-    ? canEditOwnedEntity({
-        isAdmin: permissions.isAdmin,
-        isNew: !isEditing,
-      })
-    : false;
+  const canEdit = permissions.isMaintainer
+    ? true
+    : permissions.canCreateUser
+      ? canEditOwnedEntity({
+          isAdmin: permissions.isAdmin,
+          isNew: !isEditing,
+        })
+      : false;
 
   // ── Damage report lookup per bleacher (moved out of the Core tab) ─────────
   // For each selected bleacher, look backwards from eventStart to find a damage

@@ -7,6 +7,7 @@ import { useRepairs } from "../hooks/useRepairs";
 import { useBleacherOptions } from "../hooks/useFilterOptions";
 import { Wrench, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
+import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { loadMaintenanceEventById } from "@/features/dashboard/db/client/loadMaintenanceEventById";
 import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
@@ -38,7 +39,9 @@ export default function RepairsPage() {
   const bleacherUuid = searchParams.get("bleacher_uuid");
 
   // Admins can edit maintenance/repair events directly from this page.
-  const { isAdmin } = useTeamPermissions();
+  const { isAdmin: isAdminRole, isMaintainer } = useTeamPermissions();
+  // Admins and maintainers can edit, delete and restore repairs.
+  const isAdmin = canManageDamageAndMaintenance({ isAdmin: isAdminRole, isMaintainer });
   const supabase = useClerkSupabaseClient();
   const [showDeleted, setShowDeleted] = useState(false);
   const [editingUuid, setEditingUuid] = useState<string | null>(null);

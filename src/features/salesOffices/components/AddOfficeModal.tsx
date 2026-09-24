@@ -18,6 +18,8 @@ import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient"
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { AutoEmailsForSalesOfficeBtn } from "./AutoEmailsForSalesOfficeBtn";
+import { buildSampleQuoteData } from "@/features/quotesAndBookings/pdf/sampleQuoteData";
+import { QuotePreviewPanel } from "./QuotePreviewPanel";
 
 type Props = {
   open: boolean;
@@ -34,6 +36,9 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
   const [quickbookUuid, setQuickbookUuid] = useState<string | null>(null);
   const [stripeConnectionUuid, setStripeConnectionUuid] = useState<string | null>(null);
   const [address, setAddress] = useState<SalesOfficeAddress | null>(null);
+  const [paymentInfo, setPaymentInfo] = useState("");
+  const [paymentInfoFocused, setPaymentInfoFocused] = useState(false);
+  const previewing = open && paymentInfoFocused;
   const [saving, setSaving] = useState(false);
 
   const [qboOptions, setQboOptions] = useState<QboConnectionOption[]>([]);
@@ -58,10 +63,12 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
   // Hydrate fields when opening in edit mode (or reset for create)
   useEffect(() => {
     if (!open) return;
+    setPaymentInfoFocused(false);
     if (editing) {
       setName(editing.name ?? "");
       setQuickbookUuid(editing.quickbook_uuid ?? null);
       setStripeConnectionUuid(editing.stripe_connection_uuid ?? null);
+      setPaymentInfo(editing.payment_info ?? "");
       setAddress(
         editing.address_street
           ? {
@@ -76,6 +83,7 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
       setName("");
       setQuickbookUuid(null);
       setStripeConnectionUuid(null);
+      setPaymentInfo("");
       setAddress(null);
     }
   }, [open, editing]);
@@ -115,7 +123,13 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
     if (!name.trim() || !quickbookUuid) return;
     setSaving(true);
     try {
-      const payload = { name: name.trim(), quickbookUuid, stripeConnectionUuid, address };
+      const payload = {
+        name: name.trim(),
+        quickbookUuid,
+        stripeConnectionUuid,
+        address,
+        paymentInfo,
+      };
       if (isEditing && editing) {
         await updateSalesOffice(editing.id, editing.address_uuid, payload);
         createSuccessToast([`Sales office "${name}" updated.`]);
@@ -141,7 +155,22 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && resetAndClose()}>
-      <DialogContent className="sm:max-w-md">
+      {previewing && (
+        <QuotePreviewPanel
+          data={buildSampleQuoteData({
+            name,
+            street: address?.street ?? "",
+            zip: address?.zipPostal ?? "",
+            paymentInfo,
+          })}
+        />
+      )}
+      {/* While previewing, slide to the left edge (sm and up) so the preview gets the rest. */}
+      <DialogContent
+        className={`sm:max-w-md sm:transition-[left,transform] ${
+          previewing ? "sm:left-4 sm:translate-x-0" : ""
+        }`}
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Sales Office" : "Add Sales Office"}</DialogTitle>
         </DialogHeader>
@@ -215,6 +244,25 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
               placeholder={loadingStripe ? "Loading..." : "Select Stripe (optional)..."}
               disabled={loadingStripe}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Payment Info (shown on the customer&apos;s quote)
+            </label>
+            <textarea
+              value={paymentInfo}
+              onChange={(e) => setPaymentInfo(e.target.value)}
+              onFocus={() => setPaymentInfoFocused(true)}
+              onBlur={() => setPaymentInfoFocused(false)}
+              rows={3}
+              placeholder="e.g. e-transfers to payments@bleacherrentals.com"
+              className="w-full px-3 py-2 border rounded text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Optional. Leave blank to show nothing extra, e.g. for a US office. Click in the box to
+              preview the customer&apos;s quote.
+            </p>
           </div>
 
           <div>

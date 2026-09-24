@@ -91,10 +91,10 @@ const money = (cents: number, cur = currency) =>
 
 // ── Report ────────────────────────────────────────────────────────────
 async function report(label: string) {
-  const [{ data: installments }, { data: payments }] = await Promise.all([
+  const [{ data: terms }, { data: payments }, resolved] = await Promise.all([
     supabase
       .from("PaymentInstallments")
-      .select("id, due_date, amount_cents, currency, status, paid_at")
+      .select("id, due_date, percentage_bps, currency")
       .eq("event_uuid", eventId!)
       .order("due_date"),
     supabase
@@ -102,7 +102,11 @@ async function report(label: string) {
       .select("id, installment_id, amount_cents, currency, status, paid_at")
       .eq("event_uuid", eventId!)
       .order("created_at"),
+    supabase.rpc("resolve_payment_schedule", { p_event_id: eventId! }),
   ]);
+  if (resolved.error) throw resolved.error;
+  const amounts = new Map((resolved.data ?? []).map((i) => [i.id, i.amount_cents]));
+  const installments = (terms ?? []).map((i) => ({ ...i, amount_cents: amounts.get(i.id) ?? 0 }));
 
   console.log(`\n── ${label} ───────────────────────────────`);
 
@@ -112,9 +116,7 @@ async function report(label: string) {
   } else {
     for (const i of installments) {
       console.log(
-        `  ${i.due_date}  ${money(i.amount_cents, i.currency).padStart(12)}  ${String(
-          i.status,
-        ).padEnd(7)}  ${i.paid_at ?? ""}  ${i.id}`,
+        `  ${i.due_date}  ${money(i.amount_cents, i.currency).padStart(12)}  ${i.percentage_bps / 100}%  ${i.id}`,
       );
     }
   }

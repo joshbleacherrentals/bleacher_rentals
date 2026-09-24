@@ -33,6 +33,7 @@ export function DashboardOptions() {
   const optimizationMode = state?.optimizationMode ?? false;
   const showAddressTooltip = state?.showAddressTooltip ?? false;
   const showDistanceTooltip = state?.showDistanceTooltip ?? false;
+  const hideAllSubrentals = state?.hideAllSubrentals ?? false;
 
   // Address & Distance tooltips are mutually exclusive: enabling one disables the other.
   const handleAddressTooltip = (checked: boolean) => {
@@ -121,6 +122,13 @@ export function DashboardOptions() {
               onCheckedChange={(checked) => void setField("onlyShowMyEvents", Boolean(checked))}
             >
               Only Show My Events
+            </MenubarCheckboxItem>
+            <MenubarCheckboxItem
+              checked={hideAllSubrentals}
+              onCheckedChange={(checked) => void setField("hideAllSubrentals", Boolean(checked))}
+              title="Hides every subrental row on the grid, whatever dates you're looking at."
+            >
+              Hide all Subrentals
             </MenubarCheckboxItem>
             <MenubarCheckboxItem
               checked={showAddressTooltip}

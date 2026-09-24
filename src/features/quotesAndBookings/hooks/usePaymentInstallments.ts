@@ -7,7 +7,7 @@ import { useMemo } from "react";
 type Row = {
   id: string;
   due_date: string | null;
-  amount_cents: number | null;
+  percentage_bps: number | null;
   currency: string | null;
 };
 
@@ -19,7 +19,7 @@ type Row = {
 export type PaymentInstallmentRow = {
   id: string;
   dueDate: string;
-  amountCents: number;
+  percentageBps: number;
   currency: string;
 };
 
@@ -28,7 +28,7 @@ export function usePaymentInstallments(eventId: string | null) {
     () =>
       db
         .selectFrom("PaymentInstallments")
-        .select(["id", "due_date", "amount_cents", "currency"])
+        .select(["id", "due_date", "percentage_bps", "currency"])
         .where("event_uuid", "=", eventId ?? "")
         .orderBy("due_date", "asc")
         .compile(),
@@ -42,7 +42,7 @@ export function usePaymentInstallments(eventId: string | null) {
       (data ?? []).map((r) => ({
         id: r.id,
         dueDate: r.due_date ?? "",
-        amountCents: r.amount_cents ?? 0,
+        percentageBps: r.percentage_bps ?? 0,
         currency: r.currency ?? "USD",
       })),
     [data],

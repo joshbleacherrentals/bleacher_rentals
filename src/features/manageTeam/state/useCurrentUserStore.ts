@@ -80,6 +80,8 @@ export type CurrentUserState = {
   assignedDriverUuids: string[];
   assignedZoneEntries: { zoneUuid: string; isLead: boolean }[];
   zoneDriverMap: Record<string, string[]>;
+  /** Prefills the sales office dropdown on a fresh quote — AccountManagers.default_sales_office_uuid. */
+  defaultSalesOfficeId: string | null;
 
   // UI state
   existingUserUuid: string | null;
@@ -146,6 +148,7 @@ const initialState: CurrentUserState = {
   assignedDriverUuids: [],
   assignedZoneEntries: [],
   zoneDriverMap: {},
+  defaultSalesOfficeId: null,
   existingUserUuid: null,
   isOpen: false,
   isSubmitting: false,

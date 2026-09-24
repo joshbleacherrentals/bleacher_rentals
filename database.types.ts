@@ -12,23 +12,33 @@ export type Database = {
       AccountManagers: {
         Row: {
           created_at: string
+          default_sales_office_uuid: string | null
           id: string
           is_active: boolean
           user_uuid: string | null
         }
         Insert: {
           created_at?: string
+          default_sales_office_uuid?: string | null
           id?: string
           is_active?: boolean
           user_uuid?: string | null
         }
         Update: {
           created_at?: string
+          default_sales_office_uuid?: string | null
           id?: string
           is_active?: boolean
           user_uuid?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "AccountManagers_default_sales_office_uuid_fkey"
+            columns: ["default_sales_office_uuid"]
+            isOneToOne: false
+            referencedRelation: "SalesOffices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "AccountManagers_user_uuid_fkey"
             columns: ["user_uuid"]
@@ -1014,6 +1024,7 @@ export type Database = {
         Row: {
           account_manager_uuid: string | null
           created_at: string
+          hide_all_subrentals: boolean
           id: string
           only_show_my_events: boolean
           optimization_mode: boolean
@@ -1034,6 +1045,7 @@ export type Database = {
         Insert: {
           account_manager_uuid?: string | null
           created_at?: string
+          hide_all_subrentals?: boolean
           id?: string
           only_show_my_events?: boolean
           optimization_mode?: boolean
@@ -1054,6 +1066,7 @@ export type Database = {
         Update: {
           account_manager_uuid?: string | null
           created_at?: string
+          hide_all_subrentals?: boolean
           id?: string
           only_show_my_events?: boolean
           optimization_mode?: boolean
@@ -1209,6 +1222,8 @@ export type Database = {
           app_platform: string | null
           app_version: string | null
           app_version_reported_at: string | null
+          bucket_count: number | null
+          bucket_count_reported_at: string | null
           created_at: string
           deadhead_cents: number
           id: string
@@ -1224,6 +1239,7 @@ export type Database = {
           pay_rate_cents: number
           phone_number: string | null
           setup_cents: number
+          sync_version: number | null
           tax: number
           tax_dec: number
           teardown_cents: number
@@ -1237,6 +1253,8 @@ export type Database = {
           app_platform?: string | null
           app_version?: string | null
           app_version_reported_at?: string | null
+          bucket_count?: number | null
+          bucket_count_reported_at?: string | null
           created_at?: string
           deadhead_cents?: number
           id?: string
@@ -1252,6 +1270,7 @@ export type Database = {
           pay_rate_cents?: number
           phone_number?: string | null
           setup_cents?: number
+          sync_version?: number | null
           tax?: number
           tax_dec?: number
           teardown_cents?: number
@@ -1265,6 +1284,8 @@ export type Database = {
           app_platform?: string | null
           app_version?: string | null
           app_version_reported_at?: string | null
+          bucket_count?: number | null
+          bucket_count_reported_at?: string | null
           created_at?: string
           deadhead_cents?: number
           id?: string
@@ -1280,6 +1301,7 @@ export type Database = {
           pay_rate_cents?: number
           phone_number?: string | null
           setup_cents?: number
+          sync_version?: number | null
           tax?: number
           tax_dec?: number
           teardown_cents?: number
@@ -2460,6 +2482,7 @@ export type Database = {
           attempts: number
           caption: string | null
           created_at: string
+          created_by_driver_uuid: string | null
           gallery_asset_id: string | null
           id: string
           inspection_uuid: string
@@ -2472,6 +2495,7 @@ export type Database = {
           attempts?: number
           caption?: string | null
           created_at?: string
+          created_by_driver_uuid?: string | null
           gallery_asset_id?: string | null
           id?: string
           inspection_uuid: string
@@ -2484,6 +2508,7 @@ export type Database = {
           attempts?: number
           caption?: string | null
           created_at?: string
+          created_by_driver_uuid?: string | null
           gallery_asset_id?: string | null
           id?: string
           inspection_uuid?: string
@@ -2493,6 +2518,13 @@ export type Database = {
           upload_status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "InspectionPhotos_created_by_driver_uuid_fkey"
+            columns: ["created_by_driver_uuid"]
+            isOneToOne: false
+            referencedRelation: "Drivers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "InspectionPhotos_inspection_uuid_fkey"
             columns: ["inspection_uuid"]
@@ -2773,28 +2805,31 @@ export type Database = {
       }
       PaymentInstallments: {
         Row: {
-          amount_cents: number
+          amount_cents: number | null
           created_at: string
           currency: Database["public"]["Enums"]["currency"]
           due_date: string
           event_uuid: string
           id: string
+          percentage_bps: number
         }
         Insert: {
-          amount_cents: number
+          amount_cents?: number | null
           created_at?: string
           currency: Database["public"]["Enums"]["currency"]
           due_date: string
           event_uuid: string
           id?: string
+          percentage_bps: number
         }
         Update: {
-          amount_cents?: number
+          amount_cents?: number | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
           due_date?: string
           event_uuid?: string
           id?: string
+          percentage_bps?: number
         }
         Relationships: [
           {
@@ -3357,6 +3392,7 @@ export type Database = {
           deleted: boolean
           id: string
           name: string
+          payment_info: string | null
           phone: string | null
           quickbook_uuid: string
           stripe_connection_uuid: string | null
@@ -3368,6 +3404,7 @@ export type Database = {
           deleted?: boolean
           id?: string
           name: string
+          payment_info?: string | null
           phone?: string | null
           quickbook_uuid: string
           stripe_connection_uuid?: string | null
@@ -3379,6 +3416,7 @@ export type Database = {
           deleted?: boolean
           id?: string
           name?: string
+          payment_info?: string | null
           phone?: string | null
           quickbook_uuid?: string
           stripe_connection_uuid?: string | null
@@ -3667,6 +3705,7 @@ export type Database = {
           deleted: boolean
           html_content: string
           id: string
+          is_default: boolean
           name: string
         }
         Insert: {
@@ -3675,6 +3714,7 @@ export type Database = {
           deleted?: boolean
           html_content?: string
           id?: string
+          is_default?: boolean
           name: string
         }
         Update: {
@@ -3683,6 +3723,7 @@ export type Database = {
           deleted?: boolean
           html_content?: string
           id?: string
+          is_default?: boolean
           name?: string
         }
         Relationships: [
@@ -4121,6 +4162,7 @@ export type Database = {
           drive_minutes: number | null
           driver_uuid: string | null
           dropoff_address_uuid: string | null
+          dropoff_event_uuid: string | null
           dropoff_instructions: string | null
           dropoff_poc: string | null
           dropoff_poc_contact_uuid: string | null
@@ -4128,11 +4170,13 @@ export type Database = {
           dropoff_time_end: string | null
           dropoff_time_mode: Database["public"]["Enums"]["work_tracker_time_mode"]
           dropoff_time_start: string | null
+          history_json: Json | null
           id: string
           internal_notes: string | null
           notes: string | null
           pay_cents: number | null
           pickup_address_uuid: string | null
+          pickup_event_uuid: string | null
           pickup_instructions: string | null
           pickup_poc: string | null
           pickup_poc_contact_uuid: string | null
@@ -4147,6 +4191,7 @@ export type Database = {
           setup_required: boolean
           started_at: string | null
           status: Database["public"]["Enums"]["worktracker_status"]
+          status_changed_at: string | null
           teardown_required: boolean
           updated_at: string
           user_uuid: string | null
@@ -4169,6 +4214,7 @@ export type Database = {
           drive_minutes?: number | null
           driver_uuid?: string | null
           dropoff_address_uuid?: string | null
+          dropoff_event_uuid?: string | null
           dropoff_instructions?: string | null
           dropoff_poc?: string | null
           dropoff_poc_contact_uuid?: string | null
@@ -4176,11 +4222,13 @@ export type Database = {
           dropoff_time_end?: string | null
           dropoff_time_mode?: Database["public"]["Enums"]["work_tracker_time_mode"]
           dropoff_time_start?: string | null
+          history_json?: Json | null
           id?: string
           internal_notes?: string | null
           notes?: string | null
           pay_cents?: number | null
           pickup_address_uuid?: string | null
+          pickup_event_uuid?: string | null
           pickup_instructions?: string | null
           pickup_poc?: string | null
           pickup_poc_contact_uuid?: string | null
@@ -4195,6 +4243,7 @@ export type Database = {
           setup_required?: boolean
           started_at?: string | null
           status?: Database["public"]["Enums"]["worktracker_status"]
+          status_changed_at?: string | null
           teardown_required?: boolean
           updated_at?: string
           user_uuid?: string | null
@@ -4217,6 +4266,7 @@ export type Database = {
           drive_minutes?: number | null
           driver_uuid?: string | null
           dropoff_address_uuid?: string | null
+          dropoff_event_uuid?: string | null
           dropoff_instructions?: string | null
           dropoff_poc?: string | null
           dropoff_poc_contact_uuid?: string | null
@@ -4224,11 +4274,13 @@ export type Database = {
           dropoff_time_end?: string | null
           dropoff_time_mode?: Database["public"]["Enums"]["work_tracker_time_mode"]
           dropoff_time_start?: string | null
+          history_json?: Json | null
           id?: string
           internal_notes?: string | null
           notes?: string | null
           pay_cents?: number | null
           pickup_address_uuid?: string | null
+          pickup_event_uuid?: string | null
           pickup_instructions?: string | null
           pickup_poc?: string | null
           pickup_poc_contact_uuid?: string | null
@@ -4243,6 +4295,7 @@ export type Database = {
           setup_required?: boolean
           started_at?: string | null
           status?: Database["public"]["Enums"]["worktracker_status"]
+          status_changed_at?: string | null
           teardown_required?: boolean
           updated_at?: string
           user_uuid?: string | null
@@ -4286,6 +4339,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "WorkTrackers_dropoff_event_uuid_fkey"
+            columns: ["dropoff_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "Events"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "WorkTrackers_dropoff_poc_contact_uuid_fkey"
             columns: ["dropoff_poc_contact_uuid"]
             isOneToOne: false
@@ -4297,6 +4357,13 @@ export type Database = {
             columns: ["pickup_address_uuid"]
             isOneToOne: false
             referencedRelation: "Addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "WorkTrackers_pickup_event_uuid_fkey"
+            columns: ["pickup_event_uuid"]
+            isOneToOne: false
+            referencedRelation: "Events"
             referencedColumns: ["id"]
           },
           {
@@ -4506,14 +4573,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      address_text_matches: {
+        Args: {
+          a_street: string
+          a_zip: string
+          b_street: string
+          b_zip: string
+        }
+        Returns: boolean
+      }
+      address_zip_index: { Args: { z: string }; Returns: string }
+      addresses_match: {
+        Args: { a_id: string; b_id: string }
+        Returns: boolean
+      }
       bleacher_change_reason_label: { Args: { code: string }; Returns: string }
+      build_work_tracker_history: {
+        Args: { tracker: Database["public"]["Tables"]["WorkTrackers"]["Row"] }
+        Returns: Json
+      }
       damage_reports_recompute_photos_uploaded: {
         Args: { p_ids: string[] }
         Returns: undefined
       }
+      delete_past_alerts: { Args: never; Returns: number }
       drivers_backfill_document: {
         Args: { p_doc_type: string; p_driver_id: string; p_photo_path: string }
         Returns: undefined
+      }
+      format_history_address: {
+        Args: { address_uuid: string }
+        Returns: string
       }
       generate_invoice_number: { Args: never; Returns: number }
       get_current_account_manager_id: { Args: never; Returns: string }
@@ -4529,6 +4619,15 @@ export type Database = {
         Args: { p_event_uuid: string }
         Returns: boolean
       }
+      is_work_tracker_finished: {
+        Args: { tracker: Database["public"]["Tables"]["WorkTrackers"]["Row"] }
+        Returns: boolean
+      }
+      normalize_street_words: { Args: { s: string }; Returns: string[] }
+      payment_schedule_total_cents: {
+        Args: { p_event_id: string }
+        Returns: number
+      }
       recompute_driver_scorecard_bucket: {
         Args: { p_driver: string; p_year: number }
         Returns: undefined
@@ -4540,6 +4639,37 @@ export type Database = {
       recompute_quote_hashes: {
         Args: { p_event_id: string }
         Returns: undefined
+      }
+      refresh_work_tracker_event_links: {
+        Args: { tracker_ids: string[] }
+        Returns: undefined
+      }
+      refresh_work_tracker_history: {
+        Args: { tracker_ids: string[] }
+        Returns: undefined
+      }
+      resolve_payment_schedule: {
+        Args: { p_event_id: string }
+        Returns: {
+          amount_cents: number
+          id: string
+        }[]
+      }
+      resolve_work_tracker_dropoff_event: {
+        Args: {
+          p_address_uuid: string
+          p_bleacher_uuid: string
+          p_date: string
+        }
+        Returns: string
+      }
+      resolve_work_tracker_pickup_event: {
+        Args: {
+          p_address_uuid: string
+          p_bleacher_uuid: string
+          p_date: string
+        }
+        Returns: string
       }
       user_can_manage_zone: { Args: { p_zone_uuid: string }; Returns: boolean }
       user_shares_zone_with_driver: {

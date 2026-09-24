@@ -7,6 +7,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../../../database.types";
 import { AlertDefinition, AlertEntityType, AlertPayload } from "./types";
 import { dbOpCounts, formatDuration, perfVerbose } from "@/lib/perf/perfTrace";
+import { getAlertEntityDate, isPastBusinessDate } from "./util/pastAlerts";
 
 type AlertRow = {
   id: string;
@@ -25,6 +26,10 @@ type IdRow = { id: string };
  * applies them together. Statements come back in foreign-key-safe order —
  * deletes (UserAlerts before Alerts), then updates, then inserts (Alerts before
  * its UserAlerts).
+ *
+ * An entity that is already past (docs/specs/no-past-alerts.md) never gets an alert: its payloads
+ * are dropped, so any alert it still has is planned for deletion. Every alert write — definition
+ * evaluation, cascades and review requests — comes through here, so this is the one gate.
  */
 export async function planAlertsForEntity(
   title: string,
@@ -33,7 +38,15 @@ export async function planAlertsForEntity(
   alerts: AlertPayload[],
   recipientUuids: string[],
 ): Promise<CompiledQuery<any>[]> {
-  const myAlerts = alerts.filter((a) => a.title === title);
+  let myAlerts = alerts.filter((a) => a.title === title);
+
+  if (myAlerts.length > 0) {
+    try {
+      if (isPastBusinessDate(await getAlertEntityDate(entityType, entityUuid))) myAlerts = [];
+    } catch (err) {
+      console.error(`[${title}] failed to read entity date; not gating`, err);
+    }
+  }
 
   let existing: AlertRow[];
   try {

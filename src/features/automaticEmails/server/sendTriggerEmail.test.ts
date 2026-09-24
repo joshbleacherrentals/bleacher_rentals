@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { QuoteDocumentData } from "@/features/quotesAndBookings/pdf/quoteDocumentData";
-import { QUOTE_SIGNED_CLIENT, QUOTE_SIGNED_AM } from "../triggers";
+import {
+  QUOTE_SENT_CLIENT,
+  QUOTE_SIGNED_CLIENT,
+  QUOTE_SIGNED_AM,
+  PAYMENT_MADE_CLIENT,
+  PAYMENT_MADE_AM,
+} from "../triggers";
 
 const { mockSendEmail } = vi.hoisted(() => ({ mockSendEmail: vi.fn() }));
 
@@ -10,7 +16,7 @@ vi.mock("postmark", () => ({
   },
 }));
 
-import { sendTriggerEmail } from "./sendTriggerEmail";
+import { sendTriggerEmail, resolveTriggerEmail } from "./sendTriggerEmail";
 
 // ── Fake Supabase ─────────────────────────────────────────────────────────────
 type FakeConfig = {
@@ -221,6 +227,26 @@ describe("sender identity", () => {
   });
 });
 
+describe("finance copy", () => {
+  it.each([QUOTE_SIGNED_AM, PAYMENT_MADE_AM])(
+    "CCs finance on the account manager's %s email",
+    async (trigger) => {
+      const { supabase } = makeSupabase(READY);
+      await sendTriggerEmail({ supabaseAdmin: supabase, trigger, eventId: "e1", docData: doc() });
+      expect(mockSendEmail.mock.calls[0][0].Cc).toBe("finance@bleacherrentals.com");
+    },
+  );
+
+  it.each([QUOTE_SENT_CLIENT, QUOTE_SIGNED_CLIENT, PAYMENT_MADE_CLIENT])(
+    "does not CC finance on the client's %s email",
+    async (trigger) => {
+      const { supabase } = makeSupabase(READY);
+      await sendTriggerEmail({ supabaseAdmin: supabase, trigger, eventId: "e1", docData: doc() });
+      expect(mockSendEmail.mock.calls[0][0]).not.toHaveProperty("Cc");
+    },
+  );
+});
+
 describe("recipient override", () => {
   it("wins over the resolved recipient", async () => {
     const { supabase } = makeSupabase(READY);
@@ -276,5 +302,42 @@ describe("attachments", () => {
     expect(r).toMatchObject({ sent: true });
     // Failed download skipped → no Attachments key (empty list).
     expect(mockSendEmail.mock.calls[0][0].Attachments).toBeUndefined();
+  });
+});
+
+describe("resolveTriggerEmail — what the quote send preview shows", () => {
+  it("returns the same sender, recipient, subject and body that sending uses, and sends nothing", async () => {
+    const { supabase, inserted } = makeSupabase(READY);
+    const r = await resolveTriggerEmail({
+      supabaseAdmin: supabase,
+      trigger: QUOTE_SIGNED_CLIENT,
+      eventId: "e1",
+      docData: doc(),
+      recipientOverride: "a@x.com,b@x.com",
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.email).toMatchObject({
+      from: "Sam Rivera <sam@bleacherrentals.com>",
+      to: "a@x.com,b@x.com",
+      subject: "Hi Jordan",
+    });
+    expect(r.email.htmlBody).toContain("$10.00");
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(lastEmailLog(inserted)).toBeUndefined(); // previewing is not an attempt to send
+  });
+
+  it("explains why when the office has no active template", async () => {
+    const { supabase } = makeSupabase({ ...READY, template: null });
+    const r = await resolveTriggerEmail({
+      supabaseAdmin: supabase,
+      trigger: QUOTE_SIGNED_CLIENT,
+      eventId: "e1",
+      docData: doc(),
+    });
+    expect(r).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining("No active email template"),
+    });
   });
 });

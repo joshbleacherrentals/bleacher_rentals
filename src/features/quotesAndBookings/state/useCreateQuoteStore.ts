@@ -10,6 +10,9 @@ import {
   PaymentMethod,
   QuoteStatus,
 } from "../types/quoteTypes";
+import { buildDefaultPaymentSchedule } from "../utils/buildDefaultPaymentSchedule";
+import { convertLegacySchedule } from "../utils/resolvePaymentSchedule";
+import { calculateTotals } from "../utils/calculateTotals";
 import type { LostReason } from "../utils/lostReason";
 
 export type CreateQuoteState = {
@@ -70,8 +73,9 @@ export type CreateQuoteState = {
 
   // Payment
   paymentMethod: PaymentMethod;
-  // Empty until the manager explicitly saves a schedule in the Edit Payment
-  // Schedule modal — the schedule is optional. Non-empty = a committed schedule.
+  // Fresh quotes follow the event date until their schedule is explicitly edited.
+  scheduleDatesAutomatic: boolean;
+  scheduleError: string | null;
   paymentInstallments: PaymentInstallment[];
 
   // Notes
@@ -137,7 +141,9 @@ const initialState: CreateQuoteState = {
   lineItems: [],
 
   paymentMethod: null,
-  paymentInstallments: [],
+  paymentInstallments: buildDefaultPaymentSchedule(null),
+  scheduleDatesAutomatic: true,
+  scheduleError: null,
 
   clientFacingNotes: "",
   internalNotes: "",
@@ -184,7 +190,25 @@ export const useCreateQuoteStore = create<CreateQuoteState & CreateQuoteActions>
     (set) => ({
       ...initialState,
 
-      setField: (key, value) => set((state) => ({ ...state, [key]: value })),
+      setField: (key, value) =>
+        set((state) => {
+          const next = { ...state, [key]: value };
+          if (key === "paymentInstallments" || key === "editingEventId")
+            next.scheduleDatesAutomatic = false;
+          if (
+            key === "eventStart" &&
+            state.scheduleDatesAutomatic &&
+            !state.editingEventId &&
+            state.paymentInstallments.length === 2
+          ) {
+            const dates = buildDefaultPaymentSchedule(value as string);
+            next.paymentInstallments = state.paymentInstallments.map((i, index) => ({
+              ...i,
+              dueDate: dates[index].dueDate,
+            }));
+          }
+          return next;
+        }),
 
       addLineItem: (item) => set((state) => ({ lineItems: [...state.lineItems, item] })),
 
@@ -196,11 +220,51 @@ export const useCreateQuoteStore = create<CreateQuoteState & CreateQuoteActions>
       removeLineItem: (id) =>
         set((state) => ({ lineItems: state.lineItems.filter((i) => i.id !== id) })),
 
-      setPaymentInstallments: (installments) => set({ paymentInstallments: installments }),
+      setPaymentInstallments: (installments) =>
+        set({
+          paymentInstallments: installments,
+          scheduleDatesAutomatic: false,
+          scheduleError: null,
+        }),
 
-      resetForm: () => set(initialState),
+      resetForm: () =>
+        set({ ...initialState, paymentInstallments: buildDefaultPaymentSchedule(null) }),
     }),
-    { name: "create-quote-draft", storage: throttledStorage(1000) },
+    {
+      name: "create-quote-draft",
+      storage: throttledStorage(1000),
+      version: 1,
+      migrate: (persisted) => {
+        const old = persisted as CreateQuoteState & {
+          paymentInstallments: { id: string; dueDate: string; amountCents: number }[];
+        };
+        // Keep an exact recovery copy before upgrading legacy drafts, including failures.
+        if (typeof localStorage !== "undefined")
+          localStorage.setItem("create-quote-draft-before-percentages", JSON.stringify(persisted));
+        try {
+          const { subtotal, discountTotal, taxAmount } = calculateTotals(
+            old.lineItems ?? [],
+            old.taxPercent,
+          );
+          return {
+            ...old,
+            scheduleDatesAutomatic: false,
+            scheduleError: null,
+            paymentInstallments: convertLegacySchedule(
+              old.paymentInstallments ?? [],
+              subtotal + discountTotal + (old.taxOverrideCents ?? Math.round(taxAmount)),
+            ),
+          };
+        } catch (error) {
+          return {
+            ...old,
+            scheduleDatesAutomatic: false,
+            paymentInstallments: [],
+            scheduleError: `${(error as Error).message} The original draft is retained in browser storage (create-quote-draft-before-percentages). Rebuild the schedule to continue.`,
+          };
+        }
+      },
+    },
   ),
 );
 

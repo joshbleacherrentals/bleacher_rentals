@@ -45,9 +45,10 @@ export class PinnableSection extends Container {
       nextX += 20;
     }
 
-    const hasDamageAlert = !!eventInfo.ev.hasDamageAlert;
-    const dbAlertCount = eventInfo.ev.alertCount ?? 0;
-    const alertCount = (hasDamageAlert ? 1 : 0) + dbAlertCount;
+    // Damage is shown by the red cell overlay (damageOverlayRanges), not by this badge: a damaged
+    // bleacher used to add +1 here, so an event with no alert at all still wore one and there was
+    // nothing to open in the event form.
+    const alertCount = eventInfo.ev.alertCount ?? 0;
     if (alertCount > 0) {
       const badge = new AlertBadge(baker, alertCount);
       badge.position.set(nextX, 0);

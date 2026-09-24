@@ -46,7 +46,10 @@ test.describe("Create quote layout", () => {
   }, info) => {
     await openNewQuote(page);
 
-    const trigger = page.getByRole("button", { name: /contract template/i });
+    const trigger = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "Terms and Conditions", exact: true }) })
+      .getByRole("button");
     // Park the trigger at the bottom of the screen, where a list opening downwards is cut off.
     await trigger.evaluate((el) => el.scrollIntoView({ block: "end" }));
 
@@ -102,7 +105,7 @@ test.describe("Create quote layout", () => {
   test("the payment schedule has its own labelled button", async ({ page }, info) => {
     await openNewQuote(page);
 
-    await page.getByRole("button", { name: /Set up schedule/ }).click();
+    await page.getByRole("button", { name: /Edit schedule/ }).click();
     await expect(page.getByRole("heading", { name: "Edit Payment Schedule" })).toBeVisible();
 
     await page.keyboard.press("Escape");

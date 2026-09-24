@@ -73,3 +73,61 @@ describe("resetForm", () => {
     expect(useCreateQuoteStore.getState().lostReasonNote).toBe("");
   });
 });
+
+describe("automatic payment schedules", () => {
+  it("starts each fresh quote with unique 50/50 installments", () => {
+    useCreateQuoteStore.getState().resetForm();
+    const before = useCreateQuoteStore.getState().paymentInstallments;
+    expect(before.map((i) => i.percentageBps)).toEqual([5000, 5000]);
+    useCreateQuoteStore.getState().resetForm();
+    expect(useCreateQuoteStore.getState().paymentInstallments[0].id).not.toBe(before[0].id);
+  });
+  it("follows event date until schedule is explicitly edited", () => {
+    useCreateQuoteStore.getState().resetForm();
+    useCreateQuoteStore.getState().setField("eventStart", "2099-08-01");
+    expect(useCreateQuoteStore.getState().paymentInstallments[1].dueDate).toBe("2099-07-25");
+    useCreateQuoteStore
+      .getState()
+      .setPaymentInstallments([{ id: "custom", dueDate: "2099-07-01", percentageBps: 10000 }]);
+    useCreateQuoteStore.getState().setField("eventStart", "2099-09-01");
+    expect(useCreateQuoteStore.getState().paymentInstallments[0].dueDate).toBe("2099-07-01");
+  });
+  it("does not recreate an explicitly removed schedule", () => {
+    useCreateQuoteStore.getState().setPaymentInstallments([]);
+    useCreateQuoteStore.getState().setField("eventStart", "2099-10-01");
+    expect(useCreateQuoteStore.getState().paymentInstallments).toEqual([]);
+  });
+});
+
+describe("saved draft upgrade", () => {
+  it("converts amounts to percentages, preserving dates and IDs", async () => {
+    const migrate = useCreateQuoteStore.persist.getOptions().migrate!;
+    const old = {
+      ...useCreateQuoteStore.getState(),
+      lineItems: [{ category: "custom_service", lineTotalCents: 100000 }],
+      taxPercent: 0,
+      taxOverrideCents: null,
+      paymentInstallments: [{ id: "saved", dueDate: "2099-01-01", amountCents: 100000 }],
+    };
+    const result = await migrate(old, 0);
+    expect(result.paymentInstallments).toEqual([
+      { id: "saved", dueDate: "2099-01-01", percentageBps: 10000 },
+    ]);
+    expect(JSON.parse(mem.get("create-quote-draft-before-percentages")!)).toEqual(
+      JSON.parse(JSON.stringify(old)),
+    );
+  });
+  it("preserves an unconvertible draft backup and blocks saving", async () => {
+    const migrate = useCreateQuoteStore.persist.getOptions().migrate!;
+    const old = {
+      ...useCreateQuoteStore.getState(),
+      lineItems: [],
+      taxPercent: 0,
+      taxOverrideCents: null,
+      paymentInstallments: [{ id: "saved", dueDate: "2099-01-01", amountCents: 100000 }],
+    };
+    const result = await migrate(old, 0);
+    expect(result.scheduleError).toContain("no quote total");
+    expect(mem.get("create-quote-draft-before-percentages")).toContain('"amountCents":100000');
+  });
+});

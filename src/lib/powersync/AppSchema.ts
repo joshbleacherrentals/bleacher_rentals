@@ -9,6 +9,7 @@ export const WORK_TRACKERS_TABLE = "WorkTrackers";
 
 const AccountManagersCols = {
   created_at: column.text,
+  default_sales_office_uuid: column.text,
   is_active: column.integer,
   user_uuid: column.text,
 } satisfies PowerSyncColsFor<"AccountManagers">;
@@ -255,6 +256,13 @@ const HomeBasesCols = {
 } satisfies PowerSyncColsFor<"HomeBases">;
 const HomeBases = new Table(HomeBasesCols);
 
+/**
+ * The Sync Health columns of Drivers. Office roles get them on Drivers.* like
+ * any other column; a developer with no office role syncs no Drivers rows at
+ * all and gets them on `DriverSyncHealth` (br_powersync/config/sync_rules.yaml).
+ */
+type SyncHealthDriverColumn = "bucket_count" | "sync_version" | "bucket_count_reported_at";
+
 const DriversCols = {
   created_at: column.text,
   /** @deprecated Whole-percent mirror of `tax_dec`, kept for shipped br_driver builds. */
@@ -283,6 +291,9 @@ const DriversCols = {
   insurance_expires_on: column.text,
   license_expires_on: column.text,
   medical_card_expires_on: column.text,
+  bucket_count: column.integer,
+  sync_version: column.integer,
+  bucket_count_reported_at: column.text,
 } satisfies PowerSyncColsFor<"Drivers">;
 const Drivers = new Table(DriversCols, {
   indexes: {
@@ -292,6 +303,30 @@ const Drivers = new Table(DriversCols, {
     vehicle_uuid: ["vehicle_uuid"],
   },
 });
+
+// Sync Health (/dev-tools/sync-health). Client-side names for rows of "Drivers"
+// and "Users" that the sync rules send to developers under an alias: a
+// developer with no office role syncs neither table otherwise, and the alias
+// keeps a developer who IS an office role from getting the same row twice with
+// different columns. Read-only on the web.
+const DriverSyncHealthCols = {
+  user_uuid: column.text,
+  app_version: column.text,
+  app_platform: column.text,
+  bucket_count: column.integer,
+  sync_version: column.integer,
+  bucket_count_reported_at: column.text,
+} satisfies Pick<
+  PowerSyncColsFor<"Drivers">,
+  "user_uuid" | "app_version" | "app_platform" | SyncHealthDriverColumn
+>;
+const DriverSyncHealth = new Table(DriverSyncHealthCols);
+
+const DriverSyncHealthUsersCols = {
+  first_name: column.text,
+  last_name: column.text,
+} satisfies Pick<PowerSyncColsFor<"Users">, "first_name" | "last_name">;
+const DriverSyncHealthUsers = new Table(DriverSyncHealthUsersCols);
 
 const DashboardFilterSettingsCols = {
   created_at: column.text,
@@ -311,6 +346,7 @@ const DashboardFilterSettingsCols = {
   rows_quick_filter: column.integer,
   zone_uuids: column.text,
   show_unassigned_zone: column.integer,
+  hide_all_subrentals: column.integer,
 } satisfies PowerSyncColsFor<"DashboardFilterSettings">;
 const DashboardFilterSettings = new Table(DashboardFilterSettingsCols, {
   indexes: {
@@ -388,6 +424,11 @@ const WorkTrackersCols = {
   bleacher_uuid: column.text,
   actual_bleacher_uuid: column.text,
   bleacher_change_reason: column.text,
+  // Snapshot of a finished trip (addresses, line items, inspections) as JSON
+  // text, written by Postgres triggers for the driver app's Trip History —
+  // see br_driver/docs/specs/sync-bucket-limit.md. Listed so the column map
+  // stays exhaustive; the web app reads the live tables, not this.
+  history_json: column.text,
   driver_uuid: column.text,
   user_uuid: column.text,
   status: column.text,
@@ -417,6 +458,12 @@ const WorkTrackersCols = {
   dropoff_time_end: column.text,
   declined_at: column.text,
   abandoned_at: column.text,
+  // Maintained by Postgres triggers, never written from the web app. The
+  // driver app reads them for its event roster (br_driver spec
+  // event-bleacher-roster.md).
+  status_changed_at: column.text,
+  dropoff_event_uuid: column.text,
+  pickup_event_uuid: column.text,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
 const WorkTrackers = new Table(WorkTrackersCols, {
   indexes: {
@@ -984,6 +1031,7 @@ const EventTypingIndicators = new Table(EventTypingIndicatorsCols, {
 
 const PaymentInstallmentsCols = {
   amount_cents: column.integer,
+  percentage_bps: column.integer,
   created_at: column.text,
   currency: column.text,
   due_date: column.text,
@@ -1027,6 +1075,7 @@ const TermsAndConditionsCols = {
   created_at: column.text,
   created_by_user_uuid: column.text,
   deleted: column.integer,
+  is_default: column.integer,
 } satisfies PowerSyncColsFor<"TermsAndConditions">;
 const TermsAndConditions = new Table(TermsAndConditionsCols);
 
@@ -1096,6 +1145,7 @@ const SalesOfficesCols = {
   created_by_user_uuid: column.text,
   deleted: column.integer,
   name: column.text,
+  payment_info: column.text,
   phone: column.text,
   quickbook_uuid: column.text,
   stripe_connection_uuid: column.text,
@@ -1263,6 +1313,8 @@ export const AppSchema = new Schema({
   Events,
   HomeBases,
   Drivers,
+  DriverSyncHealth,
+  DriverSyncHealthUsers,
   DriverZones,
   DamageReports,
   DamageReportPhotos,

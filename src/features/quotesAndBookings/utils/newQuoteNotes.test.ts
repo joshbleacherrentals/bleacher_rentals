@@ -2,20 +2,21 @@ import { describe, it, expect } from "vitest";
 import { NEW_QUOTE_CLIENT_NOTES, shouldPrefillNewQuoteNotes } from "./newQuoteNotes";
 
 describe("NEW_QUOTE_CLIENT_NOTES", () => {
-  it("contains the disclaimer heading, delivery window and overdue interest lines", () => {
-    expect(NEW_QUOTE_CLIENT_NOTES).toContain("**DISCLAIMER");
+  it("states the delivery window and the overdue interest", () => {
     expect(NEW_QUOTE_CLIENT_NOTES).toContain(
-      "Standard delivery & setup window is 1-3 days before the event starts, pickup 1-3 days after the event ends",
+      "Standard delivery & setup window is 1-3 days before the event starts, pickup 1-3 days after the event ends.",
     );
     expect(NEW_QUOTE_CLIENT_NOTES).toContain(
       "Overdue payments are charged at 2% interest per month.",
     );
   });
 
-  it("separates the heading from the body with a blank line, and stacks the two body lines", () => {
+  it("separates the two paragraphs with a blank line, and carries no disclaimer heading", () => {
+    // The "**DISCLAIMER" heading was dropped in cfea889; this text goes to clients as written.
     expect(NEW_QUOTE_CLIENT_NOTES).toBe(
-      "**DISCLAIMER\n\nStandard delivery & setup window is 1-3 days before the event starts, pickup 1-3 days after the event ends\nOverdue payments are charged at 2% interest per month.",
+      "Standard delivery & setup window is 1-3 days before the event starts, pickup 1-3 days after the event ends.\n\nOverdue payments are charged at 2% interest per month.",
     );
+    expect(NEW_QUOTE_CLIENT_NOTES).not.toContain("DISCLAIMER");
   });
 });
 

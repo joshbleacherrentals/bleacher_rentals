@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useTermsAndConditions } from "@/features/termsAndConditions/hooks/useTermsAndConditions";
-import { softDeleteTermsAndConditions } from "@/features/termsAndConditions/db/termsAndConditionsDb";
-import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
+import {
+  setDefaultTermsAndConditions,
+  softDeleteTermsAndConditions,
+} from "@/features/termsAndConditions/db/termsAndConditionsDb";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import {
   AlertDialog,
@@ -28,13 +30,24 @@ function formatDate(dateString: string): string {
 }
 
 export default function TermsAndConditionsPage() {
-  const supabase = useClerkSupabaseClient();
   const router = useRouter();
   const { items, isLoading } = useTermsAndConditions();
 
+  // Clicking the selected template's radio again clears the default, leaving none.
+  const handleSetDefault = async (id: string, name: string, isDefault: boolean) => {
+    try {
+      await setDefaultTermsAndConditions(isDefault ? null : id);
+      createSuccessToast([
+        isDefault ? `"${name}" is no longer the default.` : `"${name}" is now the default.`,
+      ]);
+    } catch {
+      // error toast shown in db layer
+    }
+  };
+
   const handleDelete = async (id: string, name: string) => {
     try {
-      await softDeleteTermsAndConditions(id, supabase);
+      await softDeleteTermsAndConditions(id);
       createSuccessToast([`"${name}" deleted.`]);
     } catch {
       // error toast shown in db layer
@@ -66,6 +79,9 @@ export default function TermsAndConditionsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">
+                  Default
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Name
                 </th>
@@ -84,10 +100,30 @@ export default function TermsAndConditionsPage() {
                   className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => router.push(`/terms-and-conditions/${item.id}`)}
                 >
-                  <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {formatDate(item.createdAt)}
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="radio"
+                      name="default-terms"
+                      className="h-4 w-4 cursor-pointer accent-darkBlue"
+                      checked={item.isDefault}
+                      onChange={() => handleSetDefault(item.id, item.name, item.isDefault)}
+                      // A radio cannot be unchecked by keyboard; the click handler makes the
+                      // selected one clear the default so "no default" stays reachable.
+                      onClick={() => {
+                        if (item.isDefault) void handleSetDefault(item.id, item.name, true);
+                      }}
+                      aria-label={`Make "${item.name}" the default contract template`}
+                    />
                   </td>
+                  <td className="px-4 py-3 text-sm font-medium">
+                    {item.name}
+                    {item.isDefault && (
+                      <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                        Default
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.createdAt)}</td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
