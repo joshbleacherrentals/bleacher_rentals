@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { QuoteDocumentData } from "@/features/quotesAndBookings/pdf/quoteDocumentData";
-import { QUOTE_SIGNED_CLIENT, QUOTE_SIGNED_AM } from "../triggers";
+import {
+  QUOTE_SENT_CLIENT,
+  QUOTE_SIGNED_CLIENT,
+  QUOTE_SIGNED_AM,
+  PAYMENT_MADE_CLIENT,
+  PAYMENT_MADE_AM,
+} from "../triggers";
 
 const { mockSendEmail } = vi.hoisted(() => ({ mockSendEmail: vi.fn() }));
 
@@ -219,6 +225,26 @@ describe("sender identity", () => {
     // No AM email → sends from the default address, still as the AM's name.
     expect(mockSendEmail.mock.calls[0][0].From).toBe("Sam Rivera <from@bleacherrentals.com>");
   });
+});
+
+describe("finance copy", () => {
+  it.each([QUOTE_SIGNED_AM, PAYMENT_MADE_AM])(
+    "CCs finance on the account manager's %s email",
+    async (trigger) => {
+      const { supabase } = makeSupabase(READY);
+      await sendTriggerEmail({ supabaseAdmin: supabase, trigger, eventId: "e1", docData: doc() });
+      expect(mockSendEmail.mock.calls[0][0].Cc).toBe("finance@bleacherrentals.com");
+    },
+  );
+
+  it.each([QUOTE_SENT_CLIENT, QUOTE_SIGNED_CLIENT, PAYMENT_MADE_CLIENT])(
+    "does not CC finance on the client's %s email",
+    async (trigger) => {
+      const { supabase } = makeSupabase(READY);
+      await sendTriggerEmail({ supabaseAdmin: supabase, trigger, eventId: "e1", docData: doc() });
+      expect(mockSendEmail.mock.calls[0][0]).not.toHaveProperty("Cc");
+    },
+  );
 });
 
 describe("recipient override", () => {
