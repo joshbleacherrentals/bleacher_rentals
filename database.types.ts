@@ -4551,6 +4551,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      address_text_matches: {
+        Args: {
+          a_street: string
+          a_zip: string
+          b_street: string
+          b_zip: string
+        }
+        Returns: boolean
+      }
+      address_zip_index: { Args: { z: string }; Returns: string }
+      addresses_match: {
+        Args: { a_id: string; b_id: string }
+        Returns: boolean
+      }
       bleacher_change_reason_label: { Args: { code: string }; Returns: string }
       build_work_tracker_history: {
         Args: { tracker: Database["public"]["Tables"]["WorkTrackers"]["Row"] }
@@ -4586,6 +4600,7 @@ export type Database = {
         Args: { tracker: Database["public"]["Tables"]["WorkTrackers"]["Row"] }
         Returns: boolean
       }
+      normalize_street_words: { Args: { s: string }; Returns: string[] }
       recompute_driver_scorecard_bucket: {
         Args: { p_driver: string; p_year: number }
         Returns: undefined
@@ -4598,9 +4613,29 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: undefined
       }
+      refresh_work_tracker_event_links: {
+        Args: { tracker_ids: string[] }
+        Returns: undefined
+      }
       refresh_work_tracker_history: {
         Args: { tracker_ids: string[] }
         Returns: undefined
+      }
+      resolve_work_tracker_dropoff_event: {
+        Args: {
+          p_address_uuid: string
+          p_bleacher_uuid: string
+          p_date: string
+        }
+        Returns: string
+      }
+      resolve_work_tracker_pickup_event: {
+        Args: {
+          p_address_uuid: string
+          p_bleacher_uuid: string
+          p_date: string
+        }
+        Returns: string
       }
       user_can_manage_zone: { Args: { p_zone_uuid: string }; Returns: boolean }
       user_shares_zone_with_driver: {
