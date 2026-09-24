@@ -5,7 +5,10 @@ import { CalendarClock, CalendarPlus, Pencil } from "lucide-react";
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { calculateTotals } from "../../../utils/calculateTotals";
-import { installmentPercent, scheduleBalance } from "../../../utils/scheduleBalance";
+import {
+  resolvePaymentSchedule,
+  validatePaymentSchedule,
+} from "../../../utils/resolvePaymentSchedule";
 
 function formatDueDate(dueDate: string | null | undefined): string {
   if (!dueDate) return "No date";
@@ -25,6 +28,7 @@ export function PaymentScheduleSection() {
   const currency = useCreateQuoteStore((s) => s.currency);
   const taxPercent = useCreateQuoteStore((s) => s.taxPercent);
   const taxOverrideCents = useCreateQuoteStore((s) => s.taxOverrideCents);
+  const scheduleError = useCreateQuoteStore((s) => s.scheduleError);
   const installments = useCreateQuoteStore((s) => s.paymentInstallments);
   const setField = useCreateQuoteStore((s) => s.setField);
 
@@ -34,10 +38,8 @@ export function PaymentScheduleSection() {
     return subtotal + discountTotal + effectiveTaxCents;
   }, [lineItems, taxPercent, taxOverrideCents]);
 
-  // The schedule is optional: nothing is shown (or saved) until the manager
-  // explicitly saves one in the Edit modal. So we render the store value
-  // directly — empty means "no schedule set".
-  const balance = scheduleBalance(installments, totalCents);
+  const error = scheduleError ?? validatePaymentSchedule(installments);
+  const resolved = resolvePaymentSchedule(installments, Math.max(0, Math.round(totalCents)));
   const openEditor = () => setField("isEditPaymentScheduleModalOpen", true);
   const money = (cents: number) => formatCurrency(cents / 100, currency);
 
@@ -50,7 +52,12 @@ export function PaymentScheduleSection() {
         When the client pays the quote total, split into installments with due dates.
       </p>
 
-      {balance.status === "empty" ? (
+      {error && (
+        <p role="alert" className="mb-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      {installments.length === 0 ? (
         <button
           type="button"
           onClick={openEditor}
@@ -95,12 +102,12 @@ export function PaymentScheduleSection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {installments.map((inst, idx) => (
+              {resolved.map((inst, idx) => (
                 <tr key={inst.id}>
                   <td className="px-4 py-2 text-gray-400">{idx + 1}</td>
                   <td className="px-4 py-2 font-medium">{formatDueDate(inst.dueDate)}</td>
                   <td className="px-4 py-2 text-right text-gray-500">
-                    {installmentPercent(inst.amountCents, totalCents)}%
+                    {inst.percentageBps / 100}%
                   </td>
                   <td className="px-4 py-2 text-right font-semibold">{money(inst.amountCents)}</td>
                 </tr>
@@ -110,20 +117,16 @@ export function PaymentScheduleSection() {
 
           <div
             className={`flex items-center justify-between gap-3 rounded-b-lg border-t px-4 py-2 text-sm ${
-              balance.status === "balanced"
+              !error
                 ? "border-green-200 bg-green-50 text-green-700"
                 : "border-red-200 bg-red-50 text-red-700"
             }`}
           >
             <span className="font-medium">
-              {balance.status === "balanced"
-                ? "Matches the quote total"
-                : balance.status === "short"
-                  ? `${money(balance.diffCents)} of the total is not scheduled`
-                  : `${money(balance.diffCents)} more than the quote total`}
+              {!error ? "100% scheduled" : "Percentages must total 100%"}
             </span>
             <span className="font-semibold">
-              {money(installments.reduce((sum, i) => sum + i.amountCents, 0))} / {money(totalCents)}
+              {money(resolved.reduce((sum, i) => sum + i.amountCents, 0))} / {money(totalCents)}
             </span>
           </div>
         </div>

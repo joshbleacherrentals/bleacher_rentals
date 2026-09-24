@@ -14,7 +14,7 @@ import { formatMoney } from "./formatMoney";
 export type ExistingInstallment = {
   id: string;
   dueDate: string;
-  amountCents: number;
+  percentageBps: number;
   currency: string | null;
 };
 
@@ -56,7 +56,7 @@ export function diffSchedule(
       toInsert.push(row);
     } else if (
       before.dueDate !== row.dueDate ||
-      before.amountCents !== row.amountCents ||
+      before.percentageBps !== row.percentageBps ||
       before.currency !== currency
     ) {
       toUpdate.push(row);

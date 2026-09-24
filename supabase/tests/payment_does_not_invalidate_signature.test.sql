@@ -57,12 +57,12 @@ BEGIN
   VALUES (gen_random_uuid(), v_event, 'Bleachers', 1, 360000, 'USD', false, false)
   RETURNING id INTO v_line;
 
-  INSERT INTO "PaymentInstallments" (id, event_uuid, due_date, amount_cents, currency)
-  VALUES (gen_random_uuid(), v_event, '2026-06-01', 180000, 'USD')
+  INSERT INTO "PaymentInstallments" (id, event_uuid, due_date, percentage_bps, currency)
+  VALUES (gen_random_uuid(), v_event, '2026-06-01', 5000, 'USD')
   RETURNING id INTO v_inst_a;
 
-  INSERT INTO "PaymentInstallments" (id, event_uuid, due_date, amount_cents, currency)
-  VALUES (gen_random_uuid(), v_event, '2026-06-15', 180000, 'USD')
+  INSERT INTO "PaymentInstallments" (id, event_uuid, due_date, percentage_bps, currency)
+  VALUES (gen_random_uuid(), v_event, '2026-06-15', 5000, 'USD')
   RETURNING id INTO v_inst_b;
 
   -- The client signs against the terms as they stand.
@@ -117,7 +117,7 @@ BEGIN
 
   -- ── T3: the real contract terms still invalidate ─────────────────────────
   -- Guard against over-fixing. Each of these is a term the client agreed to.
-  UPDATE "PaymentInstallments" SET amount_cents = 200000 WHERE id = v_inst_b;
+  UPDATE "PaymentInstallments" SET percentage_bps = 6000 WHERE id = v_inst_b;
   SELECT contract_hash INTO h_contract_2 FROM "Events" WHERE id = v_event;
   SELECT status INTO v_status FROM "ContractSignatures" WHERE id = v_sig;
   ASSERT h_contract_2 <> h_contract, 'an installment amount change moves contract_hash';
@@ -145,7 +145,7 @@ BEGIN
   VALUES (gen_random_uuid(), v_event, v_terms, 'Dana Reyes', 'active', h_contract)
   RETURNING id INTO v_sig;
 
-  INSERT INTO "PaymentInstallments" (id, event_uuid, due_date, amount_cents, currency)
+  INSERT INTO "PaymentInstallments" (id, event_uuid, due_date, percentage_bps, currency)
   VALUES (gen_random_uuid(), v_event, '2026-07-01', 5000, 'USD');
   SELECT status INTO v_status FROM "ContractSignatures" WHERE id = v_sig;
   ASSERT v_status = 'invalidated', 'adding an installment invalidates the signature';

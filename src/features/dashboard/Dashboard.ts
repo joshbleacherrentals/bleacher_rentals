@@ -19,7 +19,10 @@ import { useDashboardBleachersStore } from "./state/useDashboardBleachersStore";
 import { useDashboardEventsStore } from "./state/useDashboardEventsStore";
 import type { DashboardFilterState } from "../dashboardOptions/types";
 import { filterEvents, filterSortPixiBleachers, getRowKey } from "../dashboardOptions/util";
-import { filterSubrentalRowsByDateWindow } from "./util/subrentalRowVisibility";
+import {
+  filterSubrentalRowsByDateWindow,
+  withoutSubrentalRows,
+} from "./util/subrentalRowVisibility";
 import { useCurrentEventStore } from "../eventConfiguration/state/useCurrentEventStore";
 import { useMaintenanceEventStore } from "../maintenanceEvents/state/useMaintenanceEventStore";
 import { useSubrentalEventStore } from "../subrentals/state/useSubrentalEventStore";
@@ -117,6 +120,7 @@ export class Dashboard {
         rowsQuickFilter: null,
         zoneUuids: [],
         showUnassignedZone: false,
+        hideAllSubrentals: false,
       } satisfies DashboardFilterState);
 
     this.yAxis = this.filters.yAxis;
@@ -570,6 +574,11 @@ export class Dashboard {
    * and records the resulting set so scrolling only rebuilds when it actually changes.
    */
   private applySubrentalWindow(bleachers: Bleacher[]): Bleacher[] {
+    if (this.filters.hideAllSubrentals) {
+      this.subrentalWindowSignature = "";
+      return withoutSubrentalRows(bleachers, this.pinnedBleacherUuids);
+    }
+
     const { start, end } = this.visibleDateWindow();
     const windowed = filterSubrentalRowsByDateWindow(
       bleachers,

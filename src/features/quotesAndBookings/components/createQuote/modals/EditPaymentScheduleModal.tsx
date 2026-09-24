@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -12,15 +12,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { PaymentInstallment } from "../../../types/quoteTypes";
-import { formatCurrency, currencySymbol } from "../../../utils/formatCurrency";
+import { formatCurrency } from "../../../utils/formatCurrency";
 import { calculateTotals } from "../../../utils/calculateTotals";
 import { buildDefaultPaymentSchedule } from "../../../utils/buildDefaultPaymentSchedule";
+
+import {
+  resolvePaymentSchedule,
+  validatePaymentSchedule,
+} from "../../../utils/resolvePaymentSchedule";
 
 type DraftRow = PaymentInstallment & {
   /** Display string for the % input — kept separate so typing "33.3" doesn't jump. */
   pctDisplay: string;
-  /** Display string for the $ input. */
-  dollarDisplay: string;
 };
 
 export function EditPaymentScheduleModal() {
@@ -42,54 +45,42 @@ export function EditPaymentScheduleModal() {
     return subtotal + discountTotal + effectiveTaxCents;
   }, [lineItems, taxPercent, taxOverrideCents]);
 
-  const centsToPct = useCallback(
-    (cents: number) => (totalCents > 0 ? ((cents / totalCents) * 100).toFixed(2) : "0"),
-    [totalCents],
-  );
-
-  const pctToCents = useCallback(
-    (pct: number) => Math.round((pct / 100) * totalCents),
-    [totalCents],
-  );
-
-  // Seed draft when modal opens. A saved schedule is shown as-is; otherwise we
-  // seed the default suggestion (50% on signing, 50% 7 days before the event),
-  // derived live from the current event start each time the modal opens. The
-  // suggestion is only persisted if the manager presses Save — the schedule is
-  // optional.
+  // Initialize only when opened. Price changes recalculate amounts, never reset edits.
   useEffect(() => {
     if (!isOpen) return;
-    const seed =
-      storeInstallments.length > 0
-        ? storeInstallments
-        : buildDefaultPaymentSchedule(totalCents, eventStart);
-    setDraft(
-      seed.map((i) => ({
-        ...i,
-        pctDisplay: centsToPct(i.amountCents),
-        dollarDisplay: (i.amountCents / 100).toFixed(2),
-      })),
-    );
-  }, [isOpen, storeInstallments, totalCents, eventStart, centsToPct]);
+    const seed = storeInstallments.length
+      ? storeInstallments
+      : buildDefaultPaymentSchedule(eventStart);
+    setDraft(seed.map((i) => ({ ...i, pctDisplay: String(i.percentageBps / 100) })));
+  }, [isOpen, storeInstallments, eventStart]);
 
-  const scheduledCents = draft.reduce((sum, i) => sum + i.amountCents, 0);
-  const remaining = totalCents - scheduledCents;
+  const remaining =
+    10000 -
+    draft.reduce((sum, i) => sum + (Number.isFinite(i.percentageBps) ? i.percentageBps : 0), 0);
   const isBalanced = remaining === 0;
+  const validationError = validatePaymentSchedule(draft);
   const hasMissingDates = draft.some((i) => !i.dueDate);
-  const canSave = isBalanced && !hasMissingDates;
+  const canSave = draft.length > 0 && !validationError;
+  const resolved = resolvePaymentSchedule(
+    draft.map((i) => ({
+      ...i,
+      percentageBps:
+        Number.isSafeInteger(i.percentageBps) && i.percentageBps >= 0 ? i.percentageBps : 0,
+    })),
+    Math.max(0, Math.round(totalCents)),
+  );
 
   const close = () => setField("isEditPaymentScheduleModalOpen", false);
 
   const handleAdd = () => {
-    const remainCents = Math.max(remaining, 0);
+    const share = Math.max(remaining, 0);
     setDraft((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
         dueDate: "",
-        amountCents: remainCents,
-        pctDisplay: centsToPct(remainCents),
-        dollarDisplay: (remainCents / 100).toFixed(2),
+        percentageBps: share,
+        pctDisplay: String(share / 100),
       },
     ]);
   };
@@ -102,61 +93,27 @@ export function EditPaymentScheduleModal() {
     setDraft((prev) => prev.map((i) => (i.id === id ? { ...i, dueDate: value } : i)));
   };
 
-  /** User edited the % field → recompute dollar + cents. */
   const handlePctChange = (id: string, raw: string) => {
+    const share = /^\d+(\.\d{0,2})?$/.test(raw) ? Math.round(Number(raw) * 100) : NaN;
     setDraft((prev) =>
-      prev.map((i) => {
-        if (i.id !== id) return i;
-        const pct = parseFloat(raw || "0");
-        const cents = pctToCents(pct);
-        return {
-          ...i,
-          pctDisplay: raw,
-          amountCents: cents,
-          dollarDisplay: (cents / 100).toFixed(2),
-        };
-      }),
-    );
-  };
-
-  /** User edited the $ field → recompute % + cents. */
-  const handleDollarChange = (id: string, raw: string) => {
-    setDraft((prev) =>
-      prev.map((i) => {
-        if (i.id !== id) return i;
-        const dollars = parseFloat(raw || "0");
-        const cents = Math.round(dollars * 100);
-        return {
-          ...i,
-          dollarDisplay: raw,
-          amountCents: cents,
-          pctDisplay: centsToPct(cents),
-        };
-      }),
+      prev.map((i) => (i.id === id ? { ...i, pctDisplay: raw, percentageBps: share } : i)),
     );
   };
 
   const handleSplitEvenly = () => {
-    if (draft.length === 0) return;
-    const per = Math.floor(totalCents / draft.length);
-    const rem = totalCents - per * draft.length;
+    if (!draft.length) return;
+    const per = Math.floor(10000 / draft.length);
     setDraft((prev) =>
-      prev.map((inst, idx) => {
-        const cents = per + (idx === 0 ? rem : 0);
-        return {
-          ...inst,
-          amountCents: cents,
-          pctDisplay: centsToPct(cents),
-          dollarDisplay: (cents / 100).toFixed(2),
-        };
+      prev.map((i, index) => {
+        const share = per + (index === prev.length - 1 ? 10000 - per * prev.length : 0);
+        return { ...i, percentageBps: share, pctDisplay: String(share / 100) };
       }),
     );
   };
 
   const handleSave = () => {
-    setPaymentInstallments(
-      draft.map(({ pctDisplay, dollarDisplay, ...rest }) => rest),
-    );
+    if (!canSave) return;
+    setPaymentInstallments(draft.map(({ pctDisplay, ...rest }) => rest));
     close();
   };
 
@@ -167,8 +124,6 @@ export function EditPaymentScheduleModal() {
     setPaymentInstallments([]);
     close();
   };
-
-  const sym = currencySymbol(currency);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
@@ -202,6 +157,7 @@ export function EditPaymentScheduleModal() {
                 {/* Date */}
                 <input
                   type="date"
+                  aria-label={`Installment ${idx + 1} due date`}
                   value={inst.dueDate}
                   onChange={(e) => handleDateChange(inst.id, e.target.value)}
                   className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-greenAccent flex-1"
@@ -211,11 +167,12 @@ export function EditPaymentScheduleModal() {
                 <div className="relative w-24">
                   <input
                     type="number"
+                    aria-label={`Installment ${idx + 1} percentage`}
                     value={inst.pctDisplay}
                     onChange={(e) => handlePctChange(inst.id, e.target.value)}
                     min="0"
                     max="100"
-                    step="1"
+                    step="0.01"
                     className="w-full rounded border border-gray-300 pl-2 pr-6 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-greenAccent"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
@@ -223,24 +180,17 @@ export function EditPaymentScheduleModal() {
                   </span>
                 </div>
 
-                {/* Dollar amount */}
-                <div className="relative w-28">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                    {sym}
-                  </span>
-                  <input
-                    type="number"
-                    value={inst.dollarDisplay}
-                    onChange={(e) => handleDollarChange(inst.id, e.target.value)}
-                    min="0"
-                    step="0.01"
-                    className="w-full rounded border border-gray-300 pl-6 pr-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-greenAccent"
-                  />
-                </div>
+                <output
+                  className="w-28 text-right text-sm"
+                  aria-label={`Installment ${idx + 1} amount`}
+                >
+                  {formatCurrency(resolved[idx].amountCents / 100, currency)}
+                </output>
 
                 {/* Delete */}
                 <button
                   type="button"
+                  aria-label={`Remove installment ${idx + 1}`}
                   onClick={() => handleRemove(inst.id)}
                   disabled={draft.length <= 1}
                   className="p-1 text-gray-400 hover:text-red-500 transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
@@ -278,11 +228,16 @@ export function EditPaymentScheduleModal() {
               isBalanced ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
             }`}
           >
-            <span>Remaining</span>
-            <span className="font-semibold">{formatCurrency(remaining / 100, currency)}</span>
+            <span>Remaining percentage</span>
+            <span className="font-semibold">{remaining / 100}%</span>
           </div>
         </div>
 
+        {validationError && (
+          <p role="alert" className="text-sm text-red-700">
+            {validationError}
+          </p>
+        )}
         <DialogFooter>
           {hasSavedSchedule && (
             <Button
@@ -301,7 +256,7 @@ export function EditPaymentScheduleModal() {
               ? "All due dates are required"
               : isBalanced
                 ? "Save Schedule"
-                : "Amounts must equal total"}
+                : "Percentages must total 100%"}
           </Button>
         </DialogFooter>
       </DialogContent>

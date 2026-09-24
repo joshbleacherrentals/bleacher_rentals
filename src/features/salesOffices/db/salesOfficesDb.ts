@@ -11,6 +11,7 @@ export type SalesOfficeRow = {
   address_uuid: string | null;
   quickbook_uuid: string | null;
   stripe_connection_uuid: string | null;
+  payment_info: string | null;
   deleted: number | null;
   address_street: string | null;
   address_city: string | null;
@@ -42,6 +43,8 @@ export type SalesOfficeInput = {
   // Optional: office falls back to the default Stripe account when null.
   stripeConnectionUuid: string | null;
   address: SalesOfficeAddress | null;
+  /** Extra payment instructions for the customer's quote; blank is stored as null. */
+  paymentInfo: string | null;
 };
 
 // ── Read (PowerSync, reactive) ──
@@ -55,6 +58,7 @@ export const allSalesOfficesQuery = db
     "so.address_uuid as address_uuid",
     "so.quickbook_uuid as quickbook_uuid",
     "so.stripe_connection_uuid as stripe_connection_uuid",
+    "so.payment_info as payment_info",
     "so.deleted as deleted",
     "a.street as address_street",
     "a.city as address_city",
@@ -168,6 +172,7 @@ export async function createSalesOffice(params: SalesOfficeInput): Promise<strin
         quickbook_uuid: params.quickbookUuid,
         stripe_connection_uuid: params.stripeConnectionUuid,
         address_uuid: addressUuid,
+        payment_info: params.paymentInfo?.trim() || null,
         deleted: 0,
       } as any)
       .compile(),
@@ -191,6 +196,7 @@ export async function updateSalesOffice(
         quickbook_uuid: params.quickbookUuid,
         stripe_connection_uuid: params.stripeConnectionUuid,
         address_uuid: addressUuid,
+        payment_info: params.paymentInfo?.trim() || null,
       } as any)
       .where("id", "=", id)
       .compile(),

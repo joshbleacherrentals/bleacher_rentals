@@ -19,6 +19,17 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
   }
 
   const store = useCreateQuoteStore.getState();
+  // Load before mutating the form: failure must never turn into a default schedule.
+  let installments;
+  try {
+    installments = await fetchPaymentInstallments(data.id);
+  } catch (error) {
+    console.error("Failed to load payment installments:", error);
+    return null;
+  }
+  store.setField("editingEventId", data.id);
+  store.setField("paymentInstallments", installments);
+  store.setField("scheduleError", null);
 
   store.setField("quoteNumber", resolveInvoiceDisplay(data.invoiceNumber, data.id));
   store.setField("status", (data.eventStatus as any) ?? "draft");
@@ -101,15 +112,6 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
     store.setField("lineItems", lineItems);
   } catch (e) {
     console.error("Failed to load line items:", e);
-  }
-
-  // Load payment installments from PowerSync. Empty when the quote was saved
-  // without a schedule — it stays optional.
-  try {
-    const installments = await fetchPaymentInstallments(data.id);
-    store.setField("paymentInstallments", installments);
-  } catch (e) {
-    console.error("Failed to load payment installments:", e);
   }
 
   return data.id;

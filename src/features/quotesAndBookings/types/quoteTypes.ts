@@ -66,7 +66,7 @@ export type QuoteContact = {
 export type PaymentInstallment = {
   id: string;
   dueDate: string; // YYYY-MM-DD
-  amountCents: number;
+  percentageBps: number; // 100 basis points = 1%
 };
 
 export type DiscountTemplate = {

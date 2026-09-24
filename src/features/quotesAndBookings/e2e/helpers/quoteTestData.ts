@@ -127,8 +127,8 @@ export async function assignTerms(eventId: string): Promise<string> {
 export async function addPaymentSchedule(eventId: string): Promise<void> {
   const db = admin();
   const { error } = await db.from("PaymentInstallments").insert([
-    { event_uuid: eventId, due_date: "2026-09-01", amount_cents: 60_000, currency: "USD" },
-    { event_uuid: eventId, due_date: "2026-09-20", amount_cents: 40_000, currency: "USD" },
+    { event_uuid: eventId, due_date: "2026-09-01", percentage_bps: 6000, currency: "USD" },
+    { event_uuid: eventId, due_date: "2026-09-20", percentage_bps: 4000, currency: "USD" },
   ]);
   if (error) throw new Error(`addPaymentSchedule: insert failed: ${error.message}`);
 }

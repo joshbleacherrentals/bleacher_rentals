@@ -25,32 +25,30 @@ test.describe("Actual bleacher (admin)", () => {
       await fixture.cleanup();
     });
 
-    test("both selects carry the swap, with no banner shouting about it", async ({ page }) => {
+    test("the swap is called out as an action for the manager to take", async ({ page }) => {
       await openTrip(page, fixture);
 
       await expect(page.getByTestId("actual-bleacher-select")).toContainText(
         String(fixture.actualNumber),
       );
-      await expect(page.getByTestId("bleacher-change-reason-select")).toContainText(
+      await expect(page.getByTestId("bleacher-change-reason")).toContainText(
         "Blocked by other bleachers",
       );
-      // The alert belongs in Alerts, not stapled to the form.
-      await expect(page.getByTestId("bleacher-swap")).toHaveCount(0);
+      await expect(page.getByRole("alert").filter({ hasText: "Action needed" })).toBeVisible();
     });
 
-    test("the reason fits its select instead of spilling out of it", async ({ page }) => {
+    test("the reason is shown in full and stays clear of the Pickup Time column", async ({
+      page,
+    }) => {
       await openTrip(page, fixture);
 
-      const select = page.getByTestId("bleacher-change-reason-select");
-      const button = await select.getByRole("button").boundingBox();
-      const text = await select.locator("span").first().boundingBox();
-      expect(button).not.toBeNull();
-      expect(text).not.toBeNull();
-      // Clipped to the control (ellipsis), never painted past its right edge.
-      expect(text!.x + text!.width).toBeLessThanOrEqual(button!.x + button!.width);
-
+      const reason = page.getByTestId("bleacher-change-reason");
+      // Plain text now, so it wraps rather than being cut off by a control.
+      await expect(reason).toHaveText("Blocked by other bleachers");
+      const box = await reason.boundingBox();
       const pickupTime = await page.getByText("Pickup Time", { exact: true }).boundingBox();
-      expect(button!.x + button!.width).toBeLessThanOrEqual(pickupTime!.x);
+      expect(box).not.toBeNull();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(pickupTime!.x);
     });
 
     test("the assigned bleacher select stays clear of the Pickup Time column", async ({ page }) => {
@@ -122,12 +120,9 @@ test.describe("Actual bleacher (admin)", () => {
       await expect(page.getByTestId("actual-bleacher-select")).toContainText(
         String(fixture.assignedNumber),
       );
-      // Nothing was swapped, so there is no reason to give — the control is
-      // present for symmetry but inert.
-      await expect(
-        page.getByTestId("bleacher-change-reason-select").getByRole("button"),
-      ).toBeDisabled();
-      await expect(page.getByTestId("bleacher-swap")).toHaveCount(0);
+      // Nothing was swapped, so there is no reason and no alert.
+      await expect(page.getByTestId("bleacher-change-reason")).toHaveText("No change");
+      await expect(page.getByRole("alert").filter({ hasText: "Action needed" })).toHaveCount(0);
     });
   });
 });

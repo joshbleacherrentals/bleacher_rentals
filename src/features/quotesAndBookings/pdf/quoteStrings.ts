@@ -66,10 +66,6 @@ export const quoteStrings = {
     en: (n: string) => `Memo: Invoice #${n}`,
     fr: (n: string) => `Mention : facture nº ${n}`,
   },
-  eTransferNote: {
-    en: "e-transfers to payments@bleacherrentals.com",
-    fr: "Virements Interac à payments@bleacherrentals.com",
-  },
 
   // ── Totals ───────────────────────────────────────────────────────────
   totalsHeading: { en: "Totals", fr: "Totaux" },

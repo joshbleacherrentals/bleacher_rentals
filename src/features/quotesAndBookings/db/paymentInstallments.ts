@@ -1,3 +1,4 @@
+import { validatePaymentSchedule } from "../utils/resolvePaymentSchedule";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { PaymentInstallment } from "../types/quoteTypes";
@@ -12,7 +13,7 @@ import {
 type StoredInstallmentRow = {
   id: string;
   due_date: string | null;
-  amount_cents: number | null;
+  percentage_bps: number | null;
   currency: string | null;
 };
 
@@ -26,7 +27,7 @@ async function loadExisting(eventUuid: string): Promise<ExistingInstallment[]> {
   const rows = await typedGetAll(
     db
       .selectFrom("PaymentInstallments")
-      .select(["id", "due_date", "amount_cents", "currency"])
+      .select(["id", "due_date", "percentage_bps", "currency"])
       .where("event_uuid", "=", eventUuid)
       .compile(),
     expect<StoredInstallmentRow>(),
@@ -35,7 +36,7 @@ async function loadExisting(eventUuid: string): Promise<ExistingInstallment[]> {
   return rows.map((r) => ({
     id: r.id,
     dueDate: r.due_date ?? "",
-    amountCents: r.amount_cents ?? 0,
+    percentageBps: r.percentage_bps ?? 0,
     currency: r.currency,
   }));
 }
@@ -57,6 +58,8 @@ export async function syncPaymentInstallments(
   installments: PaymentInstallment[],
   currency: Currency,
 ): Promise<void> {
+  const error = validatePaymentSchedule(installments);
+  if (error) throw new Error(error);
   const existing = await loadExisting(eventUuid);
   const diff = diffSchedule(existing, installments, currency);
 
@@ -95,7 +98,7 @@ export async function syncPaymentInstallments(
         .updateTable("PaymentInstallments")
         .set({
           due_date: inst.dueDate || null,
-          amount_cents: inst.amountCents,
+          percentage_bps: inst.percentageBps,
           currency: currency,
         })
         .where("id", "=", inst.id)
@@ -111,7 +114,7 @@ export async function syncPaymentInstallments(
           id: inst.id,
           event_uuid: eventUuid,
           due_date: inst.dueDate || null,
-          amount_cents: inst.amountCents,
+          percentage_bps: inst.percentageBps,
           currency: currency,
           created_at: new Date().toISOString(),
         })
@@ -123,7 +126,7 @@ export async function syncPaymentInstallments(
 type InstallmentRow = {
   id: string;
   due_date: string | null;
-  amount_cents: number | null;
+  percentage_bps: number | null;
 };
 
 /**
@@ -132,7 +135,7 @@ type InstallmentRow = {
 export async function fetchPaymentInstallments(eventUuid: string): Promise<PaymentInstallment[]> {
   const compiled = db
     .selectFrom("PaymentInstallments")
-    .select(["id", "due_date", "amount_cents"])
+    .select(["id", "due_date", "percentage_bps"])
     .where("event_uuid", "=", eventUuid)
     .orderBy("due_date", "asc")
     .compile();
@@ -142,6 +145,6 @@ export async function fetchPaymentInstallments(eventUuid: string): Promise<Payme
   return rows.map((r) => ({
     id: r.id,
     dueDate: r.due_date ?? "",
-    amountCents: r.amount_cents ?? 0,
+    percentageBps: r.percentage_bps ?? 0,
   }));
 }

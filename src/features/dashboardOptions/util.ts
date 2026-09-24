@@ -55,11 +55,27 @@ export function filterSortPixiBleachers(
   }
 
   // 2) Ensure always-include IDs are present when form expanded OR optimization mode is ON.
+  //    A bleacher can have several rows — its own, plus a ghost row per zone it is subrented
+  //    into. Show the rows from the selected zones' perspective; only when none of its rows is
+  //    in a selected zone does it fall back to its own row. Never another zone's ghost row.
   if (isFormExpanded || optimizationMode) {
+    const rowsByBleacher = new Map<string, Bleacher[]>();
     for (const b of bleachers) {
-      if (alwaysSet.has(b.bleacherUuid)) {
-        included.add(getRowKey(b));
-      }
+      if (!alwaysSet.has(b.bleacherUuid)) continue;
+      const list = rowsByBleacher.get(b.bleacherUuid) ?? [];
+      list.push(b);
+      rowsByBleacher.set(b.bleacherUuid, list);
+    }
+
+    for (const rowsOfBleacher of rowsByBleacher.values()) {
+      const inSelectedZones = rowsOfBleacher.filter((b) =>
+        passesZoneFilter(b.zoneUuid, zoneUuids, showUnassignedZone),
+      );
+      const shown =
+        inSelectedZones.length > 0
+          ? inSelectedZones
+          : rowsOfBleacher.filter((b) => !b.isSubrentalRow);
+      for (const b of shown) included.add(getRowKey(b));
     }
   }
 

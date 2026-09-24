@@ -32,7 +32,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Owns the annual inspection of the fleet. Sees the Annual Inspections queue and can open a bleacher to read its inspection history — nothing else on the dashboard. A safe role to hand to whoever keeps the inspections up to date, without giving them anything to break.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can open a bleacher to read its history. Sees nothing else on the dashboard — no quotes, events, payments, or team management.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -309,8 +309,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can view all repair and maintenance events and their details but cannot create, edit, or delete any.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: full(
+        "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page.",
       ),
     },
   },
@@ -335,8 +335,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "Can create damage reports through the mobile app when they notice damage to a bleacher. Can view their own submitted reports but cannot edit or delete them once submitted.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: full(
+        "Can create, view, edit, delete, and restore any damage report and its photos, regardless of who created it. Can see acknowledgements but not add them.",
       ),
     },
   },
@@ -453,6 +453,30 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Contract Templates",
+    description:
+      "This applies to the Terms & Conditions page under Configuration: the contract templates a quote can attach, and which one is the default. The default is the template a brand new quote starts with — anyone building a quote can still pick a different one on the quote itself.",
+    category: "Configuration",
+    roles: {
+      admin: full(
+        "Able to create, edit, and delete contract templates, and to choose which one new quotes start with.",
+      ),
+      account_manager: none(
+        "Account managers can't see this page. They choose a contract template on a quote from the templates admins have created, and a new quote starts on the default.",
+      ),
+      developer: none(
+        "Unable to even access the configuration pages, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Viewers do not have access to the web configuration pages. They see the contract on quotes they can open.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(
+        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      ),
+    },
+  },
+  {
     label: "Manage Inspection Form",
     description:
       "The ability to create and edit the inspection form template that drivers fill out during pickup and drop-off. This applies to the Inspection Form page under Configuration.",
@@ -546,10 +570,10 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Team Management",
     roles: {
       admin: full(
-        "Can view and edit all information for every team member, including changing roles and reassigning drivers between managers.",
+        "Can view and edit all information for every team member, including changing roles, reassigning drivers between managers, and setting an account manager's default sales office.",
       ),
       account_manager: custom(
-        "Can view every team member's profile, but can only edit driver data for drivers assigned to themselves. Can assign an unassigned driver to themselves, but cannot reassign a driver who is already assigned to another manager.",
+        "Can view every team member's profile, but can only edit driver data for drivers assigned to themselves. Can assign an unassigned driver to themselves, but cannot reassign a driver who is already assigned to another manager. Their own default sales office is admin-set only — they can see it but not change it.",
       ),
       developer: none(
         "Developers do not have access to the Team page. This role is limited to the product roadmap.",

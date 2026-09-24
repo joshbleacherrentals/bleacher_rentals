@@ -44,9 +44,10 @@ describe("access to /driver-satisfaction", () => {
 
   it("a developer's narrow access still includes this page", () => {
     // Developers see almost nothing else in the web app; the survey is one of
-    // the three pages they are given, because they are its audience.
+    // the four pages they are given, because they are its audience. (The fourth
+    // is /dev-tools/sync-health, added with the Sync Health page.)
     const access = mergeRoleConfigs(["developer"]);
     expect(access.allowedPaths).toContain(PATH);
-    expect(access.allowedPaths).toHaveLength(3);
+    expect(access.allowedPaths).toHaveLength(4);
   });
 });

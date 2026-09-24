@@ -24,4 +24,7 @@ export type DashboardFilterState = {
   zoneUuids: string[];
   // whether the "Unassigned" pseudo-zone is selected
   showUnassignedZone: boolean;
+
+  // hide every subrental ("ghost") row on the grid, whatever the dates
+  hideAllSubrentals: boolean;
 };

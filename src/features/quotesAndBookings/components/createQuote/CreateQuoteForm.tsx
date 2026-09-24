@@ -33,6 +33,8 @@ import { useNavigationGuard } from "../../hooks/useNavigationGuard";
 import { UnsavedChangesDialog } from "./modals/UnsavedChangesDialog";
 import { draftSaveDefaults, validateQuoteForSend } from "../../utils/quoteValidation";
 import { validateLostReason } from "../../utils/lostReason";
+import { cleanRecipients } from "../../utils/sendQuote";
+import { SendQuoteDialog } from "../sendQuote/SendQuoteDialog";
 
 export function CreateQuoteForm() {
   const router = useRouter();
@@ -41,6 +43,9 @@ export function CreateQuoteForm() {
   const supabase = useClerkSupabaseClient();
   const currentUserUuid = useCurrentUserUuid();
   const [saving, setSaving] = useState(false);
+  const [sendTarget, setSendTarget] = useState<{ eventId: string; recipients: string[] } | null>(
+    null,
+  );
   const perms = usePermissionsStore();
   // Review-gating disabled per boss feedback — all AMs can send quotes
   // const canSendDirectly = perms.isAdmin || perms.leadZoneIds.length > 0;
@@ -105,8 +110,10 @@ export function CreateQuoteForm() {
       resetForm();
       captureQuoteBaseline(); // form is clean again — no spurious leave prompt
       return eventId;
-    } catch {
-      // Error toast already shown
+    } catch (error) {
+      createErrorToastNoThrow([
+        (error as Error).message || "Could not save the quote. Your draft has been retained.",
+      ]);
       return null;
     } finally {
       setSaving(false);
@@ -152,70 +159,73 @@ export function CreateQuoteForm() {
         // Update store so subsequent saves do UPDATE not INSERT
         useCreateQuoteStore.getState().setField("editingEventId", eventId);
       }
-    } catch {
-      // Error toast already shown
+    } catch (error) {
+      createErrorToastNoThrow([
+        (error as Error).message || "Could not save the quote. Your draft has been retained.",
+      ]);
     } finally {
       setSaving(false);
     }
   };
 
+  // Sending is two steps: save the quote as it stands (so the preview can be built from it), then
+  // review it in SendQuoteDialog. The status only becomes "quoted" when Send is pressed.
   const handleSendQuote = async () => {
     if (!validateLost() || !validateRequiredFields()) return;
+
+    const state = useCreateQuoteStore.getState();
+    const recipients = cleanRecipients([state.companyEmail, state.financeContactEmail]);
+    if (recipients.length === 0) {
+      createErrorToast(["Add a contact email before sending."]);
+      return;
+    }
+
     setSaving(true);
     try {
-      // Override status to "quoted" when sending
-      useCreateQuoteStore.getState().setField("status", "quoted");
-      const state = useCreateQuoteStore.getState();
       let eventId: string;
       if (isEditing) {
         await updateQuoteEvent(editingEventId, state, supabase, currentUserUuid ?? perms.userId);
         eventId = editingEventId;
       } else {
         eventId = await createQuoteEvent(state, supabase, currentUserUuid ?? perms.userId);
+        // Later saves must UPDATE this quote, not insert another.
+        useCreateQuoteStore.getState().setField("editingEventId", eventId);
       }
       void triage("Events", { id: eventId }, supabase);
-
-      // Collect recipient emails (main + optional finance contact)
-      const recipientEmails: string[] = [];
-      const mainEmail = state.companyEmail || state.contactName;
-      if (mainEmail?.includes("@")) recipientEmails.push(mainEmail);
-      if (state.financeContactEmail?.includes("@")) recipientEmails.push(state.financeContactEmail);
-
-      if (recipientEmails.length === 0) {
-        createSuccessToast(["Quote saved. Add a contact email to send."]);
-        resetForm();
-        router.push(`/quotes-bookings/${eventId}`);
-        return;
-      }
-
-      // Send email with PDF via API
-      const res = await fetch(`/api/quotes/${eventId}/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipientEmails }),
-      });
-
-      if (res.ok) {
-        // Log the send via PowerSync so it records the current user (the sender).
-        await logQuoteSentLocal({
-          eventId,
-          recipientLine: recipientEmails.join(","),
-          currentUserUuid: currentUserUuid ?? perms.userId,
-        });
-        createSuccessToast([`Quote sent to ${recipientEmails.join(", ")}`]);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.error("Send failed:", err);
-        createSuccessToast(["Quote saved but email failed. Try resending from the detail page."]);
-      }
-
-      resetForm();
-      router.push(`/quotes-bookings/${eventId}`);
-    } catch {
-      // Error toast already shown
+      setSendTarget({ eventId, recipients });
+    } catch (error) {
+      createErrorToastNoThrow([
+        (error as Error).message || "Could not save the quote. Your draft has been retained.",
+      ]);
     } finally {
       setSaving(false);
     }
+  };
+
+  const markQuoted = async () => {
+    if (!sendTarget) return;
+    useCreateQuoteStore.getState().setField("status", "quoted");
+    await updateQuoteEvent(
+      sendTarget.eventId,
+      useCreateQuoteStore.getState(),
+      supabase,
+      currentUserUuid ?? perms.userId,
+    );
+    void triage("Events", { id: sendTarget.eventId }, supabase);
+  };
+
+  const handleSent = () =>
+    logQuoteSentLocal({
+      eventId: sendTarget!.eventId,
+      recipientLine: sendTarget!.recipients.join(","),
+      currentUserUuid: currentUserUuid ?? perms.userId,
+    });
+
+  const handleSendDone = () => {
+    const eventId = sendTarget?.eventId;
+    resetForm();
+    captureQuoteBaseline();
+    if (eventId) router.push(`/quotes-bookings/${eventId}`);
   };
 
   return (
@@ -302,6 +312,17 @@ export function CreateQuoteForm() {
 
       <AddLineItemModal />
       <EditPaymentScheduleModal />
+      {sendTarget && (
+        <SendQuoteDialog
+          open
+          onOpenChange={(open) => !open && setSendTarget(null)}
+          eventId={sendTarget.eventId}
+          recipientEmails={sendTarget.recipients}
+          onBeforeSend={markQuoted}
+          onSent={handleSent}
+          onDone={handleSendDone}
+        />
+      )}
       <UnsavedChangesDialog
         open={guard.isBlocking}
         saving={saving}

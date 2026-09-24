@@ -1,9 +1,9 @@
+import { validatePaymentSchedule } from "../utils/resolvePaymentSchedule";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../../../../database.types";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { CreateQuoteState } from "../state/useCreateQuoteStore";
 import { syncPaymentInstallments } from "./paymentInstallments";
-import { ScheduleBlockedError } from "../utils/scheduleDiff";
 import { calculateTotals } from "../utils/calculateTotals";
 import {
   logEventChanges,
@@ -57,6 +57,8 @@ export async function updateQuoteEvent(
   supabase: SupabaseClient<Database>,
   currentUserUuid?: string | null,
 ): Promise<void> {
+  const scheduleError = state.scheduleError ?? validatePaymentSchedule(state.paymentInstallments);
+  if (scheduleError) throw new Error(scheduleError);
   // 1. Handle address / venue — see docs/specs/venue-history.md §4.
   //    venueId set ("venue" mode): write venue_uuid only, skip the Addresses
   //    block entirely — the events_sync_address_from_venue trigger sets
@@ -278,17 +280,6 @@ export async function updateQuoteEvent(
     await supabase.from("EventLineItems").insert(rows);
   }
 
-  // 6. Sync payment installments — optional. Empty clears any existing schedule.
-  try {
-    await syncPaymentInstallments(eventId, state.paymentInstallments, state.currency);
-  } catch (e) {
-    // Removing an installment that holds money is a refusal, not a failure: the
-    // person needs to read it. Everything else stays a logged non-event, since
-    // the quote itself is already saved by this point.
-    if (e instanceof ScheduleBlockedError) {
-      createErrorToast(["The payment schedule was not changed.", e.message]);
-    } else {
-      console.error("Payment installments sync failed (quote still saved):", e);
-    }
-  }
+  // Propagate errors so the editor retains the draft for retry.
+  await syncPaymentInstallments(eventId, state.paymentInstallments, state.currency);
 }

@@ -39,6 +39,9 @@ vi.mock("@/lib/powersync/typedQuery", () => ({
     if (compiled.sql.includes('from "BleacherEvents"')) {
       return Promise.resolve([{ id: "be-1" }]);
     }
+    if (compiled.sql.includes('from "Events"')) {
+      return Promise.resolve([{ deleted: 0 }]);
+    }
     return Promise.resolve([]);
   },
   typedExecute: () => Promise.resolve(),
@@ -64,9 +67,10 @@ vi.mock("./registry", () => ({
 
 import { triage } from "./triage";
 import { resetCascadeQueue } from "./cascadeQueue";
-import { todayStart, upcomingWindowEndInstant } from "./util/getUpcomingWindow";
+import { getUpcomingWindowEnd } from "./util/getUpcomingWindow";
+import { businessToday } from "./util/pastAlerts";
 
-const TUESDAY_NOON = new Date(2026, 8, 15, 12, 0, 0);
+const TUESDAY_NOON = new Date("2026-09-15T16:00:00Z"); // Tuesday, noon in Toronto
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -93,8 +97,11 @@ describe("triage WorkTrackers", () => {
 
     // Without an upper bound the cascade re-evaluates events a year out, for
     // which no alert can ever fire — the multiplier behind a 14s save.
-    expect(rippleQuery().parameters).toContain(upcomingWindowEndInstant());
-    expect(rippleQuery().parameters).toContain(todayStart());
+    // Both bounds are plain dates: the columns they filter are DATE columns, and an instant as
+    // the lower bound sorted after every row dated today.
+    expect(rippleQuery().parameters).toContain(getUpcomingWindowEnd());
+    expect(rippleQuery().parameters).toContain(businessToday());
+    expect(rippleQuery().parameters).toContain("2026-09-15");
   });
 
   it("still evaluates every bleacher_event definition inside the window", async () => {
@@ -161,5 +168,33 @@ describe("triage WorkTrackers", () => {
       "plan No Transportation be-1",
       "plan Scheduling Conflict be-1",
     ]);
+  });
+});
+
+describe("triage Events", () => {
+  function eventRipple(): CompiledQuery {
+    const query = reads.find(
+      (r) => r.sql.includes('from "BleacherEvents"') && r.sql.includes('inner join "Events"'),
+    );
+    if (!query) throw new Error("triage never ran the ripple query");
+    return query;
+  }
+
+  it("re-checks the other events of a bleacher this save removed", async () => {
+    // Taking a bleacher off an event leaves its neighbours holding alerts derived from it — a
+    // scheduling conflict with an event that no longer wants the bleacher. By the time triage
+    // runs, this event no longer points at it, so the caller has to say what it removed.
+    await triage("Events", { id: "ev-1", removed_bleacher_uuids: ["bleacher-removed"] });
+
+    expect(eventRipple().parameters).toContain("bleacher-removed");
+  });
+
+  it("bounds the ripple by the event end, so one already under way is still re-checked", async () => {
+    // Bounding on event_start skipped every long event in progress: the bug that left a stale
+    // "Double booked" alert on an event running August to October.
+    await triage("Events", { id: "ev-1", removed_bleacher_uuids: ["bleacher-removed"] });
+
+    expect(eventRipple().sql).toContain('"e"."event_end" >=');
+    expect(eventRipple().sql).not.toContain('"e"."event_start" >=');
   });
 });

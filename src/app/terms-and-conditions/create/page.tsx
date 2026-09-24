@@ -4,13 +4,11 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RichTextEditor } from "@/app/roadmap/_lib/components/RichTextEditor";
-import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createTermsAndConditions } from "@/features/termsAndConditions/db/termsAndConditionsDb";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { PrimaryButton } from "@/components/PrimaryButton";
 
 export default function CreateTermsPage() {
-  const supabase = useClerkSupabaseClient();
   const router = useRouter();
   const [name, setName] = useState("");
   const [htmlContent, setHtmlContent] = useState("");
@@ -20,7 +18,7 @@ export default function CreateTermsPage() {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await createTermsAndConditions({ name: name.trim(), htmlContent }, supabase);
+      await createTermsAndConditions({ name: name.trim(), htmlContent });
       createSuccessToast(["Contract template created."]);
       router.push("/terms-and-conditions");
     } catch {
