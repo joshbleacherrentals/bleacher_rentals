@@ -458,6 +458,12 @@ const WorkTrackersCols = {
   dropoff_time_end: column.text,
   declined_at: column.text,
   abandoned_at: column.text,
+  // Maintained by Postgres triggers, never written from the web app. The
+  // driver app reads them for its event roster (br_driver spec
+  // event-bleacher-roster.md).
+  status_changed_at: column.text,
+  dropoff_event_uuid: column.text,
+  pickup_event_uuid: column.text,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
 const WorkTrackers = new Table(WorkTrackersCols, {
   indexes: {
