@@ -1,56 +1,108 @@
+-- ============================================================================
+-- Percentage payment schedules: turning percentages into dollars.
+--
+-- A schedule stores percentage_bps (5000 = 50%), and resolve_payment_schedule()
+-- turns it into cents against the quote's current total. Covers the live
+-- functions only. The one-time backfill in
+-- 20260922120000_percentage_payment_schedules.sql has already run everywhere,
+-- and `supabase test db` cannot re-run a migration, because only this
+-- directory is mounted in its container.
+--
+-- See docs/specs/percentage-payment-schedules.md.
+-- ============================================================================
+
 \set ON_ERROR_STOP on
+
 BEGIN;
--- Recreate the old layout (no percentage_bps, amount_cents NOT NULL) inside a rollback-only
--- transaction, then run the real migration against fixtures. Existing rows are restored by ROLLBACK.
-UPDATE public."PaymentInstallments" pi SET amount_cents = r.amount_cents
-FROM (SELECT p.id, s.amount_cents FROM public."PaymentInstallments" p
-  CROSS JOIN LATERAL public.resolve_payment_schedule(p.event_uuid) s WHERE s.id = p.id) r
-WHERE r.id = pi.id;
-DO $$
-DECLARE definition text;
-BEGIN
-  SELECT pg_get_functiondef('public.recompute_quote_hashes(uuid)'::regprocedure) INTO definition;
-  definition := replace(definition, '''percentageBps'', pi.percentage_bps,', '');
-  definition := replace(definition, 'resolved.amount_cents', 'pi.amount_cents');
-  definition := replace(definition, 'JOIN public.resolve_payment_schedule(p_event_id) resolved ON resolved.id = pi.id', '');
-  EXECUTE definition;
-END $$;
-ALTER TABLE public."PaymentInstallments" DROP COLUMN percentage_bps;
-ALTER TABLE public."PaymentInstallments" ALTER COLUMN amount_cents SET NOT NULL;
+SET search_path TO extensions, public, "$user";
+SELECT plan(8);
 
 INSERT INTO public."Events" (id, event_name, event_start, event_end, lenient, must_be_clean, contract_revenue_cents)
 VALUES
- ('00000000-0000-0000-0000-000000000101', 'Percentage migration balanced', '2099-01-01', '2099-01-02', false, false, 3),
- ('00000000-0000-0000-0000-000000000102', 'Percentage migration unbalanced', '2099-01-01', '2099-01-02', false, false, 200000),
- ('00000000-0000-0000-0000-000000000103', 'Percentage migration zero', '2099-01-01', '2099-01-02', false, false, 0);
-INSERT INTO public."PaymentInstallments" (event_uuid, due_date, amount_cents, currency)
-SELECT '00000000-0000-0000-0000-000000000101'::uuid, '2099-01-01'::date + n, 1, 'USD' FROM generate_series(0,2) n;
-INSERT INTO public."PaymentInstallments" (event_uuid, due_date, amount_cents, currency)
-SELECT '00000000-0000-0000-0000-000000000102'::uuid, '2099-01-01'::date + n, 50000, 'USD' FROM generate_series(0,1) n;
-INSERT INTO public."PaymentInstallments" (event_uuid, due_date, amount_cents, currency)
-SELECT '00000000-0000-0000-0000-000000000103'::uuid, '2099-01-01'::date + n, 0, 'USD' FROM generate_series(0,2) n;
+ ('00000000-0000-0000-0000-000000000101', 'Thirds', '2099-01-01', '2099-01-02', false, false, 101),
+ ('00000000-0000-0000-0000-000000000102', 'Half and half', '2099-01-01', '2099-01-02', false, false, 100000),
+ ('00000000-0000-0000-0000-000000000103', 'Adds up to 50%', '2099-01-01', '2099-01-02', false, false, 200000),
+ ('00000000-0000-0000-0000-000000000104', 'Line items and tax', '2099-01-01', '2099-01-02', false, false, 999999);
 
-\ir ../migrations/20260922120000_percentage_payment_schedules.sql
+UPDATE public."Events" SET tax_percent = 13, tax_amount_cents = NULL
+ WHERE id = '00000000-0000-0000-0000-000000000104';
+INSERT INTO public."EventLineItems" (event_uuid, header, quantity, value_cents, currency)
+VALUES ('00000000-0000-0000-0000-000000000104', 'Rental', 2, 1000, 'USD');
 
-DO $$
-DECLARE shares integer[]; cents bigint; original_hash text;
-BEGIN
-  SELECT array_agg(percentage_bps ORDER BY due_date) INTO shares FROM public."PaymentInstallments"
-  WHERE event_uuid = '00000000-0000-0000-0000-000000000101';
-  ASSERT shares = ARRAY[3334,3333,3333], 'balanced backfill rounds to exactly 100%';
-  SELECT array_agg(percentage_bps ORDER BY due_date) INTO shares FROM public."PaymentInstallments"
-  WHERE event_uuid = '00000000-0000-0000-0000-000000000102';
-  ASSERT shares = ARRAY[2500,2500], 'unbalanced backfill preserves missing share';
-  SELECT array_agg(percentage_bps ORDER BY due_date) INTO shares FROM public."PaymentInstallments"
-  WHERE event_uuid = '00000000-0000-0000-0000-000000000103';
-  ASSERT shares = ARRAY[3333,3333,3334], 'zero-total schedules get equal shares';
-  SELECT contract_hash INTO original_hash FROM public."Events" WHERE id = '00000000-0000-0000-0000-000000000101';
-  UPDATE public."Events" SET contract_revenue_cents = 101 WHERE id = '00000000-0000-0000-0000-000000000101';
-  SELECT sum(amount_cents) INTO cents FROM public.resolve_payment_schedule('00000000-0000-0000-0000-000000000101');
-  ASSERT cents = 101, 'rounded cents always match total';
-  ASSERT (SELECT contract_hash <> original_hash FROM public."Events" WHERE id = '00000000-0000-0000-0000-000000000101'), 'price changes update contract hash';
-  SELECT sum(amount_cents) INTO cents FROM public.resolve_payment_schedule('00000000-0000-0000-0000-000000000102');
-  ASSERT cents = 100000, 'invalid schedules are not normalized';
-  RAISE NOTICE 'PASS: backfill, percentage preservation, cent rounding and price hash changes';
-END $$;
+INSERT INTO public."PaymentInstallments" (event_uuid, due_date, percentage_bps, currency)
+VALUES
+ ('00000000-0000-0000-0000-000000000101', '2099-01-01', 3334, 'USD'),
+ ('00000000-0000-0000-0000-000000000101', '2099-01-02', 3333, 'USD'),
+ ('00000000-0000-0000-0000-000000000101', '2099-01-03', 3333, 'USD'),
+ ('00000000-0000-0000-0000-000000000102', '2099-01-01', 5000, 'USD'),
+ ('00000000-0000-0000-0000-000000000102', '2099-01-02', 5000, 'USD'),
+ ('00000000-0000-0000-0000-000000000103', '2099-01-01', 2500, 'USD'),
+ ('00000000-0000-0000-0000-000000000103', '2099-01-02', 2500, 'USD');
+
+CREATE TEMP VIEW schedule AS
+SELECT pi.event_uuid, pi.due_date, s.amount_cents
+  FROM public."PaymentInstallments" pi
+  JOIN LATERAL public.resolve_payment_schedule(pi.event_uuid) s ON s.id = pi.id;
+
+SELECT is(
+  (SELECT array_agg(amount_cents ORDER BY due_date) FROM schedule
+    WHERE event_uuid = '00000000-0000-0000-0000-000000000101'),
+  ARRAY[34, 34, 33]::bigint[],
+  'a schedule adding up to 100% hands out the leftover cents, largest remainder first'
+);
+
+SELECT is(
+  (SELECT sum(amount_cents) FROM schedule WHERE event_uuid = '00000000-0000-0000-0000-000000000101'),
+  101::numeric,
+  'the rounded cents add up to exactly the quote total'
+);
+
+SELECT is(
+  (SELECT array_agg(amount_cents ORDER BY due_date) FROM schedule
+    WHERE event_uuid = '00000000-0000-0000-0000-000000000102'),
+  ARRAY[50000, 50000]::bigint[],
+  '50/50 of $1,000 is $500 each'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public."PaymentInstallments" (event_uuid, due_date, percentage_bps, currency)
+    VALUES ('00000000-0000-0000-0000-000000000102', '2099-01-03', -1, 'USD')$$,
+  '23514',
+  NULL,
+  'a negative percentage is refused'
+);
+
+CREATE TEMP TABLE hash_before AS
+SELECT contract_hash FROM public."Events" WHERE id = '00000000-0000-0000-0000-000000000102';
+
+UPDATE public."Events" SET contract_revenue_cents = 200000
+ WHERE id = '00000000-0000-0000-0000-000000000102';
+
+SELECT is(
+  (SELECT array_agg(amount_cents ORDER BY due_date) FROM schedule
+    WHERE event_uuid = '00000000-0000-0000-0000-000000000102'),
+  ARRAY[100000, 100000]::bigint[],
+  'the schedule follows a price change: 50/50 of $2,000 is $1,000 each'
+);
+
+SELECT isnt(
+  (SELECT contract_hash FROM public."Events" WHERE id = '00000000-0000-0000-0000-000000000102'),
+  (SELECT contract_hash FROM hash_before),
+  'a price change changes the contract hash, so a signed contract shows as out of date'
+);
+
+SELECT is(
+  (SELECT array_agg(amount_cents ORDER BY due_date) FROM schedule
+    WHERE event_uuid = '00000000-0000-0000-0000-000000000103'),
+  ARRAY[50000, 50000]::bigint[],
+  'a schedule that does not add up to 100% is not stretched to fit the total'
+);
+
+SELECT is(
+  public.payment_schedule_total_cents('00000000-0000-0000-0000-000000000104'),
+  2260::bigint,
+  'with line items, the total is the line items plus tax, not contract_revenue_cents'
+);
+
+SELECT * FROM finish();
 ROLLBACK;
