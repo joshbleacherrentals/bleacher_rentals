@@ -2,14 +2,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCheck, UserPlus, X } from "lucide-react";
+import Link from "next/link";
+import { Check, CheckCheck, UserPlus, X, ExternalLink } from "lucide-react";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import {
-  displayName,
-  initials,
-  useRoadmapUsers,
-} from "@/app/roadmap/_lib/hooks/useRoadmapUsers";
+import { displayName, initials, useRoadmapUsers } from "@/app/roadmap/_lib/hooks/useRoadmapUsers";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { sendEventMessage, updateEventMessage } from "../db/messages";
 import { markEventMessagesRead } from "../db/readReceipts";
@@ -22,10 +19,7 @@ import { useEventChatMemberAccess } from "../hooks/useEventChatMemberAccess";
 import { useMentionableChatMembers } from "../hooks/useMentionableChatMembers";
 import { useEventMessageMentions } from "../hooks/useEventMessageMentions";
 import { parseMentionedUserIds } from "../utils/mentions";
-import {
-  truncateReplyPreview,
-  type EventChatReplyTarget,
-} from "../utils/replyPreview";
+import { truncateReplyPreview, type EventChatReplyTarget } from "../utils/replyPreview";
 import {
   countUnreadMessages,
   findFirstUnreadMessageId,
@@ -61,8 +55,11 @@ export function EventInternalChat({
 }: Props) {
   const router = useRouter();
   const { messages, isLoading: messagesLoading } = useEventMessages(eventUuid);
-  const { receiptsByMessage, receiptDetailsByMessage, isLoading: receiptsLoading } =
-    useEventReadReceipts(eventUuid);
+  const {
+    receiptsByMessage,
+    receiptDetailsByMessage,
+    isLoading: receiptsLoading,
+  } = useEventReadReceipts(eventUuid);
   const { userMap } = useRoadmapUsers();
   const userUuid = usePermissionsStore((s) => s.userId);
   const { canManageMembers, canWrite, isSubscribed } = useEventChatMemberAccess(eventUuid);
@@ -266,9 +263,7 @@ export function EventInternalChat({
     prevCountRef.current = messages.length;
   }, [eventUuid, isNearBottom, messages.length, userUuid]);
 
-  const typingNames = typingUserUuids
-    .map((uuid) => displayName(userMap.get(uuid)))
-    .filter(Boolean);
+  const typingNames = typingUserUuids.map((uuid) => displayName(userMap.get(uuid))).filter(Boolean);
 
   const handleSend = useCallback(async () => {
     if (!body.trim() || !userUuid || !canWrite || sending) return;
@@ -311,7 +306,17 @@ export function EventInternalChat({
     } finally {
       setSending(false);
     }
-  }, [body, canWrite, eventUuid, mentionableMembers, replyTarget, sending, stopTyping, userMap, userUuid]);
+  }, [
+    body,
+    canWrite,
+    eventUuid,
+    mentionableMembers,
+    replyTarget,
+    sending,
+    stopTyping,
+    userMap,
+    userUuid,
+  ]);
 
   const jumpToMessage = useCallback((messageId: string) => {
     const container = scrollContainerRef.current;
@@ -348,8 +353,7 @@ export function EventInternalChat({
       cancelEdit();
       setReplyTarget({
         messageId,
-        authorName:
-          authorUuid === userUuid ? "You" : displayName(userMap.get(authorUuid)),
+        authorName: authorUuid === userUuid ? "You" : displayName(userMap.get(authorUuid)),
         bodyPreview: truncateReplyPreview(messageBody),
       });
     },
@@ -463,15 +467,7 @@ export function EventInternalChat({
     } finally {
       setLeaving(false);
     }
-  }, [
-    eventUuid,
-    isSubscribed,
-    leaving,
-    router,
-    showConversationActions,
-    userMap,
-    userUuid,
-  ]);
+  }, [eventUuid, isSubscribed, leaving, router, showConversationActions, userMap, userUuid]);
 
   return (
     <div
@@ -488,6 +484,16 @@ export function EventInternalChat({
           </p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {showConversationActions && (
+            <Link
+              href={`/quotes-bookings/${eventUuid}`}
+              className="p-2 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition cursor-pointer"
+              title="Open quote"
+              aria-label="Open quote"
+            >
+              <ExternalLink className="size-4" />
+            </Link>
+          )}
           {isSubscribed ? (
             <EventChatMenuDropdown
               canManageMembers={canManageMembers}
@@ -524,162 +530,164 @@ export function EventInternalChat({
 
       <div className="relative flex-1 min-h-0">
         <div ref={scrollContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-3">
-        {messages.length === 0 ? (
-          <p className="text-sm text-gray-400 italic text-center py-8">
-            No messages yet. Start the conversation.
-          </p>
-        ) : (
-          messages.map((msg) => {
-            const isUnreadAnchor = msg.id === unreadAnchorId;
-            const showDivider = isUnreadAnchor && showDividerBefore;
+          {messages.length === 0 ? (
+            <p className="text-sm text-gray-400 italic text-center py-8">
+              No messages yet. Start the conversation.
+            </p>
+          ) : (
+            messages.map((msg) => {
+              const isUnreadAnchor = msg.id === unreadAnchorId;
+              const showDivider = isUnreadAnchor && showDividerBefore;
 
-            if (msg.is_system) {
+              if (msg.is_system) {
+                return (
+                  <div key={msg.id}>
+                    {showDivider && <NewMessagesDivider />}
+                    <div className="flex justify-center py-0.5">
+                      <span className="text-[11px] text-gray-400 italic">{msg.body}</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              const isMe = msg.user_uuid === userUuid;
+              const user = userMap.get(msg.user_uuid);
+              const readers = receiptsByMessage.get(msg.id) ?? [];
+              const readByOthers = readers.filter((uuid) => uuid !== msg.user_uuid);
+              const readReceipts = (receiptDetailsByMessage.get(msg.id) ?? []).filter(
+                (r) => r.userUuid !== msg.user_uuid,
+              );
+              const mentionsMe =
+                Boolean(userUuid) && (mentionsByMessage.get(msg.id)?.includes(userUuid!) ?? false);
+              const iHaveRead = Boolean(userUuid && readers.includes(userUuid));
+              const showMentionHighlight = mentionsMe && !isMe && !iHaveRead;
+              const isHighlighted = highlightedMessageId === msg.id;
+              const parentMessage = msg.reply_to_message_id
+                ? messagesById.get(msg.reply_to_message_id)
+                : undefined;
+
               return (
-                <div key={msg.id}>
+                <div key={msg.id} id={`event-msg-${msg.id}`}>
                   {showDivider && <NewMessagesDivider />}
-                  <div className="flex justify-center py-0.5">
-                    <span className="text-[11px] text-gray-400 italic">{msg.body}</span>
+                  <div className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+                    <div
+                      className="size-7 rounded-full flex items-center justify-center text-xs font-medium text-white flex-shrink-0"
+                      style={{ backgroundColor: isMe ? "#4a90d9" : "#6b7280" }}
+                    >
+                      {initials(user)}
+                    </div>
+
+                    <div className={`max-w-[80%] ${isMe ? "items-end" : "items-start"}`}>
+                      <div
+                        className={`flex items-baseline gap-2 mb-0.5 ${isMe ? "flex-row-reverse" : ""}`}
+                      >
+                        <span className="text-xs font-medium text-gray-700">
+                          {isMe ? "You" : displayName(user)}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(msg.created_at).toLocaleTimeString(undefined, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {msg.edited_at && (
+                          <span className="text-[10px] text-gray-400 italic">edited</span>
+                        )}
+                      </div>
+                      <EventMessageContextMenu
+                        isOwnMessage={isMe}
+                        messageBody={msg.body}
+                        onReply={() => startReply(msg.id, msg.user_uuid, msg.body)}
+                        onEdit={isMe ? () => startEdit(msg.id, msg.body) : undefined}
+                        onViewReadReceipts={
+                          isMe ? () => setReadReceiptsDialog(readReceipts) : undefined
+                        }
+                      >
+                        <div
+                          className={`px-3 py-2 rounded-lg text-sm whitespace-pre-wrap cursor-default ${
+                            editingMessageId === msg.id ? "ring-2 ring-blue-400" : ""
+                          } ${
+                            isHighlighted
+                              ? "ring-2 ring-amber-400 transition-shadow duration-300"
+                              : ""
+                          } ${
+                            isMe
+                              ? "bg-blue-100 text-gray-900 rounded-tr-none"
+                              : showMentionHighlight
+                                ? "bg-amber-50 text-gray-900 rounded-tl-none ring-2 ring-amber-300"
+                                : "bg-gray-100 text-gray-900 rounded-tl-none"
+                          }`}
+                        >
+                          {msg.reply_to_message_id && (
+                            <EventMessageReplyQuote
+                              authorName={
+                                parentMessage
+                                  ? parentMessage.user_uuid === userUuid
+                                    ? "You"
+                                    : displayName(userMap.get(parentMessage.user_uuid))
+                                  : "Deleted message"
+                              }
+                              bodyPreview={
+                                parentMessage ? replyQuotePreview(parentMessage.body) : ""
+                              }
+                              isOwnBubble={isMe}
+                              onJump={() => {
+                                if (msg.reply_to_message_id) {
+                                  jumpToMessage(msg.reply_to_message_id);
+                                }
+                              }}
+                            />
+                          )}
+                          <EventMessageBody
+                            body={msg.body}
+                            members={mentionableMembers}
+                            currentUserUuid={userUuid}
+                          />
+                        </div>
+                      </EventMessageContextMenu>
+                      {isMe && (
+                        <div className="flex items-center gap-1 mt-0.5 justify-end">
+                          {readByOthers.length > 0 ? (
+                            <span className="text-[10px] text-blue-500 flex items-center gap-0.5">
+                              <CheckCheck className="size-3" />
+                              Read by {readByOthers.length}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                              <Check className="size-3" />
+                              Sent
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
-            }
+            })
+          )}
 
-            const isMe = msg.user_uuid === userUuid;
-            const user = userMap.get(msg.user_uuid);
-            const readers = receiptsByMessage.get(msg.id) ?? [];
-            const readByOthers = readers.filter((uuid) => uuid !== msg.user_uuid);
-            const readReceipts = (receiptDetailsByMessage.get(msg.id) ?? []).filter(
-              (r) => r.userUuid !== msg.user_uuid,
-            );
-            const mentionsMe =
-              Boolean(userUuid) && (mentionsByMessage.get(msg.id)?.includes(userUuid!) ?? false);
-            const iHaveRead = Boolean(userUuid && readers.includes(userUuid));
-            const showMentionHighlight = mentionsMe && !isMe && !iHaveRead;
-            const isHighlighted = highlightedMessageId === msg.id;
-            const parentMessage = msg.reply_to_message_id
-              ? messagesById.get(msg.reply_to_message_id)
-              : undefined;
-
-            return (
-              <div key={msg.id} id={`event-msg-${msg.id}`}>
-                {showDivider && <NewMessagesDivider />}
-                <div className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"}`}>
-                  <div
-                    className="size-7 rounded-full flex items-center justify-center text-xs font-medium text-white flex-shrink-0"
-                    style={{ backgroundColor: isMe ? "#4a90d9" : "#6b7280" }}
-                  >
-                    {initials(user)}
-                  </div>
-
-                  <div className={`max-w-[80%] ${isMe ? "items-end" : "items-start"}`}>
-                    <div
-                      className={`flex items-baseline gap-2 mb-0.5 ${isMe ? "flex-row-reverse" : ""}`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">
-                        {isMe ? "You" : displayName(user)}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        {new Date(msg.created_at).toLocaleTimeString(undefined, {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {msg.edited_at && (
-                        <span className="text-[10px] text-gray-400 italic">edited</span>
-                      )}
-                    </div>
-                    <EventMessageContextMenu
-                      isOwnMessage={isMe}
-                      messageBody={msg.body}
-                      onReply={() => startReply(msg.id, msg.user_uuid, msg.body)}
-                      onEdit={isMe ? () => startEdit(msg.id, msg.body) : undefined}
-                      onViewReadReceipts={
-                        isMe ? () => setReadReceiptsDialog(readReceipts) : undefined
-                      }
-                    >
-                      <div
-                        className={`px-3 py-2 rounded-lg text-sm whitespace-pre-wrap cursor-default ${
-                          editingMessageId === msg.id ? "ring-2 ring-blue-400" : ""
-                        } ${
-                          isHighlighted ? "ring-2 ring-amber-400 transition-shadow duration-300" : ""
-                        } ${
-                          isMe
-                            ? "bg-blue-100 text-gray-900 rounded-tr-none"
-                            : showMentionHighlight
-                              ? "bg-amber-50 text-gray-900 rounded-tl-none ring-2 ring-amber-300"
-                              : "bg-gray-100 text-gray-900 rounded-tl-none"
-                        }`}
-                      >
-                        {msg.reply_to_message_id && (
-                          <EventMessageReplyQuote
-                            authorName={
-                              parentMessage
-                                ? parentMessage.user_uuid === userUuid
-                                  ? "You"
-                                  : displayName(userMap.get(parentMessage.user_uuid))
-                                : "Deleted message"
-                            }
-                            bodyPreview={
-                              parentMessage ? replyQuotePreview(parentMessage.body) : ""
-                            }
-                            isOwnBubble={isMe}
-                            onJump={() => {
-                              if (msg.reply_to_message_id) {
-                                jumpToMessage(msg.reply_to_message_id);
-                              }
-                            }}
-                          />
-                        )}
-                        <EventMessageBody
-                          body={msg.body}
-                          members={mentionableMembers}
-                          currentUserUuid={userUuid}
-                        />
-                      </div>
-                    </EventMessageContextMenu>
-                    {isMe && (
-                      <div className="flex items-center gap-1 mt-0.5 justify-end">
-                        {readByOthers.length > 0 ? (
-                          <span className="text-[10px] text-blue-500 flex items-center gap-0.5">
-                            <CheckCheck className="size-3" />
-                            Read by {readByOthers.length}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                            <Check className="size-3" />
-                            Sent
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+          {typingNames.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-gray-500 italic">
+              <div className="flex gap-0.5">
+                <span
+                  className="animate-bounce size-1.5 rounded-full bg-gray-400"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <span
+                  className="animate-bounce size-1.5 rounded-full bg-gray-400"
+                  style={{ animationDelay: "150ms" }}
+                />
+                <span
+                  className="animate-bounce size-1.5 rounded-full bg-gray-400"
+                  style={{ animationDelay: "300ms" }}
+                />
               </div>
-            );
-          })
-        )}
-
-        {typingNames.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-gray-500 italic">
-            <div className="flex gap-0.5">
-              <span
-                className="animate-bounce size-1.5 rounded-full bg-gray-400"
-                style={{ animationDelay: "0ms" }}
-              />
-              <span
-                className="animate-bounce size-1.5 rounded-full bg-gray-400"
-                style={{ animationDelay: "150ms" }}
-              />
-              <span
-                className="animate-bounce size-1.5 rounded-full bg-gray-400"
-                style={{ animationDelay: "300ms" }}
-              />
+              {typingNames.join(", ")} {typingNames.length === 1 ? "is" : "are"} typing…
             </div>
-            {typingNames.join(", ")} {typingNames.length === 1 ? "is" : "are"} typing…
-          </div>
-        )}
+          )}
 
-        <div ref={bottomRef} />
+          <div ref={bottomRef} />
         </div>
 
         {showScrollToBottomButton && (
