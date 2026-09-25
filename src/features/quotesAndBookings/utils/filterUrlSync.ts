@@ -1,5 +1,6 @@
 import type { QuotesBookingsFilters } from "../types";
 import { DEFAULT_PAGE_SIZE, parsePage, parsePageSize, type PageSize } from "./pagination";
+import { parseSort, serializeSort, type EventSort } from "./sortEvents";
 
 /**
  * Query-param keys the /quotes-bookings list page owns for filter state.
@@ -23,6 +24,7 @@ const PARAM = {
   showDeleted: "showDeleted",
   page: "page",
   pageSize: "pageSize",
+  sort: "sort",
 } as const;
 
 export type UrlSyncedListState = {
@@ -32,6 +34,8 @@ export type UrlSyncedListState = {
   /** 1-based page number. Page 1 is the default and stays out of the URL. */
   page: number;
   pageSize: PageSize;
+  /** Newest-created-first is the default and stays out of the URL. */
+  sort: EventSort;
 };
 
 function boolToParam(value: boolean | null): string | null {
@@ -55,7 +59,7 @@ export function filtersToSearchParams(
   existingParams?: URLSearchParams,
 ): URLSearchParams {
   const params = new URLSearchParams(existingParams?.toString());
-  const { filters, searchQuery, showDeleted, page, pageSize } = state;
+  const { filters, searchQuery, showDeleted, page, pageSize, sort } = state;
 
   const setOrDelete = (key: string, value: string | null) => {
     if (value === null || value === "") {
@@ -80,6 +84,7 @@ export function filtersToSearchParams(
   setOrDelete(PARAM.showDeleted, showDeleted ? "1" : null);
   setOrDelete(PARAM.page, page > 1 ? String(page) : null);
   setOrDelete(PARAM.pageSize, pageSize !== DEFAULT_PAGE_SIZE ? String(pageSize) : null);
+  setOrDelete(PARAM.sort, serializeSort(sort));
 
   return params;
 }
@@ -110,6 +115,7 @@ export function searchParamsToFilters(searchParams: {
     showDeleted: paramToBool(searchParams.get(PARAM.showDeleted)) ?? false,
     page: parsePage(searchParams.get(PARAM.page)),
     pageSize: parsePageSize(searchParams.get(PARAM.pageSize)),
+    sort: parseSort(searchParams.get(PARAM.sort)),
   };
 }
 

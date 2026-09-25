@@ -17,6 +17,8 @@ function formatCurrency(cents: number | null): string {
 export function searchEvents(events: QuotesBookingsEvent[], query: string): QuotesBookingsEvent[] {
   if (!query.trim()) return events;
   const q = query.toLowerCase();
+  // Quotes print the number as "Invoice #: 242136735", so a pasted "#242136735" should match too.
+  const invoiceQuery = q.trim().replace(/^#\s*/, "");
 
   return events.filter((e) => {
     const fields = [
@@ -54,6 +56,13 @@ export function searchEvents(events: QuotesBookingsEvent[], query: string): Quot
       e.tax_amount_cents !== null ? formatCurrency(eventTaxCents(e)) : null,
     ];
 
+    if (
+      invoiceQuery &&
+      e.invoice_number !== null &&
+      String(e.invoice_number).includes(invoiceQuery)
+    ) {
+      return true;
+    }
     return fields.some((f) => f && String(f).toLowerCase().includes(q));
   });
 }

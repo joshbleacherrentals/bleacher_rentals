@@ -24,6 +24,7 @@ const emptyState: UrlSyncedListState = {
   showDeleted: false,
   page: 1,
   pageSize: 25,
+  sort: { key: "created_at", direction: "desc" },
 };
 
 describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
@@ -46,6 +47,7 @@ describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
       showDeleted: true,
       page: 3,
       pageSize: 50,
+      sort: { key: "subtotal", direction: "asc" },
     };
 
     const params = filtersToSearchParams(state);
@@ -127,5 +129,23 @@ describe("page / pageSize in the URL", () => {
     const existing = new URLSearchParams({ page: "8" });
     const params = filtersToSearchParams({ ...emptyState, page: 1 }, existing);
     expect(params.get("page")).toBeNull();
+  });
+});
+
+describe("sort in the URL", () => {
+  it("round-trips a column sort so the back button restores it", () => {
+    const params = filtersToSearchParams({
+      ...emptyState,
+      sort: { key: "event_name", direction: "desc" },
+    });
+    expect(params.get("sort")).toBe("event_name:desc");
+    expect(searchParamsToFilters(params).sort).toEqual({ key: "event_name", direction: "desc" });
+    expect(hasUrlSyncedFilterParams(params)).toBe(true);
+  });
+
+  it("keeps the default newest-created sort out of the URL", () => {
+    const existing = new URLSearchParams({ sort: "tax:asc" });
+    const params = filtersToSearchParams(emptyState, existing);
+    expect(params.get("sort")).toBeNull();
   });
 });

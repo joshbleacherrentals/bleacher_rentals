@@ -12,6 +12,12 @@ import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/use
 
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
 import { searchEvents } from "@/features/quotesAndBookings/utils/searchEvents";
+import {
+  sortEvents,
+  nextSort,
+  type EventSort,
+  type SortKey,
+} from "@/features/quotesAndBookings/utils/sortEvents";
 import { eventSubtotalCents, eventTaxCents } from "@/features/quotesAndBookings/utils/eventAmounts";
 import {
   pickEventCurrency,
@@ -122,11 +128,13 @@ export default function QuotesBookingsPage() {
   const [searchQuery, setSearchQuery] = useState(urlState.searchQuery);
   const [page, setPage] = useState(urlState.page);
   const [pageSize, setPageSize] = useState<PageSize>(urlState.pageSize);
+  const [sort, setSort] = useState<EventSort>(urlState.sort);
 
   // A new filter/search is a new question: answer it from page 1, the way a
   // search engine does. Without this, narrowing a 9-page list while sitting on
   // page 8 would land on an empty table.
-  const narrowingKey = JSON.stringify([filters, searchQuery, showDeleted]);
+  // A new sort order starts from the top as well.
+  const narrowingKey = JSON.stringify([filters, searchQuery, showDeleted, sort]);
   const lastNarrowingKeyRef = useRef(narrowingKey);
   useEffect(() => {
     if (lastNarrowingKeyRef.current === narrowingKey) return;
@@ -143,7 +151,7 @@ export default function QuotesBookingsPage() {
     isFirstSyncRef.current = false;
     const timeout = setTimeout(() => {
       const nextParams = filtersToSearchParams(
-        { filters, searchQuery, showDeleted, page, pageSize },
+        { filters, searchQuery, showDeleted, page, pageSize, sort },
         new URLSearchParams(searchParams.toString()),
       );
       const nextQs = nextParams.toString();
@@ -153,12 +161,12 @@ export default function QuotesBookingsPage() {
     }, delay);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, searchQuery, showDeleted, page, pageSize]);
+  }, [filters, searchQuery, showDeleted, page, pageSize, sort]);
 
   const searchedData = useMemo(() => {
     if (!data) return data;
-    return searchEvents(data, searchQuery);
-  }, [data, searchQuery]);
+    return sortEvents(searchEvents(data, searchQuery), sort);
+  }, [data, searchQuery, sort]);
 
   // The whole filtered list is already in memory (PowerSync), so a page is a
   // slice of it. The totals in the column headers stay whole-list on purpose.
@@ -196,6 +204,7 @@ export default function QuotesBookingsPage() {
     {
       key: "event_name",
       header: `Event Name (${searchedData?.length ?? 0})`,
+      sortKey: "event_name",
       render: (event) => (
         <div className="max-w-[240px] 2xl:max-w-[320px]">
           <CellText bold>
@@ -206,13 +215,13 @@ export default function QuotesBookingsPage() {
               </span>
             </span>
           </CellText>
-          <CellSecondary>Created: {formatDate(event.created_at)}</CellSecondary>
         </div>
       ),
     },
     {
       key: "status",
       header: "Status",
+      sortKey: "status",
       render: (event) =>
         event.deleted === 1 ? (
           <CellBadge variant="error">Deleted</CellBadge>
@@ -225,6 +234,7 @@ export default function QuotesBookingsPage() {
     {
       key: "account_manager",
       header: "Account Manager",
+      sortKey: "account_manager",
       render: (event) => (
         <CellText>
           {event.account_manager_first_name || event.account_manager_last_name
@@ -236,14 +246,22 @@ export default function QuotesBookingsPage() {
     {
       key: "start_date",
       header: "Start Date",
+      sortKey: "start_date",
       render: (event) => <CellSecondary>{formatDate(event.event_start)}</CellSecondary>,
     },
     {
       key: "end_date",
       header: "Booked",
+      sortKey: "booked_at",
       render: (event) => (
         <CellSecondary>{event.booked_at ? formatDate(event.booked_at) : "—"}</CellSecondary>
       ),
+    },
+    {
+      key: "created_at",
+      header: "Created At",
+      sortKey: "created_at",
+      render: (event) => <CellSecondary>{formatDate(event.created_at)}</CellSecondary>,
     },
     {
       key: "subtotal",
@@ -252,6 +270,7 @@ export default function QuotesBookingsPage() {
         sumByCurrency(searchedData, eventSubtotalCents, currencyOf),
       ),
       align: "right",
+      sortKey: "subtotal",
       render: (event) => (
         <CellText bold>{formatMoney(eventSubtotalCents(event), currencyOf(event))}</CellText>
       ),
@@ -260,6 +279,7 @@ export default function QuotesBookingsPage() {
       key: "tax",
       header: formatTotalsLabel("Tax", sumByCurrency(searchedData, eventTaxCents, currencyOf)),
       align: "right",
+      sortKey: "tax",
       render: (event) => (
         <CellText bold>{formatMoney(eventTaxCents(event), currencyOf(event))}</CellText>
       ),
@@ -278,7 +298,7 @@ export default function QuotesBookingsPage() {
     <main>
       <PageHeader
         title="Quotes & Bookings"
-        subtitle="View all events ordered by most recent creation date"
+        subtitle="View all events — click a column header to sort"
         action={
           <div className="flex items-center gap-2">
             <button
@@ -361,7 +381,7 @@ export default function QuotesBookingsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by name, manager, date, amount, address, contact, company..."
+          placeholder="Search by name, invoice #, manager, date, amount, address, contact, company..."
           className="w-full h-[40px] pl-10 pr-4 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-darkBlue"
         />
       </div>
@@ -374,6 +394,8 @@ export default function QuotesBookingsPage() {
         isLoading={isLoading}
         loadingMessage="Loading events..."
         onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
+        sort={sort}
+        onSort={(key) => setSort((current) => nextSort(current, key as SortKey))}
       />
 
       {!isLoading && totalItems > 0 && (

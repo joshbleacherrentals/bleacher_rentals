@@ -14,6 +14,7 @@ export type QuotesBookingsEvent = {
   is_qbo: number | null;
   sales_office_uuid: string | null;
   deleted: number | null;
+  invoice_number: number | null;
   account_manager_first_name: string | null;
   account_manager_last_name: string | null;
   account_manager_email: string | null;

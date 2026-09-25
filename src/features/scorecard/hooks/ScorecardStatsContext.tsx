@@ -101,6 +101,7 @@ export function ScorecardStatsProvider({ children }: { children: ReactNode }) {
           "ct.email as contact_email",
           "co.company_name as company_name",
           "e.deleted as deleted",
+          "e.invoice_number as invoice_number",
         ])
         .where("e.deleted", "=", 0)
         .where((eb) =>
