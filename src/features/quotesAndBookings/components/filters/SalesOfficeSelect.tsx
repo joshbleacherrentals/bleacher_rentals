@@ -30,6 +30,7 @@ export function SalesOfficeSelect({
 
   return (
     <Dropdown
+      compact
       options={options}
       selected={value ?? ALL}
       onSelect={(next) => onChange(next === ALL ? null : next)}

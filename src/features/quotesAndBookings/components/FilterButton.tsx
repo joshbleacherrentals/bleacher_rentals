@@ -5,9 +5,11 @@ import { SlidersHorizontal } from "lucide-react";
 type FilterButtonProps = {
   isOpen: boolean;
   onClick: () => void;
+  /** Number of active filters, shown as a badge. */
+  activeCount?: number;
 };
 
-export function FilterButton({ isOpen, onClick }: FilterButtonProps) {
+export function FilterButton({ isOpen, onClick, activeCount = 0 }: FilterButtonProps) {
   return (
     <button
       type="button"
@@ -20,6 +22,11 @@ export function FilterButton({ isOpen, onClick }: FilterButtonProps) {
     >
       <SlidersHorizontal className="h-4 w-4" />
       Filters
+      {activeCount > 0 && (
+        <span className="min-w-4 h-4 px-1 rounded-full bg-darkBlue text-white text-[10px] leading-4 text-center">
+          {activeCount}
+        </span>
+      )}
     </button>
   );
 }
