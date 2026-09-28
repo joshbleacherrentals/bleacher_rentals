@@ -126,13 +126,13 @@ export default function QuotesBookingsPage() {
     clearFilters,
   } = useQuotesAndBookingsFilters(initialOverrides, hasUrlFilters ? urlState.filters : undefined);
 
-  // The sidebar is pinned inside the scrolling layout, so cap it at the visible height (minus the
-  // layout's p-4 top and bottom) and let its contents scroll.
-  const [sidebarMaxHeight, setSidebarMaxHeight] = useState<number | undefined>(undefined);
+  // The sidebar is pinned inside the scrolling layout and fills the visible height, so its
+  // contents scroll rather than the whole page.
+  const [sidebarHeight, setSidebarHeight] = useState<number | undefined>(undefined);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const measure = () => setSidebarMaxHeight(Math.max(240, el.clientHeight - 32));
+    const measure = () => setSidebarHeight(Math.max(240, el.clientHeight));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
@@ -310,13 +310,15 @@ export default function QuotesBookingsPage() {
     );
   }
 
+  // -m-4 cancels the quotes-bookings layout's p-4 so the filter sidebar sits flush against the app
+  // sidebar, header and window edge; the content column puts its own padding back.
   return (
-    <div className="flex items-start gap-4">
+    <div className="-m-4 flex items-start">
       <FilterSidebar
         filters={filters}
         isOpen={filters.isOpen}
         onToggle={toggleOpen}
-        maxHeight={sidebarMaxHeight}
+        height={sidebarHeight}
         onStatusesChange={setStatuses}
         onCreatedRangeChange={setCreatedRange}
         onEventRangeChange={setEventRange}
@@ -329,7 +331,7 @@ export default function QuotesBookingsPage() {
       />
       {/* min-w-0 lets this column shrink below the table's width, so the table scrolls sideways
           instead of pushing the page (and the sidebar) wider. */}
-      <main className="min-w-0 flex-1">
+      <main className="min-w-0 flex-1 p-4">
         <PageHeader
           title="Quotes & Bookings"
           subtitle="View all events — click a column header to sort"
