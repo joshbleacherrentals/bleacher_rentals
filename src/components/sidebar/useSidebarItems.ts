@@ -24,6 +24,8 @@ import {
   Sparkles,
   Layers,
   Activity,
+  Wrench,
+  ImageIcon,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -241,13 +243,41 @@ const ALL_ITEMS: SidebarItemConfig[] = [
       },
     ],
   },
-
   {
-    type: "button",
-    key: "sync-health",
-    label: "Sync Health",
-    href: "/dev-tools/sync-health",
-    icon: Activity,
+    type: "section",
+    key: "dev-tools",
+    label: "Dev Tools",
+    icon: Wrench,
+    children: [
+      {
+        type: "button",
+        key: "sync-health",
+        label: "Sync Health",
+        href: "/dev-tools/sync-health",
+        icon: Activity,
+      },
+      {
+        type: "button",
+        key: "stripe-checkout",
+        label: "Stripe Checkout",
+        href: "/dev-tools/stripe-checkout",
+        icon: CreditCard,
+      },
+      {
+        type: "button",
+        key: "damage-photos",
+        label: "Damage Photos",
+        href: "/dev-tools/damage-photos",
+        icon: ImageIcon,
+      },
+      {
+        type: "button",
+        key: "qbo-get-sales-tax",
+        label: "QBO Sales Tax",
+        href: "/dev-tools/qbo-get-sales-tax",
+        icon: QuickBooksIcon,
+      },
+    ],
   },
   {
     type: "section",
@@ -305,7 +335,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "driver-calendar",
     "documentation",
   ],
-  developer: ["roadmap", "sync-health"],
+  developer: ["roadmap", "dev-tools"],
   viewer: [
     "dashboard",
     "quotes-bookings",

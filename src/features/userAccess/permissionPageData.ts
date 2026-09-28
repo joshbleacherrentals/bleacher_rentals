@@ -27,7 +27,8 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   admin: "Full access to all features, settings, and team management.",
   account_manager:
     "Manages their own assigned bleachers, drivers, and events. Cannot delete or modify company-wide data, other managers' records, or anything outside their own scope. A low-risk role to add without worrying about unintended changes to shared data.",
-  developer: "Access to the product roadmap only.",
+  developer:
+    "Access to the product roadmap and the internal Dev Tools pages (Sync Health, Stripe Checkout, Damage Photos, QBO Sales Tax).",
   viewer: "Read-only access to operational data. Cannot create, edit, or delete anything.",
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
@@ -732,6 +733,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read(
         "Can view all tickets in the backlog and sprints but cannot create, edit, or move them.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(
+        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      ),
+    },
+  },
+  {
+    label: "Dev Tools",
+    description:
+      "Internal pages under /dev-tools: Sync Health, Stripe Checkout, Damage Photos and QBO Sales Tax. They sit in the Dev Tools section of the sidebar.",
+    category: "Dev Tools",
+    roles: {
+      admin: custom(
+        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health is for developers only.",
+      ),
+      account_manager: none("Dev Tools are internal pages for developers."),
+      developer: full(
+        "Sees the Dev Tools section in the sidebar and can use every page in it, including Sync Health. Stripe Checkout creates real checkout sessions and Damage Photos can delete stored photos.",
+      ),
+      viewer: custom(
+        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health is for developers only.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(

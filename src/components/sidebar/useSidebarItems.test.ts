@@ -138,4 +138,33 @@ describe("useSidebarItems", () => {
       "/repairs",
     ]);
   });
+
+  // ═══ Dev Tools ═══
+
+  const devToolsHrefs = (roles: Parameters<typeof useSidebarItems>[0]) => {
+    const section = useSidebarItems(roles).find((i) => i.key === "dev-tools");
+    if (!section || section.type !== "section") return undefined;
+    return section.children.map((c) => ("href" in c ? c.href : ""));
+  };
+
+  it("developer sees a Dev Tools section with every /dev-tools page", () => {
+    expect(devToolsHrefs(["developer"])).toEqual([
+      "/dev-tools/sync-health",
+      "/dev-tools/stripe-checkout",
+      "/dev-tools/damage-photos",
+      "/dev-tools/qbo-get-sales-tax",
+    ]);
+  });
+
+  it("Sync Health is no longer a standalone sidebar item", () => {
+    const keys = useSidebarItems(["developer"]).map((i) => i.key);
+    expect(keys).not.toContain("sync-health");
+  });
+
+  it.each(["admin", "account_manager", "viewer", "maintainer", "driver"] as const)(
+    "%s without the developer role does not see Dev Tools",
+    (role) => {
+      expect(devToolsHrefs([role])).toBeUndefined();
+    },
+  );
 });

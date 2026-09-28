@@ -78,10 +78,9 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     showSidebar: true,
   },
   developer: {
-    // The Sync Health page is listed on its own, not as "/dev-tools": the rest
-    // of /dev-tools (Stripe checkout, damage photos, QBO tax) stays admin and
-    // viewer only, and allowedPaths is matched by prefix.
-    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction", "/dev-tools/sync-health"],
+    // All of /dev-tools: the developer's Dev Tools sidebar section lists every
+    // page under it. Sync Health keeps its own page gate on top of this.
+    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction", "/dev-tools"],
     showSidebar: true,
   },
   viewer: {
