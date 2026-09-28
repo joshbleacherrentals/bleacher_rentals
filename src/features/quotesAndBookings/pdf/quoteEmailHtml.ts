@@ -53,7 +53,7 @@ export function buildQuoteEmailHtml(data: QuoteDocumentData): string {
               You've received a quote from <strong>${data.company.name}</strong>
             </p>
             <p style="font-size:14px;color:#6b7280;margin:0 0 24px;">
-              Invoice <strong>${data.quoteNumber}</strong> &middot; ${formatDate(data.quoteDate)}
+              ${data.contractSignature ? "Invoice" : "Quote"} <strong>${data.quoteNumber}</strong> &middot; ${formatDate(data.quoteDate)}
             </p>
 
             <!-- Summary -->

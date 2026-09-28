@@ -258,7 +258,7 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
           <div className="space-y-2 text-sm">
             {quote.invoiceNumber && (
               <div>
-                <span className="text-gray-500">Invoice #:</span>{" "}
+                <span className="text-gray-500">{signature ? "Invoice #:" : "Quote #:"}</span>{" "}
                 <span className="font-medium">{quote.invoiceNumber}</span>
               </div>
             )}
