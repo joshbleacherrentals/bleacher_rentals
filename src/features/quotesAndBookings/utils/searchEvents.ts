@@ -14,11 +14,28 @@ function formatCurrency(cents: number | null): string {
   return `$${(cents / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }
 
+/**
+ * A query that reads as an amount, reduced to bare digits: "24600", "24,600",
+ * "$24,600.00" and "C$24 600" all become "24600…". The table prints amounts
+ * with separators, but people type them without, so amounts are matched on
+ * this form. `null` when the query is not a number at all.
+ */
+function amountQuery(query: string): string | null {
+  const bare = query.toLowerCase().replace(/c?\$|,|\s/g, "");
+  return /^\d[\d.]*$|^\.\d+$/.test(bare) ? bare : null;
+}
+
+/** Whether an amount, as plain dollars ("24600.00"), contains the digits of `amountQuery`. */
+function amountMatches(cents: number, bare: string): boolean {
+  return (cents / 100).toFixed(2).includes(bare);
+}
+
 export function searchEvents(events: QuotesBookingsEvent[], query: string): QuotesBookingsEvent[] {
   if (!query.trim()) return events;
   const q = query.toLowerCase();
   // Quotes print the number as "Invoice #: 242136735", so a pasted "#242136735" should match too.
   const invoiceQuery = q.trim().replace(/^#\s*/, "");
+  const bareAmount = amountQuery(query);
 
   return events.filter((e) => {
     const fields = [
@@ -62,6 +79,16 @@ export function searchEvents(events: QuotesBookingsEvent[], query: string): Quot
       String(e.invoice_number).includes(invoiceQuery)
     ) {
       return true;
+    }
+    // The same amounts as above, however the number was typed.
+    if (bareAmount) {
+      const amounts = [
+        ...(e.contract_revenue_cents !== null
+          ? [e.contract_revenue_cents, eventSubtotalCents(e)]
+          : []),
+        ...(e.tax_amount_cents !== null ? [eventTaxCents(e)] : []),
+      ];
+      if (amounts.some((cents) => amountMatches(cents, bareAmount))) return true;
     }
     return fields.some((f) => f && String(f).toLowerCase().includes(q));
   });

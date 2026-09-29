@@ -59,3 +59,32 @@ describe("searchEvents — invoice number", () => {
     expect(ids(searchEvents(events, "summer"))).toEqual(["b"]);
   });
 });
+
+describe("searchEvents — amounts", () => {
+  // $24,600.00 total with $1,600.00 tax, so the Subtotal column shows $23,000.00.
+  const priced = [
+    makeEvent({ id: "big", contract_revenue_cents: 2460000, tax_amount_cents: 160000 }),
+    makeEvent({ id: "small", contract_revenue_cents: 95000, tax_amount_cents: 0 }),
+  ];
+  const find = (query: string) => ids(searchEvents(priced, query));
+
+  it("finds an amount typed without the thousands separator", () => {
+    expect(find("24600")).toEqual(["big"]);
+    expect(find("23000")).toEqual(["big"]);
+    expect(find("1600")).toEqual(["big"]);
+  });
+
+  it("finds it however the number is written", () => {
+    for (const query of ["24,600", "$24,600.00", "$24600", "24600.00", " 24 600 "]) {
+      expect(find(query)).toEqual(["big"]);
+    }
+  });
+
+  it("does not match a different amount", () => {
+    expect(find("24601")).toEqual([]);
+  });
+
+  it("leaves text searches alone", () => {
+    expect(ids(searchEvents(events, "summer"))).toEqual(["b"]);
+  });
+});
