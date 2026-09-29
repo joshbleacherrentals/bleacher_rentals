@@ -10,6 +10,7 @@ import {
   type ActiveFilterKey,
   type ActiveFilterState,
 } from "../utils/activeFilters";
+import { sidewaysWheelScrollLeft } from "../utils/sidewaysWheel";
 
 type ChipActions = {
   onRemove: (key: ActiveFilterKey) => void;
@@ -95,10 +96,8 @@ function SidewaysScroller({ children }: { children: ReactNode }) {
     const el = ref.current;
     if (!el) return;
     const onWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-      const max = el.scrollWidth - el.clientWidth;
-      const next = Math.min(max, Math.max(0, el.scrollLeft + event.deltaY));
-      if (next === el.scrollLeft) return;
+      const next = sidewaysWheelScrollLeft(event, el);
+      if (next === null) return;
       event.preventDefault();
       el.scrollLeft = next;
     };

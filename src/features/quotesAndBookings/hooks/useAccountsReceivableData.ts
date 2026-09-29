@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { sql } from "kysely";
-import { DateTime } from "luxon";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
@@ -14,8 +13,8 @@ import {
   type ReceivableInstallmentRow,
   type ReceivablePaymentRow,
 } from "../utils/accountsReceivable";
-import { todayISO } from "../utils/buildDefaultPaymentSchedule";
 import type { ReceivablesTab } from "../utils/listTabs";
+import { useToday } from "./useToday";
 
 /**
  * The rows of both AR tabs, built from the list the page has already loaded and
@@ -36,11 +35,9 @@ export function useAccountsReceivableData(
   error: Error | undefined;
 } {
   const timezone = useTimezoneStore((s) => s.timezone);
-  // "Today" in the timezone the rest of the page's date filters use.
-  const today = useMemo(
-    () => DateTime.now().setZone(timezone).toISODate() ?? todayISO(),
-    [timezone],
-  );
+  // "Today" in the timezone the rest of the page's date filters use; it rolls
+  // over at midnight, so a tab left open moves events from AR Deposits to AR.
+  const today = useToday(timezone);
 
   // Summed in SQL: the list needs one number per event, not every line item.
   const lineTotalsCompiled = useMemo(
