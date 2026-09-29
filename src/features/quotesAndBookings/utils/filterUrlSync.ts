@@ -1,6 +1,7 @@
 import type { QuotesBookingsFilters } from "../types";
 import { DEFAULT_PAGE_SIZE, parsePage, parsePageSize, type PageSize } from "./pagination";
 import { parseSort, serializeSort, type EventSort } from "./sortEvents";
+import { defaultSortForTab, parseListTab, tabUsesStatusFilter, type ListTab } from "./listTabs";
 
 /**
  * Query-param keys the /quotes-bookings list page owns for filter state.
@@ -25,6 +26,7 @@ const PARAM = {
   page: "page",
   pageSize: "pageSize",
   sort: "sort",
+  tab: "tab",
 } as const;
 
 export type UrlSyncedListState = {
@@ -34,8 +36,10 @@ export type UrlSyncedListState = {
   /** 1-based page number. Page 1 is the default and stays out of the URL. */
   page: number;
   pageSize: PageSize;
-  /** Newest-created-first is the default and stays out of the URL. */
+  /** The tab's own default (`defaultSortForTab`) stays out of the URL. */
   sort: EventSort;
+  /** "all" is the default and stays out of the URL. */
+  tab: ListTab;
 };
 
 function boolToParam(value: boolean | null): string | null {
@@ -59,7 +63,7 @@ export function filtersToSearchParams(
   existingParams?: URLSearchParams,
 ): URLSearchParams {
   const params = new URLSearchParams(existingParams?.toString());
-  const { filters, searchQuery, showDeleted, page, pageSize, sort } = state;
+  const { filters, searchQuery, showDeleted, page, pageSize, sort, tab } = state;
 
   const setOrDelete = (key: string, value: string | null) => {
     if (value === null || value === "") {
@@ -69,7 +73,10 @@ export function filtersToSearchParams(
     }
   };
 
-  setOrDelete(PARAM.statuses, filters.statuses.length > 0 ? filters.statuses.join(",") : null);
+  setOrDelete(
+    PARAM.statuses,
+    filters.statuses.length > 0 && tabUsesStatusFilter(tab) ? filters.statuses.join(",") : null,
+  );
   setOrDelete(PARAM.createdFrom, filters.createdFrom);
   setOrDelete(PARAM.createdTo, filters.createdTo);
   setOrDelete(PARAM.eventFrom, filters.eventFrom);
@@ -84,7 +91,8 @@ export function filtersToSearchParams(
   setOrDelete(PARAM.showDeleted, showDeleted ? "1" : null);
   setOrDelete(PARAM.page, page > 1 ? String(page) : null);
   setOrDelete(PARAM.pageSize, pageSize !== DEFAULT_PAGE_SIZE ? String(pageSize) : null);
-  setOrDelete(PARAM.sort, serializeSort(sort));
+  setOrDelete(PARAM.sort, serializeSort(sort, defaultSortForTab(tab)));
+  setOrDelete(PARAM.tab, tab === "all" ? null : tab);
 
   return params;
 }
@@ -97,9 +105,11 @@ export function searchParamsToFilters(searchParams: {
   get(key: string): string | null;
 }): UrlSyncedListState {
   const statusesParam = searchParams.get(PARAM.statuses);
+  const tab = parseListTab(searchParams.get(PARAM.tab));
   return {
     filters: {
-      statuses: statusesParam ? statusesParam.split(",").filter(Boolean) : [],
+      statuses:
+        statusesParam && tabUsesStatusFilter(tab) ? statusesParam.split(",").filter(Boolean) : [],
       createdFrom: searchParams.get(PARAM.createdFrom),
       createdTo: searchParams.get(PARAM.createdTo),
       eventFrom: searchParams.get(PARAM.eventFrom),
@@ -115,7 +125,8 @@ export function searchParamsToFilters(searchParams: {
     showDeleted: paramToBool(searchParams.get(PARAM.showDeleted)) ?? false,
     page: parsePage(searchParams.get(PARAM.page)),
     pageSize: parsePageSize(searchParams.get(PARAM.pageSize)),
-    sort: parseSort(searchParams.get(PARAM.sort)),
+    sort: parseSort(searchParams.get(PARAM.sort), defaultSortForTab(tab)),
+    tab,
   };
 }
 

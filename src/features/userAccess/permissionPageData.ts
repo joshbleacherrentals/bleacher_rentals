@@ -107,7 +107,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Payment History",
     description:
-      "The payments and balances on the Billing tab of a quote or booking. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes.",
+      "The payments and balances on the Billing tab of a quote or booking, and the Amount Due and Remaining Balance of every booking on the AR and AR Deposits tabs of Quotes & Bookings. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes.",
     category: "Day to Day Operations",
     roles: {
       admin: read(

@@ -1,10 +1,10 @@
 "use client";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { DateTime } from "luxon";
 import { Search, ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
 import { FilterPanel } from "@/features/quotesAndBookings/components/FilterPanel";
 import { useQuotesAndBookingsFilters } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsFilters";
@@ -26,8 +26,20 @@ import {
 } from "@/features/quotesAndBookings/utils/eventCurrency";
 import { formatMoney } from "@/features/quotesAndBookings/utils/formatMoney";
 import { useOfficeCurrencies } from "@/features/quotesAndBookings/hooks/useOfficeCurrencies";
-import { isInGoodShuffle } from "@/features/quotesAndBookings/utils/filterEvents";
-import { GoodShuffleBadge } from "@/features/quotesAndBookings/components/GoodShuffleBadge";
+import {
+  EventNameCell,
+  accountManagerName,
+  formatListDate,
+} from "@/features/quotesAndBookings/components/eventListCells";
+import { AccountsReceivableTabs } from "@/features/quotesAndBookings/components/AccountsReceivableTabs";
+import { ActiveFilterChips } from "@/features/quotesAndBookings/components/ActiveFilterChips";
+import type { ActiveFilterKey } from "@/features/quotesAndBookings/utils/activeFilters";
+import {
+  defaultSortForTab,
+  parseListTab,
+  tabUsesStatusFilter,
+  type ListTab,
+} from "@/features/quotesAndBookings/utils/listTabs";
 import {
   isScorecardTemplate,
   filtersForTemplate,
@@ -47,13 +59,6 @@ import {
   searchParamsToFilters,
   hasUrlSyncedFilterParams,
 } from "@/features/quotesAndBookings/utils/filterUrlSync";
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "N/A";
-  const date = DateTime.fromISO(dateString);
-  if (!date.isValid) return "Invalid Date";
-  return date.toFormat("MMM d, yyyy");
-}
 
 function getStatusVariant(status: string | null): "success" | "warning" | "error" | "default" {
   switch (status?.toLowerCase()) {
@@ -120,6 +125,7 @@ export default function QuotesBookingsPage() {
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    clearFilter,
     clearFilters,
   } = useQuotesAndBookingsFilters(initialOverrides, hasUrlFilters ? urlState.filters : undefined);
 
@@ -129,12 +135,40 @@ export default function QuotesBookingsPage() {
   const [page, setPage] = useState(urlState.page);
   const [pageSize, setPageSize] = useState<PageSize>(urlState.pageSize);
   const [sort, setSort] = useState<EventSort>(urlState.sort);
+  const [activeTab, setActiveTab] = useState<ListTab>(urlState.tab);
+  // The AR balances are worked out the first time an AR tab is opened and kept
+  // from then on, so flipping between tabs never re-runs their queries.
+  const [receivablesOpened, setReceivablesOpened] = useState(urlState.tab !== "all");
+
+  // Each tab opens on its own default order (AR tabs: nearest event first).
+  // Filters, search and Show Deleted carry over — they narrow every tab alike —
+  // except Status, which the AR tabs do not offer: a status picked on All Events
+  // is dropped on the way in, so it cannot silently empty an AR table.
+  const switchTab = (next: ListTab) => {
+    setActiveTab(next);
+    setSort(defaultSortForTab(next));
+    if (next !== "all") setReceivablesOpened(true);
+    if (!tabUsesStatusFilter(next) && filters.statuses.length > 0) setStatuses([]);
+  };
+
+  // The applied-filter chips: one clears its own filter, "Clear all" clears
+  // every filter, the search box and Show Deleted.
+  const removeFilter = (key: ActiveFilterKey) => {
+    if (key === "search") setSearchQuery("");
+    else if (key === "showDeleted") setShowDeleted(false);
+    else clearFilter(key);
+  };
+  const clearAllFilters = () => {
+    clearFilters();
+    setSearchQuery("");
+    setShowDeleted(false);
+  };
 
   // A new filter/search is a new question: answer it from page 1, the way a
   // search engine does. Without this, narrowing a 9-page list while sitting on
   // page 8 would land on an empty table.
-  // A new sort order starts from the top as well.
-  const narrowingKey = JSON.stringify([filters, searchQuery, showDeleted, sort]);
+  // A new sort order or tab starts from the top as well.
+  const narrowingKey = JSON.stringify([filters, searchQuery, showDeleted, sort, activeTab]);
   const lastNarrowingKeyRef = useRef(narrowingKey);
   useEffect(() => {
     if (lastNarrowingKeyRef.current === narrowingKey) return;
@@ -151,7 +185,7 @@ export default function QuotesBookingsPage() {
     isFirstSyncRef.current = false;
     const timeout = setTimeout(() => {
       const nextParams = filtersToSearchParams(
-        { filters, searchQuery, showDeleted, page, pageSize, sort },
+        { filters, searchQuery, showDeleted, page, pageSize, sort, tab: activeTab },
         new URLSearchParams(searchParams.toString()),
       );
       const nextQs = nextParams.toString();
@@ -161,12 +195,14 @@ export default function QuotesBookingsPage() {
     }, delay);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, searchQuery, showDeleted, page, pageSize, sort]);
+  }, [filters, searchQuery, showDeleted, page, pageSize, sort, activeTab]);
 
+  // Only while All Events is open: on the AR tabs this sort over the whole list
+  // would be work nobody sees, redone on every tab switch.
   const searchedData = useMemo(() => {
-    if (!data) return data;
+    if (!data || activeTab !== "all") return undefined;
     return sortEvents(searchEvents(data, searchQuery), sort);
-  }, [data, searchQuery, sort]);
+  }, [data, searchQuery, sort, activeTab]);
 
   // The whole filtered list is already in memory (PowerSync), so a page is a
   // slice of it. The totals in the column headers stay whole-list on purpose.
@@ -205,18 +241,7 @@ export default function QuotesBookingsPage() {
       key: "event_name",
       header: `Event Name (${searchedData?.length ?? 0})`,
       sortKey: "event_name",
-      render: (event) => (
-        <div className="max-w-[240px] 2xl:max-w-[320px]">
-          <CellText bold>
-            <span className="flex items-center gap-1.5">
-              {isInGoodShuffle(event) && <GoodShuffleBadge />}
-              <span className="truncate" title={event.event_name ?? undefined}>
-                {event.event_name}
-              </span>
-            </span>
-          </CellText>
-        </div>
-      ),
+      render: (event) => <EventNameCell event={event} />,
     },
     {
       key: "status",
@@ -235,33 +260,27 @@ export default function QuotesBookingsPage() {
       key: "account_manager",
       header: "Account Manager",
       sortKey: "account_manager",
-      render: (event) => (
-        <CellText>
-          {event.account_manager_first_name || event.account_manager_last_name
-            ? `${event.account_manager_first_name || ""} ${event.account_manager_last_name || ""}`.trim()
-            : "Not Assigned"}
-        </CellText>
-      ),
+      render: (event) => <CellText>{accountManagerName(event)}</CellText>,
     },
     {
       key: "start_date",
       header: "Start Date",
       sortKey: "start_date",
-      render: (event) => <CellSecondary>{formatDate(event.event_start)}</CellSecondary>,
+      render: (event) => <CellSecondary>{formatListDate(event.event_start)}</CellSecondary>,
     },
     {
       key: "end_date",
       header: "Booked",
       sortKey: "booked_at",
       render: (event) => (
-        <CellSecondary>{event.booked_at ? formatDate(event.booked_at) : "—"}</CellSecondary>
+        <CellSecondary>{event.booked_at ? formatListDate(event.booked_at) : "—"}</CellSecondary>
       ),
     },
     {
       key: "created_at",
       header: "Created At",
       sortKey: "created_at",
-      render: (event) => <CellSecondary>{formatDate(event.created_at)}</CellSecondary>,
+      render: (event) => <CellSecondary>{formatListDate(event.created_at)}</CellSecondary>,
     },
     {
       key: "subtotal",
@@ -363,6 +382,7 @@ export default function QuotesBookingsPage() {
       >
         <FilterPanel
           filters={filters}
+          showStatus={tabUsesStatusFilter(activeTab)}
           onStatusesChange={setStatuses}
           onCreatedRangeChange={setCreatedRange}
           onEventRangeChange={setEventRange}
@@ -381,35 +401,82 @@ export default function QuotesBookingsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by name, invoice #, manager, date, amount, address, contact, company..."
+          placeholder={
+            activeTab === "all"
+              ? "Search by name, invoice #, manager, date, amount, address, contact, company..."
+              : "Search by name, invoice #, manager, date, amount due, remaining balance, contact, company..."
+          }
           className="w-full h-[40px] pl-10 pr-4 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-darkBlue"
         />
       </div>
 
-      <DataTable
-        columns={columns}
-        data={pageData}
-        keyExtractor={(event) => event.id}
-        emptyMessage="No events found"
-        isLoading={isLoading}
-        loadingMessage="Loading events..."
-        onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
-        sort={sort}
-        onSort={(key) => setSort((current) => nextSort(current, key as SortKey))}
-      />
+      <Tabs value={activeTab} onValueChange={(value) => switchTab(parseListTab(value))}>
+        {/* Tabs left, applied filters right. The chips scroll sideways rather
+            than wrap, and drop to their own line when the row gets narrow. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <TabsList className="shrink-0">
+            <TabsTrigger value="all">All Events</TabsTrigger>
+            <TabsTrigger value="ar">AR</TabsTrigger>
+            <TabsTrigger value="ar_deposits">AR Deposits</TabsTrigger>
+          </TabsList>
+          <ActiveFilterChips
+            filters={filters}
+            searchQuery={searchQuery}
+            showDeleted={showDeleted}
+            tab={activeTab}
+            onRemove={removeFilter}
+            onClearAll={clearAllFilters}
+          />
+        </div>
 
-      {!isLoading && totalItems > 0 && (
-        <Pagination
-          page={currentPage}
-          pageSize={pageSize}
-          totalItems={totalItems}
-          onPageChange={goToPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
-      )}
+        <TabsContent value="all">
+          <DataTable
+            columns={columns}
+            data={pageData ?? null}
+            keyExtractor={(event) => event.id}
+            emptyMessage="No events found"
+            isLoading={isLoading}
+            loadingMessage="Loading events..."
+            onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
+            sort={sort}
+            onSort={(key) => setSort((current) => nextSort(current, key as SortKey))}
+          />
+
+          {!isLoading && totalItems > 0 && (
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              onPageChange={goToPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          )}
+        </TabsContent>
+
+        {/* Not mounted until an AR tab is first opened, so All Events never
+            queries payments; kept after that, so tab switches reuse the result. */}
+        {receivablesOpened && (
+          <AccountsReceivableTabs
+            events={data}
+            eventsLoading={isLoading}
+            searchQuery={searchQuery}
+            sort={sort}
+            onSort={(key) => setSort((current) => nextSort(current, key))}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={goToPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            currencyOf={currencyOf}
+            onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
+          />
+        )}
+      </Tabs>
     </main>
   );
 }

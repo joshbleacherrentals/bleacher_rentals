@@ -11,6 +11,8 @@ import { SalesOfficeSelect } from "./filters/SalesOfficeSelect";
 
 type FilterPanelProps = {
   filters: QuotesBookingsFilters;
+  /** Off on the AR tabs, which only ever hold booked events (see `tabUsesStatusFilter`). */
+  showStatus?: boolean;
   onStatusesChange: (values: string[]) => void;
   onCreatedRangeChange: (from: string | null, to: string | null) => void;
   onEventRangeChange: (from: string | null, to: string | null) => void;
@@ -24,6 +26,7 @@ type FilterPanelProps = {
 
 export function FilterPanel({
   filters,
+  showStatus = true,
   onStatusesChange,
   onCreatedRangeChange,
   onEventRangeChange,
@@ -38,10 +41,12 @@ export function FilterPanel({
     <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
-          <div>
-            <div className="text-sm font-semibold text-gray-800 mb-2">Status</div>
-            <StatusMultiSelect values={filters.statuses} onChange={onStatusesChange} />
-          </div>
+          {showStatus && (
+            <div>
+              <div className="text-sm font-semibold text-gray-800 mb-2">Status</div>
+              <StatusMultiSelect values={filters.statuses} onChange={onStatusesChange} />
+            </div>
+          )}
 
           <div>
             <div className="text-sm font-semibold text-gray-800 mb-2">Created At</div>

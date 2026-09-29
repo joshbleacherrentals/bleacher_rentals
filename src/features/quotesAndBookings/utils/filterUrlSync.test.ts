@@ -25,6 +25,7 @@ const emptyState: UrlSyncedListState = {
   page: 1,
   pageSize: 25,
   sort: { key: "created_at", direction: "desc" },
+  tab: "all",
 };
 
 describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
@@ -48,6 +49,7 @@ describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
       page: 3,
       pageSize: 50,
       sort: { key: "subtotal", direction: "asc" },
+      tab: "all",
     };
 
     const params = filtersToSearchParams(state);
@@ -147,5 +149,66 @@ describe("sort in the URL", () => {
     const existing = new URLSearchParams({ sort: "tax:asc" });
     const params = filtersToSearchParams(emptyState, existing);
     expect(params.get("sort")).toBeNull();
+  });
+});
+
+describe("tab in the URL", () => {
+  it("round-trips the AR tab and keeps its default sort out of the URL", () => {
+    const params = filtersToSearchParams({
+      ...emptyState,
+      tab: "ar",
+      sort: { key: "start_date", direction: "desc" },
+    });
+    expect(params.get("tab")).toBe("ar");
+    expect(params.get("sort")).toBeNull();
+
+    const parsed = searchParamsToFilters(params);
+    expect(parsed.tab).toBe("ar");
+    expect(parsed.sort).toEqual({ key: "start_date", direction: "desc" });
+    expect(hasUrlSyncedFilterParams(params)).toBe(true);
+  });
+
+  it("restores AR Deposits with its nearest-first default sort", () => {
+    const parsed = searchParamsToFilters(new URLSearchParams({ tab: "ar_deposits" }));
+    expect(parsed.tab).toBe("ar_deposits");
+    expect(parsed.sort).toEqual({ key: "start_date", direction: "asc" });
+  });
+
+  it("writes a sort that differs from the tab's default", () => {
+    const params = filtersToSearchParams({
+      ...emptyState,
+      tab: "ar",
+      sort: { key: "amount_due", direction: "desc" },
+    });
+    expect(params.get("sort")).toBe("amount_due:desc");
+    expect(searchParamsToFilters(params).sort).toEqual({ key: "amount_due", direction: "desc" });
+  });
+
+  it("keeps All Events out of the URL and drops a stale tab param", () => {
+    const params = filtersToSearchParams(emptyState, new URLSearchParams({ tab: "ar" }));
+    expect(params.get("tab")).toBeNull();
+    expect(params.toString()).toBe("");
+  });
+
+  it("never writes a status filter for an AR tab", () => {
+    const params = filtersToSearchParams({
+      ...emptyState,
+      tab: "ar",
+      sort: { key: "start_date", direction: "desc" },
+      filters: { ...emptyState.filters, statuses: ["quoted"] },
+    });
+    expect(params.get("statuses")).toBeNull();
+  });
+
+  it("drops a status filter when the URL opens an AR tab", () => {
+    const parsed = searchParamsToFilters(
+      new URLSearchParams({ tab: "ar", statuses: "quoted,lost", am: "am-1" }),
+    );
+    expect(parsed.filters.statuses).toEqual([]);
+    expect(parsed.filters.accountManagerUserUuid).toBe("am-1");
+  });
+
+  it("falls back to All Events for an unknown tab", () => {
+    expect(searchParamsToFilters(new URLSearchParams({ tab: "bogus" })).tab).toBe("all");
   });
 });

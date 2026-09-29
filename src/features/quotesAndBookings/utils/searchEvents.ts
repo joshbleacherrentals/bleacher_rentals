@@ -1,6 +1,8 @@
 import { DateTime } from "luxon";
-import { QuotesBookingsEvent } from "../types";
+import type { AccountsReceivableEvent, QuotesBookingsEvent } from "../types";
+import type { Currency } from "../types/quoteTypes";
 import { eventSubtotalCents, eventTaxCents } from "./eventAmounts";
+import { formatMoney } from "./formatMoney";
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return "";
@@ -30,7 +32,7 @@ function amountMatches(cents: number, bare: string): boolean {
   return (cents / 100).toFixed(2).includes(bare);
 }
 
-export function searchEvents(events: QuotesBookingsEvent[], query: string): QuotesBookingsEvent[] {
+export function searchEvents<T extends QuotesBookingsEvent>(events: T[], query: string): T[] {
   if (!query.trim()) return events;
   const q = query.toLowerCase();
   // Quotes print the number as "Invoice #: 242136735", so a pasted "#242136735" should match too.
@@ -91,5 +93,31 @@ export function searchEvents(events: QuotesBookingsEvent[], query: string): Quot
       if (amounts.some((cents) => amountMatches(cents, bareAmount))) return true;
     }
     return fields.some((f) => f && String(f).toLowerCase().includes(q));
+  });
+}
+
+/**
+ * The AR tabs' search: everything `searchEvents` matches, plus Amount Due and
+ * Remaining Balance — as the table prints them ("$5,763.00", "C$987.75") or
+ * typed without separators ("5763", "$5763"). All Events has no balances, so
+ * it keeps `searchEvents` alone.
+ */
+export function searchReceivables<T extends AccountsReceivableEvent>(
+  rows: T[],
+  query: string,
+  currencyOf: (row: T) => Currency,
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return rows;
+  const matched = new Set(searchEvents(rows, query));
+  const bareAmount = amountQuery(query);
+
+  return rows.filter((row) => {
+    if (matched.has(row)) return true;
+    return [row.amount_due_cents, row.remaining_balance_cents].some(
+      (cents) =>
+        formatMoney(cents, currencyOf(row)).toLowerCase().includes(q) ||
+        (bareAmount !== null && amountMatches(cents, bareAmount)),
+    );
   });
 }

@@ -7,7 +7,7 @@
  * the real rows under a block of blanks. Ties fall back to newest-created first,
  * which is also the default order when nothing has been clicked.
  */
-import type { QuotesBookingsEvent } from "../types";
+import type { QuotesBookingsEvent, ReceivableBalances } from "../types";
 import { eventSubtotalCents, eventTaxCents } from "./eventAmounts";
 
 export type SortDirection = "asc" | "desc";
@@ -21,6 +21,9 @@ export const SORT_KEYS = [
   "created_at",
   "subtotal",
   "tax",
+  "invoice_number",
+  "amount_due",
+  "remaining_balance",
 ] as const;
 
 export type SortKey = (typeof SORT_KEYS)[number];
@@ -30,6 +33,9 @@ export type EventSort = { key: SortKey; direction: SortDirection };
 export const DEFAULT_SORT: EventSort = { key: "created_at", direction: "desc" };
 
 type SortValue = string | number | null;
+
+/** A list row; the AR tabs' rows also carry their balances. */
+type SortableEvent = QuotesBookingsEvent & Partial<ReceivableBalances>;
 
 function accountManagerName(e: QuotesBookingsEvent): string | null {
   const name = `${e.account_manager_first_name ?? ""} ${e.account_manager_last_name ?? ""}`.trim();
@@ -42,7 +48,7 @@ function timestamp(iso: string | null): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-const SORT_VALUE: Record<SortKey, (e: QuotesBookingsEvent) => SortValue> = {
+const SORT_VALUE: Record<SortKey, (e: SortableEvent) => SortValue> = {
   event_name: (e) => e.event_name?.trim() || null,
   status: (e) => e.event_status || null,
   account_manager: accountManagerName,
@@ -51,6 +57,9 @@ const SORT_VALUE: Record<SortKey, (e: QuotesBookingsEvent) => SortValue> = {
   created_at: (e) => timestamp(e.created_at),
   subtotal: eventSubtotalCents,
   tax: eventTaxCents,
+  invoice_number: (e) => e.invoice_number,
+  amount_due: (e) => e.amount_due_cents ?? null,
+  remaining_balance: (e) => e.remaining_balance_cents ?? null,
 };
 
 /** Text columns read A→Z on the first click; dates and money read newest/biggest first. */
@@ -63,6 +72,9 @@ const FIRST_DIRECTION: Record<SortKey, SortDirection> = {
   created_at: "desc",
   subtotal: "desc",
   tax: "desc",
+  invoice_number: "asc",
+  amount_due: "desc",
+  remaining_balance: "desc",
 };
 
 const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
@@ -72,10 +84,10 @@ function compareValues(a: SortValue, b: SortValue): number {
   return collator.compare(String(a), String(b));
 }
 
-export function sortEvents(events: QuotesBookingsEvent[], sort: EventSort): QuotesBookingsEvent[] {
+export function sortEvents<T extends SortableEvent>(events: T[], sort: EventSort): T[] {
   const valueOf = SORT_VALUE[sort.key];
   const sign = sort.direction === "asc" ? 1 : -1;
-  const createdOf = (e: QuotesBookingsEvent) => timestamp(e.created_at);
+  const createdOf = (e: T) => timestamp(e.created_at);
 
   return events
     .map((event) => ({ event, value: valueOf(event), created: createdOf(event) }))
@@ -100,16 +112,22 @@ export function nextSort(current: EventSort, key: SortKey): EventSort {
   return { key, direction: FIRST_DIRECTION[key] };
 }
 
-/** URL form is `key:direction`; the default sort stays out of the URL. */
-export function serializeSort(sort: EventSort): string | null {
-  if (sort.key === DEFAULT_SORT.key && sort.direction === DEFAULT_SORT.direction) return null;
+/**
+ * URL form is `key:direction`; the default sort stays out of the URL. Each tab
+ * of the list has its own default, so the caller says which one applies.
+ */
+export function serializeSort(
+  sort: EventSort,
+  defaultSort: EventSort = DEFAULT_SORT,
+): string | null {
+  if (sort.key === defaultSort.key && sort.direction === defaultSort.direction) return null;
   return `${sort.key}:${sort.direction}`;
 }
 
-export function parseSort(raw: string | null): EventSort {
-  if (!raw) return DEFAULT_SORT;
+export function parseSort(raw: string | null, defaultSort: EventSort = DEFAULT_SORT): EventSort {
+  if (!raw) return defaultSort;
   const [key, direction] = raw.split(":");
   const validKey = SORT_KEYS.find((k) => k === key);
-  if (!validKey || (direction !== "asc" && direction !== "desc")) return DEFAULT_SORT;
+  if (!validKey || (direction !== "asc" && direction !== "desc")) return defaultSort;
   return { key: validKey, direction };
 }

@@ -154,6 +154,42 @@ describe("sortEvents", () => {
     expect(sortBy(events, { key: "status", direction: "desc" })).toEqual(["newer", "older"]);
   });
 
+  it("sorts by the AR balances, rows without them last", () => {
+    const events = [
+      makeEvent({ id: "none" }),
+      { ...makeEvent({ id: "small" }), amount_due_cents: 1_00, remaining_balance_cents: 9_00 },
+      { ...makeEvent({ id: "big" }), amount_due_cents: 5_00, remaining_balance_cents: 2_00 },
+    ];
+    expect(sortBy(events, { key: "amount_due", direction: "desc" })).toEqual([
+      "big",
+      "small",
+      "none",
+    ]);
+    expect(sortBy(events, { key: "amount_due", direction: "asc" })).toEqual([
+      "small",
+      "big",
+      "none",
+    ]);
+    expect(sortBy(events, { key: "remaining_balance", direction: "desc" })).toEqual([
+      "small",
+      "big",
+      "none",
+    ]);
+  });
+
+  it("sorts invoice numbers numerically, missing ones last", () => {
+    const events = [
+      makeEvent({ id: "none" }),
+      makeEvent({ id: "1042", invoice_number: 1042 }),
+      makeEvent({ id: "987", invoice_number: 987 }),
+    ];
+    expect(sortBy(events, { key: "invoice_number", direction: "asc" })).toEqual([
+      "987",
+      "1042",
+      "none",
+    ]);
+  });
+
   it("does not mutate the input array", () => {
     const events = [
       makeEvent({ id: "a", event_name: "B" }),
@@ -169,6 +205,15 @@ describe("nextSort", () => {
     expect(nextSort(DEFAULT_SORT, "event_name")).toEqual({ key: "event_name", direction: "asc" });
     expect(nextSort(DEFAULT_SORT, "subtotal")).toEqual({ key: "subtotal", direction: "desc" });
     expect(nextSort(DEFAULT_SORT, "start_date")).toEqual({ key: "start_date", direction: "desc" });
+    expect(nextSort(DEFAULT_SORT, "amount_due")).toEqual({ key: "amount_due", direction: "desc" });
+    expect(nextSort(DEFAULT_SORT, "remaining_balance")).toEqual({
+      key: "remaining_balance",
+      direction: "desc",
+    });
+    expect(nextSort(DEFAULT_SORT, "invoice_number")).toEqual({
+      key: "invoice_number",
+      direction: "asc",
+    });
   });
 
   it("flips direction when the same column is clicked again", () => {
@@ -191,6 +236,14 @@ describe("parseSort / serializeSort", () => {
 
   it("keeps the default sort out of the URL", () => {
     expect(serializeSort(DEFAULT_SORT)).toBeNull();
+  });
+
+  it("measures the default against the tab's own default when one is given", () => {
+    const tabDefault: EventSort = { key: "start_date", direction: "asc" };
+    expect(serializeSort(tabDefault, tabDefault)).toBeNull();
+    expect(serializeSort(DEFAULT_SORT, tabDefault)).toBe("created_at:desc");
+    expect(parseSort(null, tabDefault)).toEqual(tabDefault);
+    expect(parseSort("bogus:asc", tabDefault)).toEqual(tabDefault);
   });
 
   it("falls back to the default for missing or unknown values", () => {

@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { QuotesBookingsFilters } from "../types";
 import { hasActiveFilterValues } from "../utils/filterUrlSync";
+import { withoutFilter, type ActiveFilterKey } from "../utils/activeFilters";
 
 const emptyFilters: QuotesBookingsFilters = {
   isOpen: false,
@@ -68,6 +69,11 @@ export function useQuotesAndBookingsFilters(
     setFilters((prev) => ({ ...prev, salesOfficeUuid: uuid }));
   }, []);
 
+  /** Clears the one filter behind an applied-filter chip. */
+  const clearFilter = useCallback((key: ActiveFilterKey) => {
+    setFilters((prev) => withoutFilter(prev, key));
+  }, []);
+
   const clearFilters = useCallback(() => {
     setFilters((prev) => ({
       ...prev,
@@ -96,6 +102,7 @@ export function useQuotesAndBookingsFilters(
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    clearFilter,
     clearFilters,
   };
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { QuotesBookingsEvent } from "../types";
-import { searchEvents } from "./searchEvents";
+import type { AccountsReceivableEvent, QuotesBookingsEvent } from "../types";
+import type { Currency } from "../types/quoteTypes";
+import { searchEvents, searchReceivables } from "./searchEvents";
 
 function makeEvent(overrides: Partial<QuotesBookingsEvent>): QuotesBookingsEvent {
   return {
@@ -86,5 +87,54 @@ describe("searchEvents — amounts", () => {
 
   it("leaves text searches alone", () => {
     expect(ids(searchEvents(events, "summer"))).toEqual(["b"]);
+  });
+});
+
+describe("searchReceivables — the AR tabs also search their balances", () => {
+  const row = (
+    id: string,
+    amountDue: number,
+    remaining: number,
+    overrides: Partial<QuotesBookingsEvent> = {},
+  ): AccountsReceivableEvent => ({
+    ...makeEvent({ id, ...overrides }),
+    amount_due_cents: amountDue,
+    remaining_balance_cents: remaining,
+  });
+  const rows = [
+    row("usd", 576300, 1152600),
+    row("cad", 98775, 347550, { sales_office_uuid: "cad-office" }),
+    row("named", 1000, 2000, { event_name: "Harbor Days Regatta" }),
+  ];
+  const currencyOf = (e: QuotesBookingsEvent): Currency =>
+    e.sales_office_uuid === "cad-office" ? "CAD" : "USD";
+  const find = (query: string) => ids(searchReceivables(rows, query, currencyOf));
+
+  it("finds a row by its Amount Due as the table shows it", () => {
+    expect(find("$5,763.00")).toEqual(["usd"]);
+    expect(find("5,763")).toEqual(["usd"]);
+  });
+
+  it("finds a row by its Remaining Balance", () => {
+    expect(find("$11,526.00")).toEqual(["usd"]);
+    expect(find("C$3,475.50")).toEqual(["cad"]);
+  });
+
+  it("matches amounts typed without the thousands separator", () => {
+    expect(find("5763")).toEqual(["usd"]);
+    expect(find("$5763")).toEqual(["usd"]);
+    expect(find("987.75")).toEqual(["cad"]);
+  });
+
+  it("still searches everything the list always searched", () => {
+    expect(find("harbor")).toEqual(["named"]);
+  });
+
+  it("keeps the whole list for an empty query", () => {
+    expect(find("  ")).toEqual(["usd", "cad", "named"]);
+  });
+
+  it("is not how All Events searches — balances are not searchable there", () => {
+    expect(ids(searchEvents(rows, "5,763"))).toEqual([]);
   });
 });
