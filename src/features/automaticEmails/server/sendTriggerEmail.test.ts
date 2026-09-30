@@ -237,6 +237,20 @@ describe("finance copy", () => {
     },
   );
 
+  it("does not CC finance on an email that is already addressed to finance", async () => {
+    const { supabase } = makeSupabase(READY);
+    await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      trigger: QUOTE_SIGNED_AM,
+      eventId: "e1",
+      docData: doc(),
+      recipientOverride: "finance@bleacherrentals.com",
+    });
+    const sent = mockSendEmail.mock.calls[0][0];
+    expect(sent.To).toBe("finance@bleacherrentals.com");
+    expect(sent).not.toHaveProperty("Cc");
+  });
+
   it.each([QUOTE_SENT_CLIENT, QUOTE_SIGNED_CLIENT, PAYMENT_MADE_CLIENT])(
     "does not CC finance on the client's %s email",
     async (trigger) => {

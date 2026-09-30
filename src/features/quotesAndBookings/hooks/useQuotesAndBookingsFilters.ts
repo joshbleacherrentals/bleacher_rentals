@@ -2,11 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { QuotesBookingsFilters } from "../types";
-import { hasActiveFilterValues } from "../utils/filterUrlSync";
 import { withoutFilter, type ActiveFilterKey } from "../utils/activeFilters";
 
 const emptyFilters: QuotesBookingsFilters = {
-  isOpen: false,
+  isOpen: true, // the filter sidebar starts expanded
   statuses: [],
   createdFrom: null,
   createdTo: null,
@@ -27,7 +26,7 @@ export function useQuotesAndBookingsFilters(
   const [filters, setFilters] = useState<QuotesBookingsFilters>(() => {
     if (initialFromUrl) {
       const merged = { ...emptyFilters, ...initialFromUrl };
-      return { ...merged, isOpen: hasActiveFilterValues(merged) };
+      return { ...merged, isOpen: true };
     }
     if (!initialOverrides) return emptyFilters;
     return { ...emptyFilters, ...initialOverrides, isOpen: true };

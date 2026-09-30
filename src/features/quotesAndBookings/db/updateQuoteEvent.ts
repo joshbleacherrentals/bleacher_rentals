@@ -16,6 +16,7 @@ import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
 import { toEventLineItemValues } from "./toEventLineItemValues";
+import { postFinanceBookedNotice, shouldNotifyFinanceBooked } from "../utils/notifyFinanceBooked";
 
 type OldEventRow = {
   event_name: string | null;
@@ -282,4 +283,9 @@ export async function updateQuoteEvent(
 
   // Propagate errors so the editor retains the draft for retry.
   await syncPaymentInstallments(eventId, state.paymentInstallments, state.currency);
+
+  // Everything is saved — now tell finance if this save is what booked the quote.
+  if (shouldNotifyFinanceBooked(oldEvent?.event_status, state.status || "draft")) {
+    postFinanceBookedNotice(eventId);
+  }
 }
