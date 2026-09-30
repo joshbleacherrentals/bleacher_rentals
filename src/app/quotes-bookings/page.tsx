@@ -12,6 +12,7 @@ import {
 } from "@/features/quotesAndBookings/components/FilterSidebar";
 import { useQuotesAndBookingsFilters } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsFilters";
 import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsData";
+import { narrowingKey } from "@/features/quotesAndBookings/utils/narrowingKey";
 
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
 import { searchEvents } from "@/features/quotesAndBookings/utils/searchEvents";
@@ -184,13 +185,14 @@ export default function QuotesBookingsPage() {
   // search engine does. Without this, narrowing a 9-page list while sitting on
   // page 8 would land on an empty table.
   // A new sort order or tab starts from the top as well.
-  const narrowingKey = JSON.stringify([filters, searchQuery, showDeleted, sort, activeTab]);
-  const lastNarrowingKeyRef = useRef(narrowingKey);
+  // Opening/closing the filter sidebar is not a new question, so it is not part of the key.
+  const currentNarrowingKey = narrowingKey(filters, searchQuery, showDeleted, sort, activeTab);
+  const lastNarrowingKeyRef = useRef(currentNarrowingKey);
   useEffect(() => {
-    if (lastNarrowingKeyRef.current === narrowingKey) return;
-    lastNarrowingKeyRef.current = narrowingKey;
+    if (lastNarrowingKeyRef.current === currentNarrowingKey) return;
+    lastNarrowingKeyRef.current = currentNarrowingKey;
     setPage(1);
-  }, [narrowingKey]);
+  }, [currentNarrowingKey]);
 
   // Push filter/search/showDeleted state into the URL (replace, not push, so
   // each edit doesn't grow browser history — only "open a quote" should).
