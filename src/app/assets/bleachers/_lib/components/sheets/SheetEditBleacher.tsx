@@ -7,6 +7,7 @@ import { Trash2, ShieldAlert, X } from "lucide-react";
 import { useBleacherTypesActive } from "@/features/pricingMatrix/hooks/useBleacherTypesActive";
 import { usePsZones } from "@/features/dashboard/db/hooks/powersync/usePsZones";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
+import { canEditBleachers } from "@/features/userAccess/logic/canEditBleachers";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +25,8 @@ import { BleacherInspectionSummary } from "@/features/annualInspections/componen
 
 export function SheetEditBleacher() {
   const router = useRouter();
-  const { isAdmin } = useTeamPermissions();
+  const permissions = useTeamPermissions();
+  const canEdit = canEditBleachers(permissions);
   const searchParams = useSearchParams();
 
   const editBleacherNumber = searchParams.get("edit") ? Number(searchParams.get("edit")) : null;
@@ -91,14 +93,14 @@ export function SheetEditBleacher() {
             </div>
           )}
 
-          {!isAdmin && (
+          {!canEdit && (
             <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               You have read-only access to assets.
             </div>
           )}
 
           <div className="flex-1 overflow-y-auto px-6 py-5">
-            <fieldset disabled={!isAdmin} className="space-y-3.5 disabled:opacity-70">
+            <fieldset disabled={!canEdit} className="space-y-3.5 disabled:opacity-70">
               <BleacherFormFields
                 state={state}
                 setField={setField}
@@ -120,7 +122,7 @@ export function SheetEditBleacher() {
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/60 px-6 py-4">
-            {isAdmin &&
+            {canEdit &&
               (isDeleted ? (
                 <button
                   type="button"
@@ -146,7 +148,7 @@ export function SheetEditBleacher() {
               <ShieldAlert className="h-4 w-4" />
               Damage Reports
             </Link>
-            {isAdmin && (
+            {canEdit && (
               <button
                 type="submit"
                 onClick={handleSave}

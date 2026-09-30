@@ -33,7 +33,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can open a bleacher to read its history. Sees nothing else on the dashboard — no quotes, events, payments, or team management.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page. Sees nothing else on the dashboard — no quotes, events, payments, or team management.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -385,8 +385,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "This user will be able to see all the bleachers and every detail but not able to create, edit, or delete any bleachers.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: read(
-        "Can open a bleacher to reach its annual inspection history, but cannot change anything about the bleacher itself.",
+      maintainer: full(
+        "Can add a bleacher, edit any of its details, and delete or restore it, on the Bleachers tab of the Assets page. Sees no add button or editable form on the Documents and Other Assets tabs — those stay Administrator-only.",
       ),
     },
   },
