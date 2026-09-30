@@ -3,6 +3,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Search, ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { InfoTooltip } from "@/components/InfoTooltip";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
@@ -13,6 +14,7 @@ import {
 import { useQuotesAndBookingsFilters } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsFilters";
 import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsData";
 import { narrowingKey } from "@/features/quotesAndBookings/utils/narrowingKey";
+import { RECEIVABLES_HELP } from "@/features/quotesAndBookings/utils/receivablesHelp";
 
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
 import { searchEvents } from "@/features/quotesAndBookings/utils/searchEvents";
@@ -443,8 +445,22 @@ export default function QuotesBookingsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <TabsList className="shrink-0">
               <TabsTrigger value="all">All Events</TabsTrigger>
-              <TabsTrigger value="ar">AR</TabsTrigger>
-              <TabsTrigger value="ar_deposits">AR Deposits</TabsTrigger>
+              <TabsTrigger value="ar">
+                AR
+                <InfoTooltip
+                  label="About the AR tab"
+                  content={RECEIVABLES_HELP.ar}
+                  focusable={false}
+                />
+              </TabsTrigger>
+              <TabsTrigger value="ar_deposits">
+                AR Deposits
+                <InfoTooltip
+                  label="About the AR Deposits tab"
+                  content={RECEIVABLES_HELP.arDeposits}
+                  focusable={false}
+                />
+              </TabsTrigger>
             </TabsList>
             <ActiveFilterChips
               filters={filters}

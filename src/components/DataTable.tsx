@@ -1,6 +1,7 @@
 "use client";
 import { ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { InfoTooltip } from "@/components/InfoTooltip";
 
 export type Column<T> = {
   key: string;
@@ -10,6 +11,11 @@ export type Column<T> = {
   align?: "left" | "right";
   /** Set to make the header a sort toggle; this key is what `onSort` receives. */
   sortKey?: string;
+  /**
+   * An info icon beside the header that explains the column on hover. It sits
+   * next to the sort button, not in it, so clicking it never sorts.
+   */
+  headerTooltip?: { label: string; content: string };
 };
 
 export type DataTableSort = { key: string; direction: "asc" | "desc" };
@@ -63,6 +69,20 @@ export function DataTable<T>({
                 const sortable = column.sortKey !== undefined && onSort !== undefined;
                 const direction =
                   sortable && sort && sort.key === column.sortKey ? sort.direction : null;
+                const heading = sortable ? (
+                  <button
+                    type="button"
+                    onClick={() => onSort(column.sortKey!)}
+                    className={`inline-flex items-center gap-1 uppercase tracking-wider cursor-pointer select-none hover:text-gray-800 ${
+                      direction ? "text-gray-800" : ""
+                    } ${column.align === "right" ? "flex-row-reverse" : ""}`}
+                  >
+                    {column.header}
+                    <SortIcon direction={direction} />
+                  </button>
+                ) : (
+                  column.header
+                );
                 return (
                   <th
                     key={column.key}
@@ -77,19 +97,16 @@ export function DataTable<T>({
                       column.align === "right" ? "text-right" : "text-left"
                     }`}
                   >
-                    {sortable ? (
-                      <button
-                        type="button"
-                        onClick={() => onSort(column.sortKey!)}
-                        className={`inline-flex items-center gap-1 uppercase tracking-wider cursor-pointer select-none hover:text-gray-800 ${
-                          direction ? "text-gray-800" : ""
-                        } ${column.align === "right" ? "flex-row-reverse" : ""}`}
-                      >
-                        {column.header}
-                        <SortIcon direction={direction} />
-                      </button>
+                    {column.headerTooltip ? (
+                      <div className="inline-flex items-center gap-1">
+                        {heading}
+                        <InfoTooltip
+                          label={column.headerTooltip.label}
+                          content={column.headerTooltip.content}
+                        />
+                      </div>
                     ) : (
-                      column.header
+                      heading
                     )}
                   </th>
                 );

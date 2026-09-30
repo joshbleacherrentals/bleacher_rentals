@@ -12,6 +12,7 @@ import { sortEvents, type EventSort, type SortKey } from "../utils/sortEvents";
 import { clampPage, getTotalPages, slicePage, type PageSize } from "../utils/pagination";
 import { formatTotalsLabel, sumByCurrency } from "../utils/eventCurrency";
 import { formatMoney } from "../utils/formatMoney";
+import { RECEIVABLES_HELP } from "../utils/receivablesHelp";
 import type { ReceivablesTab } from "../utils/listTabs";
 import { EventNameCell, accountManagerName, formatListDate } from "./eventListCells";
 
@@ -130,6 +131,7 @@ function ReceivablesTable({
       ),
       align: "right",
       sortKey: "amount_due",
+      headerTooltip: { label: "About Amount Due", content: RECEIVABLES_HELP.amountDue },
       render: (event) => (
         <CellText bold>{formatMoney(event.amount_due_cents, currencyOf(event))}</CellText>
       ),
@@ -142,6 +144,10 @@ function ReceivablesTable({
       ),
       align: "right",
       sortKey: "remaining_balance",
+      headerTooltip: {
+        label: "About Remaining Balance",
+        content: RECEIVABLES_HELP.remainingBalance,
+      },
       render: (event) => (
         <CellText>{formatMoney(event.remaining_balance_cents, currencyOf(event))}</CellText>
       ),

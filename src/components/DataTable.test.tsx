@@ -37,3 +37,49 @@ describe("DataTable sorting", () => {
     expect(render()).not.toContain("<button");
   });
 });
+
+describe("DataTable header tooltips", () => {
+  const withTip: Column<Row>[] = [
+    {
+      key: "name",
+      header: "Name",
+      sortKey: "name",
+      headerTooltip: { label: "About Name", content: "Names things" },
+      render: () => "-",
+    },
+    { key: "plain", header: "Plain", sortKey: "plain", render: () => "-" },
+  ];
+  const renderTip = () =>
+    renderToStaticMarkup(
+      <DataTable
+        columns={withTip}
+        data={[{ id: "1", name: "A" }]}
+        keyExtractor={(r) => r.id}
+        onSort={() => {}}
+      />,
+    );
+
+  it("adds an info icon only to the column that asks for one", () => {
+    expect(renderTip().match(/aria-label="About Name"/g)).toHaveLength(1);
+  });
+
+  it("keeps the icon out of the sort button, so clicking it never sorts", () => {
+    const html = renderTip();
+    const sortButton = html.match(/<button[^>]*>.*?<\/button>/)![0];
+    expect(sortButton).toContain("Name");
+    expect(sortButton).not.toContain("aria-label=");
+    expect(html.match(/<button/g)).toHaveLength(3);
+  });
+
+  it("leaves a column without a tooltip exactly as before", () => {
+    const html = renderToStaticMarkup(
+      <DataTable
+        columns={columns}
+        data={[{ id: "1", name: "A" }]}
+        keyExtractor={(r) => r.id}
+        onSort={() => {}}
+      />,
+    );
+    expect(html).not.toContain("aria-label=");
+  });
+});

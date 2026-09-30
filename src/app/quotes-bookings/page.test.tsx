@@ -109,6 +109,28 @@ describe("/quotes-bookings tabs", () => {
     expect(html).toContain(">AR Deposits<");
   });
 
+  it("puts an info icon on the AR and AR Deposits tabs, but not on All Events", () => {
+    const html = renderAt("");
+    expect(html).toContain('aria-label="About the AR tab"');
+    expect(html).toContain('aria-label="About the AR Deposits tab"');
+    expect(html).not.toContain("About the All Events tab");
+    expect(html.match(/aria-label="About /g)).toHaveLength(2);
+  });
+
+  it("keeps the tabs themselves as they were", () => {
+    const html = renderAt("tab=ar");
+    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
+  });
+
+  it("puts an info icon on Amount Due and Remaining Balance, and both still sort", () => {
+    const html = renderAt("tab=ar");
+    expect(html).toContain('aria-label="About Amount Due"');
+    expect(html).toContain('aria-label="About Remaining Balance"');
+    expect(html).toMatch(/<button[^>]*>[^<]*Amount Due \(\$1,000\)/);
+    expect(html).toMatch(/<button[^>]*>[^<]*Remaining Balance \(\$2,000\)/);
+  });
+
   it("does not compute AR balances while All Events is open", () => {
     const html = renderAt("");
     expect(mockArData).not.toHaveBeenCalled();
