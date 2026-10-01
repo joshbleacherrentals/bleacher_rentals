@@ -8,8 +8,6 @@ const adminPermissions: TeamPermissions = {
   userId: "admin-user-1",
   accountManagerId: null,
   canCreateUser: true,
-  canAssignAdmin: true,
-  canAssignAccountant: true,
 };
 
 const amPermissions: TeamPermissions = {
@@ -19,8 +17,6 @@ const amPermissions: TeamPermissions = {
   userId: "am-user-1",
   accountManagerId: "am-id-1",
   canCreateUser: true,
-  canAssignAdmin: false,
-  canAssignAccountant: false,
 };
 
 const viewerPermissions: TeamPermissions = {
@@ -30,8 +26,6 @@ const viewerPermissions: TeamPermissions = {
   userId: "viewer-user-1",
   accountManagerId: null,
   canCreateUser: false,
-  canAssignAdmin: false,
-  canAssignAccountant: false,
 };
 
 const amZones = ["zone-a", "zone-b"];

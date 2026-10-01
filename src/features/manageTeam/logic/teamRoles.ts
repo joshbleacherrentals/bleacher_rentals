@@ -13,21 +13,36 @@ export const ALL_ROLES: TeamRoleTab[] = [
 ];
 
 /**
- * The roles still offered under `+ Add Role`: the ones the user does not hold yet, minus
- * the ones this actor may not grant. Administrator and Accountant are admin-only — the
- * `Accountants` table is admin-only under RLS, so offering Accountant to anyone else would
- * end in a refused insert after the `Users` row already exists
- * (docs/specs/accountant-role.md, D2).
+ * Whether an account manager may hand each role out. An admin may hand out all of them.
+ *
+ * This mirrors what an account manager's save is able to write, not a product preference:
+ * `Developers`, `Maintainers` and `Accountants` are admin-only under RLS and `Users.is_admin`
+ * is an admin's call, so offering any of those would end in a refused write after the
+ * `Users` row already exists. A `Record`, so a new `TeamRoleTab` does not compile until
+ * someone has decided who may grant it.
+ */
+const ACCOUNT_MANAGER_MAY_ASSIGN: Record<TeamRoleTab, boolean> = {
+  administrator: false,
+  "account-manager": true,
+  driver: true,
+  developer: false,
+  viewer: true,
+  maintainer: false,
+  accountant: false,
+};
+
+/**
+ * The roles still offered under `+ Add Role`: the ones the user does not hold yet, and that
+ * this actor is allowed to grant.
  */
 export function getAvailableRoles(
   roleTabs: TeamRoleTab[],
-  permissions: Pick<TeamPermissions, "canAssignAdmin" | "canAssignAccountant">,
+  actor: Pick<TeamPermissions, "isAdmin" | "isAccountManager">,
 ): TeamRoleTab[] {
   return ALL_ROLES.filter(
     (role) =>
       !roleTabs.includes(role) &&
-      (role !== "administrator" || permissions.canAssignAdmin) &&
-      (role !== "accountant" || permissions.canAssignAccountant),
+      (actor.isAdmin || (actor.isAccountManager && ACCOUNT_MANAGER_MAY_ASSIGN[role])),
   );
 }
 

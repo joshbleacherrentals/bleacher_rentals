@@ -66,6 +66,10 @@ Two need your answer; the rest are defaults I will take unless you object.
   `RoleNavigation` hides it from non-admins the way it hides Administrator. See §9 "found on the way" for why not showing it matters: today an AM who
   picks Developer/Maintainer gets an RLS error _after_ the `Users` row was already
   inserted.
+- **Amended 2026-10-01:** the per-role flags (`canAssignAdmin`, `canAssignAccountant`) were
+  replaced by one rule in `logic/teamRoles.ts` (`ACCOUNT_MANAGER_MAY_ASSIGN`, a
+  `Record<TeamRoleTab, boolean>`), so Developer and Maintainer are now hidden from account
+  managers too — see §9 item 1, which this closes.
 - **Needs you?** **yes**
 
 **D3**
@@ -102,7 +106,7 @@ Two need your answer; the rest are defaults I will take unless you object.
 
 - **Question:** `TeamPermissions.isAccountant`.
 - **My recommendation:** **Not added** — no consumer in Stage 1. Only
-  `canAssignAccountant` (= `isAdmin`) is added, for D2.
+  `canAssignAccountant` (= `isAdmin`) was added, for D2 — removed again, see D2's amendment.
 - **Needs you?** no
 
 **D8**
@@ -317,9 +321,8 @@ confirmation panel.
   basic info if the tab is absent, exactly as `MaintainerPageContent`; text: "This role has no
   permissions yet…"). `useUserFormPaths` += `accountant` ✓ (indexed by role tab).
 - **Granting UI:** `RoleNavigation.tsx` — `ROLE_LABELS` ✓, `ALL_ROLES` ✎, and the availability
-  filter becomes `(role !== "administrator" || canAssignAdmin) && (role !== "accountant" ||
-canAssignAccountant)` (D2). `useTeamPermissions` gains `canAssignAccountant: isAdmin` (and its
-  test fixtures).
+  filter is `getAvailableRoles(roleTabs, permissions)` (D2); the who-may-grant-what rule lives in
+  `logic/teamRoles.ts`, and `useTeamPermissions` carries no per-role flags (amended 2026-10-01).
 - **`userOperations.ts`:**
   - `createUser`: after the maintainer block, `if (state.isAccountant) insert into "Accountants"
 { user_uuid, is_active: true }`.
@@ -482,7 +485,8 @@ All paths under `src/features/…` unless shown in full; `manageTeam` and `userA
 
 1. `RoleNavigation` offers Developer and Maintainer to account managers, but both tables are
    admin-only: the AM's save fails with an RLS error _after_ `Users` was inserted, leaving an
-   orphan "incomplete" user and no invite. (D2 avoids this for Accountant only.)
+   orphan "incomplete" user and no invite. (D2 avoided this for Accountant only. **Fixed
+   2026-10-01:** `ACCOUNT_MANAGER_MAY_ASSIGN` now hides Developer and Maintainer too.)
 2. `UserFormLayout.hasNoRoles` ignores `isMaintainer`, so an AM sees a maintainer-only user as
    "unclaimed" and may edit it.
 3. `CLAUDE.md` ("all five roles") and `.claude/commands/preflight.md` (its role-by-role list) still
@@ -564,7 +568,8 @@ Nothing above starts Stage 2 or anything after it (§0).
   Assurance dropdown.
 - `useIncomplete.test.ts` (real SQLite harness already there): an accountant-only user is not
   incomplete; a user whose accountant row is inactive is.
-- `useTeamPermissions.test.ts`: `canAssignAccountant` true only for admin.
+- `teamRoles.test.ts`: an account manager is offered exactly Account Manager, Driver and Viewer;
+  an admin is offered every role (replaces the `canAssignAccountant` test).
 - **new** `permissionPageData.test.ts`: `ROLE_ORDER` contains every `WebRole`; every entry has
   an `accountant` level of `none` in Stage 1 (guards the ✎ `ROLE_ORDER` gap and makes any later
   change to the Accountant column edit this test on purpose).

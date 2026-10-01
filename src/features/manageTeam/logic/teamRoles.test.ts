@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ALL_ROLES, getAvailableRoles, hasNoRoles } from "./teamRoles";
 
-const admin = { canAssignAdmin: true, canAssignAccountant: true };
-const accountManager = { canAssignAdmin: false, canAssignAccountant: false };
+const admin = { isAdmin: true, isAccountManager: false };
+const accountManager = { isAdmin: false, isAccountManager: true };
+const everyoneElse = { isAdmin: false, isAccountManager: false };
 
 describe("getAvailableRoles", () => {
   it("offers every role to an admin", () => {
@@ -13,25 +14,28 @@ describe("getAvailableRoles", () => {
     expect(ALL_ROLES).toContain("accountant");
   });
 
-  it("hides Administrator and Accountant from an account manager — only an admin grants them", () => {
-    const offered = getAvailableRoles([], accountManager);
-    expect(offered).not.toContain("administrator");
-    expect(offered).not.toContain("accountant");
+  // The `Developers`, `Maintainers` and `Accountants` tables are admin-only under RLS, and
+  // `Users.is_admin` is an admin's call — an offered role the actor cannot save ends in a
+  // refused write after the `Users` row already exists.
+  it("offers an account manager exactly the roles they are able to save", () => {
+    expect(getAvailableRoles([], accountManager)).toEqual(["account-manager", "driver", "viewer"]);
   });
 
-  it("leaves every other role available to an account manager, exactly as before", () => {
-    expect(getAvailableRoles([], accountManager)).toEqual([
-      "account-manager",
-      "driver",
-      "developer",
-      "viewer",
-      "maintainer",
-    ]);
+  it.each(["administrator", "developer", "maintainer", "accountant"] as const)(
+    "hides %s from an account manager — only an admin grants it",
+    (role) => {
+      expect(getAvailableRoles([], accountManager)).not.toContain(role);
+    },
+  );
+
+  it("offers nothing to anyone who is neither an admin nor an account manager", () => {
+    expect(getAvailableRoles([], everyoneElse)).toEqual([]);
   });
 
   it("does not offer a role the user already holds", () => {
     expect(getAvailableRoles(["accountant", "viewer"], admin)).not.toContain("accountant");
     expect(getAvailableRoles(["accountant", "viewer"], admin)).not.toContain("viewer");
+    expect(getAvailableRoles(["driver"], accountManager)).toEqual(["account-manager", "viewer"]);
   });
 });
 

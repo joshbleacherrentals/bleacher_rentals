@@ -554,7 +554,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     roles: {
       admin: full("Can invite any type of team member, including other admins."),
       account_manager: custom(
-        "Can invite new team members, but cannot assign them the Admin or Accountant role. Can only invite drivers and other standard roles.",
+        "Can invite new team members, but can only give them the Account Manager, Driver or Viewer role. Administrator, Developer, Maintainer and Accountant are granted by an admin only, so they are not offered.",
       ),
       developer: none(
         "Developers do not have access to the Team page. This role is limited to the product roadmap.",

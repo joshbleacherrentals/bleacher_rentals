@@ -9,9 +9,6 @@ export type TeamPermissions = {
   userId: string | null;
   accountManagerId: string | null;
   canCreateUser: boolean;
-  canAssignAdmin: boolean;
-  /** Only an admin grants the Accountant role — see docs/specs/accountant-role.md (D2). */
-  canAssignAccountant: boolean;
 };
 
 export function useTeamPermissions(): TeamPermissions {
@@ -25,8 +22,6 @@ export function useTeamPermissions(): TeamPermissions {
       userId: null,
       accountManagerId: null,
       canCreateUser: false,
-      canAssignAdmin: false,
-      canAssignAccountant: false,
     };
   }
 
@@ -40,8 +35,6 @@ export function useTeamPermissions(): TeamPermissions {
     userId: access.userId,
     accountManagerId: access.accountManagerId,
     canCreateUser: isAdmin || isAccountManager,
-    canAssignAdmin: isAdmin,
-    canAssignAccountant: isAdmin,
   };
 }
 

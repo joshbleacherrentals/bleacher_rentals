@@ -42,10 +42,10 @@ export default function RoleNavigation() {
   const addRoleTab = useCurrentUserStore((s) => s.addRoleTab);
   const removeRoleTab = useCurrentUserStore((s) => s.removeRoleTab);
 
-  const { canAssignAdmin, canAssignAccountant } = useTeamPermissions();
+  const permissions = useTeamPermissions();
   const [roleToRemove, setRoleToRemove] = useState<TeamRoleTab | null>(null);
 
-  const availableRoles = getAvailableRoles(roleTabs, { canAssignAdmin, canAssignAccountant });
+  const availableRoles = getAvailableRoles(roleTabs, permissions);
   const shouldHighlightAddRole = roleTabs.length === 0;
 
   const handleRemoveRole = () => {
