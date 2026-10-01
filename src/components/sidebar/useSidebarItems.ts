@@ -350,7 +350,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "documentation",
   ],
   driver: [],
-  maintainer: ["quality-assurance", "documentation", "assets"],
+  maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
   accountant: ["documentation"],
 };
 

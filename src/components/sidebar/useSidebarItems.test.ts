@@ -98,10 +98,11 @@ describe("useSidebarItems", () => {
     ]);
   });
 
-  it("maintainer sees nothing operational beyond assets — no dashboard or work trackers", () => {
+  it("maintainer sees the dashboard and assets — but no work trackers or quotes", () => {
     const keys = useSidebarItems(["maintainer"]).map((i) => i.key);
-    expect(keys).not.toContain("dashboard");
+    expect(keys).toContain("dashboard");
     expect(keys).not.toContain("work-trackers");
+    expect(keys).not.toContain("quotes-bookings");
     // Assets stays: a maintainer opens a bleacher to reach its inspection history.
     expect(keys).toContain("assets");
   });

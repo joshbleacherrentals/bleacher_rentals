@@ -7,9 +7,10 @@ describe("mergeRoleConfigs — the maintainer role", () => {
     expect(config.allowedPaths).toContain("/annual-inspections");
   });
 
-  it("lands a maintainer-only user on the one page they have — there is no dashboard for them", () => {
+  it("lands a maintainer-only user on the dashboard, like every other role that has one", () => {
     const config = mergeRoleConfigs(["maintainer"]);
-    expect(config.defaultRedirect).toBe("/annual-inspections");
+    expect(config.allowedPaths).toContain("/dashboard");
+    expect(config.defaultRedirect).toBe("/dashboard");
   });
 
   it("lets a maintainer read their own permissions and the changelog", () => {
@@ -28,9 +29,8 @@ describe("mergeRoleConfigs — the maintainer role", () => {
     expect(config.allowedPaths).toContain("/repairs");
   });
 
-  it("gives a maintainer nothing else — not the dashboard, not the inspections list", () => {
+  it("gives a maintainer nothing else — not the inspections list, work trackers or quotes", () => {
     const config = mergeRoleConfigs(["maintainer"]);
-    expect(config.allowedPaths).not.toContain("/dashboard");
     expect(config.allowedPaths).not.toContain("/inspections");
     expect(config.allowedPaths).not.toContain("/work-trackers");
     expect(config.allowedPaths).not.toContain("/quotes-bookings");
@@ -99,7 +99,7 @@ describe("mergeRoleConfigs — the accountant role (Stage 1: no permissions)", (
   it("leaves every other role's pages exactly as they were", () => {
     // The accountant role adds a config entry; it must not edit anyone else's.
     expect(mergeRoleConfigs(["admin"]).allowedPaths).toContain("/annual-inspections");
-    expect(mergeRoleConfigs(["maintainer"]).defaultRedirect).toBe("/annual-inspections");
+    expect(mergeRoleConfigs(["maintainer"]).defaultRedirect).toBe("/dashboard");
     expect(mergeRoleConfigs(["developer"]).allowedPaths).toContain("/dev-tools");
   });
 });

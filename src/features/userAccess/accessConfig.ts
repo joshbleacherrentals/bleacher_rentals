@@ -112,9 +112,11 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
   maintainer: {
     // The annual inspection queue is the heart of this role's job, plus damage reports and
     // repairs (docs/specs/maintainer-damage-and-maintenance.md). /permissions so they can read
-    // what they are allowed to do, and /changelog so a release note is not invisible to them;
-    // without a dashboard, defaultRedirect falls through to the first path here, which is the queue.
+    // what they are allowed to do, and /changelog so a release note is not invisible to them.
+    // /dashboard so they can write notes in cells (docs/specs/maintainer-dashboard-cells.md);
+    // with it, defaultRedirect lands them there, the same as every other role that has one.
     allowedPaths: [
+      "/dashboard",
       "/annual-inspections",
       "/damage-reports",
       "/repairs",

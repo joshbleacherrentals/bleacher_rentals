@@ -203,6 +203,7 @@ const BlocksCols = {
   text: column.text,
   date: column.text,
   bleacher_uuid: column.text,
+  created_by_user_uuid: column.text,
 } satisfies PowerSyncColsFor<"Blocks">;
 const Blocks = new Table(BlocksCols, { indexes: { bleacher_uuid: ["bleacher_uuid"] } });
 

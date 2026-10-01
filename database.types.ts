@@ -586,6 +586,7 @@ export type Database = {
         Row: {
           bleacher_uuid: string | null
           created_at: string
+          created_by_user_uuid: string | null
           date: string | null
           id: string
           text: string | null
@@ -593,6 +594,7 @@ export type Database = {
         Insert: {
           bleacher_uuid?: string | null
           created_at?: string
+          created_by_user_uuid?: string | null
           date?: string | null
           id?: string
           text?: string | null
@@ -600,6 +602,7 @@ export type Database = {
         Update: {
           bleacher_uuid?: string | null
           created_at?: string
+          created_by_user_uuid?: string | null
           date?: string | null
           id?: string
           text?: string | null
@@ -610,6 +613,13 @@ export type Database = {
             columns: ["bleacher_uuid"]
             isOneToOne: false
             referencedRelation: "Bleachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Blocks_created_by_user_uuid_fkey"
+            columns: ["created_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
             referencedColumns: ["id"]
           },
         ]

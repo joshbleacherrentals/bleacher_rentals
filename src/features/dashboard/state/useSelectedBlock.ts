@@ -5,6 +5,8 @@ export type SelectedBlockState = {
   isOpen: boolean;
   key: string;
   blockUuid: string | null;
+  /** Author of the note in the open cell; null when the cell is empty or the note is old. */
+  createdByUserUuid: string | null;
   bleacherUuid: string;
   date: string;
   text: string;
@@ -24,6 +26,7 @@ const initialState: SelectedBlockState = {
   isOpen: false,
   key: "",
   blockUuid: null,
+  createdByUserUuid: null,
   bleacherUuid: "",
   date: "",
   text: "",

@@ -7,6 +7,7 @@ import { create } from "zustand";
 type PermissionsState = {
   isAdmin: boolean;
   isAccountManager: boolean;
+  isMaintainer: boolean;
   accountManagerId: string | null;
   accountManagerZoneIds: string[];
   leadZoneIds: string[];
@@ -16,6 +17,7 @@ type PermissionsState = {
 export const usePermissionsStore = create<PermissionsState>(() => ({
   isAdmin: false,
   isAccountManager: false,
+  isMaintainer: false,
   accountManagerId: null,
   accountManagerZoneIds: [],
   leadZoneIds: [],

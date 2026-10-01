@@ -34,7 +34,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page. Sees nothing else on the dashboard — no quotes, events, payments, or team management.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
     "Reserved for the people who handle finances. In this release the role has no permissions yet: an Accountant can sign in and read this page and What's New, and nothing else. Its permissions will be defined later.",
 };
@@ -60,6 +60,9 @@ const full = (note?: string): PermissionAccess => ({ level: "full", note });
 const read = (note?: string): PermissionAccess => ({ level: "read", note });
 const custom = (note: string): PermissionAccess => ({ level: "custom", note });
 const none = (note?: string): PermissionAccess => ({ level: "none", note });
+
+const MAINTAINER_NO_ACCESS_NOTE =
+  "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard. Everything else in the web app is hidden from them entirely.";
 
 // Stage 1 of docs/specs/accountant-role.md: the role exists and has no permissions.
 const ACCOUNTANT_NO_ACCESS_NOTE =
@@ -87,8 +90,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "Can file a ticket to the developers from the mobile app, and edit their own for a short window afterwards. Has no access to the rest of the roadmap — they cannot see, edit or comment on anyone else's work.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: read(
+        "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -108,9 +111,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can see whether the flag is set, but the checkbox is disabled."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -133,9 +134,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can see payments and balances, and open any payment to read it in full, but cannot change anything.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -158,9 +157,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "No. Reading the payment history is a separate thing, and they can still do that.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -181,9 +178,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can read event chats and who is in them, but cannot post, join or leave."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -205,8 +200,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "This user will be able to see all the cells and every detail but not able to create, edit, or delete any cells.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: custom(
+        "Maintainers can add a note to any empty cell, and edit or delete only the notes they wrote themselves. Notes written by anyone else, or written before this rule existed, are read-only for them. They cannot create events, work trackers, maintenance or sub-rentals from a cell.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -230,9 +225,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "This user can see companies, contacts and venues and every detail, but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -257,8 +250,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "(in the mobile app only) Drivers only have access to work trackers that have been released and are assigned to them. They only have the ability to change the status and submit inspection forms to this work tracker. They cannot delete a work tracker or change any other information.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: read(
+        "The Dashboard shows work trackers, and a maintainer can read them there, but cannot create, edit or delete any. They still have no Work Trackers page.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -284,9 +277,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none(
         "The driver's own withdrawals and bleacher swaps are reported to the account managers of their zones, not back to them in the mobile app.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -303,9 +294,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: full(
         "Drivers have full access to their profile in the mobile app. They can update their driver information, vehicle information, and legal information. They can also set their availability and accept and complete work trackers.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -426,9 +415,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -447,9 +434,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -472,9 +457,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers do not have access to the web configuration pages. They see a line item's description on quotes they can open.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -497,9 +480,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers do not have access to the web configuration pages. They see the contract on quotes they can open.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -520,9 +501,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none(
         "Drivers do not have access to the web configuration pages. They interact with the inspection form only when completing inspections in the mobile app.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -547,9 +526,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "Drivers submit inspections through the mobile app when picking up or dropping off a bleacher. They can only submit inspections for work trackers assigned to them. Once submitted, an inspection cannot be edited or deleted by the driver.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -564,9 +541,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -588,9 +563,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers cannot invite team members. They have read-only access across the platform.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -611,9 +584,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can view all team member profiles and details, but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -636,9 +607,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers cannot deactivate team members. They have read-only access across the platform.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -659,9 +628,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can view all sales scorecard data but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -678,9 +645,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can view all driver scorecard data but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -699,9 +664,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the development roadmap."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -720,9 +683,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the development roadmap."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -747,9 +708,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "(in the mobile app only) Answers the survey, and can see their own past answers. Cannot see any other driver's responses, and has no access to the web page.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -772,9 +731,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can view all tickets in the backlog and sprints but cannot create, edit, or move them.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
@@ -795,9 +752,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health is for developers only.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },

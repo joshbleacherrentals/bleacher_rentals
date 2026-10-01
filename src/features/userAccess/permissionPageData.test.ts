@@ -39,4 +39,26 @@ describe("permission matrix", () => {
       expect(invite?.roles.account_manager.note).toMatch(/Accountant/);
     });
   });
+
+  // docs/specs/maintainer-dashboard-cells.md: a maintainer writes notes in dashboard cells,
+  // and only edits the ones they wrote.
+  describe("maintainer on the dashboard", () => {
+    const row = (label: string) => PERMISSIONS.find((p) => p.label === label)?.roles.maintainer;
+
+    it("has a custom Dashboard Cells answer that names the own-notes-only rule", () => {
+      const cells = row("Dashboard Cells");
+      expect(cells?.level).toBe("custom");
+      expect(cells?.note).toMatch(/wrote themselves/i);
+    });
+
+    it("no longer says the dashboard is hidden from them", () => {
+      expect(ROLE_DESCRIPTIONS.maintainer).not.toMatch(/nothing else on the dashboard/i);
+      expect(row("Dashboard Cells")?.note).not.toMatch(/hidden/i);
+    });
+
+    it("only reads Events and Work Trackers — the dashboard shows them, nothing more", () => {
+      expect(row("Events")?.level).toBe("read");
+      expect(row("Work Trackers")?.level).toBe("read");
+    });
+  });
 });
