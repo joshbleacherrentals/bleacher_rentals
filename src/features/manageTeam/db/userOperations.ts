@@ -285,6 +285,15 @@ export async function createUser(
       if (maintError) throw maintError;
     }
 
+    // 7. If accountant, insert into Accountants table (admin-only under RLS)
+    if (state.isAccountant) {
+      const { error: acctError } = await supabase.from("Accountants").insert({
+        user_uuid: userUuid,
+        is_active: true,
+      });
+      if (acctError) throw acctError;
+    }
+
     return { success: true, userUuid };
   } catch (error) {
     console.error("Error creating user:", error);
@@ -541,6 +550,36 @@ export async function updateUser(
         .update({ is_active: false })
         .eq("user_uuid", userUuid);
       if (maintDeactivateError) throw maintDeactivateError;
+    }
+
+    // 6. Handle Accountant role. Same shape as the maintainer block: revoking
+    // deactivates the row rather than deleting it.
+    const { data: existingAcct } = await supabase
+      .from("Accountants")
+      .select("id")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (state.isAccountant) {
+      if (!existingAcct) {
+        const { error: acctInsertError } = await supabase.from("Accountants").insert({
+          user_uuid: userUuid,
+          is_active: true,
+        });
+        if (acctInsertError) throw acctInsertError;
+      } else {
+        const { error: acctUpdateError } = await supabase
+          .from("Accountants")
+          .update({ is_active: true })
+          .eq("user_uuid", userUuid);
+        if (acctUpdateError) throw acctUpdateError;
+      }
+    } else if (existingAcct) {
+      const { error: acctDeactivateError } = await supabase
+        .from("Accountants")
+        .update({ is_active: false })
+        .eq("user_uuid", userUuid);
+      if (acctDeactivateError) throw acctDeactivateError;
     }
 
     return { success: true };
@@ -951,6 +990,18 @@ export async function fetchUserById(
     if (maintainer && maintainer.is_active) {
       roleTabs.push("maintainer");
       result.isMaintainer = true;
+    }
+
+    // 6. Check if user is an accountant
+    const { data: accountant } = await supabase
+      .from("Accountants")
+      .select("id, is_active")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (accountant && accountant.is_active) {
+      roleTabs.push("accountant");
+      result.isAccountant = true;
     }
 
     result.roleTabs = roleTabs;

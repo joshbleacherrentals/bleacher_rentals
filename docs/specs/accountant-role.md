@@ -1,27 +1,45 @@
 # Accountant role
 
-Status: **DRAFT — awaiting approval** — 2026-09-30.
+Status: **APPROVED** — 2026-09-30 (D1 `user_uuid`, D2 admin-only, D3–D8 as recommended). Stage 1 in implementation.
+Revision: everything after Stage 1 is intentionally left undefined — see §0.
 Branch: `q4-sprint1-finance-role`.
 Precedent: [maintainer-role.md](maintainer-role.md) (the last role added; this spec follows
 the same shape, and its `git show 4e7168ca --stat` is the checklist of places a role touches).
 
 ## 0. What this is, and what it is not
 
-A seventh web role, `accountant`, for the people who handle finances. Today `account_manager`
-does both operations and finance; the plan is to later **restrict** the finance part of
-`account_manager` and **give** it to `accountant`.
+A seventh web role, `accountant`, for employees who work with finances. `account_manager` is the
+role for managers who work with the operational part of the system.
+
+This is the concept, not a design: in the future `accountant` is expected to receive the
+financial functionality it needs, and part of the corresponding `account_manager` functionality
+may be restricted. **Which functionality, how, and in what order is not decided here.** It is
+deliberately left open for the later stages.
 
 That is a multi-stage feature. **This spec locks Stage 1 only:**
 
 > Stage 1 — the role exists, can be granted from `/team`, is stored in its own `Accountants`
 > table, is synced to the client, and has **no permissions and no access to any data**.
 
-| Stage | Scope                                                                                                                                                                                     | Spec                                 |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| **1** | **Role plumbing: DB table, `get_user_roles()`, TS role, `/team`, sync identity**                                                                                                          | **this document**                    |
-| 2     | Inventory of finance features today owned by `account_manager` (Payment History, Record a Payment, QuickBooks Invoice Flag, AR tabs, QuickBooks/Stripe connections…) and the target split | new spec, not started                |
-| 3     | Grant `accountant` finance access **one capability at a time** (RLS arrays + sync rules + UI gate + matrix row)                                                                           | one spec per capability, not started |
-| 4     | Restrict `account_manager` — the only stage that changes someone else's behaviour, so it comes last                                                                                       | new spec, not started                |
+**Stage 1**
+
+- **Scope:** **Role plumbing: DB table, `get_user_roles()`, TS role, `/team`, sync
+  identity**
+- **Spec:** **this document**
+
+**Stage 2**
+
+- **Scope:** Discovery / analysis only. Research the current `account_manager`
+  functionality, determine which of it belongs to the financial area of responsibility, and
+  separately agree which functionality `accountant` should receive and which
+  `account_manager` functionality should be restricted. This spec does not name any of it.
+- **Spec:** not started; its outcome is agreed with you before anything is designed
+
+**After Stage 2**
+
+- **Scope:** Not defined. Their number, order and form follow from the outcome of Stage 2
+  and are agreed separately.
+- **Spec:** not started
 
 Nothing in Stage 1 may change what `admin`, `account_manager`, `developer`, `viewer`,
 `maintainer` or `driver` can see or do.
@@ -30,16 +48,70 @@ Nothing in Stage 1 may change what `admin`, `account_manager`, `developer`, `vie
 
 Two need your answer; the rest are defaults I will take unless you object.
 
-| #   | Question                                                                                                                                                             | My recommendation                                                                                                                                                                                                                                                                                                                            | Needs you? |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| D1  | Column name. The request says `usersUuid`; every role table in the repo uses snake_case **`user_uuid`** (`AccountManagers`, `Developers`, `Maintainers`, `Drivers`). | **`user_uuid`**, FK named `accountants_user_uuid_fkey`. A camelCase column would be the only one in the schema and would not match the PostgREST embed hints, `AppSchema.ts` or `determineAccess.ts` conventions.                                                                                                                            | **yes**    |
-| D2  | Who may grant the Accountant role? `canCreateUser` is `admin \|\| account_manager`, and `RoleNavigation` only hides "Administrator" from AMs.                        | **Admin only.** RLS on `Accountants` is admin-only (D3) and the role is finance-sensitive, so `RoleNavigation` hides it from non-admins the way it hides Administrator. See §9 "found on the way" for why not showing it matters: today an AM who picks Developer/Maintainer gets an RLS error _after_ the `Users` row was already inserted. | **yes**    |
-| D3  | RLS on `Accountants`.                                                                                                                                                | Four `rbac_*` policies, `{admin}` only — verbatim `Maintainers`/`Developers`. No self-read policy (none of the role tables has one; the client learns its own role from PowerSync). Known side effect in R6.                                                                                                                                 | no         |
-| D4  | What does an accountant-only user see in Stage 1?                                                                                                                    | Signs in (is **not** shown "No roles assigned"), sidebar shows only **Documentation** (Role Permissions, What's New), lands on `/permissions`. Nothing else.                                                                                                                                                                                 | no         |
-| D5  | Sync rules in Stage 1.                                                                                                                                               | Identity row (`Accountants`) + `ChangeLog` (What's New needs it). No operational tables.                                                                                                                                                                                                                                                     | no         |
-| D6  | `/permissions` placement.                                                                                                                                            | `ROLE_ORDER`: after `account_manager` (the role it will take work from). Card colour `teal`.                                                                                                                                                                                                                                                 | no         |
-| D7  | `TeamPermissions.isAccountant`.                                                                                                                                      | **Not added** — no consumer in Stage 1. Only `canAssignAccountant` (= `isAdmin`) is added, for D2.                                                                                                                                                                                                                                           | no         |
-| D8  | E2E.                                                                                                                                                                 | Specs are written, **not run locally** (you asked not to run Playwright; there is no Clerk accountant user yet). The accountant Playwright project is registered only when `E2E_ACCOUNTANT_EMAIL` exists, as for `maintainer`.                                                                                                               | no         |
+**D1**
+
+- **Question:** Column name. The request says `usersUuid`; every role table in the repo
+  uses snake_case **`user_uuid`** (`AccountManagers`, `Developers`, `Maintainers`,
+  `Drivers`).
+- **My recommendation:** **`user_uuid`**, FK named `accountants_user_uuid_fkey`. A
+  camelCase column would be the only one in the schema and would not match the PostgREST
+  embed hints, `AppSchema.ts` or `determineAccess.ts` conventions.
+- **Needs you?** **yes**
+
+**D2**
+
+- **Question:** Who may grant the Accountant role? `canCreateUser` is
+  `admin || account_manager`, and `RoleNavigation` only hides "Administrator" from AMs.
+- **My recommendation:** **Admin only.** RLS on `Accountants` is admin-only (D3), so
+  `RoleNavigation` hides it from non-admins the way it hides Administrator. See §9 "found on the way" for why not showing it matters: today an AM who
+  picks Developer/Maintainer gets an RLS error _after_ the `Users` row was already
+  inserted.
+- **Needs you?** **yes**
+
+**D3**
+
+- **Question:** RLS on `Accountants`.
+- **My recommendation:** Four `rbac_*` policies, `{admin}` only — verbatim
+  `Maintainers`/`Developers`. No self-read policy (none of the role tables has one; the
+  client learns its own role from PowerSync). Known side effect in R6.
+- **Needs you?** no
+
+**D4**
+
+- **Question:** What does an accountant-only user see in Stage 1?
+- **My recommendation:** Signs in (is **not** shown "No roles assigned"), sidebar shows
+  only **Documentation** (Role Permissions, What's New), lands on `/permissions`. Nothing
+  else.
+- **Needs you?** no
+
+**D5**
+
+- **Question:** Sync rules in Stage 1.
+- **My recommendation:** Identity row (`Accountants`) + `ChangeLog` (What's New needs it).
+  No operational tables.
+- **Needs you?** no
+
+**D6**
+
+- **Question:** `/permissions` placement.
+- **My recommendation:** `ROLE_ORDER`: after `account_manager`. Card colour `teal`.
+  Purely presentational and easy to change.
+- **Needs you?** no
+
+**D7**
+
+- **Question:** `TeamPermissions.isAccountant`.
+- **My recommendation:** **Not added** — no consumer in Stage 1. Only
+  `canAssignAccountant` (= `isAdmin`) is added, for D2.
+- **Needs you?** no
+
+**D8**
+
+- **Question:** E2E.
+- **My recommendation:** Specs are written, **not run locally** (you asked not to run
+  Playwright; there is no Clerk accountant user yet). The accountant Playwright project is
+  registered only when `E2E_ACCOUNTANT_EMAIL` exists, as for `maintainer`.
+- **Needs you?** no
 
 ## 2. How roles work today (research findings)
 
@@ -140,7 +212,7 @@ comment on table public."Accountants" is
 ```
 
 Only the four columns you listed (plus `user_uuid` being the FK you called `usersUuid`). No other
-columns; later stages may add some.
+columns; the table may be extended later if the Accountant functionality requires it.
 
 RLS — copied from `Maintainers`, `{admin}` for select / insert / update / delete (`rbac_select`,
 `rbac_insert`, `rbac_update`, `rbac_delete`).
@@ -167,7 +239,8 @@ untouched. This is the single most important statement in Stage 1.
 
 No existing policy is edited and no helper (`is_current_user_*`, the driver-update fence
 trigger) is touched: an `accountant` has no writes anywhere, so there is nothing to allow-list.
-Adding `accountant` to any policy array is a Stage 3 act, per capability.
+Adding `accountant` to any policy array is outside Stage 1: it happens only once permissions
+for the role have been defined and approved.
 
 ### 4.4 Seed
 
@@ -213,12 +286,12 @@ is_active)` and maps `accountant_id: activeId(row.Accountants)`.
 - `permissionPageData.ts` (CLAUDE.md: same commit as the role):
   - `ROLE_LABELS.accountant = "Accountant"`; `ROLE_DESCRIPTIONS.accountant` — "Reserved for the
     people who handle finances. In this release the role has no permissions yet: an Accountant
-    can sign in and read this page and What's New, and nothing else. Finance access will be
-    added in later releases."
+    can sign in and read this page and What's New, and nothing else. Its permissions will be
+    defined later."
   - `ROLE_ORDER` — add `"accountant"` after `"account_manager"` (**not** compile-enforced).
   - Every one of the 31 `PERMISSIONS` entries gets `accountant: none(ACCOUNTANT_NO_ACCESS_NOTE)`
-    (one shared constant: "The Accountant role has no permissions yet. Finance access is being
-    added in stages; until then everything on the web dashboard is hidden from it.").
+    (one shared constant: "The Accountant role has no permissions yet. Until permissions are
+    assigned to it, everything on the web dashboard is hidden from it.").
   - Account Manager's **Invite Team Members** note: "…cannot assign them the Admin **or
     Accountant** role" (D2).
 - `RoleCard.tsx` `COLOR_MAP.accountant = "border-l-teal-500"`.
@@ -305,10 +378,14 @@ Stage 1 adds exactly two lines to `web`:
 **Why only those.** What an accountant-only user's shell reads in Stage 1: own `Users` row
 (identity ✔, carries `changelog_last_read_at`), `UserStatuses` and `AppVersionPolicy` (already
 synced to everyone), `Accountants` (new), `ChangeLog` (What's New page + sidebar dot — same as
-the maintainer). Everything else the shell queries (`AccountManagerZones` for the zone store,
-alert counts, the inspection badge) is empty-safe. Everything operational (Events,
-PaymentHistory, Companies, Bleachers, Users-of-others…) is **not** synced — it is what Stage 3
-adds, per capability, with a query built from the same template (`JOIN "Accountants"`).
+the maintainer). The identity queries have no `user_uuid` filter, so — exactly like the
+`AccountManagers`, `Developers` and `Maintainers` lines beside it — the `Accountants` line sends
+the whole table (who holds the role, `is_active`, `created_at`; no personal data) to every web
+user. That is deliberate: it is what fills the Accountants tab on `/team` for admins, account
+managers and viewers. Everything else the shell queries (`AccountManagerZones` for the zone store,
+alert counts, the inspection badge) is empty-safe. Everything operational is **not** synced in
+Stage 1. Which data the role later receives, if any, is decided in a later stage; a query for
+it would be built from the same template (`JOIN "Accountants"`).
 
 **Deploy order (same as maintainer): migration → sync rules + PowerSync restart → app.**
 Assumption to confirm at first deploy: PowerSync's Postgres publication covers new tables
@@ -324,21 +401,80 @@ Only the migration. No API route changes; no change to `/api/invite`, the webhoo
 
 ✓ = compile-enforced once `WebRole` / `TeamRoleTab` grow · ✎ = manual, compiler silent.
 
-| Area      | File                                                                                                                                                                                                                     | Change                                      |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| DB        | `supabase/migrations/20260930130000_accountant_role.sql`                                                                                                                                                                 | **new** — §4                                |
-| DB        | `supabase/tests/accountant_role.test.sql`, `package.json` (`test:db:accountant`, append to `test:db:all`)                                                                                                                | **new**                                     |
-| DB        | `database.types.ts`                                                                                                                                                                                                      | `npm run gtl`                               |
-| PS        | `src/lib/powersync/AppSchema.ts`                                                                                                                                                                                         | table + schema list + `AccountantsRecord`   |
-| PS        | `br_powersync/config/sync_rules.yaml`                                                                                                                                                                                    | 2 queries (§7.2)                            |
-| Access    | `logic/determineAccess.ts`, `types.ts`, `hooks/useUserAccess.ts`, `logic/resolveUserAccessForRequest.ts`                                                                                                                 | §5                                          |
-| Access    | `accessConfig.ts` ✓, `src/components/sidebar/useSidebarItems.ts` ✓ (+ `useSidebarItems.test.ts`)                                                                                                                         | §5                                          |
-| Access    | `permissionPageData.ts` ✓ (+ `ROLE_ORDER` ✎, AM invite note ✎), `RoleCard.tsx` ✓                                                                                                                                         | §5                                          |
-| Team      | `state/useCurrentUserStore.ts`, `db/userOperations.ts`                                                                                                                                                                   | §6                                          |
-| Team      | `components/RoleNavigation.tsx` ✓/✎, `inputs/TabNavigation.tsx` ✎, `hooks/useUserFormPaths.ts` ✓, `hooks/useTeamPermissions.ts`                                                                                          | §6                                          |
-| Team      | `hooks/useIncomplete.ts` ✎, `components/UserFormLayout.tsx` ✎, `lists/IncompleteList.tsx` ✎                                                                                                                              | §6                                          |
-| Team      | `src/app/team/page.tsx` ✎; **new:** `hooks/useAccountants.ts`, `lists/AccountantList.tsx`, `pages/AccountantPageContent.tsx`, `src/app/team/new/accountant/page.tsx`, `src/app/team/[userUuid]/edit/accountant/page.tsx` | §6                                          |
-| Tests/E2E | `playwright.config.ts` (`ROLES`, conditional project), `manageTeam/e2e/auth.setup.ts` (`ROLES`)                                                                                                                          | accountant, gated on `E2E_ACCOUNTANT_EMAIL` |
+**DB**
+
+- **File:** `supabase/migrations/20260930130000_accountant_role.sql`
+- **Change:** **new** — §4
+
+**DB**
+
+- **File:** `supabase/tests/accountant_role.test.sql`, `package.json`
+  (`test:db:accountant`, append to `test:db:all`)
+- **Change:** **new**
+
+**DB**
+
+- **File:** `database.types.ts`
+- **Change:** `npm run gtl`
+
+**PS**
+
+- **File:** `src/lib/powersync/AppSchema.ts`
+- **Change:** table + schema list + `AccountantsRecord`
+
+**PS**
+
+- **File:** `br_powersync/config/sync_rules.yaml`
+- **Change:** 2 queries (§7.2)
+
+**Access**
+
+- **File:** `logic/determineAccess.ts`, `types.ts`, `hooks/useUserAccess.ts`,
+  `logic/resolveUserAccessForRequest.ts`
+- **Change:** §5
+
+**Access**
+
+- **File:** `accessConfig.ts` ✓, `src/components/sidebar/useSidebarItems.ts` ✓ (+
+  `useSidebarItems.test.ts`)
+- **Change:** §5
+
+**Access**
+
+- **File:** `permissionPageData.ts` ✓ (+ `ROLE_ORDER` ✎, AM invite note ✎), `RoleCard.tsx`
+  ✓
+- **Change:** §5
+
+**Team**
+
+- **File:** `state/useCurrentUserStore.ts`, `db/userOperations.ts`
+- **Change:** §6
+
+**Team**
+
+- **File:** `components/RoleNavigation.tsx` ✓/✎, `inputs/TabNavigation.tsx` ✎,
+  `hooks/useUserFormPaths.ts` ✓, `hooks/useTeamPermissions.ts`
+- **Change:** §6
+
+**Team**
+
+- **File:** `hooks/useIncomplete.ts` ✎, `components/UserFormLayout.tsx` ✎,
+  `lists/IncompleteList.tsx` ✎
+- **Change:** §6
+
+**Team**
+
+- **File:** `src/app/team/page.tsx` ✎; **new:** `hooks/useAccountants.ts`,
+  `lists/AccountantList.tsx`, `pages/AccountantPageContent.tsx`,
+  `src/app/team/new/accountant/page.tsx`,
+  `src/app/team/[userUuid]/edit/accountant/page.tsx`
+- **Change:** §6
+
+**Tests/E2E**
+
+- **File:** `playwright.config.ts` (`ROLES`, conditional project),
+  `manageTeam/e2e/auth.setup.ts` (`ROLES`)
+- **Change:** accountant, gated on `E2E_ACCOUNTANT_EMAIL`
 
 All paths under `src/features/…` unless shown in full; `manageTeam` and `userAccess` as in §5/§6.
 
@@ -362,16 +498,56 @@ project's Definition of Done; per standing instruction, **Playwright is not run 
 (reported SKIPPED)** and Prettier is run only on touched files (repo-wide `lint` is red at
 baseline).
 
-| Step                    | Work                                                                                                                                                                   | Gate — what must be true before continuing                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1.1 Database**        | Migration + `accountant_role.test.sql`; `npm run gtl`                                                                                                                  | Migration applies (dry-run first inside `BEGIN … ROLLBACK` through the `supabase_db_bleacher_rentals` container — host `psql` is absent and the local DB lags migrations — by piping the migration and then the test file, whose own `ROLLBACK` undoes both); the new test **and** `rls_multi_role.test.sql` pass (CI runs `supabase test db`, which picks up the whole `supabase/tests/` folder, so the new file needs no CI wiring); `database.types.ts` has `Accountants` and `git diff` of it is only that table. |
-| **1.2 Access layer**    | `AppSchema`, `WebRole`, `UserAccessData`, `useUserAccess`, `resolveUserAccessForRequest`, `accessConfig`, sidebar keys, `permissionPageData`, `RoleCard` + their tests | `npm run tc` clean (every ✓ satisfied); `npx vitest run` green incl. new cases; no existing test expectation edited except adding `accountant_id: null` to `UserAccessData` literals.                                                                                                                                                                                                                                                                                                                                 |
-| **1.3 `/team`**         | Store, tab, routes, pages, list, hook, `userOperations`, `useIncomplete`, `UserFormLayout`, `RoleNavigation` gating                                                    | tc + vitest green; **manual in the dev preview as an admin**: invite an accountant, see them in Accountants and All, edit, remove the role, re-add; create one user each of AM / driver / viewer / developer / maintainer and confirm nothing regressed.                                                                                                                                                                                                                                                              |
-| **1.4 Sync rules**      | `br_powersync` PR: the 2 queries                                                                                                                                       | YAML loads; service restarted; with the local PowerSync stack, an accountant-only test user's client holds `Accountants` + `ChangeLog` + own `Users` row and **no other table**; `useUserAccess` → `active`.                                                                                                                                                                                                                                                                                                          |
-| **1.5 E2E scaffolding** | Two specs + config (§11)                                                                                                                                               | Files type-check and lint; not executed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **1.6 Close-out**       | Matrix re-read against the code; final DoD report                                                                                                                      | Report with real tails of `npm run tc`, `npx vitest run`, `test:db:*`, `prettier --check <touched files>`; E2E marked SKIPPED with the reason.                                                                                                                                                                                                                                                                                                                                                                        |
+**1.1 Database**
 
-Stages 2–4 are not started by anything above.
+- **Work:** Migration + `accountant_role.test.sql`; `npm run gtl`
+- **Gate — what must be true before continuing:** Migration applies (dry-run first inside
+  `BEGIN … ROLLBACK` through the `supabase_db_bleacher_rentals` container — host `psql` is
+  absent and the local DB lags migrations — by piping the migration and then the test
+  file, whose own `ROLLBACK` undoes both); the new test **and** `rls_multi_role.test.sql`
+  pass (CI runs `supabase test db`, which picks up the whole `supabase/tests/` folder, so
+  the new file needs no CI wiring); `database.types.ts` has `Accountants` and `git diff`
+  of it is only that table.
+
+**1.2 Access layer**
+
+- **Work:** `AppSchema`, `WebRole`, `UserAccessData`, `useUserAccess`,
+  `resolveUserAccessForRequest`, `accessConfig`, sidebar keys, `permissionPageData`,
+  `RoleCard` + their tests
+- **Gate — what must be true before continuing:** `npm run tc` clean (every ✓ satisfied);
+  `npx vitest run` green incl. new cases; no existing test expectation edited except
+  adding `accountant_id: null` to `UserAccessData` literals.
+
+**1.3 `/team`**
+
+- **Work:** Store, tab, routes, pages, list, hook, `userOperations`, `useIncomplete`,
+  `UserFormLayout`, `RoleNavigation` gating
+- **Gate — what must be true before continuing:** tc + vitest green; **manual in the dev
+  preview as an admin**: invite an accountant, see them in Accountants and All, edit,
+  remove the role, re-add; create one user each of AM / driver / viewer / developer /
+  maintainer and confirm nothing regressed.
+
+**1.4 Sync rules**
+
+- **Work:** `br_powersync` PR: the 2 queries
+- **Gate — what must be true before continuing:** YAML loads; service restarted; with the
+  local PowerSync stack, an accountant-only test user's client holds `Accountants` +
+  `ChangeLog` + own `Users` row (plus `UserStatuses`, `AppVersionPolicy`, and the table-wide identity
+  rows every web user already gets) and **no operational table**; `useUserAccess` → `active`.
+
+**1.5 E2E scaffolding**
+
+- **Work:** Two specs + config (§11)
+- **Gate — what must be true before continuing:** Files type-check and lint; not executed.
+
+**1.6 Close-out**
+
+- **Work:** Matrix re-read against the code; final DoD report
+- **Gate — what must be true before continuing:** Report with real tails of `npm run tc`,
+  `npx vitest run`, `test:db:*`, `prettier --check <touched files>`; E2E marked SKIPPED
+  with the reason.
+
+Nothing above starts Stage 2 or anything after it (§0).
 
 ## 11. What to verify after each step, and tests
 
@@ -390,8 +566,8 @@ Stages 2–4 are not started by anything above.
   incomplete; a user whose accountant row is inactive is.
 - `useTeamPermissions.test.ts`: `canAssignAccountant` true only for admin.
 - **new** `permissionPageData.test.ts`: `ROLE_ORDER` contains every `WebRole`; every entry has
-  an `accountant` level of `none` in Stage 1 (guards the ✎ `ROLE_ORDER` gap and stops Stage 3
-  from editing the matrix silently).
+  an `accountant` level of `none` in Stage 1 (guards the ✎ `ROLE_ORDER` gap and makes any later
+  change to the Accountant column edit this test on purpose).
 
 **SQL** — `supabase/tests/accountant_role.test.sql`
 
@@ -448,20 +624,92 @@ other role is unchanged (manual in 1.3, existing unit tests).
 
 ## 13. Risks and dependencies
 
-| #   | Risk                                                                                                                                               | Impact                                                                                          | Mitigation                                                                                                                                                                                                                                                 |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | App released before the migration                                                                                                                  | Fallback embed fails for all fallback users (driver-only users lose `DriverWelcome`)            | Order: migration → sync rules → app; called out in the PR description                                                                                                                                                                                      |
-| R2  | `get_user_roles()` re-created from a stale definition                                                                                              | `maintainer` (or the lockout) silently revoked for everyone                                     | Copy from `20260910130000`; pgTAP asserts every existing role still resolves                                                                                                                                                                               |
-| R3  | `sync_rules.yaml` is not watched                                                                                                                   | New role never syncs until restart                                                              | Restart is a named step in 1.4; verify with a real accountant-only client                                                                                                                                                                                  |
-| R4  | A role enumeration missed (compiler silent)                                                                                                        | Accountant shows as "incomplete", or is claimable/editable by AMs (this happened to maintainer) | The ✎ list in §9; before closing 1.3, `grep -rn "Maintainers\|isMaintainer" src` and justify every hit                                                                                                                                                     |
-| R5  | AM can reach the grant UI                                                                                                                          | Orphan half-created users                                                                       | D2                                                                                                                                                                                                                                                         |
-| R6  | First-login flash of "No roles assigned": local DB empty → fallback → RLS hides `Accountants` (admin-only) → "no roles" until the first sync lands | Bad first impression for a brand-new role; shared by maintainer/developer today                 | Verify in 1.4. If it shows, the fix is a self-read `select` policy on `Accountants` (`user_uuid` = the caller) — one extra policy, deferred unless you want it now                                                                                         |
-| R7  | "No access" holds only while no policy is blanket-permissive                                                                                       | A future `using (true)` leaks finance data to accountants                                       | Sweep test in §11; `ChangeLog` is the one intentional exception; bucket-level `storage.objects` policies are role-agnostic for **every** role and out of scope                                                                                             |
-| R8  | Naming (`usersUuid` vs `user_uuid`)                                                                                                                | Schema inconsistency                                                                            | D1                                                                                                                                                                                                                                                         |
-| R9  | PowerSync publication assumed to cover new tables                                                                                                  | Role row never reaches clients                                                                  | Confirm at first deploy (see §7.2)                                                                                                                                                                                                                         |
-| R10 | Migration version collides with `develop`                                                                                                          | `supabase db push` refuses                                                                      | Renumber (precedent `1b55bf3d`)                                                                                                                                                                                                                            |
-| R11 | No Clerk accountant user / E2E creds                                                                                                               | Accountant E2E cannot run                                                                       | Project registered conditionally on `E2E_ACCOUNTANT_EMAIL` (a project with no storageState **fails** rather than skips); needs, later: a Clerk user with a password, a seeded `Users` + `Accountants` row, the two `E2E_ACCOUNTANT_*` vars in `.env.local` |
-| R12 | Stage 4 (restricting AM) changes existing behaviour                                                                                                | Regression for current AMs                                                                      | Out of scope here; its own spec, after Stage 3 proves the accountant can do the work                                                                                                                                                                       |
+**R1**
+
+- **Risk:** App released before the migration
+- **Impact:** Fallback embed fails for all fallback users (driver-only users lose
+  `DriverWelcome`)
+- **Mitigation:** Order: migration → sync rules → app; called out in the PR description
+
+**R2**
+
+- **Risk:** `get_user_roles()` re-created from a stale definition
+- **Impact:** `maintainer` (or the lockout) silently revoked for everyone
+- **Mitigation:** Copy from `20260910130000`; pgTAP asserts every existing role still
+  resolves
+
+**R3**
+
+- **Risk:** `sync_rules.yaml` is not watched
+- **Impact:** New role never syncs until restart
+- **Mitigation:** Restart is a named step in 1.4; verify with a real accountant-only
+  client
+
+**R4**
+
+- **Risk:** A role enumeration missed (compiler silent)
+- **Impact:** Accountant shows as "incomplete", or is claimable/editable by AMs (this
+  happened to maintainer)
+- **Mitigation:** The ✎ list in §9; before closing 1.3,
+  `grep -rn "Maintainers|isMaintainer" src` and justify every hit
+
+**R5**
+
+- **Risk:** AM can reach the grant UI
+- **Impact:** Orphan half-created users
+- **Mitigation:** D2
+
+**R6**
+
+- **Risk:** First-login flash of "No roles assigned": local DB empty → fallback → RLS
+  hides `Accountants` (admin-only) → "no roles" until the first sync lands
+- **Impact:** Bad first impression for a brand-new role; shared by maintainer/developer
+  today
+- **Mitigation:** Verify in 1.4. If it shows, the fix is a self-read `select` policy on
+  `Accountants` (`user_uuid` = the caller) — one extra policy, deferred unless you want it
+  now
+
+**R7**
+
+- **Risk:** "No access" holds only while no policy is blanket-permissive
+- **Impact:** A future `using (true)` policy leaks data to an Accountant
+- **Mitigation:** Sweep test in §11; `ChangeLog` is the one intentional exception;
+  bucket-level `storage.objects` policies are role-agnostic for **every** role and out of
+  scope
+
+**R8**
+
+- **Risk:** Naming (`usersUuid` vs `user_uuid`)
+- **Impact:** Schema inconsistency
+- **Mitigation:** D1
+
+**R9**
+
+- **Risk:** PowerSync publication assumed to cover new tables
+- **Impact:** Role row never reaches clients
+- **Mitigation:** Confirm at first deploy (see §7.2)
+
+**R10**
+
+- **Risk:** Migration version collides with `develop`
+- **Impact:** `supabase db push` refuses
+- **Mitigation:** Renumber (precedent `1b55bf3d`)
+
+**R11**
+
+- **Risk:** No Clerk accountant user / E2E creds
+- **Impact:** Accountant E2E cannot run
+- **Mitigation:** Project registered conditionally on `E2E_ACCOUNTANT_EMAIL` (a project
+  with no storageState **fails** rather than skips); needs, later: a Clerk user with a
+  password, a seeded `Users` + `Accountants` row, the two `E2E_ACCOUNTANT_*` vars in
+  `.env.local`
+
+**R12**
+
+- **Risk:** A later decision to restrict an existing role (for example `account_manager`)
+  changes what its current users can do
+- **Impact:** Regression for current users of that role
+- **Mitigation:** Not part of Stage 1; assessed and designed in the stage that proposes it
 
 Dependencies: Supabase migration access (and the local DB catch-up before dry-running); write
 access to the separate `br_powersync` repo and a way to restart that service; `npm run gtl`
@@ -469,7 +717,7 @@ needs the local Supabase running.
 
 ## 14. Out of scope
 
-Any accountant permission or data access; restricting `account_manager`; moving finance pages or
-RLS; the `Developers`/`Maintainers` AM-grant bug and the `hasNoRoles`-for-maintainer gap (§9,
+Any accountant permission or data access; any change to the behaviour of existing roles
+(including any future restriction of `account_manager`); the `Developers`/`Maintainers` AM-grant bug and the `hasNoRoles`-for-maintainer gap (§9,
 reported not fixed); the stale role lists in `CLAUDE.md` and `preflight.md`; the
 release-notes entry (written with the changelog workflow at PR time).

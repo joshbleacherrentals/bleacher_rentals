@@ -9,6 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      Accountants: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          user_uuid: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_uuid: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_uuid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accountants_user_uuid_fkey"
+            columns: ["user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       AccountManagers: {
         Row: {
           created_at: string

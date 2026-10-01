@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { createUser, driverDocumentFields, driverPayFields } from "./userOperations";
+import {
+  createUser,
+  driverDocumentFields,
+  driverPayFields,
+  fetchUserById,
+  updateUser,
+} from "./userOperations";
 import type { CurrentUserState } from "../state/useCurrentUserStore";
 
 const baseState: CurrentUserState = {
@@ -12,6 +18,7 @@ const baseState: CurrentUserState = {
   isAccountManager: false,
   isDeveloper: false,
   isMaintainer: false,
+  isAccountant: false,
   isViewer: false,
   autoSubscribeToNewTickets: true,
   roleTabs: [],
@@ -183,5 +190,221 @@ describe("driverDocumentFields", () => {
       insurance_expires_on: null,
       medical_card_expires_on: null,
     });
+  });
+});
+
+// ── The Accountant role ──────────────────────────────────────────────────────
+//
+// A recording fake of the Supabase builder. Every chain ends either in `.single()`
+// or in being awaited, and both resolve from `tables` / `failOn`.
+
+type Call = { table: string; op: "select" | "insert" | "update"; payload?: unknown };
+
+function recordingSupabase(
+  opts: {
+    /** What `.single()` returns for a select on this table (default: no row). */
+    rows?: Record<string, unknown>;
+    /** Tables whose insert/update comes back with an error. */
+    failOn?: Record<string, { code?: string; message: string }>;
+  } = {},
+) {
+  const calls: Call[] = [];
+  const client = {
+    from: (table: string) => {
+      const chain = (op: Call["op"]) => {
+        const error = op === "select" ? null : (opts.failOn?.[table] ?? null);
+        const b: any = {
+          select: () => b,
+          eq: () => b,
+          // insert(...).select("id").single() yields the new row; select(...).single() the fixture.
+          single: async () => ({
+            data: op === "insert" ? { id: `new-${table}-id` } : (opts.rows?.[table] ?? null),
+            error,
+          }),
+          then: (resolve: (v: unknown) => void) => resolve({ data: null, error }),
+        };
+        return b;
+      };
+      return {
+        select: () => {
+          calls.push({ table, op: "select" });
+          return chain("select");
+        },
+        insert: (payload: unknown) => {
+          calls.push({ table, op: "insert", payload });
+          return chain("insert");
+        },
+        update: (payload: unknown) => {
+          calls.push({ table, op: "update", payload });
+          return chain("update");
+        },
+      };
+    },
+    rpc: async () => ({ data: ["admin"], error: null }),
+  } as any;
+  const on = (table: string, op: Call["op"]) =>
+    calls.filter((c) => c.table === table && c.op === op);
+  return { client, calls, on };
+}
+
+describe("createUser — accountant", () => {
+  it("records the role in Accountants, active, pointing at the new user", async () => {
+    const { client, on } = recordingSupabase();
+
+    const result = await createUser(client, { ...baseState, isAccountant: true });
+
+    expect(result).toEqual({ success: true, userUuid: "new-Users-id" });
+    expect(on("Accountants", "insert")).toEqual([
+      {
+        table: "Accountants",
+        op: "insert",
+        payload: { user_uuid: "new-Users-id", is_active: true },
+      },
+    ]);
+  });
+
+  it("writes nothing to Accountants when the role was not chosen", async () => {
+    const { client, on } = recordingSupabase();
+
+    await createUser(client, { ...baseState, isViewer: true });
+
+    expect(on("Accountants", "insert")).toHaveLength(0);
+  });
+
+  it("does not change what the other roles write", async () => {
+    const { client, on } = recordingSupabase();
+
+    await createUser(client, { ...baseState, isDeveloper: true, isMaintainer: true });
+
+    expect(on("Developers", "insert")).toHaveLength(1);
+    expect(on("Maintainers", "insert")).toHaveLength(1);
+    expect(on("Accountants", "insert")).toHaveLength(0);
+  });
+
+  it("reports a refused Accountants insert instead of swallowing it", async () => {
+    const { client } = recordingSupabase({
+      failOn: {
+        Accountants: { code: "42501", message: "new row violates row-level security policy" },
+      },
+    });
+
+    const result = await createUser(client, { ...baseState, isAccountant: true });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("new row violates row-level security policy");
+  });
+});
+
+describe("updateUser — accountant", () => {
+  const existing = { ...baseState, existingUserUuid: "user-1" };
+
+  it("inserts the row when the role is granted to a user who never had it", async () => {
+    const { client, on } = recordingSupabase();
+
+    const result = await updateUser(client, { ...existing, isAccountant: true });
+
+    expect(result.success).toBe(true);
+    expect(on("Accountants", "insert")).toEqual([
+      { table: "Accountants", op: "insert", payload: { user_uuid: "user-1", is_active: true } },
+    ]);
+    expect(on("Accountants", "update")).toHaveLength(0);
+  });
+
+  it("reactivates the existing row instead of inserting a second one", async () => {
+    const { client, on } = recordingSupabase({ rows: { Accountants: { id: "acct-1" } } });
+
+    await updateUser(client, { ...existing, isAccountant: true });
+
+    expect(on("Accountants", "insert")).toHaveLength(0);
+    expect(on("Accountants", "update")).toEqual([
+      { table: "Accountants", op: "update", payload: { is_active: true } },
+    ]);
+  });
+
+  it("deactivates the row when the role is removed — it is never deleted", async () => {
+    const { client, on } = recordingSupabase({ rows: { Accountants: { id: "acct-1" } } });
+
+    await updateUser(client, { ...existing, isAccountant: false });
+
+    expect(on("Accountants", "update")).toEqual([
+      { table: "Accountants", op: "update", payload: { is_active: false } },
+    ]);
+  });
+
+  it("does nothing to Accountants for a user who never had the role", async () => {
+    const { client, on } = recordingSupabase();
+
+    await updateUser(client, { ...existing, isAccountant: false });
+
+    expect(on("Accountants", "insert")).toHaveLength(0);
+    expect(on("Accountants", "update")).toHaveLength(0);
+  });
+
+  it("does not disturb the maintainer role while handling the accountant one", async () => {
+    const { client, on } = recordingSupabase({ rows: { Maintainers: { id: "m-1" } } });
+
+    await updateUser(client, { ...existing, isMaintainer: true, isAccountant: false });
+
+    expect(on("Maintainers", "update")).toEqual([
+      { table: "Maintainers", op: "update", payload: { is_active: true } },
+    ]);
+    expect(on("Accountants", "update")).toHaveLength(0);
+  });
+});
+
+describe("fetchUserById — accountant", () => {
+  const user = {
+    first_name: "Ann",
+    last_name: "Ledger",
+    email: "ann@example.com",
+    is_admin: false,
+    is_viewer: false,
+    status_uuid: null,
+    phone: null,
+  };
+
+  it("opens the accountant tab for an active row", async () => {
+    const { client } = recordingSupabase({
+      rows: { Users: user, Accountants: { id: "a-1", is_active: true } },
+    });
+
+    const result = await fetchUserById(client, "user-1");
+
+    expect(result?.roleTabs).toEqual(["accountant"]);
+    expect(result?.isAccountant).toBe(true);
+  });
+
+  it("does not open it for an inactive row — the role was removed", async () => {
+    const { client } = recordingSupabase({
+      rows: { Users: user, Accountants: { id: "a-1", is_active: false } },
+    });
+
+    const result = await fetchUserById(client, "user-1");
+
+    expect(result?.roleTabs).toEqual([]);
+    expect(result?.isAccountant).toBeFalsy();
+  });
+
+  it("does not open it for a user who never held it", async () => {
+    const { client } = recordingSupabase({ rows: { Users: user } });
+
+    const result = await fetchUserById(client, "user-1");
+
+    expect(result?.roleTabs).toEqual([]);
+    expect(result?.isAccountant).toBeFalsy();
+  });
+
+  it("keeps the order of tabs stable when several roles are held", async () => {
+    const { client } = recordingSupabase({
+      rows: {
+        Users: { ...user, is_viewer: true },
+        Maintainers: { id: "m-1", is_active: true },
+        Accountants: { id: "a-1", is_active: true },
+      },
+    });
+
+    const result = await fetchUserById(client, "user-1");
+
+    expect(result?.roleTabs).toEqual(["viewer", "maintainer", "accountant"]);
   });
 });

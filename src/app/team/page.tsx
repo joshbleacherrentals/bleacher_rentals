@@ -7,6 +7,7 @@ import { AccountManagerList } from "@/features/manageTeam/components/lists/Accou
 import { AdminList } from "@/features/manageTeam/components/lists/AdminList";
 import { DeveloperList } from "@/features/manageTeam/components/lists/DeveloperList";
 import { MaintainerList } from "@/features/manageTeam/components/lists/MaintainerList";
+import { AccountantList } from "@/features/manageTeam/components/lists/AccountantList";
 import { ViewerList } from "@/features/manageTeam/components/lists/ViewerList";
 import { IncompleteList } from "@/features/manageTeam/components/lists/IncompleteList";
 import TabNavigation, { TeamTab } from "../../features/manageTeam/components/inputs/TabNavigation";
@@ -116,6 +117,14 @@ export default function TeamPage() {
         </div>
       )}
 
+      {/* Accountants Section */}
+      {activeTab === "accountants" && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Accountants</h2>
+          <AccountantList showInactive={showInactive} />
+        </div>
+      )}
+
       {/* Viewers Section */}
       {activeTab === "viewers" && (
         <div className="mb-8">
@@ -150,6 +159,11 @@ export default function TeamPage() {
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Maintainers</h2>
             <MaintainerList showInactive={showInactive} />
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Accountants</h2>
+            <AccountantList showInactive={showInactive} />
           </div>
 
           <div className="mb-8">

@@ -351,6 +351,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
   ],
   driver: [],
   maintainer: ["quality-assurance", "documentation", "assets"],
+  accountant: ["documentation"],
 };
 
 export function useSidebarItems(roles: WebRole[]): SidebarItemConfig[] {

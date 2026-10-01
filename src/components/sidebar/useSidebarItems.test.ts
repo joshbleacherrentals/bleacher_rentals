@@ -139,6 +139,30 @@ describe("useSidebarItems", () => {
     ]);
   });
 
+  // ═══ Accountant (Stage 1: no permissions) ═══
+
+  it("accountant sees only the Documentation section", () => {
+    const items = useSidebarItems(["accountant"]);
+    expect(items.map((i) => i.key)).toEqual(["documentation"]);
+    const docs = items[0];
+    expect(docs.type).toBe("section");
+    const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
+      "href" in c ? c.href : "",
+    );
+    expect(hrefs).toEqual(["/permissions", "/changelog"]);
+  });
+
+  it("accountant sees no Quality Assurance dropdown — it would open onto nothing", () => {
+    const keys = useSidebarItems(["accountant"]).map((i) => i.key);
+    expect(keys).not.toContain("quality-assurance");
+  });
+
+  it("an account manager who is also an accountant sees what an account manager sees", () => {
+    expect(useSidebarItems(["account_manager", "accountant"]).map((i) => i.key)).toEqual(
+      useSidebarItems(["account_manager"]).map((i) => i.key),
+    );
+  });
+
   // ═══ Dev Tools ═══
 
   const devToolsHrefs = (roles: Parameters<typeof useSidebarItems>[0]) => {
@@ -161,7 +185,7 @@ describe("useSidebarItems", () => {
     expect(keys).not.toContain("sync-health");
   });
 
-  it.each(["admin", "account_manager", "viewer", "maintainer", "driver"] as const)(
+  it.each(["admin", "account_manager", "viewer", "maintainer", "accountant", "driver"] as const)(
     "%s without the developer role does not see Dev Tools",
     (role) => {
       expect(devToolsHrefs([role])).toBeUndefined();

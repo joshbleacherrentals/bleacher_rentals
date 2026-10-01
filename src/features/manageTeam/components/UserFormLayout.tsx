@@ -8,6 +8,7 @@ import { useTeamPermissions, getEditAccess } from "../hooks/useTeamPermissions";
 import { useCurrentUserStore } from "../state/useCurrentUserStore";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { EditAccessProvider } from "../state/EditAccessContext";
+import { hasNoRoles as holdsNoRole } from "../logic/teamRoles";
 
 interface UserFormLayoutProps {
   children: React.ReactNode;
@@ -24,9 +25,16 @@ export function UserFormLayout({ children }: UserFormLayoutProps) {
   const isViewer = useCurrentUserStore((s) => s.isViewer);
   const isAccountManagerFlag = useCurrentUserStore((s) => s.isAccountManager);
   const isDeveloper = useCurrentUserStore((s) => s.isDeveloper);
+  const isAccountant = useCurrentUserStore((s) => s.isAccountant);
   // Mirrors useIncomplete.ts's definition of an "incomplete" user (no role assigned yet).
-  const hasNoRoles =
-    !isAdminFlag && !isViewer && !isDriver && !isAccountManagerFlag && !isDeveloper;
+  const hasNoRoles = holdsNoRole({
+    isAdmin: isAdminFlag,
+    isViewer,
+    isDriver,
+    isAccountManager: isAccountManagerFlag,
+    isDeveloper,
+    isAccountant,
+  });
 
   const editAccess = existingUserUuid
     ? getEditAccess(

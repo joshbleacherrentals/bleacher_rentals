@@ -124,6 +124,15 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     ],
     showSidebar: true,
   },
+  accountant: {
+    // Stage 1 (docs/specs/accountant-role.md): the role has no permissions, so it gets only the two
+    // pages every role may read. With no /dashboard, defaultRedirect falls through to the first path
+    // here — the page that tells them what they may do. This must not be empty: useAccessRedirect
+    // would bounce a user with no allowed path forever (the driver's [] is safe only because a
+    // driver-only user is blocked before this config is read).
+    allowedPaths: ["/permissions", "/changelog"],
+    showSidebar: true,
+  },
   driver: {
     allowedPaths: [],
     showSidebar: false,

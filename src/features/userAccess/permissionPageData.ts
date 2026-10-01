@@ -19,6 +19,7 @@ export const ROLE_LABELS: Record<WebRole, string> = {
   account_manager: "Account Manager",
   driver: "Driver",
   maintainer: "Maintainer",
+  accountant: "Accountant",
   viewer: "Viewer",
   developer: "Developer",
 };
@@ -34,11 +35,14 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page. Sees nothing else on the dashboard — no quotes, events, payments, or team management.",
+  accountant:
+    "Reserved for the people who handle finances. In this release the role has no permissions yet: an Accountant can sign in and read this page and What's New, and nothing else. Its permissions will be defined later.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
   "admin",
   "account_manager",
+  "accountant",
   "maintainer",
   "driver",
   "viewer",
@@ -56,6 +60,10 @@ const full = (note?: string): PermissionAccess => ({ level: "full", note });
 const read = (note?: string): PermissionAccess => ({ level: "read", note });
 const custom = (note: string): PermissionAccess => ({ level: "custom", note });
 const none = (note?: string): PermissionAccess => ({ level: "none", note });
+
+// Stage 1 of docs/specs/accountant-role.md: the role exists and has no permissions.
+const ACCOUNTANT_NO_ACCESS_NOTE =
+  "The Accountant role has no permissions yet. Until permissions are assigned to it, everything on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -82,6 +90,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -102,6 +111,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -126,6 +136,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -150,6 +161,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -172,6 +184,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -195,6 +208,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -219,6 +233,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -245,6 +260,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -271,6 +287,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -289,6 +306,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -313,6 +331,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: full(
         "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -339,6 +358,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: full(
         "Can create, view, edit, delete, and restore any damage report and its photos, regardless of who created it. Can see acknowledgements but not add them.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -365,6 +385,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: full(
         "This is the role's whole job. Can record an inspection on any bleacher, correct an earlier record, upload or replace the certificate, and edit the notes. The only role that is notified: a counter in the sidebar on Annual Inspections, and a highlight on the bleachers that crossed a date since the last visit. Opening the page marks them all read, so the next visit highlights only what is new since then.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 
@@ -388,6 +409,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: full(
         "Can add a bleacher, edit any of its details, and delete or restore it, on the Bleachers tab of the Assets page. Sees no add button or editable form on the Documents and Other Assets tabs — those stay Administrator-only.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -407,6 +429,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -427,6 +450,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -451,6 +475,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -475,6 +500,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -497,6 +523,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -523,6 +550,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -539,6 +567,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 
@@ -550,7 +579,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     roles: {
       admin: full("Can invite any type of team member, including other admins."),
       account_manager: custom(
-        "Can invite new team members, but cannot assign them the Admin role. Can only invite drivers and other standard roles.",
+        "Can invite new team members, but cannot assign them the Admin or Accountant role. Can only invite drivers and other standard roles.",
       ),
       developer: none(
         "Developers do not have access to the Team page. This role is limited to the product roadmap.",
@@ -562,6 +591,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -584,6 +614,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -608,6 +639,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 
@@ -630,6 +662,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -648,6 +681,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 
@@ -668,6 +702,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -688,6 +723,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -714,6 +750,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -738,6 +775,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -760,6 +798,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(
         "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 ];

@@ -57,3 +57,49 @@ describe("mergeRoleConfigs — the maintainer role", () => {
     expect(mergeRoleConfigs(["viewer"]).allowedPaths).toContain("/annual-inspections");
   });
 });
+
+describe("mergeRoleConfigs — the accountant role (Stage 1: no permissions)", () => {
+  it("lets an accountant open exactly the two pages every role may read", () => {
+    const config = mergeRoleConfigs(["accountant"]);
+    expect(config.allowedPaths).toEqual(["/permissions", "/changelog"]);
+  });
+
+  it("lands an accountant-only user on /permissions — there is no dashboard for them", () => {
+    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/permissions");
+  });
+
+  it("shows the sidebar to an accountant", () => {
+    expect(mergeRoleConfigs(["accountant"]).showSidebar).toBe(true);
+  });
+
+  it("gives an accountant nothing operational", () => {
+    const { allowedPaths } = mergeRoleConfigs(["accountant"]);
+    for (const path of [
+      "/dashboard",
+      "/quotes-bookings",
+      "/team",
+      "/assets",
+      "/work-trackers",
+      "/companies-contacts",
+      "/messages",
+      "/quickbooks",
+      "/stripe-connections",
+    ]) {
+      expect(allowedPaths).not.toContain(path);
+    }
+  });
+
+  it("takes nothing away from an account manager who is also an accountant", () => {
+    const am = mergeRoleConfigs(["account_manager"]);
+    const both = mergeRoleConfigs(["account_manager", "accountant"]);
+    expect(both.allowedPaths).toEqual(am.allowedPaths);
+    expect(both.defaultRedirect).toBe("/dashboard");
+  });
+
+  it("leaves every other role's pages exactly as they were", () => {
+    // The accountant role adds a config entry; it must not edit anyone else's.
+    expect(mergeRoleConfigs(["admin"]).allowedPaths).toContain("/annual-inspections");
+    expect(mergeRoleConfigs(["maintainer"]).defaultRedirect).toBe("/annual-inspections");
+    expect(mergeRoleConfigs(["developer"]).allowedPaths).toContain("/dev-tools");
+  });
+});
