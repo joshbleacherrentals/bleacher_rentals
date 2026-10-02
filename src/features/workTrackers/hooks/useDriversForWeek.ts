@@ -8,50 +8,75 @@ import type { DriverWithMeta } from "../db/db";
 import { applyDriverScope, resolveDriverScope, type DriverScope } from "../db/driverZoneScope";
 import { matchesPayCurrency, type PayCurrencyFilter } from "../util/payCurrencyFilter";
 import { deriveRegion, isUsaAddress } from "../util/addressCountry";
+import { seesAllDriversAlways } from "../util/workTrackerPageAccess";
 
 const NONE = "__none__";
 
 // ---------------------------------------------------------------------------
-// Access (admin / account manager) — reactive replacement for checkUserAccess
+// Access (admin / account manager / accountant) — reactive replacement for checkUserAccess
 // ---------------------------------------------------------------------------
 
-type AccessRow = { is_admin: number | null; account_manager_id: string | null };
+type AccessRow = {
+  is_admin: number | null;
+  account_manager_id: string | null;
+  accountant_id: string | null;
+};
 
 export type WorkTrackerAccess = {
   isAdmin: boolean;
   isAccountManager: boolean;
+  isAccountant: boolean;
   accountManagerUuid: string | null;
 };
+
+/** Exported so a test can run the compiled SQL against a real SQLite database. */
+export function buildWorkTrackerAccessQuery(currentUserUuid: string | null) {
+  return db
+    .selectFrom("Users as u")
+    .leftJoin("AccountManagers as am", (join) =>
+      join.onRef("am.user_uuid", "=", "u.id").on("am.is_active", "=", 1),
+    )
+    .leftJoin("Accountants as acct", (join) =>
+      join.onRef("acct.user_uuid", "=", "u.id").on("acct.is_active", "=", 1),
+    )
+    .select(["u.is_admin as is_admin", "am.id as account_manager_id", "acct.id as accountant_id"])
+    .where("u.id", "=", currentUserUuid ?? NONE)
+    .limit(1)
+    .compile();
+}
+
+export function toWorkTrackerAccess(
+  currentUserUuid: string | null,
+  rows: AccessRow[] | undefined,
+): WorkTrackerAccess | null {
+  if (!currentUserUuid) return null;
+  const row = rows?.[0];
+  if (!row) {
+    return {
+      isAdmin: false,
+      isAccountManager: false,
+      isAccountant: false,
+      accountManagerUuid: null,
+    };
+  }
+  const isAccountManager = !!row.account_manager_id;
+  return {
+    isAdmin: !!row.is_admin,
+    isAccountManager,
+    isAccountant: !!row.accountant_id,
+    accountManagerUuid: isAccountManager ? row.account_manager_id : null,
+  };
+}
 
 export function useWorkTrackerAccess(currentUserUuid: string | null): {
   access: WorkTrackerAccess | null;
   isLoading: boolean;
 } {
-  const compiled = useMemo(() => {
-    return db
-      .selectFrom("Users as u")
-      .leftJoin("AccountManagers as am", (join) =>
-        join.onRef("am.user_uuid", "=", "u.id").on("am.is_active", "=", 1),
-      )
-      .select(["u.is_admin as is_admin", "am.id as account_manager_id"])
-      .where("u.id", "=", currentUserUuid ?? NONE)
-      .limit(1)
-      .compile();
-  }, [currentUserUuid]);
+  const compiled = useMemo(() => buildWorkTrackerAccessQuery(currentUserUuid), [currentUserUuid]);
 
   const { data, isLoading } = useTypedQuery(compiled, expect<AccessRow>());
 
-  const access = useMemo<WorkTrackerAccess | null>(() => {
-    if (!currentUserUuid) return null;
-    const row = data?.[0];
-    if (!row) return { isAdmin: false, isAccountManager: false, accountManagerUuid: null };
-    const isAccountManager = !!row.account_manager_id;
-    return {
-      isAdmin: !!row.is_admin,
-      isAccountManager,
-      accountManagerUuid: isAccountManager ? row.account_manager_id : null,
-    };
-  }, [currentUserUuid, data]);
+  const access = useMemo(() => toWorkTrackerAccess(currentUserUuid, data), [currentUserUuid, data]);
 
   return { access, isLoading };
 }
@@ -100,6 +125,9 @@ export function useDriversForWeek(
 ): { drivers: DriverWithMeta[]; isLoading: boolean } {
   const isAdmin = access?.isAdmin ?? false;
   const accountManagerUuid = access?.accountManagerUuid ?? null;
+  // An accountant has no zones and pays every driver: "See All Drivers" is always on for them.
+  const showAll =
+    showAllDrivers || seesAllDriversAlways({ isAccountant: access?.isAccountant ?? false });
 
   const driversCompiled = useMemo(() => {
     const base = db
@@ -123,11 +151,11 @@ export function useDriversForWeek(
 
     // Keep the query inert until access is resolved.
     const scope: DriverScope = enabled
-      ? resolveDriverScope({ isAdmin, accountManagerUuid, showAll: showAllDrivers })
+      ? resolveDriverScope({ isAdmin, accountManagerUuid, showAll })
       : { kind: "none" };
 
     return applyDriverScope(base, scope).compile();
-  }, [showAllDrivers, isAdmin, accountManagerUuid, enabled]);
+  }, [showAll, isAdmin, accountManagerUuid, enabled]);
 
   const { data: driverRows, isLoading: driversLoading } = useTypedQuery(
     driversCompiled,

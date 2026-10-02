@@ -30,6 +30,7 @@ import { DateTime } from "luxon";
 import { buildReleaseAllNotification } from "@/features/workTrackers/db/notifications";
 import { getDateRange } from "@/features/workTrackers/util";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import { canReleaseAllDrafts } from "@/features/workTrackers/util/workTrackerPageAccess";
 
 const getRandomLoadingMessage = () => {
   const messages = [
@@ -77,7 +78,10 @@ export default function WorkTrackersForUserPage() {
 
   const dateRange = getDateRange(startDate);
   const perms = usePermissionsStore();
-  const canReleaseAll = perms.isAdmin || perms.leadZoneIds.length > 0;
+  const canReleaseAll = canReleaseAllDrafts({
+    isAdmin: perms.isAdmin,
+    leadZoneIds: perms.leadZoneIds,
+  });
 
   const { data: draftTripCount = 0 } = useQuery({
     queryKey: ["draft-work-trackers-count", userUuid, startDate],

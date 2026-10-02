@@ -14,7 +14,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(30);
+SELECT plan(27);
 
 -- ── Shape ───────────────────────────────────────────────────────────────────
 
@@ -181,28 +181,29 @@ SELECT is(public.get_user_roles(), '{developer}'::text[], 'developer is still re
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_plain_maint')::text, true);
 SELECT is(public.get_user_roles(), '{maintainer}'::text[], 'maintainer is still resolved');
 
--- ── Stage 1: the role has no access to anything ─────────────────────────────
+-- ── The role has no access beyond what it was explicitly given ──────────────
 --
--- Zero-trust RLS: every policy names the roles it admits, and 'accountant' is in
--- none of them yet. This sweep is what keeps that true.
+-- Zero-trust RLS: every policy names the roles it admits. Stage 1 gave the role nothing;
+-- Stage 2 (accountant_work_trackers.test.sql, 20261001130000) added the Work Trackers
+-- tables — Bleachers, Drivers, WorkTrackers and the Users rows of drivers — so those are
+-- asserted THERE. This sweep is what keeps everything else closed.
 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_acct_only')::text, true);
 
 SELECT is((SELECT count(*)::int FROM public."Events"), 0, 'an accountant cannot read Events');
-SELECT is((SELECT count(*)::int FROM public."Bleachers"), 0, 'an accountant cannot read Bleachers');
-SELECT is((SELECT count(*)::int FROM public."Drivers"), 0, 'an accountant cannot read Drivers');
 SELECT is((SELECT count(*)::int FROM public."AccountManagers"), 0, 'an accountant cannot read AccountManagers');
 SELECT is((SELECT count(*)::int FROM public."Developers"), 0, 'an accountant cannot read Developers');
 SELECT is((SELECT count(*)::int FROM public."Maintainers"), 0, 'an accountant cannot read Maintainers');
 SELECT is((SELECT count(*)::int FROM public."PaymentHistory"), 0, 'an accountant cannot read PaymentHistory');
-SELECT is((SELECT count(*)::int FROM public."WorkTrackers"), 0, 'an accountant cannot read WorkTrackers');
 SELECT is((SELECT count(*)::int FROM public."DamageReports"), 0, 'an accountant cannot read DamageReports');
 
 SELECT is(
-  (SELECT count(*)::int FROM public."Users" WHERE clerk_user_id <> 'clerk_acct_only'),
+  (SELECT count(*)::int FROM public."Users" u
+    WHERE u.clerk_user_id <> 'clerk_acct_only'
+      AND NOT EXISTS (SELECT 1 FROM public."Drivers" d WHERE d.user_uuid = u.id)),
   0,
-  'an accountant cannot read other users'
+  'an accountant cannot read the users who are not drivers'
 );
 
 SELECT is(

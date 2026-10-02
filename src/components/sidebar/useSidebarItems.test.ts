@@ -140,12 +140,17 @@ describe("useSidebarItems", () => {
     ]);
   });
 
-  // ═══ Accountant (Stage 1: no permissions) ═══
+  // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees only the Documentation section", () => {
+  it("accountant sees Work Trackers and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
-    expect(items.map((i) => i.key)).toEqual(["documentation"]);
-    const docs = items[0];
+    expect(items.map((i) => i.key)).toEqual(["work-trackers", "documentation"]);
+
+    const workTrackers = items[0];
+    expect(workTrackers.type).toBe("button");
+    expect("href" in workTrackers && workTrackers.href).toBe("/work-trackers");
+
+    const docs = items[1];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",

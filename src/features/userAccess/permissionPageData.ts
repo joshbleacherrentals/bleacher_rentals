@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "Reserved for the people who handle finances. In this release the role has no permissions yet: an Accountant can sign in and read this page and What's New, and nothing else. Its permissions will be defined later.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment and creates its QuickBooks bill. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -64,9 +64,10 @@ const none = (note?: string): PermissionAccess => ({ level: "none", note });
 const MAINTAINER_NO_ACCESS_NOTE =
   "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard. Everything else in the web app is hidden from them entirely.";
 
-// Stage 1 of docs/specs/accountant-role.md: the role exists and has no permissions.
+// docs/specs/accountant-role.md and accountant-work-trackers.md: the Accountant has the Work
+// Trackers pages and the driver payment window, and nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role has no permissions yet. Until permissions are assigned to it, everything on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages and driver payments only. Everything else on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -253,7 +254,34 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: read(
         "The Dashboard shows work trackers, and a maintainer can read them there, but cannot create, edit or delete any. They still have no Work Trackers page.",
       ),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: custom(
+        "Opens the Work Trackers pages and sees every week, every driver (without having to switch on 'See All Drivers') and every trip in full, and can open any work tracker to read it. Cannot create, edit, delete or release work trackers — there is no Release All button for them. Has no Dashboard.",
+      ),
+    },
+  },
+  {
+    label: "Driver Payments & QuickBooks Bills",
+    description:
+      "The Payment Details window on a driver's week (Work Trackers page): the payment status of the week, and the QuickBooks bill created from it.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Can mark any driver's week Ready for Payment or back to Draft, and create or update its QuickBooks bill.",
+      ),
+      account_manager: full(
+        "Can mark a driver's week Ready for Payment or back to Draft, and create or update its QuickBooks bill, for any driver in the list they open — their own zones' drivers, or every driver with 'See All Drivers'.",
+      ),
+      developer: none(
+        "Unable to even access the pages where driver payments are shown, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Cannot change a payment status or create a QuickBooks bill — the database refuses both.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: custom(
+        "Can mark any driver's week Ready for Payment or back to Draft, and create or update its QuickBooks bill — for every driver, not only the ones in their zones. The bill carries the same QuickBooks Class an administrator's does. Cannot change the work trackers behind it.",
+      ),
     },
   },
   {
@@ -278,7 +306,9 @@ export const PERMISSIONS: PermissionEntry[] = [
         "The driver's own withdrawals and bleacher swaps are reported to the account managers of their zones, not back to them in the mobile app.",
       ),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: none(
+        "An Accountant manages no zones, so no count is shown to them — not on the sidebar, not next to a week, not next to a driver.",
+      ),
     },
   },
   {

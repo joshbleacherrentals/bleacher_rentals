@@ -20,14 +20,41 @@ describe("permission matrix", () => {
     }
   });
 
-  // Stage 1 of docs/specs/accountant-role.md: the role exists and has no
-  // permissions. Giving it one is a separate, approved change — and it should
-  // have to edit this test on purpose.
-  describe("accountant (Stage 1)", () => {
-    it("has no access to anything", () => {
-      for (const entry of PERMISSIONS) {
-        expect(entry.roles.accountant.level, entry.label).toBe("none");
-      }
+  // docs/specs/accountant-work-trackers.md: the accountant has the Work Trackers pages and the
+  // payment modal, and nothing else. Widening that is a separate, approved change — and it
+  // should have to edit this test on purpose.
+  describe("accountant (Stage 2: Work Trackers)", () => {
+    const accountant = (label: string) =>
+      PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
+
+    it("is only granted Work Trackers and Driver Payments & QuickBooks Bills", () => {
+      const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
+        (p) => p.label,
+      );
+      expect(granted.sort()).toEqual(["Driver Payments & QuickBooks Bills", "Work Trackers"]);
+    });
+
+    it("can neither create, edit, delete nor release a work tracker — and the matrix says so", () => {
+      const note = accountant("Work Trackers")?.note ?? "";
+      expect(accountant("Work Trackers")?.level).toBe("custom");
+      expect(note).toMatch(/cannot create, edit, delete or release/i);
+      expect(note).toMatch(/Release All/);
+    });
+
+    it("can mark a week ready for payment and create the QuickBooks bill", () => {
+      const row = accountant("Driver Payments & QuickBooks Bills");
+      expect(row?.level).toBe("custom");
+      expect(row?.note).toMatch(/Ready for Payment/);
+      expect(row?.note).toMatch(/QuickBooks bill/);
+    });
+
+    it("answers for every role on the new payments row", () => {
+      const entry = PERMISSIONS.find((p) => p.label === "Driver Payments & QuickBooks Bills");
+      expect(Object.keys(entry?.roles ?? {}).sort()).toEqual([...roles].sort());
+    });
+
+    it("no longer describes itself as having no permissions", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).not.toMatch(/no permissions yet/i);
     });
 
     it("sits right after the account manager column", () => {

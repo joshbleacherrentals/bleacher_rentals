@@ -29,11 +29,10 @@ That is a multi-stage feature. **This spec locks Stage 1 only:**
 
 **Stage 2**
 
-- **Scope:** Discovery / analysis only. Research the current `account_manager`
-  functionality, determine which of it belongs to the financial area of responsibility, and
-  separately agree which functionality `accountant` should receive and which
-  `account_manager` functionality should be restricted. This spec does not name any of it.
-- **Spec:** not started; its outcome is agreed with you before anything is designed
+- **Scope:** Work Trackers access for `accountant` (2026-10-01, given by you): the
+  `/work-trackers` pages, the payment buttons of the Work Tracker Group modal, and the
+  Edit Work Tracker modal read-only. Nothing else, and no restriction of `account_manager`.
+- **Spec:** [accountant-work-trackers.md](accountant-work-trackers.md)
 
 **After Stage 2**
 

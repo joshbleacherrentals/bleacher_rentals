@@ -127,12 +127,13 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     showSidebar: true,
   },
   accountant: {
-    // Stage 1 (docs/specs/accountant-role.md): the role has no permissions, so it gets only the two
-    // pages every role may read. With no /dashboard, defaultRedirect falls through to the first path
-    // here — the page that tells them what they may do. This must not be empty: useAccessRedirect
-    // would bounce a user with no allowed path forever (the driver's [] is safe only because a
-    // driver-only user is blocked before this config is read).
-    allowedPaths: ["/permissions", "/changelog"],
+    // docs/specs/accountant-work-trackers.md: the Work Trackers pages (every week, every driver,
+    // the payment modal, read-only work tracker details), plus the two pages every role may
+    // read. Not /all-work-trackers or /work-tracker-types. With no /dashboard, defaultRedirect
+    // falls through to the first path here, so /work-trackers must stay first. This must not be
+    // empty: useAccessRedirect would bounce a user with no allowed path forever (the driver's []
+    // is safe only because a driver-only user is blocked before this config is read).
+    allowedPaths: ["/work-trackers", "/permissions", "/changelog"],
     showSidebar: true,
   },
   driver: {
@@ -159,4 +160,13 @@ export function mergeRoleConfigs(roles: WebRole[]): MergedAccessConfig {
     : (allowedPaths[0] ?? "/");
 
   return { allowedPaths, defaultRedirect, showSidebar };
+}
+
+/**
+ * Whether these roles may open `pathname`, matched the way `useAccessRedirect` matches it (by
+ * path prefix). For UI that links somewhere: a link whose destination would bounce the user
+ * straight back out is a button that does nothing, so it is not shown.
+ */
+export function canAccessPath(roles: WebRole[], pathname: string): boolean {
+  return mergeRoleConfigs(roles).allowedPaths.some((p) => pathname.startsWith(p));
 }

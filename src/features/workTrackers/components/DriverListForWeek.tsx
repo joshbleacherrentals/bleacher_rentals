@@ -16,6 +16,7 @@ import {
   parsePayCurrencyFilter,
   type PayCurrencyFilter,
 } from "../util/payCurrencyFilter";
+import { canOpenWorkTrackerWeek, seesAllDriversAlways } from "../util/workTrackerPageAccess";
 
 type Props = {
   startDate: string;
@@ -85,7 +86,7 @@ export function DriverListForWeek({ startDate }: Props) {
   // because the list does.
   const attentionByDriver = useAttentionCountsByDriver(startDate);
 
-  const hasAccess = !!accessData && (accessData.isAdmin || accessData.isAccountManager);
+  const hasAccess = !!accessData && canOpenWorkTrackerWeek(accessData);
 
   const { drivers, isLoading } = useDriversForWeek(
     startDate,
@@ -107,14 +108,14 @@ export function DriverListForWeek({ startDate }: Props) {
     );
   }
 
-  if (!accessData || (!accessData.isAdmin && !accessData.isAccountManager)) {
+  if (!hasAccess) {
     return (
       <tbody className="p-4">
         <tr>
           <td className="text-center py-8">
             <div className="text-red-600 font-semibold mb-2">Access Denied</div>
             <div className="text-gray-600 text-sm">
-              You must be an Account Manager or Admin to access this page.
+              You must be an Account Manager, Accountant or Admin to access this page.
             </div>
           </td>
         </tr>
@@ -140,12 +141,15 @@ export function DriverListForWeek({ startDate }: Props) {
         <tr>
           <td className="p-3">
             <div className="flex flex-wrap items-center gap-4">
-              <button
-                onClick={() => setShowAllDrivers(!showAllDrivers)}
-                className="px-4 py-2 bg-darkBlue text-white text-sm font-semibold rounded shadow-md hover:bg-lightBlue transition cursor-pointer"
-              >
-                {showAllDrivers ? "See My Drivers Only" : "See All Drivers"}
-              </button>
+              {/* An accountant has no zones and always sees every driver — the switch would do nothing. */}
+              {!seesAllDriversAlways({ isAccountant: accessData?.isAccountant ?? false }) && (
+                <button
+                  onClick={() => setShowAllDrivers(!showAllDrivers)}
+                  className="px-4 py-2 bg-darkBlue text-white text-sm font-semibold rounded shadow-md hover:bg-lightBlue transition cursor-pointer"
+                >
+                  {showAllDrivers ? "See My Drivers Only" : "See All Drivers"}
+                </button>
+              )}
 
               <div className="flex items-center gap-2">
                 <label htmlFor="pay-currency-filter" className="text-sm font-medium text-gray-600">

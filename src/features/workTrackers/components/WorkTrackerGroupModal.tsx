@@ -14,6 +14,8 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QboBillPreview } from "./QboBillPreview";
 import { Database } from "../../../../database.types";
+import { useUserAccess } from "@/features/userAccess/client";
+import { canAccessPath } from "@/features/userAccess/accessConfig";
 
 type WorkTrackerGroupModalProps = {
   isOpen: boolean;
@@ -47,6 +49,7 @@ export function WorkTrackerGroupModal({
   const supabase = useClerkSupabaseClient();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const access = useUserAccess();
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -63,6 +66,11 @@ export function WorkTrackerGroupModal({
   const [currentStatus, setCurrentStatus] = useState<
     Database["public"]["Enums"]["worktracker_group_status"]
   >(groupData?.status || "draft");
+
+  // The Edit Profile link goes to the Team pages. A user who cannot open them (an accountant)
+  // would be bounced straight back out, so for them there is no link
+  // (docs/specs/accountant-work-trackers.md, D1).
+  const canOpenDriverProfile = access.status === "active" && canAccessPath(access.roles, "/team");
 
   // Format the date range for display
   const startDateObj = DateTime.fromISO(startDate);
@@ -408,16 +416,18 @@ export function WorkTrackerGroupModal({
                   <span className="text-sm text-gray-600">Driver</span>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold">{driverName}</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
-                      onClick={() => userUuid && router.push(`/team/${userUuid}/edit/driver`)}
-                      disabled={!userUuid}
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Edit Profile
-                    </Button>
+                    {canOpenDriverProfile && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
+                        onClick={() => userUuid && router.push(`/team/${userUuid}/edit/driver`)}
+                        disabled={!userUuid}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        Edit Profile
+                      </Button>
+                    )}
                   </div>
                 </div>
                 {hasVendor && (
