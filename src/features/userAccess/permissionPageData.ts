@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment and creates its QuickBooks bill. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -281,6 +281,31 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: custom(
         "Can mark any driver's week Ready for Payment or back to Draft, and create or update its QuickBooks bill — for every driver, not only the ones in their zones. The bill carries the same QuickBooks Class an administrator's does. Cannot change the work trackers behind it.",
+      ),
+    },
+  },
+  {
+    label: "Driver Week Paid / Unpaid",
+    description:
+      "The Mark Paid / Mark Unpaid button on a driver's week, on the Work Trackers driver list, on the driver's own page and in the Payment Details window. It records by hand that the week has been paid; it does not move any money and does not change the week's payment status or its QuickBooks bill.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Can mark any driver's week Paid, and back to Unpaid if it was a mistake. Every week starts Unpaid.",
+      ),
+      account_manager: none(
+        "Cannot mark a week Paid or Unpaid — the button is not shown to them and the database refuses the change. They can still move a week between Draft and Ready for Payment and create its QuickBooks bill (see Driver Payments & QuickBooks Bills).",
+      ),
+      developer: none(
+        "Unable to even access the pages where driver payments are shown, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Cannot mark a week Paid or Unpaid — the button is not shown and the database refuses the change.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can mark any driver's week Paid, and back to Unpaid if it was a mistake — for every driver, not only the ones in their zones. Every week starts Unpaid.",
       ),
     },
   },

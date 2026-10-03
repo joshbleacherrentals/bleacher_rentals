@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canMarkGroupPaid,
   canOpenWorkTrackerWeek,
   canReleaseAllDrafts,
   seesAllDriversAlways,
@@ -54,5 +55,19 @@ describe("canReleaseAllDrafts — the Release All button", () => {
     // accountant input on purpose, so the role cannot be added as a way in.
     expect(canReleaseAllDrafts({ isAdmin: false, leadZoneIds: [] })).toBe(false);
     expect(canReleaseAllDrafts.length).toBe(1);
+  });
+});
+
+describe("canMarkGroupPaid — the Mark Paid / Mark Unpaid button", () => {
+  const cases: [string, boolean, boolean, boolean][] = [
+    // name, isAdmin, isAccountant, expected
+    ["nobody in particular (an account manager, a viewer, a maintainer…)", false, false, false],
+    ["an admin", true, false, true],
+    ["an accountant", false, true, true],
+    ["an admin who is also an accountant", true, true, true],
+  ];
+
+  it.each(cases)("%s", (_name, isAdmin, isAccountant, expected) => {
+    expect(canMarkGroupPaid({ isAdmin, isAccountant })).toBe(expected);
   });
 });

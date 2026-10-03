@@ -13,6 +13,9 @@ import { DateTime } from "luxon";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QboBillPreview } from "./QboBillPreview";
+import { MarkPaidButton } from "./MarkPaidButton";
+import { useWorkTrackerGroupPaid } from "../hooks/useWorkTrackerGroupPaid";
+import { canMarkGroupPaid } from "../util/workTrackerPageAccess";
 import { Database } from "../../../../database.types";
 import { useUserAccess } from "@/features/userAccess/client";
 import { canAccessPath } from "@/features/userAccess/accessConfig";
@@ -36,6 +39,31 @@ type WorkTrackerData = {
   pay_cents: number | null;
   date: string | null;
 };
+
+// Its own component so the live read of the week's group exists only while the window is open: the
+// modal itself is mounted for every driver in the list, closed or not.
+function ModalMarkPaidButton({
+  driverUuid,
+  driverName,
+  startDate,
+  canMarkPaid,
+}: {
+  driverUuid: string;
+  driverName: string;
+  startDate: string;
+  canMarkPaid: boolean;
+}) {
+  const { groupId, isPaid } = useWorkTrackerGroupPaid(driverUuid, startDate);
+  return (
+    <MarkPaidButton
+      groupId={groupId}
+      driverName={driverName}
+      isPaid={isPaid}
+      canMarkPaid={canMarkPaid}
+      size="default"
+    />
+  );
+}
 
 export function WorkTrackerGroupModal({
   isOpen,
@@ -71,6 +99,13 @@ export function WorkTrackerGroupModal({
   // would be bounced straight back out, so for them there is no link
   // (docs/specs/accountant-work-trackers.md, D1).
   const canOpenDriverProfile = access.status === "active" && canAccessPath(access.roles, "/team");
+
+  const canMarkPaid =
+    access.status === "active" &&
+    canMarkGroupPaid({
+      isAdmin: access.roles.includes("admin"),
+      isAccountant: access.roles.includes("accountant"),
+    });
 
   // Format the date range for display
   const startDateObj = DateTime.fromISO(startDate);
@@ -505,6 +540,12 @@ export function WorkTrackerGroupModal({
                     Mark as Ready for Payment
                   </Button>
                 )}
+                <ModalMarkPaidButton
+                  driverUuid={driverUuid}
+                  driverName={driverName}
+                  startDate={startDate}
+                  canMarkPaid={canMarkPaid}
+                />
               </div>
 
               <div className="flex gap-2">

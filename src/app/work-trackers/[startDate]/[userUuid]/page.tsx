@@ -26,11 +26,17 @@ import {
 } from "@/features/workTrackers/db/db";
 import { PaymentStatusButton } from "@/features/workTrackers/components/PaymentStatusButton";
 import { TotalsMatch } from "@/features/workTrackers/components/TotalsMatch";
+import { MarkPaidButton } from "@/features/workTrackers/components/MarkPaidButton";
+import { useWorkTrackerGroupPaid } from "@/features/workTrackers/hooks/useWorkTrackerGroupPaid";
 import { DateTime } from "luxon";
 import { buildReleaseAllNotification } from "@/features/workTrackers/db/notifications";
 import { getDateRange } from "@/features/workTrackers/util";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
-import { canReleaseAllDrafts } from "@/features/workTrackers/util/workTrackerPageAccess";
+import { useUserAccess } from "@/features/userAccess/client";
+import {
+  canMarkGroupPaid,
+  canReleaseAllDrafts,
+} from "@/features/workTrackers/util/workTrackerPageAccess";
 
 const getRandomLoadingMessage = () => {
   const messages = [
@@ -74,6 +80,17 @@ export default function WorkTrackersForUserPage() {
     queryKey: ["driver-with-meta", userUuid, startDate],
     enabled: !!supabase && !!userUuid && !!startDate,
     queryFn: () => fetchDriverWithMetaForWeek(supabase, userUuid, startDate),
+  });
+
+  const { groupId: paidGroupId, isPaid } = useWorkTrackerGroupPaid(
+    driverMeta?.driver_uuid ?? null,
+    startDate,
+  );
+  const access = useUserAccess();
+  const roles = access.status === "active" ? access.roles : [];
+  const canMarkPaid = canMarkGroupPaid({
+    isAdmin: roles.includes("admin"),
+    isAccountant: roles.includes("accountant"),
   });
 
   const dateRange = getDateRange(startDate);
@@ -183,6 +200,12 @@ export default function WorkTrackersForUserPage() {
           <div className="flex items-center gap-2">
             <PaymentStatusButton driver={driverMeta} weekStart={startDate} weekEnd={weekEnd} />
             <TotalsMatch driver={driverMeta} />
+            <MarkPaidButton
+              groupId={paidGroupId}
+              driverName={`${driverMeta.first_name} ${driverMeta.last_name}`}
+              isPaid={isPaid}
+              canMarkPaid={canMarkPaid}
+            />
           </div>
         )}
       </div>

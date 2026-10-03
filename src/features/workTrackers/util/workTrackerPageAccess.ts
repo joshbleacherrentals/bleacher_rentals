@@ -25,6 +25,17 @@ export function seesAllDriversAlways(access: { isAccountant: boolean }): boolean
 }
 
 /**
+ * The Mark Paid / Mark Unpaid button on a driver's week: only an admin or an accountant records
+ * that the money has gone out. `isAccountManager` is deliberately not an input — an account
+ * manager runs the week up to Ready for Payment but does not pay it, and leaving it out of the
+ * signature means no caller can pass it in as a way through. The database refuses the change from
+ * anyone else too (guard_work_tracker_group_is_paid), so this only decides who is shown the button.
+ */
+export function canMarkGroupPaid(access: { isAdmin: boolean; isAccountant: boolean }): boolean {
+  return access.isAdmin || access.isAccountant;
+}
+
+/**
  * The Release All button: releases a driver's draft work trackers to the driver, so it is a write
  * on work trackers. Only an admin or a zone lead may. `isAccountant` is deliberately not an
  * input — the Accountant role cannot release work trackers (spec §0), and leaving it out of the

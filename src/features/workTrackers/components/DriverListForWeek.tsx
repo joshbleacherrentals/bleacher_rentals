@@ -7,6 +7,7 @@ import { useUser } from "@clerk/nextjs";
 import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { useState } from "react";
 import { PaymentStatusButton } from "./PaymentStatusButton";
+import { MarkPaidButton } from "./MarkPaidButton";
 import { TotalsMatch } from "./TotalsMatch";
 import { DateTime } from "luxon";
 import { useAttentionCountsByDriver } from "../db/attentionTrackers";
@@ -16,7 +17,11 @@ import {
   parsePayCurrencyFilter,
   type PayCurrencyFilter,
 } from "../util/payCurrencyFilter";
-import { canOpenWorkTrackerWeek, seesAllDriversAlways } from "../util/workTrackerPageAccess";
+import {
+  canMarkGroupPaid,
+  canOpenWorkTrackerWeek,
+  seesAllDriversAlways,
+} from "../util/workTrackerPageAccess";
 
 type Props = {
   startDate: string;
@@ -87,6 +92,10 @@ export function DriverListForWeek({ startDate }: Props) {
   const attentionByDriver = useAttentionCountsByDriver(startDate);
 
   const hasAccess = !!accessData && canOpenWorkTrackerWeek(accessData);
+  const canMarkPaid = canMarkGroupPaid({
+    isAdmin: accessData?.isAdmin ?? false,
+    isAccountant: accessData?.isAccountant ?? false,
+  });
 
   const { drivers, isLoading } = useDriversForWeek(
     startDate,
@@ -215,6 +224,12 @@ export function DriverListForWeek({ startDate }: Props) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <TotalsMatch driver={row} />
+                  <MarkPaidButton
+                    groupId={row.workTrackerGroup?.id ?? null}
+                    driverName={`${row.first_name} ${row.last_name}`}
+                    isPaid={row.workTrackerGroup?.is_paid ?? false}
+                    canMarkPaid={canMarkPaid}
+                  />
                   <PaymentStatusButton driver={row} weekStart={startDate} weekEnd={weekEnd} />
                 </div>
               </div>

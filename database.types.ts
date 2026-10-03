@@ -4069,6 +4069,7 @@ export type Database = {
           created_at: string
           driver_uuid: string
           id: string
+          is_paid: boolean
           qbo_bill_id: string | null
           status: Database["public"]["Enums"]["worktracker_group_status"]
           week_end: string
@@ -4078,6 +4079,7 @@ export type Database = {
           created_at?: string
           driver_uuid: string
           id?: string
+          is_paid?: boolean
           qbo_bill_id?: string | null
           status?: Database["public"]["Enums"]["worktracker_group_status"]
           week_end: string
@@ -4087,6 +4089,7 @@ export type Database = {
           created_at?: string
           driver_uuid?: string
           id?: string
+          is_paid?: boolean
           qbo_bill_id?: string | null
           status?: Database["public"]["Enums"]["worktracker_group_status"]
           week_end?: string

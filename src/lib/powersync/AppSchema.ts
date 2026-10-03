@@ -493,6 +493,7 @@ const WorkTrackerGroupsCols = {
   driver_uuid: column.text,
   qbo_bill_id: column.text,
   status: column.text,
+  is_paid: column.integer,
 } satisfies PowerSyncColsFor<"WorkTrackerGroups">;
 const WorkTrackerGroups = new Table(WorkTrackerGroupsCols, {
   indexes: {

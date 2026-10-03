@@ -114,6 +114,7 @@ type GroupRow = {
   qbo_bill_id: string | null;
   week_start: string | null;
   week_end: string | null;
+  is_paid: number | null;
 };
 
 export function useDriversForWeek(
@@ -196,6 +197,7 @@ export function useDriversForWeek(
         "g.qbo_bill_id as qbo_bill_id",
         "g.week_start as week_start",
         "g.week_end as week_end",
+        "g.is_paid as is_paid",
       ])
       .where("g.week_start", "=", startDate)
       .where("g.week_end", "=", weekEnd)
@@ -263,6 +265,7 @@ export function useDriversForWeek(
                 qbo_bill_id: group.qbo_bill_id,
                 week_start: group.week_start,
                 week_end: group.week_end,
+                is_paid: !!group.is_paid,
               }
             : null,
         } as unknown as DriverWithMeta;

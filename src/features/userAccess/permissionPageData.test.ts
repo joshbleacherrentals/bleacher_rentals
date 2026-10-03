@@ -27,11 +27,15 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers and Driver Payments & QuickBooks Bills", () => {
+    it("is only granted Work Trackers, Driver Payments & QuickBooks Bills and Driver Week Paid / Unpaid", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
-      expect(granted.sort()).toEqual(["Driver Payments & QuickBooks Bills", "Work Trackers"]);
+      expect(granted.sort()).toEqual([
+        "Driver Payments & QuickBooks Bills",
+        "Driver Week Paid / Unpaid",
+        "Work Trackers",
+      ]);
     });
 
     it("can neither create, edit, delete nor release a work tracker — and the matrix says so", () => {
@@ -64,6 +68,32 @@ describe("permission matrix", () => {
     it("tells account managers they cannot grant the role", () => {
       const invite = PERMISSIONS.find((p) => p.label === "Invite Team Members");
       expect(invite?.roles.account_manager.note).toMatch(/Accountant/);
+    });
+  });
+
+  // Mark Paid / Mark Unpaid on a driver's week: an admin and an accountant record it, nobody else
+  // does. The database refuses the change from anyone else, and this row is what tells them so.
+  describe("Driver Week Paid / Unpaid", () => {
+    const entry = PERMISSIONS.find((p) => p.label === "Driver Week Paid / Unpaid");
+
+    it("answers for every role", () => {
+      expect(Object.keys(entry?.roles ?? {}).sort()).toEqual([...roles].sort());
+    });
+
+    it("is full for an admin and an accountant, and nobody else", () => {
+      const full = Object.entries(entry?.roles ?? {})
+        .filter(([, access]) => access.level !== "none")
+        .map(([role, access]) => [role, access.level]);
+      expect(full.sort()).toEqual([
+        ["accountant", "full"],
+        ["admin", "full"],
+      ]);
+    });
+
+    it("tells an account manager they cannot, even though they run the rest of the payment", () => {
+      const note = entry?.roles.account_manager.note ?? "";
+      expect(note).toMatch(/cannot mark a week Paid or Unpaid/i);
+      expect(note).toMatch(/database refuses/i);
     });
   });
 
