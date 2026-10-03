@@ -1,6 +1,8 @@
 # Quotes & Bookings list — shared list-state hook (no behaviour change)
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1, D2 answered 2026-10-03).
+Status: **IMPLEMENTED 2026-10-03, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); Playwright S1–S5 written, not run. 0 open decisions (D1, D2 answered
+2026-10-03).
 Original request: №1 (preparation). Implementation order: **01 of 11** — the next spec is
 [02](accountant-quotes-02-accountant-page.md), which moves AR / AR Deposits to `/accountant`.
 Branch: `q4-sprint1-finance-role`.
