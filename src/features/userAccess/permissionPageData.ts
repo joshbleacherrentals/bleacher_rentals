@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking the one thing they can change is the QuickBooks Invoice Flag. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -96,7 +96,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
       accountant: read(
-        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs. Cannot create, edit, delete or send one.",
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs. Cannot create, edit, delete or send one. The one thing they can change is the QuickBooks Invoice Flag.",
       ),
     },
   },
@@ -116,7 +116,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       viewer: read("Can see whether the flag is set, but the checkbox is disabled."),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: read("Can see whether the flag is set, but the checkbox is disabled."),
+      accountant: full(
+        "Can tick or untick the flag on any quote or booking, deleted ones included. It is the only thing an accountant can change on a quote or booking — the database refuses every other change.",
+      ),
     },
   },
   {

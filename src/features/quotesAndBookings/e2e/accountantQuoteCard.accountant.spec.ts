@@ -40,7 +40,7 @@ test.describe("Quotes & Bookings (accountant)", () => {
     await expect(page).toHaveURL(/\/quotes-bookings\/[0-9a-f-]{36}/);
   });
 
-  test("S2: a card has all five tabs, no Edit / Delete / Send To Client / Open in Dashboard, and a read-only Billing tab", async ({
+  test("S2: a card has all five tabs, no Edit / Delete / Send To Client / Open in Dashboard, and a Billing tab with no payments to record", async ({
     page,
   }) => {
     await page.goto(`${CARD}?tab=billing`);
@@ -55,7 +55,8 @@ test.describe("Quotes & Bookings (accountant)", () => {
 
     await expect(page.getByRole("heading", { name: "Payment History" })).toBeVisible();
     await expect(page.getByRole("button", { name: "+ Record Payment" })).toHaveCount(0);
-    await expect(page.getByRole("checkbox", { name: "QuickBooks Invoice" })).toBeDisabled();
+    // Enabled since docs/specs/accountant-quotes-05: the one thing an accountant may change.
+    await expect(page.getByRole("checkbox", { name: "QuickBooks Invoice" })).toBeEnabled();
   });
 
   test("S2: the Contract and Log tabs open and show data", async ({ page }) => {

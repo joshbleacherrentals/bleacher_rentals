@@ -12,7 +12,8 @@
 --   * the accountant READS each table the AR tabs are built from — one named assertion per
 --     table, because a refused read is an empty result, not an error (a missing Contacts grant
 --     silently becomes empty contact columns, a missing SalesOffices grant a wrong currency);
---   * the accountant WRITES none of them. An INSERT that RLS refuses raises 42501; an UPDATE or
+--   * the accountant WRITES none of them (Events.is_qbo excepted since spec 05). An INSERT that RLS
+--     refuses raises 42501; an UPDATE or
 --     DELETE that RLS filters out does not raise, so every refusal is also checked by looking
 --     at the row afterwards;
 --   * nobody else gained or lost anything: admin, account manager, viewer and maintainer read
@@ -161,9 +162,12 @@ SELECT is((SELECT count(*)::int FROM public."BleacherEvents"), 0,
 SELECT throws_ok(
   'INSERT INTO public."Events" (event_name, event_start, event_end, lenient, must_be_clean) VALUES (''AR intruder'', ''2026-07-01'', ''2026-07-02'', false, false)',
   '42501', NULL, 'an accountant cannot create an Event');
-SELECT is(
-  public.test_rows_affected(format('UPDATE public."Events" SET event_name = ''AR edited'' WHERE id = %L', :'event')),
-  0, 'an accountant cannot update an Event');
+-- Since docs/specs/accountant-quotes-05 the accountant may UPDATE Events, but only is_qbo: a guard
+-- trigger raises 42501 for any other column (supabase/tests/accountant_events_is_qbo.test.sql
+-- asserts the whole rule). Before it, RLS filtered the update out and it affected 0 rows.
+SELECT throws_ok(
+  format('UPDATE public."Events" SET event_name = ''AR edited'' WHERE id = %L', :'event'),
+  '42501', NULL, 'an accountant cannot change an Event other than its is_qbo flag');
 SELECT is(
   public.test_rows_affected(format('DELETE FROM public."Events" WHERE id = %L', :'event')),
   0, 'an accountant cannot delete an Event');

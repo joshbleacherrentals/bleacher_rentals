@@ -178,21 +178,8 @@ describe("the other roles", () => {
     expect(capsFor(["maintainer"])).toEqual({ ...NOTHING, openInDashboard: true });
   });
 
-  it.each(["developer", "driver", "accountant"] as const)(
-    "%s: every capability is 'no'",
-    (role) => {
-      expect(capsFor([role])).toEqual(NOTHING);
-    },
-  );
-
-  it("accountant: stays all 'no' even with the zones and the ownership that would help a manager", () => {
-    expect(
-      capsFor(["accountant"], {
-        leadZoneIds: ["zone-a"],
-        accountManagerZoneIds: ["zone-a"],
-        quote: { createdByUserId: ME },
-      }),
-    ).toEqual(NOTHING);
+  it.each(["developer", "driver"] as const)("%s: every capability is 'no'", (role) => {
+    expect(capsFor([role])).toEqual(NOTHING);
   });
 
   it("no roles at all (the store before sign-in completes): every capability is 'no'", () => {
@@ -201,6 +188,53 @@ describe("the other roles", () => {
 
   it("a role the function does not know is 'no' for everything", () => {
     expect(capsFor(["superuser" as WebRole])).toEqual(NOTHING);
+  });
+});
+
+// docs/specs/accountant-quotes-05-is-qbo-column.md: the accountant changes exactly one thing on a
+// quote, the QuickBooks Invoice flag. Spec 10 (payments) and spec 11 (chat) will each add a cell;
+// they have to edit this block on purpose.
+describe("accountant", () => {
+  it("can set the QuickBooks flag, on a quote they did not create", () => {
+    expect(capsFor(["accountant"]).setQuickBooksFlag).toBe(true);
+  });
+
+  it("can set it on their own quote too, and with no quote at all", () => {
+    expect(capsFor(["accountant"], { quote: { createdByUserId: ME } }).setQuickBooksFlag).toBe(
+      true,
+    );
+    expect(capsFor(["accountant"], { quote: undefined }).setQuickBooksFlag).toBe(true);
+  });
+
+  it("can do nothing else: the flag is the only 'yes' in their column", () => {
+    expect(capsFor(["accountant"])).toEqual({ ...NOTHING, setQuickBooksFlag: true });
+  });
+
+  it("stays at the flag even with the zones and the ownership that would help a manager", () => {
+    expect(
+      capsFor(["accountant"], {
+        leadZoneIds: ["zone-a"],
+        accountManagerZoneIds: ["zone-a"],
+        quote: { createdByUserId: ME },
+      }),
+    ).toEqual({ ...NOTHING, setQuickBooksFlag: true });
+  });
+
+  it("cannot edit, delete, send, or record a payment — the database refuses any other column too", () => {
+    const caps = capsFor(["accountant"]);
+    expect(caps.manageQuote).toBe(false);
+    expect(caps.sendToClient).toBe(false);
+    expect(caps.showRecordPayment).toBe(false);
+    expect(caps.recordPayment).toBe(false);
+    expect(caps.createQuote).toBe(false);
+    expect(caps.useInternalChat).toBe(false);
+    expect(caps.openInDashboard).toBe(false);
+  });
+
+  it("is the only role that gains the flag: a viewer, maintainer, developer and driver do not", () => {
+    for (const role of ["viewer", "maintainer", "developer", "driver"] as const) {
+      expect(capsFor([role]).setQuickBooksFlag, role).toBe(false);
+    }
   });
 });
 
@@ -221,8 +255,12 @@ describe("roles are additive", () => {
     expect(capsFor(["account_manager", "accountant"])).toEqual(capsFor(["account_manager"]));
   });
 
-  it("viewer + accountant: still no create, manage, send or payment", () => {
-    expect(capsFor(["viewer", "accountant"])).toEqual({ ...NOTHING, openInDashboard: true });
+  it("viewer + accountant: the flag and the dashboard, still no create, manage, send or payment", () => {
+    expect(capsFor(["viewer", "accountant"])).toEqual({
+      ...NOTHING,
+      openInDashboard: true,
+      setQuickBooksFlag: true,
+    });
   });
 });
 

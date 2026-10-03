@@ -47,12 +47,26 @@ describe("permission matrix", () => {
     // any quote, read-only, plus the Files tab. Writing a payment, the QuickBooks flag and the
     // internal chat come with later specs and have to edit this test on purpose.
     describe("Quotes & Bookings, read-only", () => {
-      it("reads events, the QuickBooks flag and payments — and changes none of them", () => {
-        for (const label of ["Events", "QuickBooks Invoice Flag", "Payment History"]) {
+      it("reads events and payments, and changes neither", () => {
+        for (const label of ["Events", "Payment History"]) {
           expect(accountant(label)?.level, label).toBe("read");
         }
         expect(accountant("Events")?.note).toMatch(/cannot create, edit, delete or send/i);
-        expect(accountant("QuickBooks Invoice Flag")?.note).toMatch(/checkbox is disabled/i);
+      });
+
+      // docs/specs/accountant-quotes-05-is-qbo-column.md: the one thing an accountant changes on a
+      // quote or booking, and the database refuses every other change.
+      it("ticks the QuickBooks Invoice Flag — the only thing it can change on a quote", () => {
+        const flag = accountant("QuickBooks Invoice Flag");
+        expect(flag?.level).toBe("full");
+        expect(flag?.note).toMatch(/any quote or booking, deleted ones included/i);
+        expect(flag?.note).toMatch(/only thing an accountant can change/i);
+        expect(flag?.note).toMatch(/database refuses every other change/i);
+      });
+
+      it("says so in the Events row and in the role description", () => {
+        expect(accountant("Events")?.note).toMatch(/QuickBooks Invoice Flag/);
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(/QuickBooks Invoice Flag/);
       });
 
       it("still cannot record a payment or use the internal chat", () => {

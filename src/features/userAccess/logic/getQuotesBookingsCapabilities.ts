@@ -37,7 +37,10 @@ export type QuotesBookingsCapabilities = {
   showRecordPayment: boolean;
   /** Whether "+ Record Payment" can be pressed. A visible button that cannot be pressed keeps its hint. */
   recordPayment: boolean;
-  /** The QuickBooks Invoice checkbox. Bookkeeping, so not tied to the quote's owner. */
+  /**
+   * The QuickBooks Invoice checkbox. Bookkeeping, so not tied to the quote's owner: an admin, an
+   * account manager or an accountant, on any quote.
+   */
   setQuickBooksFlag: boolean;
   /** The Messages tab's internal chat. */
   useInternalChat: boolean;
@@ -64,6 +67,7 @@ export function getQuotesBookingsCapabilities(input: {
   const isAdmin = roles.includes("admin");
   const isAccountManager = roles.includes("account_manager");
   const isStaff = isAdmin || isAccountManager;
+  const isAccountant = roles.includes("accountant");
 
   const manageQuote = canEditOwnedEntity({
     isAdmin,
@@ -86,7 +90,9 @@ export function getQuotesBookingsCapabilities(input: {
     sendToClient: isStaff,
     showRecordPayment: isStaff,
     recordPayment: manageQuote,
-    setQuickBooksFlag: isStaff,
+    // The one cell the accountant has: the database lets them change Events.is_qbo and no other
+    // column (docs/specs/accountant-quotes-05-is-qbo-column.md).
+    setQuickBooksFlag: isStaff || isAccountant,
     useInternalChat: isStaff,
     openInDashboard: canAccessPath(roles, "/dashboard"),
   };

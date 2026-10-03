@@ -1,6 +1,8 @@
 # Accountant — edits only `Events.is_qbo`
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D3 answered 2026-10-03).
+Status: **IMPLEMENTED 2026-10-03, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); Playwright specs written, not run. 0 open decisions (D1–D3 answered
+2026-10-03).
 Original request: №4. Implementation order: **05 of 11**. Needs
 [03](accountant-quotes-03-capabilities.md) (the capability table) and
 [04](accountant-quotes-04-accountant-quote-access.md) (the accountant opens the card).
@@ -189,6 +191,11 @@ files.
 - **Gate:** dry-run in `BEGIN … ROLLBACK` through the `supabase_db_bleacher_rentals` container; the
   new test passes and `rls_multi_role.test.sql`, `accountant_role.test.sql`,
   `accountant_work_trackers.test.sql` stay green.
+- **Found at implementation:** `accountant_receivables.test.sql` (spec 02) asserted that an
+  accountant's UPDATE of an `Events` row affects 0 rows. With this migration the update reaches the
+  row and the guard raises `42501`, so that one assertion became `throws_ok(…, '42501')`. Likewise
+  spec 04's e2e `accountantQuoteCard.accountant.spec.ts` expected the QuickBooks checkbox to be
+  disabled for the accountant; it now expects it enabled.
 
 **7.2 Capability table**
 
