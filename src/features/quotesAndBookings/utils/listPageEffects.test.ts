@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { QuotesBookingsFilters } from "../types";
 import { DEFAULT_SORT } from "./sortEvents";
-import { defaultSortForTab } from "./listTabs";
+import { ACCOUNTANT_TABS, QUOTES_BOOKINGS_TABS, defaultSortForTab } from "./listTabs";
 import {
   queryStringToWrite,
   urlWriteDelayMs,
@@ -34,26 +34,45 @@ const state: UrlSyncedListState = {
   tab: "all",
 };
 
+const QB = QUOTES_BOOKINGS_TABS;
+const ACCT = ACCOUNTANT_TABS;
+
 describe("queryStringToWrite", () => {
   it("writes nothing when the URL already says what the state says", () => {
-    expect(queryStringToWrite(state, "")).toBeNull();
+    expect(queryStringToWrite(state, "", QB)).toBeNull();
     const withSearch = { ...state, searchQuery: "acme" };
-    expect(queryStringToWrite(withSearch, "q=acme")).toBeNull();
+    expect(queryStringToWrite(withSearch, "q=acme", QB)).toBeNull();
   });
 
   it("writes the new query string when the state differs from the URL", () => {
-    expect(queryStringToWrite({ ...state, searchQuery: "acme" }, "")).toBe("q=acme");
-    expect(queryStringToWrite({ ...state, showDeleted: true }, "q=acme")).toBe("showDeleted=1");
+    expect(queryStringToWrite({ ...state, searchQuery: "acme" }, "", QB)).toBe("q=acme");
+    expect(queryStringToWrite({ ...state, showDeleted: true }, "q=acme", QB)).toBe("showDeleted=1");
   });
 
   it("keeps query parameters the list does not own", () => {
     expect(
-      queryStringToWrite({ ...state, searchQuery: "acme" }, "template=x&timeRange=weekly"),
+      queryStringToWrite({ ...state, searchQuery: "acme" }, "template=x&timeRange=weekly", QB),
     ).toBe("template=x&timeRange=weekly&q=acme");
   });
 
   it("writes an empty string when the last synced parameter is cleared", () => {
-    expect(queryStringToWrite(state, "q=acme")).toBe("");
+    expect(queryStringToWrite(state, "q=acme", QB)).toBe("");
+  });
+
+  it("removes a stale ?tab on /quotes-bookings, where the tab is not written", () => {
+    expect(queryStringToWrite(state, "tab=ar", QB)).toBe("");
+    expect(queryStringToWrite(state, "tab=ar&template=x", QB)).toBe("template=x");
+  });
+
+  it("writes ?tab=ar on /accountant when the URL has none — the first sync rewrites it", () => {
+    const arState: UrlSyncedListState = {
+      ...state,
+      tab: "ar",
+      sort: { key: "start_date", direction: "desc" },
+    };
+    expect(queryStringToWrite(arState, "", ACCT)).toBe("tab=ar");
+    expect(queryStringToWrite(arState, "tab=all&statuses=quoted", ACCT)).toBe("tab=ar");
+    expect(queryStringToWrite(arState, "tab=ar", ACCT)).toBeNull();
   });
 });
 
@@ -79,21 +98,23 @@ describe("pageAfterChange", () => {
 
 describe("tabSwitchOutcome", () => {
   it("starts the new tab on its own sort", () => {
-    expect(tabSwitchOutcome("ar", false).sort).toEqual(defaultSortForTab("ar"));
-    expect(tabSwitchOutcome("ar_deposits", false).sort).toEqual(defaultSortForTab("ar_deposits"));
-    expect(tabSwitchOutcome("all", false).sort).toEqual(defaultSortForTab("all"));
+    expect(tabSwitchOutcome("ar", false, ACCT).sort).toEqual(defaultSortForTab("ar", ACCT));
+    expect(tabSwitchOutcome("ar_deposits", false, ACCT).sort).toEqual(
+      defaultSortForTab("ar_deposits", ACCT),
+    );
+    expect(tabSwitchOutcome("all", false, QB).sort).toEqual(defaultSortForTab("all", QB));
   });
 
   it("drops a status filter when the tab does not offer one", () => {
-    expect(tabSwitchOutcome("ar", true).dropStatuses).toBe(true);
-    expect(tabSwitchOutcome("ar_deposits", true).dropStatuses).toBe(true);
+    expect(tabSwitchOutcome("ar", true, ACCT).dropStatuses).toBe(true);
+    expect(tabSwitchOutcome("ar_deposits", true, ACCT).dropStatuses).toBe(true);
   });
 
-  it("keeps the status filter on All Events", () => {
-    expect(tabSwitchOutcome("all", true).dropStatuses).toBe(false);
+  it("keeps the status filter on a tab that offers it", () => {
+    expect(tabSwitchOutcome("all", true, QB).dropStatuses).toBe(false);
   });
 
   it("has nothing to drop when no status is chosen", () => {
-    expect(tabSwitchOutcome("ar", false).dropStatuses).toBe(false);
+    expect(tabSwitchOutcome("ar", false, ACCT).dropStatuses).toBe(false);
   });
 });

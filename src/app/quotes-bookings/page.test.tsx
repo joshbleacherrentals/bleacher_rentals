@@ -6,8 +6,8 @@ import type {
 } from "@/features/quotesAndBookings/types";
 
 // The page is wired to Next routing, PowerSync and the office currencies.
-// Those are stubbed; what is under test is which tab draws what, and that the
-// AR balances are never asked for while "All Events" is open.
+// Those are stubbed; what is under test is that the page is All Events only — no tab bar, and
+// the AR balances are never asked for (they live on /accountant).
 const { mockSearchParams, mockArData, mockFilterPanel, mockListData } = vi.hoisted(() => ({
   mockSearchParams: { current: new URLSearchParams() },
   mockArData: vi.fn(),
@@ -101,85 +101,60 @@ beforeEach(() => {
 const lastFilterPanelProps = () => mockFilterPanel.mock.calls.at(-1)![0] as { showStatus: boolean };
 const lastListFilters = () => mockListData.mock.calls.at(-1)![0] as { statuses: string[] };
 
-describe("/quotes-bookings tabs", () => {
-  it("offers All Events, AR and AR Deposits", () => {
+describe("/quotes-bookings is All Events only", () => {
+  it("draws no tab bar", () => {
     const html = renderAt("");
-    expect(html).toContain(">All Events<");
-    expect(html).toContain(">AR<");
-    expect(html).toContain(">AR Deposits<");
+    expect(html).not.toContain('role="tab"');
+    expect(html).not.toContain('role="tablist"');
+    expect(html).not.toContain(">AR<");
+    expect(html).not.toContain(">AR Deposits<");
+    expect(html).not.toContain("About the AR");
   });
 
-  it("puts an info icon on the AR and AR Deposits tabs, but not on All Events", () => {
+  it("shows the list with its own columns and the search placeholder of All Events", () => {
     const html = renderAt("");
-    expect(html).toContain('aria-label="About the AR tab"');
-    expect(html).toContain('aria-label="About the AR Deposits tab"');
-    expect(html).not.toContain("About the All Events tab");
-    expect(html.match(/aria-label="About /g)).toHaveLength(2);
-  });
-
-  it("keeps the tabs themselves as they were", () => {
-    const html = renderAt("tab=ar");
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
-    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
-  });
-
-  it("puts an info icon on Amount Due and Remaining Balance, and both still sort", () => {
-    const html = renderAt("tab=ar");
-    expect(html).toContain('aria-label="About Amount Due"');
-    expect(html).toContain('aria-label="About Remaining Balance"');
-    expect(html).toMatch(/<button[^>]*>[^<]*Amount Due \(\$1,000\)/);
-    expect(html).toMatch(/<button[^>]*>[^<]*Remaining Balance \(\$2,000\)/);
-  });
-
-  it("does not compute AR balances while All Events is open", () => {
-    const html = renderAt("");
-    expect(mockArData).not.toHaveBeenCalled();
+    expect(html).toContain("Fall Classic");
     expect(html).toContain("Subtotal");
     expect(html).not.toContain("Amount Due");
+    expect(html).toContain(
+      "Search by name, invoice #, manager, date, amount, address, contact, company...",
+    );
   });
 
-  it("shows the AR columns in place of Subtotal and Tax on the AR tab", () => {
-    const html = renderAt("tab=ar");
-    expect(mockArData).toHaveBeenCalledWith([listEvent], expect.any(Function));
-    for (const header of ["Event Name (1)", "Account Manager", "Start Date", "Invoice #"]) {
-      expect(html).toContain(header);
-    }
-    expect(html).toContain("Amount Due ($1,000)");
-    expect(html).toContain("Remaining Balance ($2,000)");
-    expect(html).not.toContain("Subtotal");
-    expect(html).toContain("#1042");
-    expect(html).toContain("Dana Whitfield");
-  });
-
-  it("works out both AR tabs from one set of queries", () => {
+  it("never asks for AR balances", () => {
+    renderAt("");
+    renderAt("tab=ar");
     renderAt("tab=ar_deposits");
-    expect(mockArData).toHaveBeenCalledTimes(1);
+    expect(mockArData).not.toHaveBeenCalled();
   });
 
-  it("searches AR balances on the AR tabs", () => {
-    expect(renderAt("tab=ar&q=1%2C000")).toContain("Fall Classic");
-    expect(renderAt("tab=ar&q=2000.00")).toContain("Fall Classic");
-    expect(renderAt("tab=ar&q=9%2C999")).not.toContain("Fall Classic");
+  it("opens All Events for an old ?tab=ar or ?tab=ar_deposits bookmark", () => {
+    for (const query of ["tab=ar", "tab=ar_deposits", "tab=ar&q=Fall"]) {
+      const html = renderAt(query);
+      expect(html).toContain("Fall Classic");
+      expect(html).toContain("Subtotal");
+      expect(html).not.toContain("Amount Due");
+    }
+  });
+
+  it("keeps Create Quote and the scorecard banner", () => {
+    expect(renderAt("")).toContain("Create Quote");
+    expect(renderAt("template=revenue&timeRange=weekly")).toContain("Scorecard: Revenue");
   });
 });
 
 describe("/quotes-bookings status filter", () => {
-  it("offers Status on All Events", () => {
+  it("always offers Status", () => {
     renderAt("");
+    expect(lastFilterPanelProps().showStatus).toBe(true);
+    renderAt("tab=ar");
     expect(lastFilterPanelProps().showStatus).toBe(true);
   });
 
-  it("hides Status on the AR tabs", () => {
-    renderAt("tab=ar");
-    expect(lastFilterPanelProps().showStatus).toBe(false);
-    renderAt("tab=ar_deposits");
-    expect(lastFilterPanelProps().showStatus).toBe(false);
-  });
-
-  it("does not carry a status filter from the URL into an AR tab", () => {
-    renderAt("tab=ar&statuses=quoted");
-    expect(lastListFilters().statuses).toEqual([]);
+  it("carries a status filter from the URL, whatever ?tab says", () => {
     renderAt("statuses=quoted");
+    expect(lastListFilters().statuses).toEqual(["quoted"]);
+    renderAt("tab=ar&statuses=quoted");
     expect(lastListFilters().statuses).toEqual(["quoted"]);
   });
 });

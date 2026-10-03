@@ -27,11 +27,12 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, Driver Payments & QuickBooks Bills and Driver Week Paid / Unpaid", () => {
+    it("is only granted Work Trackers, Driver Payments & QuickBooks Bills, Driver Week Paid / Unpaid and Accounts Receivable", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
       expect(granted.sort()).toEqual([
+        "Accounts Receivable",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
         "Work Trackers",
@@ -55,6 +56,53 @@ describe("permission matrix", () => {
     it("answers for every role on the new payments row", () => {
       const entry = PERMISSIONS.find((p) => p.label === "Driver Payments & QuickBooks Bills");
       expect(Object.keys(entry?.roles ?? {}).sort()).toEqual([...roles].sort());
+    });
+
+    // docs/specs/accountant-quotes-02-accountant-page.md: AR and AR Deposits moved to /accountant.
+    describe("Accounts Receivable (the Accountant page)", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Accounts Receivable");
+
+      it("sits in Day to Day Operations, right after Payment History", () => {
+        const index = PERMISSIONS.findIndex((p) => p.label === "Accounts Receivable");
+        expect(PERMISSIONS[index - 1]?.label).toBe("Payment History");
+        expect(row?.category).toBe("Day to Day Operations");
+      });
+
+      it("is read-only for an admin and an accountant, and hidden from everyone else", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "read",
+          accountant: "read",
+          account_manager: "none",
+          viewer: "none",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("tells an account manager and a viewer where they still see a balance", () => {
+        expect(row?.roles.account_manager.note).toMatch(/Billing tab/);
+        expect(row?.roles.viewer.note).toMatch(/Billing tab/);
+      });
+
+      it("describes both tabs", () => {
+        expect(row?.description).toMatch(/AR tab/);
+        expect(row?.description).toMatch(/AR Deposits tab/);
+      });
+
+      it("is no longer listed under Payment History, which only covers the Billing tab", () => {
+        const payments = PERMISSIONS.find((p) => p.label === "Payment History");
+        expect(payments?.description).not.toMatch(/AR Deposits/);
+        expect(payments?.description).not.toMatch(/Quotes & Bookings/);
+      });
+    });
+
+    it("names the Accountant page in the role description and in every hidden-from-you note", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Accountant page/);
+      expect(accountant("Events")?.note).toMatch(/Accountant page/);
     });
 
     it("no longer describes itself as having no permissions", () => {

@@ -16,6 +16,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     allowedPaths: [
       "/dashboard",
       "/quotes-bookings",
+      "/accountant",
       "/team",
       "/assets",
       "/damage-reports",
@@ -128,12 +129,13 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
   },
   accountant: {
     // docs/specs/accountant-work-trackers.md: the Work Trackers pages (every week, every driver,
-    // the payment modal, read-only work tracker details), plus the two pages every role may
-    // read. Not /all-work-trackers or /work-tracker-types. With no /dashboard, defaultRedirect
-    // falls through to the first path here, so /work-trackers must stay first. This must not be
-    // empty: useAccessRedirect would bounce a user with no allowed path forever (the driver's []
-    // is safe only because a driver-only user is blocked before this config is read).
-    allowedPaths: ["/work-trackers", "/permissions", "/changelog"],
+    // the payment modal, read-only work tracker details). docs/specs/accountant-quotes-02: the
+    // Accountant page (AR and AR Deposits). Plus the two pages every role may read. Not
+    // /all-work-trackers or /work-tracker-types. With no /dashboard, defaultRedirect falls through
+    // to the first path here, so /accountant must stay first. This must not be empty:
+    // useAccessRedirect would bounce a user with no allowed path forever (the driver's [] is safe
+    // only because a driver-only user is blocked before this config is read).
+    allowedPaths: ["/accountant", "/work-trackers", "/permissions", "/changelog"],
     showSidebar: true,
   },
   driver: {

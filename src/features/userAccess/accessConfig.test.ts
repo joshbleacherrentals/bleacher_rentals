@@ -58,14 +58,19 @@ describe("mergeRoleConfigs — the maintainer role", () => {
   });
 });
 
-describe("mergeRoleConfigs — the accountant role (Stage 2: Work Trackers)", () => {
-  it("lets an accountant open the Work Trackers pages and the two pages every role may read", () => {
+describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accountant page)", () => {
+  it("lets an accountant open the Accountant page, the Work Trackers pages and the two pages every role may read", () => {
     const config = mergeRoleConfigs(["accountant"]);
-    expect(config.allowedPaths).toEqual(["/work-trackers", "/permissions", "/changelog"]);
+    expect(config.allowedPaths).toEqual([
+      "/accountant",
+      "/work-trackers",
+      "/permissions",
+      "/changelog",
+    ]);
   });
 
-  it("lands an accountant-only user on Work Trackers — there is no dashboard for them", () => {
-    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/work-trackers");
+  it("lands an accountant-only user on the Accountant page — there is no dashboard for them", () => {
+    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
   });
 
   it("shows the sidebar to an accountant", () => {
@@ -90,11 +95,24 @@ describe("mergeRoleConfigs — the accountant role (Stage 2: Work Trackers)", ()
     }
   });
 
-  it("takes nothing away from an account manager who is also an accountant", () => {
+  it("takes nothing away from an account manager who is also an accountant, and adds the Accountant page", () => {
     const am = mergeRoleConfigs(["account_manager"]);
     const both = mergeRoleConfigs(["account_manager", "accountant"]);
-    expect(both.allowedPaths).toEqual(am.allowedPaths);
+    expect(both.allowedPaths).toEqual([...am.allowedPaths, "/accountant"]);
     expect(both.defaultRedirect).toBe("/dashboard");
+  });
+
+  it("lets an admin open the Accountant page, and nobody else but an accountant", () => {
+    expect(mergeRoleConfigs(["admin"]).allowedPaths).toContain("/accountant");
+    for (const role of [
+      "account_manager",
+      "viewer",
+      "maintainer",
+      "developer",
+      "driver",
+    ] as const) {
+      expect(mergeRoleConfigs([role]).allowedPaths, role).not.toContain("/accountant");
+    }
   });
 
   it("leaves every other role's pages exactly as they were", () => {
@@ -115,6 +133,13 @@ describe("canAccessPath — a link is shown only if its destination is reachable
 
   it("keeps an accountant away from the driver profile — they have no Team page", () => {
     expect(canAccessPath(["accountant"], driverProfile)).toBe(false);
+  });
+
+  it("lets an accountant into the Accountant page and keeps everyone else out of it", () => {
+    expect(canAccessPath(["accountant"], "/accountant")).toBe(true);
+    expect(canAccessPath(["admin"], "/accountant")).toBe(true);
+    expect(canAccessPath(["account_manager"], "/accountant")).toBe(false);
+    expect(canAccessPath(["viewer"], "/accountant")).toBe(false);
   });
 
   it("lets an accountant into the Work Trackers pages, week and driver included", () => {

@@ -41,4 +41,8 @@ describe("narrowingKey", () => {
     ).not.toBe(base);
     expect(keyFor(filters, "", false, "ar")).not.toBe(base);
   });
+
+  it("tells the two AR tabs of /accountant apart, so switching one goes back to page 1", () => {
+    expect(keyFor(filters, "", false, "ar")).not.toBe(keyFor(filters, "", false, "ar_deposits"));
+  });
 });

@@ -26,6 +26,7 @@ import {
   Activity,
   Wrench,
   ImageIcon,
+  Receipt,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -122,6 +123,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         roles: ["admin", "account_manager", "viewer", "maintainer"],
       },
     ],
+  },
+  {
+    type: "button",
+    key: "accountant",
+    label: "Accountant",
+    href: "/accountant",
+    icon: Receipt,
   },
   {
     type: "button",
@@ -313,6 +321,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "team",
     "assets",
     "quality-assurance",
+    "accountant",
     "work-trackers",
     "scorecard",
     "leaderboard",
@@ -351,7 +360,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
   ],
   driver: [],
   maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
-  accountant: ["work-trackers", "documentation"],
+  accountant: ["accountant", "work-trackers", "documentation"],
 };
 
 export function useSidebarItems(roles: WebRole[]): SidebarItemConfig[] {

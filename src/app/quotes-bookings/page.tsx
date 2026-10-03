@@ -3,9 +3,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { Search, ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { InfoTooltip } from "@/components/InfoTooltip";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
 import {
   FilterSidebar,
@@ -13,7 +11,6 @@ import {
 } from "@/features/quotesAndBookings/components/FilterSidebar";
 import { useListPageState } from "@/features/quotesAndBookings/hooks/useListPageState";
 import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsData";
-import { RECEIVABLES_HELP } from "@/features/quotesAndBookings/utils/receivablesHelp";
 
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
 import { searchEvents } from "@/features/quotesAndBookings/utils/searchEvents";
@@ -31,13 +28,8 @@ import {
   accountManagerName,
   formatListDate,
 } from "@/features/quotesAndBookings/components/eventListCells";
-import { AccountsReceivableTabs } from "@/features/quotesAndBookings/components/AccountsReceivableTabs";
 import { ActiveFilterChips } from "@/features/quotesAndBookings/components/ActiveFilterChips";
-import {
-  parseListTab,
-  tabUsesStatusFilter,
-  type ListTab,
-} from "@/features/quotesAndBookings/utils/listTabs";
+import { QUOTES_BOOKINGS_TABS } from "@/features/quotesAndBookings/utils/listTabs";
 import {
   isScorecardTemplate,
   filtersForTemplate,
@@ -115,11 +107,9 @@ export default function QuotesBookingsPage() {
     setPageSize,
     sort,
     setSort,
-    activeTab,
-    switchTab,
     removeFilter,
     clearAllFilters,
-  } = useListPageState(initialOverrides);
+  } = useListPageState(QUOTES_BOOKINGS_TABS, initialOverrides);
 
   // The sidebar is pinned inside the scrolling layout and fills the visible height, so its
   // contents scroll rather than the whole page.
@@ -135,20 +125,11 @@ export default function QuotesBookingsPage() {
   }, [scrollRef]);
 
   const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
-  // The AR balances are worked out the first time an AR tab is opened and kept
-  // from then on, so flipping between tabs never re-runs their queries.
-  const [receivablesOpened, setReceivablesOpened] = useState(activeTab !== "all");
-  const handleTabChange = (next: ListTab) => {
-    switchTab(next);
-    if (next !== "all") setReceivablesOpened(true);
-  };
 
-  // Only while All Events is open: on the AR tabs this sort over the whole list
-  // would be work nobody sees, redone on every tab switch.
   const searchedData = useMemo(() => {
-    if (!data || activeTab !== "all") return undefined;
+    if (!data) return undefined;
     return sortEvents(searchEvents(data, searchQuery), sort);
-  }, [data, searchQuery, sort, activeTab]);
+  }, [data, searchQuery, sort]);
 
   // The whole filtered list is already in memory (PowerSync), so a page is a
   // slice of it. The totals in the column headers stay whole-list on purpose.
@@ -268,7 +249,7 @@ export default function QuotesBookingsPage() {
         isOpen={filters.isOpen}
         onToggle={toggleOpen}
         height={sidebarHeight}
-        showStatus={tabUsesStatusFilter(activeTab)}
+        showStatus
         onStatusesChange={setStatuses}
         onCreatedRangeChange={setCreatedRange}
         onEventRangeChange={setEventRange}
@@ -356,96 +337,48 @@ export default function QuotesBookingsPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={
-              activeTab === "all"
-                ? "Search by name, invoice #, manager, date, amount, address, contact, company..."
-                : "Search by name, invoice #, manager, date, amount due, remaining balance, contact, company..."
-            }
+            placeholder="Search by name, invoice #, manager, date, amount, address, contact, company..."
             className="w-full h-[40px] pl-10 pr-4 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-darkBlue"
           />
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => handleTabChange(parseListTab(value))}>
-          {/* Tabs left, applied filters right. The chips scroll sideways rather
-              than wrap, and drop to their own line when the row gets narrow. */}
-          <div className="flex flex-wrap items-center gap-3">
-            <TabsList className="shrink-0">
-              <TabsTrigger value="all">All Events</TabsTrigger>
-              <TabsTrigger value="ar">
-                AR
-                <InfoTooltip
-                  label="About the AR tab"
-                  content={RECEIVABLES_HELP.ar}
-                  focusable={false}
-                />
-              </TabsTrigger>
-              <TabsTrigger value="ar_deposits">
-                AR Deposits
-                <InfoTooltip
-                  label="About the AR Deposits tab"
-                  content={RECEIVABLES_HELP.arDeposits}
-                  focusable={false}
-                />
-              </TabsTrigger>
-            </TabsList>
-            <ActiveFilterChips
-              filters={filters}
-              searchQuery={searchQuery}
-              showDeleted={showDeleted}
-              tab={activeTab}
-              onRemove={removeFilter}
-              onClearAll={clearAllFilters}
-            />
-          </div>
+        {/* The applied filters. The chips scroll sideways rather than wrap; the row is empty (and
+            hidden) when nothing is applied. */}
+        <div className="mb-3 flex flex-wrap items-center gap-3 empty:hidden">
+          <ActiveFilterChips
+            filters={filters}
+            searchQuery={searchQuery}
+            showDeleted={showDeleted}
+            showStatus
+            onRemove={removeFilter}
+            onClearAll={clearAllFilters}
+          />
+        </div>
 
-          <TabsContent value="all">
-            <DataTable
-              columns={columns}
-              data={pageData ?? null}
-              keyExtractor={(event) => event.id}
-              emptyMessage="No events found"
-              isLoading={isLoading}
-              loadingMessage="Loading events..."
-              onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
-              sort={sort}
-              onSort={(key) => setSort((current) => nextSort(current, key as SortKey))}
-            />
+        <DataTable
+          columns={columns}
+          data={pageData ?? null}
+          keyExtractor={(event) => event.id}
+          emptyMessage="No events found"
+          isLoading={isLoading}
+          loadingMessage="Loading events..."
+          onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
+          sort={sort}
+          onSort={(key) => setSort((current) => nextSort(current, key as SortKey))}
+        />
 
-            {!isLoading && totalItems > 0 && (
-              <Pagination
-                page={currentPage}
-                pageSize={pageSize}
-                totalItems={totalItems}
-                onPageChange={goToPage}
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setPage(1);
-                }}
-              />
-            )}
-          </TabsContent>
-
-          {/* Not mounted until an AR tab is first opened, so All Events never
-              queries payments; kept after that, so tab switches reuse the result. */}
-          {receivablesOpened && (
-            <AccountsReceivableTabs
-              events={data}
-              eventsLoading={isLoading}
-              searchQuery={searchQuery}
-              sort={sort}
-              onSort={(key) => setSort((current) => nextSort(current, key))}
-              page={page}
-              pageSize={pageSize}
-              onPageChange={goToPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              currencyOf={currencyOf}
-              onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
-            />
-          )}
-        </Tabs>
+        {!isLoading && totalItems > 0 && (
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={goToPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        )}
       </main>
     </div>
   );

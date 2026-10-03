@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -64,10 +64,11 @@ const none = (note?: string): PermissionAccess => ({ level: "none", note });
 const MAINTAINER_NO_ACCESS_NOTE =
   "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard. Everything else in the web app is hidden from them entirely.";
 
-// docs/specs/accountant-role.md and accountant-work-trackers.md: the Accountant has the Work
-// Trackers pages and the driver payment window, and nothing else.
+// docs/specs/accountant-role.md, accountant-work-trackers.md and accountant-quotes-02: the
+// Accountant has the Work Trackers pages, the driver payment window and the Accountant page, and
+// nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role covers the Work Trackers pages and driver payments only. Everything else on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages, driver payments and the Accountant page only. Everything else on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -119,7 +120,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Payment History",
     description:
-      "The payments and balances on the Billing tab of a quote or booking, and the Amount Due and Remaining Balance of every booking on the AR and AR Deposits tabs of Quotes & Bookings. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes.",
+      "The payments and balances on the Billing tab of a quote or booking. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes.",
     category: "Day to Day Operations",
     roles: {
       admin: read(
@@ -137,6 +138,27 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Accounts Receivable",
+    description:
+      "The Accountant page: the AR tab lists booked events with an amount due that should already have been paid, the AR Deposits tab lists those due later. Each shows the Amount Due and the Remaining Balance. Filters, search and sorting apply to both.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: read("Can open the Accountant page and see the balances of every booking."),
+      account_manager: none(
+        "The Accountant page is for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "The Accountant page is for accountants and administrators. A viewer still sees a booking's balance on the Billing tab of the quote.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: read("Can open the Accountant page and see the balances of every booking."),
     },
   },
   {

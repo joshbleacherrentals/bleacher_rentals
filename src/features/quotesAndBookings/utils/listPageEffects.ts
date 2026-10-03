@@ -1,5 +1,10 @@
 import { filtersToSearchParams, type UrlSyncedListState } from "./filterUrlSync";
-import { defaultSortForTab, tabUsesStatusFilter, type ListTab } from "./listTabs";
+import {
+  defaultSortForTab,
+  tabUsesStatusFilter,
+  type ListTab,
+  type ListTabDeclaration,
+} from "./listTabs";
 import type { EventSort } from "./sortEvents";
 
 /**
@@ -15,8 +20,16 @@ const URL_WRITE_DEBOUNCE_MS = 300;
  * Parameters the list does not own (scorecard deep links, ...) are kept as they are.
  * An empty string is a real answer: the last synced parameter was cleared.
  */
-export function queryStringToWrite(state: UrlSyncedListState, currentQuery: string): string | null {
-  const nextQuery = filtersToSearchParams(state, new URLSearchParams(currentQuery)).toString();
+export function queryStringToWrite(
+  state: UrlSyncedListState,
+  currentQuery: string,
+  tabs: ListTabDeclaration,
+): string | null {
+  const nextQuery = filtersToSearchParams(
+    state,
+    tabs,
+    new URLSearchParams(currentQuery),
+  ).toString();
   return nextQuery === currentQuery ? null : nextQuery;
 }
 
@@ -40,9 +53,10 @@ export function pageAfterChange(page: number, previousKey: string, currentKey: s
 export function tabSwitchOutcome(
   next: ListTab,
   hasStatusFilter: boolean,
+  tabs: ListTabDeclaration,
 ): { sort: EventSort; dropStatuses: boolean } {
   return {
-    sort: defaultSortForTab(next),
-    dropStatuses: hasStatusFilter && !tabUsesStatusFilter(next),
+    sort: defaultSortForTab(next, tabs),
+    dropStatuses: hasStatusFilter && !tabUsesStatusFilter(next, tabs),
   };
 }

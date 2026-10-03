@@ -12,11 +12,17 @@ describe("useSidebarItems", () => {
     expect(keys).toContain("team");
     expect(keys).toContain("assets");
     expect(keys).toContain("quality-assurance");
+    expect(keys).toContain("accountant");
     expect(keys).toContain("work-trackers");
     expect(keys).toContain("scorecard");
     expect(keys).toContain("leaderboard");
     expect(keys).toContain("driver-calendar");
     expect(keys).toContain("configuration");
+  });
+
+  it("admin lists Accountant immediately before Work Trackers", () => {
+    const keys = useSidebarItems(["admin"]).map((i) => i.key);
+    expect(keys.indexOf("accountant")).toBe(keys.indexOf("work-trackers") - 1);
   });
 
   // ═══ Viewer ═══
@@ -51,10 +57,10 @@ describe("useSidebarItems", () => {
 
   // ═══ Account Manager ═══
 
-  it("account_manager sees admin items minus configuration and documentation", () => {
+  it("account_manager sees admin items minus configuration and the Accountant page", () => {
     const adminItems = useSidebarItems(["admin"]);
     const amItems = useSidebarItems(["account_manager"]);
-    const adminOnly = ["configuration"];
+    const adminOnly = ["configuration", "accountant"];
     expect(amItems.map((i) => i.key)).toEqual(
       adminItems.filter((i) => !adminOnly.includes(i.key)).map((i) => i.key),
     );
@@ -142,15 +148,20 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Work Trackers and the Documentation section, nothing else", () => {
+  it("accountant sees Accountant, Work Trackers and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
-    expect(items.map((i) => i.key)).toEqual(["work-trackers", "documentation"]);
+    expect(items.map((i) => i.key)).toEqual(["accountant", "work-trackers", "documentation"]);
 
-    const workTrackers = items[0];
+    const accountantPage = items[0];
+    expect(accountantPage.type).toBe("button");
+    expect("label" in accountantPage && accountantPage.label).toBe("Accountant");
+    expect("href" in accountantPage && accountantPage.href).toBe("/accountant");
+
+    const workTrackers = items[1];
     expect(workTrackers.type).toBe("button");
     expect("href" in workTrackers && workTrackers.href).toBe("/work-trackers");
 
-    const docs = items[1];
+    const docs = items[2];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",
@@ -163,10 +174,27 @@ describe("useSidebarItems", () => {
     expect(keys).not.toContain("quality-assurance");
   });
 
-  it("an account manager who is also an accountant sees what an account manager sees", () => {
-    expect(useSidebarItems(["account_manager", "accountant"]).map((i) => i.key)).toEqual(
-      useSidebarItems(["account_manager"]).map((i) => i.key),
+  it("an account manager who is also an accountant sees what an account manager sees, plus Accountant", () => {
+    const keys = useSidebarItems(["account_manager", "accountant"]).map((i) => i.key);
+    const amKeys = useSidebarItems(["account_manager"]).map((i) => i.key);
+    expect(keys).toEqual(
+      amKeys.flatMap((key) => (key === "work-trackers" ? ["accountant", key] : [key])),
     );
+  });
+
+  it("account manager and viewer do not see Accountant", () => {
+    for (const role of [
+      "account_manager",
+      "viewer",
+      "maintainer",
+      "developer",
+      "driver",
+    ] as const) {
+      expect(
+        useSidebarItems([role]).map((i) => i.key),
+        role,
+      ).not.toContain("accountant");
+    }
   });
 
   // ═══ Dev Tools ═══

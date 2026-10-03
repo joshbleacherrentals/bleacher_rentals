@@ -130,13 +130,17 @@ INSERT INTO public."ZoneStateProvinces" (zone_uuid, state_province) VALUES (:'zo
 INSERT INTO public."ZoneQboClasses" (zone_uuid, qbo_connection_uuid, qbo_class_id)
 VALUES (:'zone', :'qbo_conn', 'CLASS-1');
 
--- Rows the accountant must still NOT see.
+-- Rows the accountant must still NOT see (Events, PaymentHistory and Contacts excepted: since the
+-- Accountant page they are read on purpose, and are asserted as readable below).
 INSERT INTO public."Events" (event_name, event_start, event_end, lenient, must_be_clean)
 VALUES ('Accountant WT probe event', '2026-07-01', '2026-07-02', false, false)
 RETURNING id AS event \gset
 
 INSERT INTO public."PaymentHistory" (event_uuid, amount_cents, payer_name)
 VALUES (:'event', 12345, 'Accountant WT probe');
+
+INSERT INTO public."Contacts" (first_name) VALUES ('Accountant WT probe contact')
+RETURNING id AS contact \gset
 
 INSERT INTO public."DamageReports" (bleacher_uuid) VALUES (:'bleacher');
 
@@ -195,13 +199,15 @@ SELECT is(
 
 -- ── Still nothing else (zero-trust holds) ───────────────────────────────────
 
-SELECT is((SELECT count(*)::int FROM public."Events"), 0, 'an accountant still cannot read Events');
+-- Events, PaymentHistory and Contacts are readable since the Accountant page (accountant-quotes-02,
+-- migration 20261004120000): it builds AR and AR Deposits from them. See accountant_receivables.test.sql.
+SELECT is((SELECT count(*)::int FROM public."Events" WHERE id = :'event'), 1, 'an accountant can now read Events (Accountant page)');
 SELECT is((SELECT count(*)::int FROM public."BleacherEvents"), 0, 'an accountant still cannot read BleacherEvents');
-SELECT is((SELECT count(*)::int FROM public."PaymentHistory"), 0, 'an accountant still cannot read PaymentHistory');
+SELECT is((SELECT count(*)::int FROM public."PaymentHistory" WHERE event_uuid = :'event'), 1, 'an accountant can now read PaymentHistory (Accountant page)');
 SELECT is((SELECT count(*)::int FROM public."DamageReports"), 0, 'an accountant still cannot read DamageReports');
 SELECT is((SELECT count(*)::int FROM public."AccountManagers"), 0, 'an accountant still cannot read AccountManagers');
 SELECT is((SELECT count(*)::int FROM public."Accountants"), 0, 'an accountant still cannot read who holds the role');
-SELECT is((SELECT count(*)::int FROM public."Contacts"), 0, 'an accountant still cannot read Contacts');
+SELECT is((SELECT count(*)::int FROM public."Contacts" WHERE id = :'contact'), 1, 'an accountant can now read Contacts (Accountant page)');
 SELECT is((SELECT count(*)::int FROM public."Notifications"), 0, 'an accountant still cannot read Notifications');
 
 -- ═══ THE ACCOUNTANT: writes ══════════════════════════════════════════════════

@@ -1,10 +1,16 @@
 import type { QuotesBookingsFilters } from "../types";
 import { DEFAULT_PAGE_SIZE, parsePage, parsePageSize, type PageSize } from "./pagination";
 import { parseSort, serializeSort, type EventSort } from "./sortEvents";
-import { defaultSortForTab, parseListTab, tabUsesStatusFilter, type ListTab } from "./listTabs";
+import {
+  defaultSortForTab,
+  parseListTab,
+  tabUsesStatusFilter,
+  type ListTab,
+  type ListTabDeclaration,
+} from "./listTabs";
 
 /**
- * Query-param keys the /quotes-bookings list page owns for filter state.
+ * Query-param keys the quotes list pages own for filter state.
  * Kept separate from scorecard deep-link params (template, timeRange,
  * accountManager, periodStart) and the isOpen UI flag, which are never
  * written back to the URL.
@@ -38,7 +44,7 @@ export type UrlSyncedListState = {
   pageSize: PageSize;
   /** The tab's own default (`defaultSortForTab`) stays out of the URL. */
   sort: EventSort;
-  /** "all" is the default and stays out of the URL. */
+  /** Written only when the page's declaration says so (`writeTabToUrl`). */
   tab: ListTab;
 };
 
@@ -60,6 +66,7 @@ function paramToBool(value: string | null): boolean | null {
  */
 export function filtersToSearchParams(
   state: UrlSyncedListState,
+  tabs: ListTabDeclaration,
   existingParams?: URLSearchParams,
 ): URLSearchParams {
   const params = new URLSearchParams(existingParams?.toString());
@@ -75,7 +82,9 @@ export function filtersToSearchParams(
 
   setOrDelete(
     PARAM.statuses,
-    filters.statuses.length > 0 && tabUsesStatusFilter(tab) ? filters.statuses.join(",") : null,
+    filters.statuses.length > 0 && tabUsesStatusFilter(tab, tabs)
+      ? filters.statuses.join(",")
+      : null,
   );
   setOrDelete(PARAM.createdFrom, filters.createdFrom);
   setOrDelete(PARAM.createdTo, filters.createdTo);
@@ -91,8 +100,9 @@ export function filtersToSearchParams(
   setOrDelete(PARAM.showDeleted, showDeleted ? "1" : null);
   setOrDelete(PARAM.page, page > 1 ? String(page) : null);
   setOrDelete(PARAM.pageSize, pageSize !== DEFAULT_PAGE_SIZE ? String(pageSize) : null);
-  setOrDelete(PARAM.sort, serializeSort(sort, defaultSortForTab(tab)));
-  setOrDelete(PARAM.tab, tab === "all" ? null : tab);
+  setOrDelete(PARAM.sort, serializeSort(sort, defaultSortForTab(tab, tabs)));
+  // A page that does not write its tab also removes a stale one (an old AR bookmark).
+  setOrDelete(PARAM.tab, tabs.writeTabToUrl ? tab : null);
 
   return params;
 }
@@ -101,15 +111,18 @@ export function filtersToSearchParams(
  * Reads filter/search/showDeleted state back out of URL search params.
  * Any param that's absent/invalid falls back to its empty-filter default.
  */
-export function searchParamsToFilters(searchParams: {
-  get(key: string): string | null;
-}): UrlSyncedListState {
+export function searchParamsToFilters(
+  searchParams: { get(key: string): string | null },
+  tabs: ListTabDeclaration,
+): UrlSyncedListState {
   const statusesParam = searchParams.get(PARAM.statuses);
-  const tab = parseListTab(searchParams.get(PARAM.tab));
+  const tab = parseListTab(searchParams.get(PARAM.tab), tabs);
   return {
     filters: {
       statuses:
-        statusesParam && tabUsesStatusFilter(tab) ? statusesParam.split(",").filter(Boolean) : [],
+        statusesParam && tabUsesStatusFilter(tab, tabs)
+          ? statusesParam.split(",").filter(Boolean)
+          : [],
       createdFrom: searchParams.get(PARAM.createdFrom),
       createdTo: searchParams.get(PARAM.createdTo),
       eventFrom: searchParams.get(PARAM.eventFrom),
@@ -125,16 +138,23 @@ export function searchParamsToFilters(searchParams: {
     showDeleted: paramToBool(searchParams.get(PARAM.showDeleted)) ?? false,
     page: parsePage(searchParams.get(PARAM.page)),
     pageSize: parsePageSize(searchParams.get(PARAM.pageSize)),
-    sort: parseSort(searchParams.get(PARAM.sort), defaultSortForTab(tab)),
+    sort: parseSort(searchParams.get(PARAM.sort), defaultSortForTab(tab, tabs)),
     tab,
   };
 }
 
-/** True if any filter/search/showDeleted param this module owns is present in the URL. */
-export function hasUrlSyncedFilterParams(searchParams: {
-  get(key: string): string | null;
-}): boolean {
-  return Object.values(PARAM).some((key) => searchParams.get(key) !== null);
+/**
+ * True if any filter/search/showDeleted param this module owns is present in the URL. `?tab` only
+ * counts on a page that writes its tab: elsewhere it is not state, and a stale one must not
+ * suppress the scorecard deep link's filters.
+ */
+export function hasUrlSyncedFilterParams(
+  searchParams: { get(key: string): string | null },
+  tabs: ListTabDeclaration,
+): boolean {
+  return Object.values(PARAM).some(
+    (key) => (key !== PARAM.tab || tabs.writeTabToUrl) && searchParams.get(key) !== null,
+  );
 }
 
 /**

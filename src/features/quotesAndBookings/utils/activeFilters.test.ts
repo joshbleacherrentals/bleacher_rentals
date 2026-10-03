@@ -27,7 +27,13 @@ const names: ActiveFilterNames = {
 };
 
 function state(overrides: Partial<ActiveFilterState> = {}): ActiveFilterState {
-  return { filters: noFilters, searchQuery: "", showDeleted: false, tab: "all", ...overrides };
+  return {
+    filters: noFilters,
+    searchQuery: "",
+    showDeleted: false,
+    showStatus: true,
+    ...overrides,
+  };
 }
 
 const labels = (s: ActiveFilterState) => describeActiveFilters(s, names).map((f) => f.label);
@@ -69,10 +75,10 @@ describe("describeActiveFilters", () => {
     ]);
   });
 
-  it("leaves Status out on the AR tabs, where it does not apply", () => {
+  it("leaves Status out where the page does not offer it (the AR tabs)", () => {
     const withStatus = { ...noFilters, statuses: ["booked"] };
-    expect(labels(state({ tab: "ar", filters: withStatus }))).toEqual([]);
-    expect(labels(state({ tab: "ar_deposits", filters: withStatus }))).toEqual([]);
+    expect(labels(state({ showStatus: false, filters: withStatus }))).toEqual([]);
+    expect(labels(state({ showStatus: true, filters: withStatus }))).toEqual(["Status: Booked"]);
   });
 
   it("still says what is filtered when a name has not loaded", () => {

@@ -1,6 +1,8 @@
 # Accountant page — AR and AR Deposits move to `/accountant`
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D16 answered 2026-10-03).
+Status: **IMPLEMENTED 2026-10-03, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); Playwright specs written, not run; the `br_powersync` sync-rules diff
+is uncommitted and not deployed. 0 open decisions (D1–D16 answered 2026-10-03).
 Original request: №1. Implementation order: **02 of 11**. Needs [01](accountant-quotes-01-list-state-hook.md)
 (the shared list-state hook) first.
 Ships in one release with specs 03 and 04 (the capability refactor and the accountant's access to
@@ -215,9 +217,21 @@ about AR. The declaration holds:
 - whether the Status filter is offered on each tab;
 - whether `tab` is written to the URL.
 
-**`/quotes-bookings` declares:** no tabs; the Status filter offered; the starting sort All Events
-has today (newest created first). `tab` is never read or written there — a stale `tab=ar` is
-ignored and the first URL write removes it (D3).
+**The shape (approved 2026-10-03).** A page with no tabs is declared as one tab that is not
+written to the URL, so the hook and the URL code never branch on "no declaration":
+
+```ts
+type ListTabDeclaration = {
+  tabs: readonly { id: string; startingSort: EventSort; offersStatus: boolean }[];
+  /** Used when `?tab` is missing or unknown. */
+  openingTab: string;
+  writeTabToUrl: boolean;
+};
+```
+
+**`/quotes-bookings` declares:** one tab, `all` (no tab bar is drawn); the Status filter offered;
+the starting sort All Events has today (newest created first); `writeTabToUrl: false`. `tab` is
+never read or written there — a stale `tab=ar` is ignored and the first URL write removes it (D3).
 
 **`/accountant` declares:** tabs `ar` and `ar_deposits`; opening tab `ar` (D11); starting sorts as
 today — AR by start date descending, AR Deposits by start date ascending; the Status filter not

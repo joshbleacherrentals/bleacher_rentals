@@ -5,7 +5,7 @@ import type { QuotesBookingsFilters } from "../types";
 import { useQuotesAndBookingsFilters } from "./useQuotesAndBookingsFilters";
 import type { ActiveFilterKey } from "../utils/activeFilters";
 import { searchParamsToFilters, hasUrlSyncedFilterParams } from "../utils/filterUrlSync";
-import type { ListTab } from "../utils/listTabs";
+import type { ListTab, ListTabDeclaration } from "../utils/listTabs";
 import { narrowingKey } from "../utils/narrowingKey";
 import type { PageSize } from "../utils/pagination";
 import type { EventSort } from "../utils/sortEvents";
@@ -18,9 +18,13 @@ import {
 
 /**
  * The state of a quotes list page — filters, search, page, page size, sort, tab and Show Deleted —
- * and its round trip through the URL. Data loading and layout stay with the page.
+ * and its round trip through the URL. Data loading and layout stay with the page. The page
+ * declares its tabs; the hook knows nothing about which tabs exist.
  */
-export function useListPageState(initialOverrides?: Partial<QuotesBookingsFilters>) {
+export function useListPageState(
+  tabs: ListTabDeclaration,
+  initialOverrides?: Partial<QuotesBookingsFilters>,
+) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -30,8 +34,8 @@ export function useListPageState(initialOverrides?: Partial<QuotesBookingsFilter
   // on mount — subsequent user edits are pushed back out via the effect below.
   // eslint/exhaustive-deps note: intentionally read once on mount, not on every
   // searchParams change (that would fight the sync effect below).
-  const urlState = useMemo(() => searchParamsToFilters(searchParams), []);
-  const hasUrlFilters = useMemo(() => hasUrlSyncedFilterParams(searchParams), []);
+  const urlState = useMemo(() => searchParamsToFilters(searchParams, tabs), []);
+  const hasUrlFilters = useMemo(() => hasUrlSyncedFilterParams(searchParams, tabs), []);
 
   const {
     filters,
@@ -60,7 +64,7 @@ export function useListPageState(initialOverrides?: Partial<QuotesBookingsFilter
   // except Status, which the AR tabs do not offer: a status picked on All Events
   // is dropped on the way in, so it cannot silently empty an AR table.
   const switchTab = (next: ListTab) => {
-    const outcome = tabSwitchOutcome(next, filters.statuses.length > 0);
+    const outcome = tabSwitchOutcome(next, filters.statuses.length > 0, tabs);
     setActiveTab(next);
     setSort(outcome.sort);
     if (outcome.dropStatuses) setStatuses([]);
@@ -103,6 +107,7 @@ export function useListPageState(initialOverrides?: Partial<QuotesBookingsFilter
       const nextQs = queryStringToWrite(
         { filters, searchQuery, showDeleted, page, pageSize, sort, tab: activeTab },
         searchParams.toString(),
+        tabs,
       );
       if (nextQs === null) return;
       router.replace(nextQs ? `${pathname}?${nextQs}` : pathname, { scroll: false });

@@ -1,9 +1,8 @@
 import { DateTime } from "luxon";
 import type { QuotesBookingsFilters } from "../types";
-import { tabUsesStatusFilter, type ListTab } from "./listTabs";
 
 /**
- * The chips above the /quotes-bookings table: one per filter that is narrowing
+ * The chips above a quotes list table: one per filter that is narrowing
  * the list right now, each removable on its own.
  *
  * Search and Show Deleted count as filters here too — both hide rows, and a
@@ -28,7 +27,8 @@ export type ActiveFilterState = {
   filters: Omit<QuotesBookingsFilters, "isOpen">;
   searchQuery: string;
   showDeleted: boolean;
-  tab: ListTab;
+  /** Whether the page offers the Status filter; where it does not, a status is not a chip. */
+  showStatus: boolean;
 };
 
 /** Filters store ids; the chips show names. `undefined` while a name has not loaded. */
@@ -53,7 +53,7 @@ const yesNo = (value: boolean) => (value ? "Yes" : "No");
 
 /** In the order the Filter Panel lists them, with the search box first. */
 export function describeActiveFilters(
-  { filters, searchQuery, showDeleted, tab }: ActiveFilterState,
+  { filters, searchQuery, showDeleted, showStatus }: ActiveFilterState,
   names: ActiveFilterNames,
 ): ActiveFilter[] {
   const active: ActiveFilter[] = [];
@@ -61,7 +61,7 @@ export function describeActiveFilters(
 
   const search = searchQuery.trim();
   if (search) add("search", `Search: “${search}”`);
-  if (filters.statuses.length > 0 && tabUsesStatusFilter(tab)) {
+  if (filters.statuses.length > 0 && showStatus) {
     add("statuses", `Status: ${filters.statuses.map(capitalize).join(", ")}`);
   }
   if (filters.createdFrom || filters.createdTo) {

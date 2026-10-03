@@ -191,11 +191,13 @@ SELECT is(public.get_user_roles(), '{maintainer}'::text[], 'maintainer is still 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_acct_only')::text, true);
 
-SELECT is((SELECT count(*)::int FROM public."Events"), 0, 'an accountant cannot read Events');
+-- Events and PaymentHistory are readable since the Accountant page (accountant-quotes-02, migration
+-- 20261004120000): it builds AR and AR Deposits from them. Writes stay refused (asserted below).
+SELECT is((SELECT count(*)::int FROM public."Events" WHERE id = :'event'), 1, 'an accountant can read Events (Accountant page)');
 SELECT is((SELECT count(*)::int FROM public."AccountManagers"), 0, 'an accountant cannot read AccountManagers');
 SELECT is((SELECT count(*)::int FROM public."Developers"), 0, 'an accountant cannot read Developers');
 SELECT is((SELECT count(*)::int FROM public."Maintainers"), 0, 'an accountant cannot read Maintainers');
-SELECT is((SELECT count(*)::int FROM public."PaymentHistory"), 0, 'an accountant cannot read PaymentHistory');
+SELECT is((SELECT count(*)::int FROM public."PaymentHistory" WHERE event_uuid = :'event'), 1, 'an accountant can read PaymentHistory (Accountant page)');
 SELECT is((SELECT count(*)::int FROM public."DamageReports"), 0, 'an accountant cannot read DamageReports');
 
 SELECT is(
