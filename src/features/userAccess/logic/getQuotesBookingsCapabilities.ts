@@ -1,0 +1,93 @@
+import { canAccessPath } from "../accessConfig";
+import { canEditOwnedEntity } from "./canEditOwnedEntity";
+import type { WebRole } from "./determineAccess";
+
+/** Every role the app knows. `satisfies` makes a new WebRole fail to compile until it is listed. */
+const KNOWN_ROLES = {
+  admin: true,
+  account_manager: true,
+  developer: true,
+  viewer: true,
+  driver: true,
+  maintainer: true,
+  accountant: true,
+} satisfies Record<WebRole, true>;
+
+const isKnownRole = (role: string): role is WebRole => Object.hasOwn(KNOWN_ROLES, role);
+
+/**
+ * "Can this user do X?" for the quote card (/quotes-bookings/{id}) and the list
+ * (/quotes-bookings) — the one place that answers it. Components read the answers and never ask
+ * who the user is.
+ *
+ * Roles are additive: a user holding several gets what any of them gives. A role this function
+ * does not know gets nothing. docs/specs/accountant-quotes-03-capabilities.md
+ */
+export type QuotesBookingsCapabilities = {
+  /** The list's "+ Create Quote". */
+  createQuote: boolean;
+  /** The card's Edit and Delete, for one quote. The owner rule applies to an account manager. */
+  manageQuote: boolean;
+  /**
+   * Send To Client. Any admin or account manager, on any quote: review-gating was disabled per
+   * boss feedback, so it does not follow the owner rule.
+   */
+  sendToClient: boolean;
+  /** Whether "+ Record Payment" is drawn at all. */
+  showRecordPayment: boolean;
+  /** Whether "+ Record Payment" can be pressed. A visible button that cannot be pressed keeps its hint. */
+  recordPayment: boolean;
+  /** The QuickBooks Invoice checkbox. Bookkeeping, so not tied to the quote's owner. */
+  setQuickBooksFlag: boolean;
+  /** The Messages tab's internal chat. */
+  useInternalChat: boolean;
+  /** Open in Dashboard. */
+  openInDashboard: boolean;
+};
+
+export function getQuotesBookingsCapabilities(input: {
+  roles: WebRole[];
+  userId: string | null;
+  leadZoneIds: string[];
+  accountManagerZoneIds: string[];
+  /** The quote on the card. The list has none and reads only `createQuote`. */
+  quote?: {
+    createdByUserId?: string | null;
+    /** Zones of the bleachers on the quote; the card passes none today. */
+    eventBleacherZoneIds?: string[];
+  };
+}): QuotesBookingsCapabilities {
+  const { userId, leadZoneIds, accountManagerZoneIds, quote } = input;
+  // A role this function does not know gives nothing (and must not reach the access config).
+  const roles = input.roles.filter(isKnownRole);
+
+  const isAdmin = roles.includes("admin");
+  const isAccountManager = roles.includes("account_manager");
+  const isStaff = isAdmin || isAccountManager;
+
+  const manageQuote = canEditOwnedEntity({
+    isAdmin,
+    isNew: false,
+    // Without this a caller who is neither admin nor account manager would fall to the shared
+    // function's last branch ("non-AM callers, backwards compat") and be allowed.
+    canCreate: isStaff,
+    isAccountManager,
+    leadZoneIds,
+    accountManagerZoneIds,
+    createdByUserId: quote?.createdByUserId,
+    assignedUserId: quote?.createdByUserId,
+    userId,
+    eventBleacherZoneIds: quote?.eventBleacherZoneIds,
+  });
+
+  return {
+    createQuote: isStaff,
+    manageQuote,
+    sendToClient: isStaff,
+    showRecordPayment: isStaff,
+    recordPayment: manageQuote,
+    setQuickBooksFlag: isStaff,
+    useInternalChat: isStaff,
+    openInDashboard: canAccessPath(roles, "/dashboard"),
+  };
+}

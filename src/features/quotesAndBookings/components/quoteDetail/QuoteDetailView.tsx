@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, Trash2, Send } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { QuoteDetail, fetchQuoteDetail } from "../../db/fetchQuoteDetail";
 import { softDeleteEvent } from "../../db/softDeleteEvent";
@@ -15,13 +15,14 @@ import { BillingTab } from "./tabs/BillingTab";
 import { FilesTab } from "./tabs/FilesTab";
 import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
+import { QuoteActionBar } from "./QuoteActionBar";
+import { useQuotesBookingsCapabilities } from "../../hooks/useQuotesBookingsCapabilities";
 import { useEventCurrency } from "../../hooks/useEventCurrency";
 import { formatMoney } from "../../utils/formatMoney";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { loadEventForModal } from "@/features/eventConfiguration/functions/loadEventForModal";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 // import { canSendQuote } from "@/features/userAccess/logic/canEditOwnedEntity";
-import { canEditOwnedEntity } from "@/features/userAccess/logic/canEditOwnedEntity";
 import { getAmRoleForZone } from "@/features/userAccess/logic/getAmRoleForZone";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
@@ -50,6 +51,9 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const perms = usePermissionsStore();
+  // What this user may do on this quote. Worked out once here and handed down: no component below
+  // asks who the user is.
+  const can = useQuotesBookingsCapabilities({ createdByUserId: quote?.createdByUserUuid });
 
   // Active tab stays in sync with ?tab=… (deep links from chat notifications, shareable URLs).
   const activeTab = useMemo(() => {
@@ -162,18 +166,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   //   isAdmin: perms.isAdmin,
   //   leadZoneIds: perms.leadZoneIds,
   // });
-  const canSend = perms.isAdmin || perms.isAccountManager;
-
-  const canEditQuote = canEditOwnedEntity({
-    isAdmin: perms.isAdmin,
-    isNew: false,
-    isAccountManager: perms.isAccountManager,
-    leadZoneIds: perms.leadZoneIds,
-    accountManagerZoneIds: perms.accountManagerZoneIds,
-    createdByUserId: quote?.createdByUserUuid,
-    assignedUserId: quote?.createdByUserUuid,
-    userId: perms.userId,
-  });
+  // Who may send is `can.sendToClient` (getQuotesBookingsCapabilities).
 
   // Review-request flow disabled per boss feedback — kept for future use
   // const handleRequestQuoteReview = async () => {
@@ -307,53 +300,25 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
           <div className="flex items-center gap-3 py-2">
             <span className="text-sm font-bold">{formatMoney(contractTotalCents, currency)}</span>
             <span className="text-xs text-gray-500">Contract Total</span>
-            {!isDeleted && (
-              <>
-                <button
-                  onClick={handleOpenInDashboard}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-sm hover:bg-gray-50 transition cursor-pointer"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Open in Dashboard
-                </button>
-                {canEditQuote && (
-                  <button
-                    onClick={() => router.push(`/quotes-bookings/${quote.id}/edit`)}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-sm hover:bg-gray-50 transition cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                )}
-                {canEditQuote && (
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-300 rounded-sm hover:bg-red-50 transition cursor-pointer disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-                {canSend && (
-                  <button
-                    onClick={handleSendToClient}
-                    className="px-3 py-1.5 text-sm font-semibold text-white bg-darkBlue rounded-sm hover:bg-lightBlue transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    Send To Client
-                  </button>
-                )}
-                {/* Review-request button disabled per boss feedback — kept for future use
-                {!canSend && perms.isAccountManager && (
-                  <button
-                    onClick={handleRequestQuoteReview}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-sm hover:bg-amber-100 transition cursor-pointer"
-                  >
-                    <ClipboardCheck className="w-3.5 h-3.5" />
-                    Request Review
-                  </button>
-                )} */}
-              </>
-            )}
+            <QuoteActionBar
+              can={can}
+              isDeleted={isDeleted}
+              deleting={deleting}
+              onOpenInDashboard={handleOpenInDashboard}
+              onEdit={() => router.push(`/quotes-bookings/${quote.id}/edit`)}
+              onDelete={handleDelete}
+              onSendToClient={handleSendToClient}
+            />
+            {/* Review-request button disabled per boss feedback — kept for future use
+            {!canSend && perms.isAccountManager && (
+              <button
+                onClick={handleRequestQuoteReview}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-sm hover:bg-amber-100 transition cursor-pointer"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                Request Review
+              </button>
+            )} */}
           </div>
         </div>
 
@@ -362,11 +327,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
             <ContractTab quote={quote} />
           </TabsContent>
           <TabsContent value="billing">
-            <BillingTab
-              quote={quote}
-              contractTotalCents={contractTotalCents}
-              canEdit={canEditQuote}
-            />
+            <BillingTab quote={quote} contractTotalCents={contractTotalCents} can={can} />
           </TabsContent>
           <TabsContent value="files">
             <FilesTab quoteId={quote.id} />
@@ -375,7 +336,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
             <LogTab quoteId={quote.id} />
           </TabsContent>
           <TabsContent value="messages">
-            <MessagesTab quoteId={quote.id} />
+            <MessagesTab quoteId={quote.id} can={can} />
           </TabsContent>
         </div>
       </Tabs>

@@ -10,6 +10,7 @@ import {
   countActiveFilters,
 } from "@/features/quotesAndBookings/components/FilterSidebar";
 import { useListPageState } from "@/features/quotesAndBookings/hooks/useListPageState";
+import { useQuotesBookingsCapabilities } from "@/features/quotesAndBookings/hooks/useQuotesBookingsCapabilities";
 import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsData";
 
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
@@ -62,6 +63,8 @@ export default function QuotesBookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { scrollRef } = useLayoutContext();
+  // On the list only `createQuote` is read.
+  const can = useQuotesBookingsCapabilities();
 
   const templateParam = searchParams.get("template");
   const timeRangeParam = searchParams.get("timeRange") as
@@ -295,13 +298,15 @@ export default function QuotesBookingsPage() {
                   activeCount={countActiveFilters(filters)}
                 />
               )}
-              <PrimaryButton
-                // Prefilling lives on /quotes-bookings/new itself, so typing the URL or refreshing
-                // gets the same starting point as this button.
-                onClick={() => router.push("/quotes-bookings/new")}
-              >
-                + Create Quote
-              </PrimaryButton>
+              {can.createQuote && (
+                <PrimaryButton
+                  // Prefilling lives on /quotes-bookings/new itself, so typing the URL or refreshing
+                  // gets the same starting point as this button.
+                  onClick={() => router.push("/quotes-bookings/new")}
+                >
+                  + Create Quote
+                </PrimaryButton>
+              )}
             </div>
           }
         />

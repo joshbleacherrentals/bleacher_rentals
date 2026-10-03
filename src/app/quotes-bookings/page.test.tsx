@@ -8,17 +8,33 @@ import type {
 // The page is wired to Next routing, PowerSync and the office currencies.
 // Those are stubbed; what is under test is that the page is All Events only — no tab bar, and
 // the AR balances are never asked for (they live on /accountant).
-const { mockSearchParams, mockArData, mockFilterPanel, mockListData } = vi.hoisted(() => ({
-  mockSearchParams: { current: new URLSearchParams() },
-  mockArData: vi.fn(),
-  mockFilterPanel: vi.fn(),
-  mockListData: vi.fn(),
-}));
+const { mockSearchParams, mockArData, mockFilterPanel, mockListData, mockPermissions } = vi.hoisted(
+  () => ({
+    mockSearchParams: { current: new URLSearchParams() },
+    // zustand reads its initial state under a static server render, so the store is replaced
+    // rather than set; the page's hook reads it through selectors.
+    mockPermissions: {
+      current: {
+        roles: [] as string[],
+        userId: "user-7",
+        leadZoneIds: [],
+        accountManagerZoneIds: [],
+      },
+    },
+    mockArData: vi.fn(),
+    mockFilterPanel: vi.fn(),
+    mockListData: vi.fn(),
+  }),
+);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/quotes-bookings",
   useSearchParams: () => mockSearchParams.current,
+}));
+vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
+  usePermissionsStore: (selector: (state: typeof mockPermissions.current) => unknown) =>
+    selector(mockPermissions.current),
 }));
 vi.mock("@/features/quotesAndBookings/hooks/useQuotesAndBookingsData", () => ({
   useQuotesAndBookingsData: (...args: unknown[]) => {
@@ -88,6 +104,7 @@ function renderAt(query: string) {
 }
 
 beforeEach(() => {
+  mockPermissions.current = { ...mockPermissions.current, roles: ["account_manager"] };
   mockArData.mockReset();
   mockFilterPanel.mockReset();
   mockListData.mockReset();
@@ -137,8 +154,7 @@ describe("/quotes-bookings is All Events only", () => {
     }
   });
 
-  it("keeps Create Quote and the scorecard banner", () => {
-    expect(renderAt("")).toContain("Create Quote");
+  it("keeps the scorecard banner", () => {
     expect(renderAt("template=revenue&timeRange=weekly")).toContain("Scorecard: Revenue");
   });
 });
@@ -177,5 +193,26 @@ describe("/quotes-bookings applied filters", () => {
       expect(html).toContain(`aria-label="Remove filter: ${label}"`);
     }
     expect(html).toContain("Clear all filters");
+  });
+});
+
+describe("/quotes-bookings + Create Quote", () => {
+  it("S6: is drawn for an admin and an account manager", () => {
+    for (const roles of [["admin"], ["account_manager"], ["admin", "viewer"]] as const) {
+      mockPermissions.current = { ...mockPermissions.current, roles: [...roles] };
+      expect(renderAt(""), roles.join("+")).toContain("Create Quote");
+    }
+  });
+
+  it("S6: is not drawn for a viewer, an accountant, or before sign-in has filled the roles", () => {
+    for (const roles of [["viewer"], ["accountant"], ["viewer", "accountant"], []] as const) {
+      mockPermissions.current = { ...mockPermissions.current, roles: [...roles] };
+      expect(renderAt(""), roles.join("+") || "no roles").not.toContain("Create Quote");
+    }
+  });
+
+  it("does not take the list with it: a viewer still sees every event", () => {
+    mockPermissions.current = { ...mockPermissions.current, roles: ["viewer"] };
+    expect(renderAt("")).toContain("Fall Classic");
   });
 });

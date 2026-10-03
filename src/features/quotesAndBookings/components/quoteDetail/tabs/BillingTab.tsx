@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import type { QuotesBookingsCapabilities } from "@/features/userAccess/logic/getQuotesBookingsCapabilities";
 import { QuoteDetail } from "../../../db/fetchQuoteDetail";
 import { setEventIsQbo } from "../../../db/setEventIsQbo";
 import { useEventIsQbo } from "../../../hooks/useEventIsQbo";
@@ -193,11 +194,15 @@ function AppliedToCell({
 export function BillingTab({
   quote,
   contractTotalCents,
-  canEdit,
+  can,
 }: {
   quote: QuoteDetail;
   contractTotalCents: number;
-  canEdit: boolean;
+  /** What the page worked out for this user on this quote; the tab never asks who they are. */
+  can: Pick<
+    QuotesBookingsCapabilities,
+    "showRecordPayment" | "recordPayment" | "setQuickBooksFlag"
+  >;
 }) {
   const { installments: terms, isLoading, error: scheduleError } = usePaymentInstallments(quote.id);
   const installments = useMemo(
@@ -214,11 +219,6 @@ export function BillingTab({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [openPaymentId, setOpenPaymentId] = useState<string | null>(null);
-
-  // A viewer is anyone who can read the page but holds neither of the roles the
-  // RLS insert policy names. Showing them a button the server would refuse is
-  // worse than showing nothing.
-  const isViewer = !perms.isAdmin && !perms.isAccountManager;
 
   // Every figure on this tab comes from the money in PaymentHistory. The
   // schedule supplies only the terms — what is owed, and when.
@@ -328,20 +328,20 @@ export function BillingTab({
       <div>
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">QuickBooks</h3>
         {/*
-          Gated on role, not on `canEdit`. Bookkeeping is not the quote owner's
-          job: whoever enters the invoice into QuickBooks ticks the box, on
-          anyone's quote (owner's call, 2026-09-03). That matches `events_update`,
-          which already lets any admin or account manager write this column, so
-          the box no longer promises a limit the database does not keep.
-          Viewers still see the state and cannot change it.
+          Gated on `can.setQuickBooksFlag`, not on `can.recordPayment`. Bookkeeping
+          is not the quote owner's job: whoever enters the invoice into QuickBooks
+          ticks the box, on anyone's quote (owner's call, 2026-09-03). That matches
+          `events_update`, which already lets any admin or account manager write
+          this column, so the box no longer promises a limit the database does not
+          keep. Everyone else still sees the state and cannot change it.
         */}
         <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
           <Checkbox
             checked={isQbo}
-            disabled={isViewer}
+            disabled={!can.setQuickBooksFlag}
             onCheckedChange={(checked) => handleQboChange(checked === true)}
           />
-          <span className={isViewer ? "text-gray-400" : ""}>QuickBooks Invoice</span>
+          <span className={can.setQuickBooksFlag ? "" : "text-gray-400"}>QuickBooks Invoice</span>
         </label>
       </div>
 
@@ -365,21 +365,21 @@ export function BillingTab({
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">
             Payment History
           </h3>
-          {/* A viewer is not shown a control they could never use. Everyone
+          {/* Someone who could never use the control is not shown it. Everyone
               else sees it, enabled on the same terms as every other edit on
               this page — which means a lead AM may record a payment on a quote
               they did not create. */}
-          {!isViewer && (
+          {can.showRecordPayment && (
             <button
               onClick={() => setDialogOpen(true)}
-              disabled={!canEdit}
+              disabled={!can.recordPayment}
               title={
-                canEdit
+                can.recordPayment
                   ? "Record a check, ACH or manual card payment"
                   : "You can only record a payment on quotes you created."
               }
               className={
-                canEdit
+                can.recordPayment
                   ? "text-xs font-medium text-darkBlue border border-darkBlue rounded px-2 py-1 hover:bg-blue-50"
                   : "text-xs font-medium text-gray-400 border border-gray-300 rounded px-2 py-1 cursor-not-allowed"
               }

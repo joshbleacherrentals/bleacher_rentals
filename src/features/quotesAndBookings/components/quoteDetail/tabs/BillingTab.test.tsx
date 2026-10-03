@@ -30,8 +30,11 @@ vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
 vi.mock("../../../hooks/useUserNames", () => ({
   useUserNames: () => new Map([["user-7", "Dana Whitfield"]]),
 }));
+// A bare input that keeps the one thing the tab decides: whether it is disabled.
 vi.mock("@/components/ui/checkbox", () => ({
-  Checkbox: () => null,
+  Checkbox: ({ disabled }: { disabled?: boolean }) => (
+    <input type="checkbox" data-testid="qbo-flag" disabled={disabled} />
+  ),
 }));
 
 import { BillingTab } from "./BillingTab";
@@ -71,9 +74,9 @@ function payment(over: object = {}) {
   };
 }
 
-function render(contractTotalCents = 500000, canEdit = true) {
+function render(contractTotalCents = 500000, can: Can = ADMIN) {
   return renderToStaticMarkup(
-    <BillingTab quote={quote} contractTotalCents={contractTotalCents} canEdit={canEdit} />,
+    <BillingTab quote={quote} contractTotalCents={contractTotalCents} can={can} />,
   );
 }
 
@@ -89,18 +92,38 @@ function paymentsReceivedRow(html: string): string {
   return html.slice(start, html.indexOf("</div>", html.indexOf("Payments Received")));
 }
 
-/** The three identities the button distinguishes. */
-const ADMIN = { userId: "user-7", isAdmin: true, isAccountManager: false, leadZoneIds: ["z1"] };
-const AM = { userId: "user-7", isAdmin: false, isAccountManager: true, leadZoneIds: [] };
-const LEAD_AM = { userId: "user-7", isAdmin: false, isAccountManager: true, leadZoneIds: ["z1"] };
-const VIEWER = { userId: "user-7", isAdmin: false, isAccountManager: false, leadZoneIds: [] };
+/**
+ * What the page works out and hands down (docs/specs/accountant-quotes-03-capabilities.md): the
+ * tab reads these three answers and never asks who the user is. The store only supplies the user's
+ * own id, which the tab stamps on a payment it records.
+ */
+type Can = Parameters<typeof BillingTab>[0]["can"];
+
+/** An admin, or a lead AM: Record Payment drawn and pressable, the QuickBooks flag settable. */
+const ADMIN: Can = { showRecordPayment: true, recordPayment: true, setQuickBooksFlag: true };
+const LEAD_AM: Can = ADMIN;
+/** A junior AM on someone else's quote: the button is drawn but cannot be pressed. */
+const AM_ON_OTHERS_QUOTE: Can = {
+  showRecordPayment: true,
+  recordPayment: false,
+  setQuickBooksFlag: true,
+};
+/** A viewer: no button, and the flag is read-only. */
+const VIEWER: Can = { showRecordPayment: false, recordPayment: false, setQuickBooksFlag: false };
+
+const USER = { userId: "user-7" };
+
+/** The QuickBooks checkbox the tab drew, and the label next to it. */
+const qboCheckbox = (html: string) =>
+  html.match(/<input[^>]*data-testid="qbo-flag"[^>]*>/)?.[0] ?? "";
+const qboLabel = (html: string) => html.match(/<span[^>]*>QuickBooks Invoice<\/span>/)?.[0] ?? "";
 
 describe("BillingTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInstallments.mockReturnValue([]);
     mockPayments.mockReturnValue([]);
-    mockPerms.mockReturnValue(ADMIN);
+    mockPerms.mockReturnValue(USER);
     mockCurrencyResolved.mockReturnValue(true);
   });
 
@@ -236,35 +259,69 @@ describe("BillingTab", () => {
 
   describe("the + Record Payment button", () => {
     it("is offered to an admin", () => {
-      mockPerms.mockReturnValue(ADMIN);
-      const html = render(500000, true);
+      const html = render(500000, ADMIN);
       expect(html).toContain("+ Record Payment");
       expect(html).not.toContain("disabled");
     });
 
     it("S13: a lead AM may record a payment on a quote they did not create", () => {
-      // canEdit is what canEditOwnedEntity already answers for a lead: true on
+      // recordPayment is what canEditOwnedEntity already answers for a lead: true on
       // every quote. The tab only has to honour it.
-      mockPerms.mockReturnValue(LEAD_AM);
-      const html = render(500000, true);
+      const html = render(500000, LEAD_AM);
       expect(html).toContain("+ Record Payment");
       expect(html).not.toContain("disabled");
     });
 
     it("S8: a junior AM on someone else's quote sees it disabled, and why", () => {
-      mockPerms.mockReturnValue(AM);
-      const html = render(500000, false);
+      const html = render(500000, AM_ON_OTHERS_QUOTE);
       expect(html).toContain("+ Record Payment");
       expect(html).toContain("disabled");
       expect(html).toContain("only record a payment on quotes you created");
     });
 
     it("S9: a viewer is not shown it at all", () => {
-      mockPerms.mockReturnValue(VIEWER);
-      const html = render(500000, false);
+      const html = render(500000, VIEWER);
       expect(html).not.toContain("+ Record Payment");
       // …but the history is still fully readable.
       expect(html).toContain("Payment History");
+    });
+
+    it("is drawn by showRecordPayment alone, and pressable by recordPayment alone", () => {
+      const hidden = render(500000, { ...ADMIN, showRecordPayment: false });
+      expect(hidden).not.toContain("+ Record Payment");
+
+      const drawnButStuck = render(500000, { ...ADMIN, recordPayment: false });
+      expect(drawnButStuck).toContain("+ Record Payment");
+      expect(drawnButStuck).toContain("only record a payment on quotes you created");
+    });
+  });
+
+  describe("the QuickBooks Invoice checkbox", () => {
+    it("S1: is enabled for an admin", () => {
+      const html = render(500000, ADMIN);
+      expect(qboCheckbox(html)).not.toBe("");
+      expect(qboCheckbox(html)).not.toContain("disabled");
+      expect(qboLabel(html)).not.toContain("text-gray-400");
+    });
+
+    it("S3: is enabled for a junior AM even on someone else's quote — bookkeeping is not the owner's job", () => {
+      const html = render(500000, AM_ON_OTHERS_QUOTE);
+      expect(qboCheckbox(html)).not.toContain("disabled");
+    });
+
+    it("S5: is disabled and greyed out for a viewer, who can still see it", () => {
+      const html = render(500000, VIEWER);
+      expect(qboCheckbox(html)).toContain("disabled");
+      expect(qboLabel(html)).toContain("text-gray-400");
+    });
+
+    it("follows setQuickBooksFlag alone, not the Record Payment answers", () => {
+      const html = render(500000, {
+        showRecordPayment: true,
+        recordPayment: true,
+        setQuickBooksFlag: false,
+      });
+      expect(qboCheckbox(html)).toContain("disabled");
     });
   });
 
