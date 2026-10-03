@@ -17,6 +17,7 @@ import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
 import { QuoteActionBar } from "./QuoteActionBar";
 import { useQuotesBookingsCapabilities } from "../../hooks/useQuotesBookingsCapabilities";
+import { useGoBackOrTo } from "../../hooks/useGoBackOrTo";
 import { useEventCurrency } from "../../hooks/useEventCurrency";
 import { formatMoney } from "../../utils/formatMoney";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
@@ -54,6 +55,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   // What this user may do on this quote. Worked out once here and handed down: no component below
   // asks who the user is.
   const can = useQuotesBookingsCapabilities({ createdByUserId: quote?.createdByUserUuid });
+  // Back to wherever the card was opened from (the list, /accountant), or to the list if nowhere.
+  const goBack = useGoBackOrTo();
 
   // Active tab stays in sync with ?tab=… (deep links from chat notifications, shareable URLs).
   const activeTab = useMemo(() => {
@@ -144,7 +147,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
     const ok = await softDeleteEvent(eventId, supabase, perms.userId);
     if (ok) {
       createSuccessToast(["Quote deleted."]);
-      router.push("/quotes-bookings");
+      goBack();
     }
     setDeleting(false);
   };
@@ -204,10 +207,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <p className="text-gray-500">Quote not found</p>
-        <button
-          onClick={() => router.push("/quotes-bookings")}
-          className="text-sm text-darkBlue underline cursor-pointer"
-        >
+        <button onClick={goBack} className="text-sm text-darkBlue underline cursor-pointer">
           Back to Quotes & Bookings
         </button>
       </div>
@@ -238,10 +238,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
       {/* Header */}
       <div className={`bg-darkBlue text-white px-6 py-4 ${isDeleted ? "" : "rounded-t-lg"}`}>
         <div className="flex items-center gap-2 text-xs text-white/60 mb-1">
-          <button
-            onClick={() => router.push("/quotes-bookings")}
-            className="hover:text-white transition cursor-pointer"
-          >
+          <button onClick={goBack} className="hover:text-white transition cursor-pointer">
             Quotes & Bookings
           </button>
           <span>/</span>

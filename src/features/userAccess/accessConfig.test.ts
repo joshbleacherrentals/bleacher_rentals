@@ -59,10 +59,11 @@ describe("mergeRoleConfigs — the maintainer role", () => {
 });
 
 describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accountant page)", () => {
-  it("lets an accountant open the Accountant page, the Work Trackers pages and the two pages every role may read", () => {
+  it("lets an accountant open the Accountant page, Quotes & Bookings, the Work Trackers pages and the two pages every role may read", () => {
     const config = mergeRoleConfigs(["accountant"]);
     expect(config.allowedPaths).toEqual([
       "/accountant",
+      "/quotes-bookings",
       "/work-trackers",
       "/permissions",
       "/changelog",
@@ -81,7 +82,6 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     const { allowedPaths } = mergeRoleConfigs(["accountant"]);
     for (const path of [
       "/dashboard",
-      "/quotes-bookings",
       "/team",
       "/assets",
       "/all-work-trackers",
@@ -140,6 +140,14 @@ describe("canAccessPath — a link is shown only if its destination is reachable
     expect(canAccessPath(["admin"], "/accountant")).toBe(true);
     expect(canAccessPath(["account_manager"], "/accountant")).toBe(false);
     expect(canAccessPath(["viewer"], "/accountant")).toBe(false);
+  });
+
+  it("lets an accountant into Quotes & Bookings: the list, a quote, and by prefix its form pages (the pages guard themselves)", () => {
+    expect(canAccessPath(["accountant"], "/quotes-bookings")).toBe(true);
+    expect(
+      canAccessPath(["accountant"], "/quotes-bookings/00000000-0000-0000-0000-000000000000"),
+    ).toBe(true);
+    expect(canAccessPath(["accountant"], "/quotes-bookings/new")).toBe(true);
   });
 
   it("lets an accountant into the Work Trackers pages, week and driver included", () => {

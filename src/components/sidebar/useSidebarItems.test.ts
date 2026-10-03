@@ -148,20 +148,30 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Accountant, Work Trackers and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Accountant, Work Trackers and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
-    expect(items.map((i) => i.key)).toEqual(["accountant", "work-trackers", "documentation"]);
+    expect(items.map((i) => i.key)).toEqual([
+      "quotes-bookings",
+      "accountant",
+      "work-trackers",
+      "documentation",
+    ]);
 
-    const accountantPage = items[0];
+    const quotes = items[0];
+    expect(quotes.type).toBe("button");
+    expect("label" in quotes && quotes.label).toBe("Quotes & Bookings");
+    expect("href" in quotes && quotes.href).toBe("/quotes-bookings");
+
+    const accountantPage = items[1];
     expect(accountantPage.type).toBe("button");
     expect("label" in accountantPage && accountantPage.label).toBe("Accountant");
     expect("href" in accountantPage && accountantPage.href).toBe("/accountant");
 
-    const workTrackers = items[1];
+    const workTrackers = items[2];
     expect(workTrackers.type).toBe("button");
     expect("href" in workTrackers && workTrackers.href).toBe("/work-trackers");
 
-    const docs = items[2];
+    const docs = items[3];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",

@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -64,11 +64,11 @@ const none = (note?: string): PermissionAccess => ({ level: "none", note });
 const MAINTAINER_NO_ACCESS_NOTE =
   "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard. Everything else in the web app is hidden from them entirely.";
 
-// docs/specs/accountant-role.md, accountant-work-trackers.md and accountant-quotes-02: the
-// Accountant has the Work Trackers pages, the driver payment window and the Accountant page, and
-// nothing else.
+// docs/specs/accountant-role.md, accountant-work-trackers.md, accountant-quotes-02 and -04: the
+// Accountant has the Work Trackers pages, the driver payment window, the Accountant page and
+// Quotes & Bookings read-only, and nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role covers the Work Trackers pages, driver payments and the Accountant page only. Everything else on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only. Everything else on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -95,7 +95,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: read(
         "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: read(
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs. Cannot create, edit, delete or send one.",
+      ),
     },
   },
   {
@@ -114,7 +116,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       viewer: read("Can see whether the flag is set, but the checkbox is disabled."),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: read("Can see whether the flag is set, but the checkbox is disabled."),
     },
   },
   {
@@ -137,7 +139,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: read(
+        "Can see payments and balances, and open any payment to read it in full, but cannot change anything.",
+      ),
     },
   },
   {
@@ -203,6 +207,25 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Quote Files",
+    description:
+      "The Files tab of a quote or booking — documents and photos attached to it. The app does not check the role on this tab, and neither does the database for a signed-in user.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can open, add and delete files on any quote or booking."),
+      account_manager: full("Can open, add and delete files on any quote or booking."),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: custom(
+        "Can open, add and delete files, although the rest of the quote is read-only for a viewer — the Files tab does not check the role.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full("Can open, add and delete files on any quote or booking."),
     },
   },
   {

@@ -27,7 +27,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, Driver Payments & QuickBooks Bills, Driver Week Paid / Unpaid and Accounts Receivable", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, and read access to Quotes & Bookings", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -35,8 +35,50 @@ describe("permission matrix", () => {
         "Accounts Receivable",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
+        "Events",
+        "Payment History",
+        "QuickBooks Invoice Flag",
+        "Quote Files",
         "Work Trackers",
       ]);
+    });
+
+    // docs/specs/accountant-quotes-04-accountant-quote-access.md: the accountant opens the list and
+    // any quote, read-only, plus the Files tab. Writing a payment, the QuickBooks flag and the
+    // internal chat come with later specs and have to edit this test on purpose.
+    describe("Quotes & Bookings, read-only", () => {
+      it("reads events, the QuickBooks flag and payments — and changes none of them", () => {
+        for (const label of ["Events", "QuickBooks Invoice Flag", "Payment History"]) {
+          expect(accountant(label)?.level, label).toBe("read");
+        }
+        expect(accountant("Events")?.note).toMatch(/cannot create, edit, delete or send/i);
+        expect(accountant("QuickBooks Invoice Flag")?.note).toMatch(/checkbox is disabled/i);
+      });
+
+      it("still cannot record a payment or use the internal chat", () => {
+        expect(accountant("Record a Payment")?.level).toBe("none");
+        expect(accountant("Event Chat")?.level).toBe("none");
+      });
+
+      it("has a Quote Files row: full for an admin, an account manager and an accountant; custom for a viewer", () => {
+        const files = PERMISSIONS.find((p) => p.label === "Quote Files");
+        expect(files?.category).toBe("Day to Day Operations");
+        expect(Object.keys(files?.roles ?? {}).sort()).toEqual([...roles].sort());
+        const levels = Object.fromEntries(
+          Object.entries(files?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "full",
+          account_manager: "full",
+          accountant: "full",
+          viewer: "custom",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+        // The matrix describes what is: a viewer's rights on this tab are wider than on the quote.
+        expect(files?.roles.viewer.note).toMatch(/does not check the role/i);
+      });
     });
 
     it("can neither create, edit, delete nor release a work tracker — and the matrix says so", () => {
@@ -100,9 +142,11 @@ describe("permission matrix", () => {
       });
     });
 
-    it("names the Accountant page in the role description and in every hidden-from-you note", () => {
+    it("names the Accountant page and Quotes & Bookings in the role description and in every hidden-from-you note", () => {
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Accountant page/);
-      expect(accountant("Events")?.note).toMatch(/Accountant page/);
+      expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Quotes & Bookings/);
+      expect(accountant("Record a Payment")?.note).toMatch(/Accountant page/);
+      expect(accountant("Record a Payment")?.note).toMatch(/Quotes & Bookings, read-only/);
     });
 
     it("no longer describes itself as having no permissions", () => {

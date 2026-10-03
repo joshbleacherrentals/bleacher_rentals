@@ -1,6 +1,8 @@
 # Accountant — access to `/quotes-bookings` and `/quotes-bookings/{id}`
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D9 answered 2026-10-03).
+Status: **IMPLEMENTED 2026-10-03, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); Playwright specs written, not run; the `br_powersync` sync-rules diff
+is uncommitted and not deployed. 0 open decisions (D1–D11 answered 2026-10-03).
 Original request: №2. Implementation order: **04 of 11**. Needs
 [02](accountant-quotes-02-accountant-page.md) and [03](accountant-quotes-03-capabilities.md).
 Ships in one release with 02 and 03.
@@ -99,6 +101,24 @@ tab, where they can add and delete files.
   accountant can all add and delete). **Option B — a new row** where a viewer only reads.
   **Option C — only a note in the _Events_ row.**
 - **User's answer: A — a new row, as it is.**
+
+**D10 — the `EventChangeLog` write test (found at implementation, answered 2026-10-03)**
+
+- **Question:** `event_change_log_insert` is `WITH CHECK (true)`: any authenticated user may insert,
+  so the §7.1 line "inserts … are refused" cannot hold for this table.
+- **Option A — pin it as it is:** the insert stays open and the test says so; update and delete are
+  refused. **Option B — close the insert:** a policy change, outside this spec.
+- **User's answer: A.** "Every change made by any role (a viewer makes none) must be written to the
+  log, so the insert stays open; update and delete stay forbidden." The migration does not touch
+  the INSERT policy.
+
+**D11 — where the pages' redirect decisions live (found at implementation, answered 2026-10-03)**
+
+- **Question:** §7.3 wants the pages' loading/redirect decisions as pure functions, but §6 named no
+  file for them.
+- **Option A — a new file** `src/features/quotesAndBookings/utils/quotePageGuard.ts` with its own
+  test. **Option B — inside `useGoBackOrTo.ts`.** **Option C — static render of `/new` only.**
+- **User's answer: A.**
 
 ## 2. Research findings
 
@@ -224,7 +244,7 @@ and restart → app.
 
 ## 6. Files
 
-**Counted — 8 files** (limit 10):
+**Counted — 9 files** (limit 10; D11 added the guard):
 
 1. `src/features/userAccess/accessConfig.ts` — changed
 2. `src/components/sidebar/useSidebarItems.ts` — changed
@@ -233,11 +253,13 @@ and restart → app.
 5. `src/features/quotesAndBookings/components/quoteDetail/QuoteDetailView.tsx` — changed: back
    navigation
 6. `src/features/quotesAndBookings/hooks/useGoBackOrTo.ts` — new
-7. `supabase/migrations/20261004130000_accountant_quote_card.sql` — new
-8. `package.json` — changed: `test:db:accountantquotecard`, added to `test:db:all`
+7. `src/features/quotesAndBookings/utils/quotePageGuard.ts` — new: the pages' decisions (D11)
+8. `supabase/migrations/20261004130000_accountant_quote_card.sql` — new
+9. `package.json` — changed: `test:db:accountantquotecard`, added to `test:db:all`
 
 **Not counted:** `br_powersync/config/sync_rules.yaml`; `src/features/userAccess/permissionPageData.ts`;
 tests — `supabase/tests/accountant_quote_card.test.sql` (new), `useGoBackOrTo.test.ts` (new),
+`quotePageGuard.test.ts` (new),
 `accessConfig.test.ts`, `useSidebarItems.test.ts`, `permissionPageData.test.ts`,
 `roleAccess.accountant.spec.ts` (edited), the Playwright specs of §5.
 
@@ -251,7 +273,9 @@ files.
 - **Work:** the migration; `supabase/tests/accountant_quote_card.test.sql`;
   `npm run test:db:accountantquotecard` (and `test:db:all`).
 - **Test asserts:** the accountant reads each of the four tables — **one named assertion per
-  table**; inserts, updates and deletes on them are refused and the row is unchanged afterwards;
+  table**; inserts, updates and deletes on `Venues`, `BleacherTypes` and `EventEmailLog` are
+  refused and the row is unchanged afterwards; on `EventChangeLog` the insert is allowed as it is
+  (D10) and update and delete are refused;
   the other roles read what they did before (`rls_multi_role.test.sql` stays green); the
   `EventFiles` policies are asserted as they are (open to any authenticated user), so a future
   change shows up.
@@ -266,10 +290,13 @@ files.
 
 **7.3 Pages**
 
-- **Work:** the two page checks.
-- **Tests:** where a static render can show it (the pages' loading and redirect decision as pure
+- **Work:** the two page checks; the decisions in `quotePageGuard.ts` (D11).
+- **Tests:** `quotePageGuard.test.ts` first (the pages' loading and redirect decision as pure
   functions): `/new` — a role without `createQuote` is redirected, one with it is not;
   `/edit` — the same for `manageQuote`, including a junior account manager on someone else's quote.
+  Neither page decides before the roles are known (the store's `roles` is empty until sign-in
+  fills it, and a page's effect runs before the effect that fills it): "not known yet" is the
+  loading state, never a redirect.
 
 **7.4 Access layer**
 
@@ -315,6 +342,13 @@ files.
   missing value, not as an error; the SQL test names each grant and the sync check each table.
 - **R4 — wider direct access.** The accountant can read every venue, bleacher type, change log and
   email log through the API, not only through the sync.
+- **R5 — the edit page decides once, on what the store holds.** It waits for the roles
+  (`roles` non-empty) and for the quote, but the store has no "zones loaded" signal: an account
+  manager's lead zones arrive from a separate local query. If that query were slower than the quote
+  load, a lead on a quote they did not create could be taken for a junior and sent to the card. The
+  zone query is issued before the quote load starts, so this is not expected; closing it for good
+  needs a "permissions loaded" flag in `usePermissionsStore` and `SignedInComponents`, which are
+  outside this spec.
 
 **Found on the way — reported, not fixed**
 
