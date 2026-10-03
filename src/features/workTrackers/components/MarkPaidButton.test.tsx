@@ -32,6 +32,26 @@ describe("MarkPaidButton", () => {
     expect(html).not.toContain("Mark Paid");
   });
 
+  it("looks different when paid: solid green with a check, against a plain outline", () => {
+    const unpaid = render({ isPaid: false });
+    const paid = render({ isPaid: true });
+
+    expect(unpaid).toContain('data-paid="false"');
+    expect(unpaid).toContain("border-slate-300");
+    expect(unpaid).not.toContain("bg-emerald-600");
+
+    expect(paid).toContain('data-paid="true"');
+    expect(paid).toContain("bg-emerald-600");
+    expect(paid).not.toContain("border-slate-300");
+  });
+
+  it("carries an icon in both states, and says the state in a tooltip", () => {
+    expect(render({ isPaid: false })).toContain("<svg");
+    expect(render({ isPaid: false })).toContain("Unpaid — click to mark this week paid");
+    expect(render({ isPaid: true })).toContain("<svg");
+    expect(render({ isPaid: true })).toContain("Paid — click to mark this week unpaid");
+  });
+
   it("is a button an e2e test can find", () => {
     expect(render()).toContain('data-testid="mark-paid-button"');
   });

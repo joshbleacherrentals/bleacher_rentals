@@ -16,6 +16,7 @@ import { QboBillPreview } from "./QboBillPreview";
 import { MarkPaidButton } from "./MarkPaidButton";
 import { useWorkTrackerGroupPaid } from "../hooks/useWorkTrackerGroupPaid";
 import { canMarkGroupPaid } from "../util/workTrackerPageAccess";
+import { invalidateGroupQueries } from "../util/invalidateGroupQueries";
 import { Database } from "../../../../database.types";
 import { useUserAccess } from "@/features/userAccess/client";
 import { canAccessPath } from "@/features/userAccess/accessConfig";
@@ -239,10 +240,7 @@ export function WorkTrackerGroupModal({
 
         if (updateError) throw new Error(updateError.message);
 
-        await queryClient.invalidateQueries({
-          queryKey: ["drivers-for-week"],
-          refetchType: "active",
-        });
+        await invalidateGroupQueries(queryClient);
 
         setCurrentStatus("no_bill_ready_for_payment");
         createSuccessToast([
@@ -268,10 +266,7 @@ export function WorkTrackerGroupModal({
 
         if (updateError) throw new Error(updateError.message);
 
-        await queryClient.invalidateQueries({
-          queryKey: ["drivers-for-week"],
-          refetchType: "active",
-        });
+        await invalidateGroupQueries(queryClient);
 
         setCurrentStatus("draft");
         createSuccessToast(["Marked as Draft"]);
@@ -319,14 +314,7 @@ export function WorkTrackerGroupModal({
       }
 
       // Invalidate the drivers query to refresh the list
-      await queryClient.invalidateQueries({
-        queryKey: ["drivers-for-week"],
-        refetchType: "active",
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["driver-with-meta"],
-        refetchType: "active",
-      });
+      await invalidateGroupQueries(queryClient);
 
       setCurrentStatus("qbo_bill_created");
       createSuccessToast([
@@ -371,14 +359,7 @@ export function WorkTrackerGroupModal({
       if (!response.ok) throw new Error(data.error || "Failed to update bill");
 
       setSyncToken(null); // will be refreshed when QboBillPreview reloads
-      await queryClient.invalidateQueries({
-        queryKey: ["drivers-for-week"],
-        refetchType: "active",
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["driver-with-meta"],
-        refetchType: "active",
-      });
+      await invalidateGroupQueries(queryClient);
       createSuccessToast([
         `Bill updated successfully!`,
         `${driverName} - $${totalAmount.toFixed(2)}`,
@@ -392,7 +373,8 @@ export function WorkTrackerGroupModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      {/* `sm:` matters: the dialog's own `sm:max-w-lg` beats a bare `max-w-3xl` from 640px up. */}
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Work Tracker Group - {driverName}</DialogTitle>
         </DialogHeader>
@@ -518,8 +500,8 @@ export function WorkTrackerGroupModal({
             )}
 
             {/* Actions */}
-            <div className="flex justify-between items-center pt-4 border-t gap-2">
-              <div className="flex gap-2">
+            <div className="flex flex-wrap justify-between items-center pt-4 border-t gap-2">
+              <div className="flex flex-wrap gap-2">
                 {currentStatus !== "draft" && (
                   <Button
                     variant="outline"
@@ -548,7 +530,7 @@ export function WorkTrackerGroupModal({
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {hasVendor && vendorLinkedToQbo && currentStatus !== "qbo_bill_created" && (
                   <Button
                     onClick={handleCreateBill}

@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Tables } from "../../../../../database.types";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { WORKTRACKER_STATUS_COLORS } from "@/features/workTrackers/constants";
 import {
   Dialog,
@@ -27,6 +28,7 @@ import {
 import { PaymentStatusButton } from "@/features/workTrackers/components/PaymentStatusButton";
 import { TotalsMatch } from "@/features/workTrackers/components/TotalsMatch";
 import { MarkPaidButton } from "@/features/workTrackers/components/MarkPaidButton";
+import { DRIVER_WITH_META_QUERY_KEY } from "@/features/workTrackers/util/invalidateGroupQueries";
 import { useWorkTrackerGroupPaid } from "@/features/workTrackers/hooks/useWorkTrackerGroupPaid";
 import { DateTime } from "luxon";
 import { buildReleaseAllNotification } from "@/features/workTrackers/db/notifications";
@@ -77,7 +79,7 @@ export default function WorkTrackersForUserPage() {
   const weekEnd = DateTime.fromISO(startDate).plus({ days: 6 }).toISODate() ?? startDate;
 
   const { data: driverMeta } = useQuery({
-    queryKey: ["driver-with-meta", userUuid, startDate],
+    queryKey: [DRIVER_WITH_META_QUERY_KEY, userUuid, startDate],
     enabled: !!supabase && !!userUuid && !!startDate,
     queryFn: () => fetchDriverWithMetaForWeek(supabase, userUuid, startDate),
   });
@@ -176,25 +178,26 @@ export default function WorkTrackersForUserPage() {
 
   return (
     <div>
-      <div className="flex gap-2">
-        {/* put a button that says "Download PDF"  */}
-        <button
+      <div className="flex items-center gap-2">
+        {/* Same Button, size and corner radius as the status and paid buttons beside them. */}
+        <Button
+          size="sm"
           onClick={handleDownload}
           disabled={isLoading}
-          className="px-4 py-2 bg-darkBlue text-white text-sm font-semibold rounded shadow-md hover:bg-lightBlue transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-darkBlue text-white hover:bg-lightBlue cursor-pointer"
         >
           {isLoading ? getRandomLoadingMessage() : "Download PDF"}
-        </button>
+        </Button>
         {canReleaseAll && (
-          <button
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setShowReleaseModal(true)}
-            className={`rounded px-4 py-2 flex items-center gap-2 ${WORKTRACKER_STATUS_COLORS.released.bg} border ${WORKTRACKER_STATUS_COLORS.released.border} ${WORKTRACKER_STATUS_COLORS.released.text} font-semibold shadow-md hover:opacity-80 transition cursor-pointer`}
+            className={`${WORKTRACKER_STATUS_COLORS.released.bg} ${WORKTRACKER_STATUS_COLORS.released.border} ${WORKTRACKER_STATUS_COLORS.released.text} hover:bg-blue-500/10 hover:text-blue-700 hover:opacity-80 cursor-pointer`}
           >
-            <span className={`text-sm ${WORKTRACKER_STATUS_COLORS.released.text}`}>
-              Release All
-            </span>
-            <Send className={`h-4 w-4 ${WORKTRACKER_STATUS_COLORS.released.text}`} />
-          </button>
+            Release All
+            <Send />
+          </Button>
         )}
         {driverMeta && (
           <div className="flex items-center gap-2">
