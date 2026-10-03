@@ -3,9 +3,13 @@ import { test, expect, type Page } from "@playwright/test";
 /**
  * The /quotes-bookings list state and its round trip through the URL.
  *
- * docs/specs/accountant-quotes-01-list-state-hook.md §6 (S1–S5). The state moved into
+ * docs/specs/accountant-quotes-01-list-state-hook.md §6 (S1–S3 and S5). The state moved into
  * `useListPageState` with no change in behaviour, so these scenarios describe what the page did
  * before and must still do.
+ *
+ * S4 (each tab starts on its own sort; a status is dropped on the AR tabs) is not here: the AR tabs
+ * moved to /accountant (accountant-quotes-02), where accountantPage.accountant.spec.ts covers it
+ * (S2 and S9).
  */
 
 const LIST = "/quotes-bookings";
@@ -64,26 +68,6 @@ test.describe("Quotes & Bookings list state (admin)", () => {
     // Give a (wrong) page reset time to be written before asserting that it did not happen.
     await page.waitForTimeout(600);
     expect(params(page).get("page")).toBe("3");
-  });
-
-  test("S4: each tab starts on its own sort and drops a status the tab does not offer", async ({
-    page,
-  }) => {
-    await page.goto(`${LIST}?statuses=booked`);
-    await expect.poll(() => params(page).get("statuses")).toBe("booked");
-    expect(params(page).get("sort")).toBeNull();
-
-    await page.getByRole("tab", { name: /^AR(?! Deposits)/ }).click();
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
-    expect(params(page).get("statuses")).toBeNull();
-
-    await page.getByRole("tab", { name: /^AR Deposits/ }).click();
-    await expect.poll(() => params(page).get("tab")).toBe("ar_deposits");
-
-    await page.getByRole("tab", { name: "All Events" }).click();
-    await expect.poll(() => params(page).get("tab")).toBeNull();
-    // The status chosen at the start did not come back with the tab.
-    expect(params(page).get("statuses")).toBeNull();
   });
 
   test("S5: a scorecard link applies its filters, and a manual edit replaces them in the URL", async ({
