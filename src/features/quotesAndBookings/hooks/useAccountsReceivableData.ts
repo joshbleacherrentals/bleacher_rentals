@@ -78,6 +78,7 @@ export function useAccountsReceivableData(
           "status",
           "paid_at",
           "created_at",
+          "deleted_at",
         ])
         .compile(),
     [],

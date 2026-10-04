@@ -94,6 +94,8 @@ export function PayInvoiceTab({
           status: p.status,
           paidAt: p.paid_at,
           createdAt: p.created_at,
+          // The API never returns a deleted payment (docs/specs/accountant-quotes-08).
+          deletedAt: null,
         })),
         currency,
       ),

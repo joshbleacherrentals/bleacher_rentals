@@ -20,7 +20,7 @@ export type AppliedToPart = {
 };
 
 export type AppliedToDescription =
-  | { kind: "excluded"; reason: "currency" | "status" }
+  | { kind: "excluded"; reason: "currency" | "status" | "deleted" }
   | { kind: "unapplied" }
   | {
       kind: "applied";

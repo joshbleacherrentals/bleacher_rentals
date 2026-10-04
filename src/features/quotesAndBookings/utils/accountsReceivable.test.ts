@@ -69,6 +69,7 @@ function payment(
     status: "succeeded",
     paid_at: "2026-09-10 12:00:00+00",
     created_at: "2026-09-10 12:00:00+00",
+    deleted_at: null,
     ...overrides,
   };
 }
@@ -134,6 +135,66 @@ describe("withReceivableBalances", () => {
     expect(balancesOf(makeEvent({ id: "a" }), sources)).toEqual({
       due: 50000,
       remaining: 150000,
+    });
+  });
+
+  // docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md: a deleted payment is as if it
+  // had never been made — Amount Due and Remaining Balance both ignore it.
+  it("ignores a deleted payment: neither Amount Due nor Remaining Balance moves", () => {
+    const sources = exampleSources("a");
+    const withDeleted: ReceivableSources = {
+      ...sources,
+      payments: [
+        ...sources.payments,
+        payment("a", "gone", 100000, {
+          installment_id: "a-2",
+          deleted_at: "2026-09-12 09:00:00+00",
+        }),
+      ],
+    };
+
+    expect(balancesOf(makeEvent({ id: "a" }), withDeleted)).toEqual(
+      balancesOf(makeEvent({ id: "a" }), sources),
+    );
+    expect(balancesOf(makeEvent({ id: "a" }), withDeleted)).toEqual({
+      due: 100000,
+      remaining: 200000,
+    });
+  });
+
+  it("owes the money again when the only payment is deleted", () => {
+    const sources: ReceivableSources = {
+      ...exampleSources("a"),
+      payments: [
+        payment("a", "a-p1", 200000, {
+          installment_id: "a-1",
+          deleted_at: "2026-09-12 09:00:00+00",
+        }),
+      ],
+    };
+
+    // #1 ($2,000) and #2 ($1,000) are due by Sep 25; #3 ($1,000) is not yet.
+    expect(balancesOf(makeEvent({ id: "a" }), sources)).toEqual({
+      due: 300000,
+      remaining: 400000,
+    });
+  });
+
+  it("does not let a deleted refund reopen what was paid", () => {
+    const sources: ReceivableSources = {
+      ...exampleSources("a"),
+      payments: [
+        ...exampleSources("a").payments,
+        payment("a", "refund", -200000, {
+          installment_id: "a-1",
+          deleted_at: "2026-09-12 09:00:00+00",
+        }),
+      ],
+    };
+
+    expect(balancesOf(makeEvent({ id: "a" }), sources)).toEqual({
+      due: 100000,
+      remaining: 200000,
     });
   });
 

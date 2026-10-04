@@ -70,9 +70,19 @@ function payment(over: object = {}) {
     recordedByUserUuid: null,
     reference: null,
     notes: null,
+    // Soft delete (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md).
+    deletedAt: null,
+    deletedByUserUuid: null,
+    deleteReason: null,
     ...over,
   };
 }
+
+const DELETED = {
+  deletedAt: "2026-08-20T09:00:00.000+00:00",
+  deletedByUserUuid: "admin-1",
+  deleteReason: "entered twice",
+};
 
 function render(contractTotalCents = 500000, can: Can = ADMIN) {
   return renderToStaticMarkup(
@@ -251,6 +261,70 @@ describe("BillingTab", () => {
     expect(html).toContain("not included in this balance");
     expect(html).toContain("CAD");
     expect(html).toContain("$1,000.00"); // full balance still due
+  });
+
+  // ── Deleted payments (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md) ──
+  // The hook returns every row; the list hides the deleted ones, and the allocation — which still
+  // receives them — leaves them out of every figure.
+
+  describe("a deleted payment", () => {
+    it("is not listed", () => {
+      mockPayments.mockReturnValue([
+        payment({ id: "live", payerName: "Live Payer", amountCents: 1000 }),
+        payment({ id: "gone", payerName: "Deleted Payer", amountCents: 5000, ...DELETED }),
+      ]);
+
+      const html = render(500000);
+
+      expect(html).toContain("Live Payer");
+      expect(html).not.toContain("Deleted Payer");
+    });
+
+    it("is not in the received total or the balance", () => {
+      mockPayments.mockReturnValue([payment({ id: "gone", amountCents: 120000, ...DELETED })]);
+
+      const html = render(500000);
+
+      expect(paymentsReceivedRow(html)).toContain("$0.00");
+      expect(html).toContain("$5,000.00"); // the whole contract is still owed
+      expect(html).not.toContain("$1,200.00");
+    });
+
+    it("does not fill an installment it was applied to", () => {
+      mockInstallments.mockReturnValue([installment()]);
+      mockPayments.mockReturnValue([
+        payment({ id: "gone", amountCents: 270000, installmentId: "i1", ...DELETED }),
+      ]);
+
+      const html = render(270000);
+
+      expect(html).toContain("Unpaid");
+      expect(html).not.toContain("Paid</span>");
+      expect(html).not.toContain("Partial");
+      expect(html).toContain("$2,700.00"); // still owed in full
+    });
+
+    it("does not reopen an installment when it was a refund", () => {
+      mockInstallments.mockReturnValue([installment()]);
+      mockPayments.mockReturnValue([
+        payment({ id: "paid", amountCents: 270000, installmentId: "i1" }),
+        payment({ id: "refund", amountCents: -270000, installmentId: "i1", ...DELETED }),
+      ]);
+
+      const html = render(270000);
+
+      expect(html).toContain("Paid");
+      expect(html).toContain("$0.00"); // balance cleared
+      expect(html).not.toContain("-$2,700.00");
+    });
+
+    it("leaves 'No payments recorded yet' when every payment is deleted", () => {
+      mockPayments.mockReturnValue([payment({ id: "gone", ...DELETED })]);
+
+      const html = render(500000);
+
+      expect(html).toContain("No payments recorded yet");
+    });
   });
 
   // ── Manual payment entry (docs/specs/manual-payment-entry.md §6.1, §6.4) ──

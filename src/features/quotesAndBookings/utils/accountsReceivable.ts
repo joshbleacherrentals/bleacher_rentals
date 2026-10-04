@@ -42,6 +42,7 @@ export type ReceivablePaymentRow = {
   status: string | null;
   paid_at: string | null;
   created_at: string | null;
+  deleted_at: string | null;
 };
 
 export type ReceivableSources = {
@@ -84,6 +85,7 @@ function toAllocatablePayment(p: ReceivablePaymentRow): AllocatablePayment {
     status: p.status ?? "",
     paidAt: p.paid_at,
     createdAt: p.created_at ?? "",
+    deletedAt: p.deleted_at,
   };
 }
 

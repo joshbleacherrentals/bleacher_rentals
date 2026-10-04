@@ -1,6 +1,9 @@
 # Payments — every reader skips deleted rows
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D3 answered 2026-10-03).
+Status: **IMPLEMENTED 2026-10-04, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); no Playwright scenario (no screen change). 0 open decisions (D1–D3 answered
+2026-10-03). Approved 2026-10-04 with two additions: `describeAppliedTo.ts` as an 11th counted file, and
+the extra test files named in §5.
 Original request: №6, part 2 of 3. Implementation order: **08 of 11**. Needs
 [07](accountant-quotes-07-payments-soft-delete-db.md) (the `deleted_at` columns). Next:
 [09](accountant-quotes-09-payments-edit-delete-ui.md) (the screen).
@@ -115,7 +118,7 @@ Playwright scenario; the behaviour is pinned by the Vitest cases of §6.
 
 ## 5. Files
 
-**Counted — 10 files** (limit 10):
+**Counted — 11 files** (limit 10; one over, see R3):
 
 1. `src/features/quotesAndBookings/utils/allocatePayments.ts` — changed
 2. `src/features/quotesAndBookings/utils/deletedPayments.ts` — new
@@ -127,9 +130,25 @@ Playwright scenario; the behaviour is pinned by the Vitest cases of §6.
 8. `src/features/quotesAndBookings/pdf/quoteDocumentData.ts` — changed
 9. `src/features/quotesAndBookings/pdf/PayInvoiceTab.tsx` — changed
 10. `src/app/api/payments/history/route.ts` — changed
+11. `src/features/quotesAndBookings/utils/describeAppliedTo.ts` — changed: `AppliedToDescription`'s
+    `reason` is `"currency" | "status"`, and the new `excluded: "deleted"` does not fit it (`npm run tc`
+    fails at `describeAppliedTo.ts:44`), so the union gains `"deleted"`. Added 2026-10-04 on the user's
+    "Approved, 1 A". `PaymentDetailDialog` is **not** changed here: for any reason that is not `currency`
+    it prints the status sentence, so a `deleted` reason would read wrongly there. It cannot be reached
+    before spec 09 — the Billing list hides deleted rows and the dialog opens from the list — and spec 09
+    changes the dialog.
 
 **Not counted:** tests — `allocatePayments.test.ts`, `accountsReceivable.test.ts`, `BillingTab.test.tsx`,
 `eventPaymentContext.test.ts`, `src/app/api/payments/history/route.test.ts` (edited);
+`describeAppliedTo.test.ts` (edited: a case for `deleted`),
+`quoteDocumentData.schedule.test.ts` and `quoteDocumentData.salesOffice.test.ts` (edited: their Supabase
+fakes have no `.is()`, and the first asserts the filter — the "quote-document tests" of §6 step 3; added
+2026-10-04 on the user's "Approved, 2 A");
+`src/app/api/payments/create-checkout/route.test.ts` (edited: one line, `is: () => chain` in its Supabase
+fake — the checkout reads payments through `eventPaymentContext`; found while implementing, same kind as
+the two above);
+`describeAppliedTo.test.ts` (above), `computeAmountDue.test.ts` (edited: its payment builder gains
+`deletedAt: null`, because the field is required);
 `deletedPayments.test.ts` (new); no migration, `sync_rules.yaml`, `AppSchema.ts`, `database.types.ts` or
 `permissionPageData.ts`.
 
@@ -170,4 +189,6 @@ Red first; each step ends at a gate. Prettier only on touched files.
   check, and review is the only guard.
 - **R2 — three queries rely on their own filter (D1).** If one of the server or public queries lost
   `deleted_at IS NULL`, the client would receive a deleted row; the tests of §6 pin the three.
-- **R3 — the file count is at the limit** (10 of 10).
+- **R3 — the file count is one over the limit** (11 of 10): `describeAppliedTo.ts` cannot stay untouched
+  while `allocatePayments` gains a reason its union does not know. Cutting it would leave `tc` red, so the
+  count is stated here instead.

@@ -13,6 +13,7 @@ function payment(amountCents: number, over: Partial<AllocatablePayment> = {}): A
     status: "succeeded",
     paidAt: "2026-08-01T10:00:00.000+00:00",
     createdAt: "2026-08-01T10:00:00.000+00:00",
+    deletedAt: null,
     ...over,
   };
 }

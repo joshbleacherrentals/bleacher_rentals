@@ -13,6 +13,7 @@ import { usePaymentInstallments } from "../../../hooks/usePaymentInstallments";
 import { usePaymentHistory, PaymentHistoryRow } from "../../../hooks/usePaymentHistory";
 import { useEventCurrencyState } from "../../../hooks/useEventCurrency";
 import { allocatePayments, type Allocation } from "../../../utils/allocatePayments";
+import { withoutDeleted } from "../../../utils/deletedPayments";
 import { formatMoney } from "../../../utils/formatMoney";
 import { Currency } from "../../../types/quoteTypes";
 import { formatDate, formatDateTime, formatTime } from "../../../utils/formatDate";
@@ -207,6 +208,10 @@ export function BillingTab({
     [terms, contractTotalCents],
   );
   const { payments, isLoading: paymentsLoading } = usePaymentHistory(quote.id);
+  // The hook returns every row. The allocation below still receives all of them — it leaves the
+  // deleted ones out of every figure itself — while the list shows only those that are not deleted
+  // (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md).
+  const visiblePayments = useMemo(() => withoutDeleted(payments), [payments]);
   // Two answers, deliberately: the value paints the tab, the flag gates the
   // one place that writes it (§3.5, E5).
   const { currency, isResolved: currencyResolved } = useEventCurrencyState(quote.id);
@@ -377,7 +382,7 @@ export function BillingTab({
         </div>
         {paymentsLoading ? (
           <p className="text-sm text-gray-400 py-4 text-center">Loading payments...</p>
-        ) : payments.length > 0 ? (
+        ) : visiblePayments.length > 0 ? (
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-sm">
               <thead>
@@ -391,7 +396,7 @@ export function BillingTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {payments.map((p) => (
+                {visiblePayments.map((p) => (
                   /* The whole row is the affordance — a payment has more to it
                      than fits here, and there is nothing else a click could
                      mean on a ledger nobody may edit. */
