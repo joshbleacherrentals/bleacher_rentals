@@ -33,9 +33,11 @@ export type QuotesBookingsCapabilities = {
    * boss feedback, so it does not follow the owner rule.
    */
   sendToClient: boolean;
-  /** Whether "+ Record Payment" is drawn at all. */
-  showRecordPayment: boolean;
-  /** Whether "+ Record Payment" can be pressed. A visible button that cannot be pressed keeps its hint. */
+  /**
+   * "+ Record Payment": drawn when true, not drawn when false — there is no disabled state. An
+   * admin only, on any quote: the database refuses every other role, so none is shown the button
+   * (docs/specs/accountant-quotes-06-am-read-only-payments.md; spec 10 adds the accountant).
+   */
   recordPayment: boolean;
   /**
    * The QuickBooks Invoice checkbox. Bookkeeping, so not tied to the quote's owner: an admin, an
@@ -88,8 +90,7 @@ export function getQuotesBookingsCapabilities(input: {
     createQuote: isStaff,
     manageQuote,
     sendToClient: isStaff,
-    showRecordPayment: isStaff,
-    recordPayment: manageQuote,
+    recordPayment: isAdmin,
     // The one cell the accountant has: the database lets them change Events.is_qbo and no other
     // column (docs/specs/accountant-quotes-05-is-qbo-column.md).
     setQuickBooksFlag: isStaff || isAccountant,

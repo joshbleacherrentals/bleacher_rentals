@@ -199,10 +199,7 @@ export function BillingTab({
   quote: QuoteDetail;
   contractTotalCents: number;
   /** What the page worked out for this user on this quote; the tab never asks who they are. */
-  can: Pick<
-    QuotesBookingsCapabilities,
-    "showRecordPayment" | "recordPayment" | "setQuickBooksFlag"
-  >;
+  can: Pick<QuotesBookingsCapabilities, "recordPayment" | "setQuickBooksFlag">;
 }) {
   const { installments: terms, isLoading, error: scheduleError } = usePaymentInstallments(quote.id);
   const installments = useMemo(
@@ -365,24 +362,14 @@ export function BillingTab({
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">
             Payment History
           </h3>
-          {/* Someone who could never use the control is not shown it. Everyone
-              else sees it, enabled on the same terms as every other edit on
-              this page — which means a lead AM may record a payment on a quote
-              they did not create. */}
-          {can.showRecordPayment && (
+          {/* One answer: whoever may record a payment sees the button, enabled;
+              everyone else is not shown it. The database refuses the insert for
+              any other role, so there is no disabled state to explain. */}
+          {can.recordPayment && (
             <button
               onClick={() => setDialogOpen(true)}
-              disabled={!can.recordPayment}
-              title={
-                can.recordPayment
-                  ? "Record a check, ACH or manual card payment"
-                  : "You can only record a payment on quotes you created."
-              }
-              className={
-                can.recordPayment
-                  ? "text-xs font-medium text-darkBlue border border-darkBlue rounded px-2 py-1 hover:bg-blue-50"
-                  : "text-xs font-medium text-gray-400 border border-gray-300 rounded px-2 py-1 cursor-not-allowed"
-              }
+              title="Record a check, ACH or manual card payment"
+              className="text-xs font-medium text-darkBlue border border-darkBlue rounded px-2 py-1 hover:bg-blue-50"
             >
               + Record Payment
             </button>

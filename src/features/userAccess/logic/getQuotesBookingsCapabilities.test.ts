@@ -24,7 +24,6 @@ const NOTHING: QuotesBookingsCapabilities = {
   createQuote: false,
   manageQuote: false,
   sendToClient: false,
-  showRecordPayment: false,
   recordPayment: false,
   setQuickBooksFlag: false,
   useInternalChat: false,
@@ -37,7 +36,6 @@ describe("admin", () => {
       createQuote: true,
       manageQuote: true,
       sendToClient: true,
-      showRecordPayment: true,
       recordPayment: true,
       setQuickBooksFlag: true,
       useInternalChat: true,
@@ -55,33 +53,31 @@ describe("admin", () => {
 describe("lead account manager", () => {
   const lead = { leadZoneIds: ["zone-a"], accountManagerZoneIds: ["zone-a", "zone-b"] };
 
-  it("can do everything on a quote they did not create (S2)", () => {
+  it("can do everything but record a payment, on a quote they did not create (S2)", () => {
     expect(capsFor(["account_manager"], lead)).toEqual({
       createQuote: true,
       manageQuote: true,
       sendToClient: true,
-      showRecordPayment: true,
-      recordPayment: true,
+      recordPayment: false,
       setQuickBooksFlag: true,
       useInternalChat: true,
       openInDashboard: true,
     });
   });
 
-  it("can do the same on their own quote", () => {
+  it("can manage their own quote, and still cannot record a payment on it", () => {
     const caps = capsFor(["account_manager"], { ...lead, quote: { createdByUserId: ME } });
     expect(caps.manageQuote).toBe(true);
-    expect(caps.recordPayment).toBe(true);
+    expect(caps.recordPayment).toBe(false);
   });
 });
 
 describe("junior account manager", () => {
   const junior = { leadZoneIds: [], accountManagerZoneIds: ["zone-b"] };
 
-  it("S3: on someone else's quote cannot manage it or press Record Payment, but still sees the button", () => {
+  it("S3: on someone else's quote cannot manage it or record a payment", () => {
     const caps = capsFor(["account_manager"], junior);
     expect(caps.manageQuote).toBe(false);
-    expect(caps.showRecordPayment).toBe(true);
     expect(caps.recordPayment).toBe(false);
   });
 
@@ -93,10 +89,10 @@ describe("junior account manager", () => {
     expect(caps.openInDashboard).toBe(true);
   });
 
-  it("S4: on their own quote can manage it and press Record Payment", () => {
+  it("S4: on their own quote can manage it, but still cannot record a payment", () => {
     const caps = capsFor(["account_manager"], { ...junior, quote: { createdByUserId: ME } });
     expect(caps.manageQuote).toBe(true);
-    expect(caps.recordPayment).toBe(true);
+    expect(caps.recordPayment).toBe(false);
   });
 
   it("can create a quote", () => {
@@ -147,7 +143,6 @@ describe("viewer (the D1 case)", () => {
     expect(caps.createQuote).toBe(false);
     expect(caps.manageQuote).toBe(false);
     expect(caps.sendToClient).toBe(false);
-    expect(caps.showRecordPayment).toBe(false);
     expect(caps.recordPayment).toBe(false);
   });
 
@@ -224,7 +219,6 @@ describe("accountant", () => {
     const caps = capsFor(["accountant"]);
     expect(caps.manageQuote).toBe(false);
     expect(caps.sendToClient).toBe(false);
-    expect(caps.showRecordPayment).toBe(false);
     expect(caps.recordPayment).toBe(false);
     expect(caps.createQuote).toBe(false);
     expect(caps.useInternalChat).toBe(false);
@@ -235,6 +229,61 @@ describe("accountant", () => {
     for (const role of ["viewer", "maintainer", "developer", "driver"] as const) {
       expect(capsFor([role]).setQuickBooksFlag, role).toBe(false);
     }
+  });
+});
+
+// docs/specs/accountant-quotes-06-am-read-only-payments.md: until spec 10, only an admin records a
+// payment — the database refuses everyone else, so no other role is shown the button. There is one
+// answer (no "drawn but disabled" state any more), and it does not depend on the quote.
+describe("recordPayment: admin only", () => {
+  const lead = { leadZoneIds: ["zone-a"], accountManagerZoneIds: ["zone-a"] };
+  const junior = { leadZoneIds: [], accountManagerZoneIds: ["zone-b"] };
+  const own = { quote: { createdByUserId: ME } };
+  const others = { quote: { createdByUserId: SOMEONE_ELSE } };
+
+  it("is true for an admin, on any quote", () => {
+    expect(capsFor(["admin"], own).recordPayment).toBe(true);
+    expect(capsFor(["admin"], others).recordPayment).toBe(true);
+  });
+
+  it("is false for a lead account manager, on their own quote and on someone else's", () => {
+    expect(capsFor(["account_manager"], { ...lead, ...own }).recordPayment).toBe(false);
+    expect(capsFor(["account_manager"], { ...lead, ...others }).recordPayment).toBe(false);
+  });
+
+  it("is false for a junior account manager, on their own quote and on someone else's", () => {
+    expect(capsFor(["account_manager"], { ...junior, ...own }).recordPayment).toBe(false);
+    expect(capsFor(["account_manager"], { ...junior, ...others }).recordPayment).toBe(false);
+  });
+
+  it("is false for an account manager with no zones, and with no quote at all", () => {
+    expect(capsFor(["account_manager"], own).recordPayment).toBe(false);
+    expect(capsFor(["account_manager"], { quote: undefined }).recordPayment).toBe(false);
+  });
+
+  it.each(["viewer", "maintainer", "developer", "driver", "accountant"] as const)(
+    "is false for a %s, even on a quote they created",
+    (role) => {
+      expect(capsFor([role], own).recordPayment).toBe(false);
+      expect(capsFor([role], others).recordPayment).toBe(false);
+    },
+  );
+
+  it("follows the admin right when a user holds several roles", () => {
+    expect(capsFor(["admin", "account_manager"], others).recordPayment).toBe(true);
+    expect(capsFor(["admin", "viewer"], others).recordPayment).toBe(true);
+    expect(capsFor(["account_manager", "viewer"], own).recordPayment).toBe(false);
+    expect(capsFor(["account_manager", "accountant"], own).recordPayment).toBe(false);
+  });
+
+  it("is not tied to manageQuote: an account manager manages their own quote and still cannot record", () => {
+    const caps = capsFor(["account_manager"], { ...junior, ...own });
+    expect(caps.manageQuote).toBe(true);
+    expect(caps.recordPayment).toBe(false);
+  });
+
+  it("is gone as a separate 'drawn' answer: showRecordPayment no longer exists", () => {
+    expect(Object.keys(capsFor(["admin"]))).not.toContain("showRecordPayment");
   });
 });
 

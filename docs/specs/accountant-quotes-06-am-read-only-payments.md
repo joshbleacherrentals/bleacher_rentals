@@ -1,7 +1,10 @@
 # Account manager — payment history becomes read-only
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D2 answered 2026-10-03; the scope in §0
-is taken from the request).
+Status: **IMPLEMENTED 2026-10-04, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); Playwright specs written, not run. 0 open decisions (D1–D2 answered
+2026-10-03; the scope in §0 is taken from the request). Approved 2026-10-04 with one addition to
+§6: `quoteCapabilities.am.spec.ts` (spec 03's e2e) asserted the AM's Record Payment enabled, so it is
+edited too.
 Original request: №5. Implementation order: **06 of 11**. Needs
 [03](accountant-quotes-03-capabilities.md) (the capability table).
 Branch: `q4-sprint1-finance-role`.
@@ -123,7 +126,9 @@ webhook path; every other table. Spec 10 adds `accountant` to this same check.
 
 **Not counted:** `src/features/userAccess/permissionPageData.ts`; tests — `manual_payment_entry.test.sql`,
 `getQuotesBookingsCapabilities.test.ts`, `BillingTab.test.tsx`, `permissionPageData.test.ts`,
-`recordPayment.am.spec.ts` (edited); no new `package.json` script (`test:db:payments` already runs the
+`recordPayment.am.spec.ts` and `quoteCapabilities.am.spec.ts` (edited: its S2 asserted the button
+enabled for the lead account manager — it now asserts no button, and the `S3` `test.fixme` text no
+longer mentions a disabled Record Payment; added 2026-10-04 on the user's "Approved, variant A"); no new `package.json` script (`test:db:payments` already runs the
 SQL test); no `sync_rules.yaml`, `AppSchema.ts` or `database.types.ts`.
 
 ## 7. Tests and implementation sequence

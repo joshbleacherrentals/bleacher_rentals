@@ -203,6 +203,45 @@ describe("permission matrix", () => {
     });
   });
 
+  // docs/specs/accountant-quotes-06-am-read-only-payments.md: an account manager (lead and junior
+  // alike) no longer records a payment; until spec 10 only an admin does. Spec 10 will edit this
+  // block on purpose when it gives the accountant the right.
+  describe("Record a Payment (spec 06)", () => {
+    const row = PERMISSIONS.find((p) => p.label === "Record a Payment");
+    const levels = Object.fromEntries(
+      Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+    );
+
+    it("is full for an admin and none for every other role", () => {
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "none",
+        accountant: "none",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("tells an account manager that reading the history is a separate thing they can still do", () => {
+      const note = row?.roles.account_manager.note ?? "";
+      expect(note).toMatch(/reading the payment history is a separate thing/i);
+      expect(note).toMatch(/still do that/i);
+    });
+
+    it("no longer describes the lead / own-quotes rule or a disabled button", () => {
+      const note = row?.roles.account_manager.note ?? "";
+      expect(note).not.toMatch(/lead account manager/i);
+      expect(note).not.toMatch(/disabled/i);
+    });
+
+    it("leaves the Payment History row readable for an account manager", () => {
+      const history = PERMISSIONS.find((p) => p.label === "Payment History");
+      expect(history?.roles.account_manager.level).toBe("read");
+    });
+  });
+
   // docs/specs/maintainer-dashboard-cells.md: a maintainer writes notes in dashboard cells,
   // and only edits the ones they wrote.
   describe("maintainer on the dashboard", () => {

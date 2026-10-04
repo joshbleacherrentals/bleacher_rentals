@@ -94,22 +94,20 @@ function paymentsReceivedRow(html: string): string {
 
 /**
  * What the page works out and hands down (docs/specs/accountant-quotes-03-capabilities.md): the
- * tab reads these three answers and never asks who the user is. The store only supplies the user's
+ * tab reads these two answers and never asks who the user is. The store only supplies the user's
  * own id, which the tab stamps on a payment it records.
  */
 type Can = Parameters<typeof BillingTab>[0]["can"];
 
-/** An admin, or a lead AM: Record Payment drawn and pressable, the QuickBooks flag settable. */
-const ADMIN: Can = { showRecordPayment: true, recordPayment: true, setQuickBooksFlag: true };
-const LEAD_AM: Can = ADMIN;
-/** A junior AM on someone else's quote: the button is drawn but cannot be pressed. */
-const AM_ON_OTHERS_QUOTE: Can = {
-  showRecordPayment: true,
-  recordPayment: false,
-  setQuickBooksFlag: true,
-};
+/** An admin: Record Payment drawn, the QuickBooks flag settable. */
+const ADMIN: Can = { recordPayment: true, setQuickBooksFlag: true };
+/**
+ * An account manager, lead or junior (docs/specs/accountant-quotes-06-am-read-only-payments.md):
+ * no Record Payment, whatever the quote; the QuickBooks flag is theirs.
+ */
+const ACCOUNT_MANAGER: Can = { recordPayment: false, setQuickBooksFlag: true };
 /** A viewer: no button, and the flag is read-only. */
-const VIEWER: Can = { showRecordPayment: false, recordPayment: false, setQuickBooksFlag: false };
+const VIEWER: Can = { recordPayment: false, setQuickBooksFlag: false };
 
 const USER = { userId: "user-7" };
 
@@ -257,42 +255,50 @@ describe("BillingTab", () => {
 
   // ── Manual payment entry (docs/specs/manual-payment-entry.md §6.1, §6.4) ──
 
+  // docs/specs/accountant-quotes-06-am-read-only-payments.md: one answer, `can.recordPayment`. The
+  // button is drawn when it is true and not drawn when it is false — there is no disabled state.
   describe("the + Record Payment button", () => {
-    it("is offered to an admin", () => {
+    it("is offered to an admin, enabled", () => {
       const html = render(500000, ADMIN);
       expect(html).toContain("+ Record Payment");
+      expect(html).toContain("Record a check, ACH or manual card payment");
       expect(html).not.toContain("disabled");
     });
 
-    it("S13: a lead AM may record a payment on a quote they did not create", () => {
-      // recordPayment is what canEditOwnedEntity already answers for a lead: true on
-      // every quote. The tab only has to honour it.
-      const html = render(500000, LEAD_AM);
-      expect(html).toContain("+ Record Payment");
-      expect(html).not.toContain("disabled");
+    it("S1: an account manager is not shown it — lead and junior get the same answer", () => {
+      const html = render(500000, ACCOUNT_MANAGER);
+      expect(html).not.toContain("+ Record Payment");
     });
 
-    it("S8: a junior AM on someone else's quote sees it disabled, and why", () => {
-      const html = render(500000, AM_ON_OTHERS_QUOTE);
-      expect(html).toContain("+ Record Payment");
-      expect(html).toContain("disabled");
-      expect(html).toContain("only record a payment on quotes you created");
+    it("S1: …but still reads the payment history in full", () => {
+      mockPayments.mockReturnValue([payment({ amountCents: 200 })]);
+
+      const html = render(500000, ACCOUNT_MANAGER);
+
+      expect(html).toContain("Payment History");
+      expect(html).toContain("Krista Timmermans");
+      expect(html).toContain("$2.00");
+      expect(html).toContain("Balance Due");
     });
 
-    it("S9: a viewer is not shown it at all", () => {
+    it("S3: a viewer is not shown it at all", () => {
       const html = render(500000, VIEWER);
       expect(html).not.toContain("+ Record Payment");
       // …but the history is still fully readable.
       expect(html).toContain("Payment History");
     });
 
-    it("is drawn by showRecordPayment alone, and pressable by recordPayment alone", () => {
-      const hidden = render(500000, { ...ADMIN, showRecordPayment: false });
-      expect(hidden).not.toContain("+ Record Payment");
+    it("is drawn by recordPayment alone", () => {
+      expect(render(500000, { ...ADMIN, recordPayment: false })).not.toContain("+ Record Payment");
+      expect(render(500000, { ...VIEWER, recordPayment: true })).toContain("+ Record Payment");
+    });
 
-      const drawnButStuck = render(500000, { ...ADMIN, recordPayment: false });
-      expect(drawnButStuck).toContain("+ Record Payment");
-      expect(drawnButStuck).toContain("only record a payment on quotes you created");
+    it("has no disabled state and no hint, whatever the answers", () => {
+      for (const can of [ADMIN, ACCOUNT_MANAGER, VIEWER]) {
+        const html = render(500000, can);
+        expect(html).not.toContain("only record a payment on quotes you created");
+        expect(html).not.toContain("cursor-not-allowed");
+      }
     });
   });
 
@@ -304,8 +310,8 @@ describe("BillingTab", () => {
       expect(qboLabel(html)).not.toContain("text-gray-400");
     });
 
-    it("S3: is enabled for a junior AM even on someone else's quote — bookkeeping is not the owner's job", () => {
-      const html = render(500000, AM_ON_OTHERS_QUOTE);
+    it("S3: is enabled for an account manager, who cannot record a payment — bookkeeping is not the owner's job", () => {
+      const html = render(500000, ACCOUNT_MANAGER);
       expect(qboCheckbox(html)).not.toContain("disabled");
     });
 
@@ -316,11 +322,7 @@ describe("BillingTab", () => {
     });
 
     it("follows setQuickBooksFlag alone, not the Record Payment answers", () => {
-      const html = render(500000, {
-        showRecordPayment: true,
-        recordPayment: true,
-        setQuickBooksFlag: false,
-      });
+      const html = render(500000, { recordPayment: true, setQuickBooksFlag: false });
       expect(qboCheckbox(html)).toContain("disabled");
     });
   });

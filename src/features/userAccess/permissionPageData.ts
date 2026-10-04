@@ -176,8 +176,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       admin: full(
         "Can record a card, ACH or check payment on any quote or booking, including a negative amount for a refund, a bounced check or a correction. Recording a refund here does not send money back through Stripe — that is done in Stripe.",
       ),
-      account_manager: custom(
-        "A lead account manager can do all of that on any quote or booking, including ones they did not create. Everyone else can only do it on the quotes they created — on other people's quotes the button is disabled. The same rule as every other edit on the page.",
+      account_manager: none(
+        "No. Reading the payment history is a separate thing, and they can still do that.",
       ),
       developer: none(
         "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",

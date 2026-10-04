@@ -8,14 +8,17 @@
 --
 -- Verifies:
 --   T1 — an admin may insert a manual row
---   T2 — an account manager may too, on a quote they did not create
+--   T2 — an account manager may NOT, lead or not (accountant-quotes-06; until then
+--        they could, on a quote they did not create)
 --   T3 — a viewer may not
 --   T4 — a client cannot write a row claiming to be a Stripe payment
 --   T5 — amount_cents = 0 is refused; negatives are allowed
 --   T6 — a manual row must name its method and its author
 --   T7 — nobody may UPDATE or DELETE a payment row, ever
+--   T8 — an account manager still READS the payment rows
 --
--- See docs/specs/manual-payment-entry.md §4.2, §4.4, T3.
+-- See docs/specs/manual-payment-entry.md §4.2, §4.4, T3 and
+-- docs/specs/accountant-quotes-06-am-read-only-payments.md §3, §7.1.
 -- ============================================================================
 
 \set ON_ERROR_STOP on
@@ -29,7 +32,10 @@ DO $$
 DECLARE
   v_admin_id    UUID;
   v_am_id       UUID;
+  v_lead_id     UUID;
   v_viewer_id   UUID;
+  v_lead_row    UUID;
+  v_zone        UUID;
   v_event       UUID;
   v_row         UUID;
 BEGIN
@@ -47,6 +53,21 @@ BEGIN
     RETURNING id INTO v_viewer_id;
 
   INSERT INTO public."AccountManagers" (user_uuid, is_active) VALUES (v_am_id, true);
+
+  -- A lead account manager: AccountManagerZones.is_lead. The policy never looks at it; the
+  -- fixture exists so that the test can say "lead or not" and mean it.
+  INSERT INTO public."Users" (email, clerk_user_id)
+    VALUES ('t-lead@example.test', 'clerk_t_lead')
+    RETURNING id INTO v_lead_id;
+
+  INSERT INTO public."AccountManagers" (user_uuid, is_active) VALUES (v_lead_id, true)
+    RETURNING id INTO v_lead_row;
+
+  INSERT INTO public."Zones" (display_name) VALUES ('ManualPaymentEntry lead zone')
+    RETURNING id INTO v_zone;
+
+  INSERT INTO public."AccountManagerZones" (account_manager_uuid, zone_uuid, is_lead)
+    VALUES (v_lead_row, v_zone, true);
 
   -- The policy never looks at the event; that is the point of T2. It is built
   -- here rather than borrowed from the seed, because CI runs the suite against
@@ -150,7 +171,10 @@ BEGIN
   IF v_result <> 'allowed' THEN RAISE EXCEPTION 'T1 FAILED: admin was denied (%)', v_result; END IF;
 
   v_result := pg_temp.insert_as('clerk_t_am', 'manual');
-  IF v_result <> 'allowed' THEN RAISE EXCEPTION 'T2 FAILED: account manager was denied (%)', v_result; END IF;
+  IF v_result <> 'denied' THEN RAISE EXCEPTION 'T2 FAILED: a non-lead account manager recorded a payment'; END IF;
+
+  v_result := pg_temp.insert_as('clerk_t_lead', 'manual');
+  IF v_result <> 'denied' THEN RAISE EXCEPTION 'T2 FAILED: a lead account manager recorded a payment'; END IF;
 
   v_result := pg_temp.insert_as('clerk_t_viewer', 'manual');
   IF v_result <> 'denied' THEN RAISE EXCEPTION 'T3 FAILED: a viewer recorded a payment'; END IF;
@@ -163,27 +187,59 @@ END $$;
 
 -- T7 — the ledger is append-only. No UPDATE or DELETE policy exists, so every
 -- role sees zero rows to change, which is how RLS expresses "forbidden" for a
--- statement that names no rows.
+-- statement that names no rows. Checked for every identity the fixtures hold, so
+-- that "for anyone" is asserted and not assumed.
 DO $$
 DECLARE
+  v_sub     TEXT;
   v_updated INT;
   v_deleted INT;
 BEGIN
-  SET LOCAL ROLE authenticated;
-  PERFORM set_config('request.jwt.claims', json_build_object('sub', 'clerk_t_admin')::text, true);
+  FOREACH v_sub IN ARRAY ARRAY['clerk_t_admin', 'clerk_t_am', 'clerk_t_lead', 'clerk_t_viewer'] LOOP
+    SET LOCAL ROLE authenticated;
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', v_sub)::text, true);
 
-  UPDATE public."PaymentHistory" SET amount_cents = 1;
-  GET DIAGNOSTICS v_updated = ROW_COUNT;
+    UPDATE public."PaymentHistory" SET amount_cents = 1;
+    GET DIAGNOSTICS v_updated = ROW_COUNT;
 
-  DELETE FROM public."PaymentHistory";
-  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+    DELETE FROM public."PaymentHistory";
+    GET DIAGNOSTICS v_deleted = ROW_COUNT;
 
-  RESET ROLE;
+    RESET ROLE;
 
-  IF v_updated <> 0 THEN RAISE EXCEPTION 'T7 FAILED: % payment rows were edited', v_updated; END IF;
-  IF v_deleted <> 0 THEN RAISE EXCEPTION 'T7 FAILED: % payment rows were deleted', v_deleted; END IF;
+    IF v_updated <> 0 THEN RAISE EXCEPTION 'T7 FAILED: % payment rows were edited by %', v_updated, v_sub; END IF;
+    IF v_deleted <> 0 THEN RAISE EXCEPTION 'T7 FAILED: % payment rows were deleted by %', v_deleted, v_sub; END IF;
+  END LOOP;
 
   RAISE NOTICE 'append-only: OK';
+END $$;
+
+-- T8 — taking the right to write away from an account manager must not take the right to
+-- read. The rows T1 and the constraint checks left behind are visible to a lead and to a
+-- non-lead account manager alike.
+DO $$
+DECLARE
+  v_sub   TEXT;
+  v_total INT;
+  v_seen  INT;
+BEGIN
+  SELECT count(*) INTO v_total FROM public."PaymentHistory";
+  IF v_total = 0 THEN RAISE EXCEPTION 'T8 FAILED: the fixtures left no payment rows to read'; END IF;
+
+  FOREACH v_sub IN ARRAY ARRAY['clerk_t_am', 'clerk_t_lead'] LOOP
+    SET LOCAL ROLE authenticated;
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', v_sub)::text, true);
+
+    SELECT count(*) INTO v_seen FROM public."PaymentHistory";
+
+    RESET ROLE;
+
+    IF v_seen <> v_total THEN
+      RAISE EXCEPTION 'T8 FAILED: % sees % of % payment rows', v_sub, v_seen, v_total;
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE 'account manager reads: OK';
 END $$;
 
 -- Every check above raises on failure, so reaching here is the pass condition.

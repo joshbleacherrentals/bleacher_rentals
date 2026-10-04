@@ -25,7 +25,7 @@ const createQuote = (page: Page) => page.getByRole("button", { name: "+ Create Q
 test.describe("Quote capabilities (account manager)", () => {
   // The seeded E2E account manager is a lead (see recordPayment.am.spec.ts), so this project
   // exercises S2 and not S3.
-  test("S2: a lead sees Edit and Delete on a quote they did not create, and can record a payment", async ({
+  test("S2: a lead sees Edit and Delete on a quote they did not create, but no Record Payment", async ({
     page,
   }) => {
     await page.goto(BILLING);
@@ -34,7 +34,8 @@ test.describe("Quote capabilities (account manager)", () => {
     await expect(edit(page)).toBeVisible();
     await expect(remove(page)).toBeVisible();
     await expect(sendToClient(page)).toBeVisible();
-    await expect(recordPayment(page)).toBeEnabled();
+    // An account manager records no payment (docs/specs/accountant-quotes-06): not drawn at all.
+    await expect(recordPayment(page)).toHaveCount(0);
     await expect(qboFlag(page)).toBeEnabled();
   });
 
@@ -46,6 +47,6 @@ test.describe("Quote capabilities (account manager)", () => {
   // S3 and S4 need a second, non-lead account manager, and a quote one of them created; the seed
   // has neither. Both are pinned in getQuotesBookingsCapabilities.test.ts, where lead status and
   // ownership are inputs rather than fixtures.
-  test.fixme("S3: a junior on someone else's quote has no Edit or Delete, Record Payment disabled with its hint", async () => {});
+  test.fixme("S3: a junior on someone else's quote has no Edit or Delete, and no Record Payment", async () => {});
   test.fixme("S4: a junior on their own quote sees Edit and Delete", async () => {});
 });
