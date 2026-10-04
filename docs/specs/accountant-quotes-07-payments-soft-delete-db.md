@@ -1,7 +1,10 @@
 # Payments — edit and soft delete, the database layer
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D7 answered 2026-10-03; the rules of §0 come
-from the request).
+Status: **IMPLEMENTED 2026-10-04, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); no screen, so no Playwright scenario. 0 open decisions (D1–D7 answered
+2026-10-03; the rules of §0 come from the request). Approved 2026-10-04 with two answers: §8 corrected (1 A),
+`database.types.ts` gets the three columns and no `Relationships` entry (2 A); then `manual_payment_entry.test.sql`
+T7 rewritten to forbid only a hard DELETE.
 Original request: №6, part 1 of 3. Implementation order: **07 of 11**. Needs
 [06](accountant-quotes-06-am-read-only-payments.md) (only an admin writes payments). The next two parts:
 [08](accountant-quotes-08-payments-readers-skip-deleted.md) (every reader skips deleted rows) and
@@ -193,7 +196,11 @@ which is its only gate.
 2. `package.json` — changed: `test:db:paymentedit`, added to `test:db:all`
 
 **Not counted:** `src/lib/powersync/AppSchema.ts`; `database.types.ts`; tests —
-`supabase/tests/payment_history_edit_soft_delete.test.sql` (new); no `sync_rules.yaml`; no
+`supabase/tests/payment_history_edit_soft_delete.test.sql` (new);
+`supabase/tests/manual_payment_entry.test.sql` (edited: its T7 asserted that nobody can UPDATE or DELETE a
+payment, which this spec ends for UPDATE; it now asserts only that nobody can hard DELETE — an admin edits
+and soft-deletes, and that is asserted in the new test; added 2026-10-04 on the user's "update must be
+allowed, delete not, because we have soft delete"); no `sync_rules.yaml`; no
 `permissionPageData.ts`.
 
 ## 7. Tests and implementation sequence
@@ -223,7 +230,7 @@ row back** (an update that RLS filters out does not raise):
 - **Other roles.** An account manager (lead and junior), a viewer, a maintainer and an accountant cannot edit or
   delete — the row is unchanged (the accountant until spec 10).
 - **Insert.** An admin cannot insert a row that is already deleted; the ordinary manual insert still works
-  (`manual_payment_entry.test.sql` stays green after its spec-06 edit).
+  (`manual_payment_entry.test.sql` stays green after its spec-06 edit and the T7 edit of §6).
 - **The service role.** A Stripe-style insert and an update through the service role are not blocked by the
   guard.
 - **Existing rows.** Rows that existed before the migration have the three columns null.

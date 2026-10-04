@@ -14,7 +14,8 @@
 --   T4 — a client cannot write a row claiming to be a Stripe payment
 --   T5 — amount_cents = 0 is refused; negatives are allowed
 --   T6 — a manual row must name its method and its author
---   T7 — nobody may UPDATE or DELETE a payment row, ever
+--   T7 — nobody may DELETE a payment row, ever (a mistake is a soft delete since
+--        accountant-quotes-07; UPDATE is fenced in payment_history_edit_soft_delete.test.sql)
 --   T8 — an account manager still READS the payment rows
 --
 -- See docs/specs/manual-payment-entry.md §4.2, §4.4, T3 and
@@ -185,33 +186,33 @@ BEGIN
   RAISE NOTICE 'rls insert: OK';
 END $$;
 
--- T7 — the ledger is append-only. No UPDATE or DELETE policy exists, so every
--- role sees zero rows to change, which is how RLS expresses "forbidden" for a
--- statement that names no rows. Checked for every identity the fixtures hold, so
--- that "for anyone" is asserted and not assumed.
+-- T7 — a payment is never hard-deleted. No DELETE policy exists, so every role
+-- sees zero rows to remove, which is how RLS expresses "forbidden" for a statement
+-- that names no rows. Checked for every identity the fixtures hold, so that "for
+-- anyone" is asserted and not assumed.
+--
+-- This used to assert the same of UPDATE (the ledger was append-only). Since
+-- accountant-quotes-07 an admin may edit a manual row and soft-delete it, so UPDATE
+-- is no longer forbidden here; who may change which column, and that a deleted row is
+-- frozen, is asserted in payment_history_edit_soft_delete.test.sql.
 DO $$
 DECLARE
   v_sub     TEXT;
-  v_updated INT;
   v_deleted INT;
 BEGIN
   FOREACH v_sub IN ARRAY ARRAY['clerk_t_admin', 'clerk_t_am', 'clerk_t_lead', 'clerk_t_viewer'] LOOP
     SET LOCAL ROLE authenticated;
     PERFORM set_config('request.jwt.claims', json_build_object('sub', v_sub)::text, true);
 
-    UPDATE public."PaymentHistory" SET amount_cents = 1;
-    GET DIAGNOSTICS v_updated = ROW_COUNT;
-
     DELETE FROM public."PaymentHistory";
     GET DIAGNOSTICS v_deleted = ROW_COUNT;
 
     RESET ROLE;
 
-    IF v_updated <> 0 THEN RAISE EXCEPTION 'T7 FAILED: % payment rows were edited by %', v_updated, v_sub; END IF;
     IF v_deleted <> 0 THEN RAISE EXCEPTION 'T7 FAILED: % payment rows were deleted by %', v_deleted, v_sub; END IF;
   END LOOP;
 
-  RAISE NOTICE 'append-only: OK';
+  RAISE NOTICE 'no hard delete: OK';
 END $$;
 
 -- T8 — taking the right to write away from an account manager must not take the right to
