@@ -2749,6 +2749,9 @@ export type Database = {
           amount_cents: number
           created_at: string
           currency: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by_user_uuid: string | null
           entry_source: string
           event_uuid: string
           id: string
@@ -2771,6 +2774,9 @@ export type Database = {
           amount_cents: number
           created_at?: string
           currency?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by_user_uuid?: string | null
           entry_source?: string
           event_uuid: string
           id?: string
@@ -2793,6 +2799,9 @@ export type Database = {
           amount_cents?: number
           created_at?: string
           currency?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by_user_uuid?: string | null
           entry_source?: string
           event_uuid?: string
           id?: string

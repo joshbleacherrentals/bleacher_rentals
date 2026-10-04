@@ -237,15 +237,25 @@ row back** (an update that RLS filters out does not raise):
 
 ## 8. Edge cases and error handling
 
-- **Offline edit or delete.** The change is a local write that uploads later; if the server refuses it (the
-  payment was deleted meanwhile, or the role changed), the connector discards it with the existing toast and the
-  local row may differ until the next sync.
+- **Two kinds of refusal, and only one tells the user.** The connector uploads an edit as
+  `table.update(changedColumns).eq("id", id)` and does not check how many rows it changed
+  (`BackendConnector.ts`). So:
+  - **The guard trigger and the CHECK raise** (`42501`, `23514`): the connector discards the change and shows
+    "A change could not be saved and has been discarded." This is what an admin meets when they change an
+    immutable column, edit a payment that is already deleted, or send a deletion with a missing reason.
+  - **The UPDATE policy filters the row out** (a caller who is not an admin, a Stripe row): the statement
+    matches **no row and raises nothing**. The server changes nothing, the connector sees success and shows
+    **no toast**; the local row keeps the change until the next sync overwrites it.
+- **Offline edit or delete.** The change is a local write that uploads later. If the payment was deleted
+  meanwhile, the guard refuses it and the user sees the toast above; if the role changed meanwhile, the policy
+  filters it out silently.
 - **Two devices.** Last write wins for an edit; an edit of a payment another device already deleted is refused
-  (the row is frozen).
+  by the guard (the row is frozen), with the toast.
 - **A client clock.** `deleted_at` is the value the client sends, like `paid_at` and `created_at` today; the
   database does not overwrite it.
-- **A role changed while signed in.** `get_user_roles()` changes; the next upload is refused and discarded.
-- **Deactivated user.** `get_user_roles()` returns nothing: RLS refuses.
+- **A role changed while signed in.** `get_user_roles()` changes; the next upload matches no row and is
+  dropped without a toast.
+- **Deactivated user.** `get_user_roles()` returns nothing: the policy filters every row out, silently.
 - **Clerk.** Nothing new: no route, token or webhook is touched.
 
 ## 9. Risks, and found on the way

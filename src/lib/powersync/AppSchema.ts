@@ -1114,6 +1114,12 @@ const PaymentHistoryCols = {
   // Check number, ACH trace, terminal auth code; for Stripe rows, the method
   // Stripe reported.
   reference: column.text,
+  // Soft delete (docs/specs/accountant-quotes-07-payments-soft-delete-db.md): a row is
+  // deleted when deleted_at is set. Only a manual row can be, with its author and a reason,
+  // and a deleted row is frozen. Nothing reads these before specs 08 and 09.
+  deleted_at: column.text,
+  deleted_by_user_uuid: column.text,
+  delete_reason: column.text,
 } satisfies PowerSyncColsFor<"PaymentHistory">;
 const PaymentHistory = new Table(PaymentHistoryCols, {
   indexes: { event_uuid: ["event_uuid"], installment_id: ["installment_id"] },
