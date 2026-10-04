@@ -64,8 +64,37 @@ test.describe("Record Payment (admin)", () => {
     await expect(page.getByRole("button", { name: "Record Payment", exact: true })).toBeDisabled();
   });
 
-  test("a recorded payment offers no way to edit or delete it", async ({ page }) => {
-    await expect(page.getByText(/record a negative amount/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Delete payment/ })).toHaveCount(0);
+  // docs/specs/accountant-quotes-09-payments-edit-delete-ui.md: this used to assert the opposite — that
+  // a recorded payment offers no way to edit or delete it. A manual payment can be edited and deleted
+  // now; a Stripe payment cannot, and the line under the table says so.
+  test("a Stripe payment offers neither Edit nor Delete, and the line under the table says so", async ({
+    page,
+  }) => {
+    await expect(page.getByText("Stripe payments cannot be edited or deleted.")).toBeVisible();
+
+    await page
+      .getByRole("row", { name: /Payment details for \$2,700\.00/ })
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+  });
+
+  test("a manual payment opens with Edit and Delete", async ({ page }) => {
+    await page.getByRole("button", { name: "+ Record Payment" }).click();
+    await page.getByLabel(/^Amount/).fill("10.00");
+    await page.getByLabel("Check #").fill("OFFERS-1");
+    await page.getByRole("button", { name: "Record Payment", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+
+    await page
+      .getByRole("row", { name: /Payment details for \$10\.00/ })
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Delete", exact: true })).toBeVisible();
   });
 });

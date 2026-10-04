@@ -1,7 +1,9 @@
 # Payments — edit, delete and "Show deleted" on the Billing tab
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D7 answered 2026-10-03; the behaviour of §0 comes
-from the request).
+Status: **IMPLEMENTED 2026-10-04, awaiting review** — not checked by hand in a browser (Clerk
+sign-in is unavailable here); Playwright specs written, not run. 0 open decisions (D1–D7 answered 2026-10-03;
+the behaviour of §0 comes from the request). Approved 2026-10-04 with three answers: the line under the table
+(1 A), "Applied To" for a deleted payment (2 A), §7 and R2 corrected (3 A).
 Original request: №6, part 3 of 3. Implementation order: **09 of 11**. Needs
 [07](accountant-quotes-07-payments-soft-delete-db.md) (the database rules) and
 [08](accountant-quotes-08-payments-readers-skip-deleted.md) (the readers skip deleted rows), and
@@ -149,11 +151,21 @@ button "Save changes", write through `editManualPayment`, the payer field starts
 - the footer text changes: for a manual payment the "cannot be edited or deleted" line goes; for a Stripe payment it
   reads "Stripe payments cannot be edited or deleted."
 
+**What a deleted payment says in "Applied To"** (added 2026-10-04, "Approved, 2 A"). `allocatePayments` reports
+a deleted payment as `excluded: "deleted"` (spec 08), which until now fell into the status sentence:
+
+- the table's **Applied To** cell reads `Not counted (deleted)`;
+- the detail dialog's **Applied To** section reads a sentence of its own, not the status one: "Not counted —
+  this payment was deleted."
+
 **The reason prompt** — `DeletePaymentDialog.tsx` (new): a short text area; its **Delete** button is disabled while the
 reason is empty after trimming; it writes through `deleteManualPayment`; with a write queue against a double click
 (D4). No further confirmation step.
 
-**The tab** — `BillingTab.tsx`: a **Show deleted** switch next to **+ Record Payment**, visible to every role that
+**The tab** — `BillingTab.tsx`: the line under the table, "Payments cannot be edited or deleted. To correct one,
+record a negative amount — both entries stay visible.", is false for a manual payment from now on. It becomes
+"Stripe payments cannot be edited or deleted." and stays under the table (added 2026-10-04, "Approved, 1 A").
+A **Show deleted** switch next to **+ Record Payment**, visible to every role that
 reads payments, off at start, local to the tab (not in the URL); when on, the table lists deleted payments too, in
 place (D5) — greyed, amount struck through, a "Deleted" badge; they never enter the allocation or any total (spec
 08). It passes `canWrite` and the name of the user who deleted a payment (from `useUserNames`).
@@ -215,7 +227,11 @@ the event's payments; if it is not found it falls back to "Payment" with a short
 **Not counted:** `src/features/userAccess/permissionPageData.ts`; tests — `paymentEdit.test.ts`,
 `editManualPayment.test.ts`, `deleteManualPayment.test.ts`, `PaymentDetailDialog.test.tsx`,
 `DeletePaymentDialog.test.tsx` (new); `recordPaymentForm.test.ts`, `BillingTab.test.tsx`, `LogTab.test.ts`,
-`permissionPageData.test.ts` (edited); the Playwright spec of §4; no migration, `sync_rules.yaml`, `AppSchema.ts` or
+`permissionPageData.test.ts` (edited); the Playwright specs of §4 (new);
+`src/features/quotesAndBookings/e2e/recordPayment.admin.spec.ts` (edited: its last test, "a recorded payment
+offers no way to edit or delete it", looks for the old line under the table and for no Delete button; it
+now asserts the Stripe line and that a manual payment opens with Edit and Delete — added 2026-10-04,
+"Approved, 1 A"); no migration, `sync_rules.yaml`, `AppSchema.ts` or
 `database.types.ts`.
 
 ## 6. Tests and implementation sequence
@@ -244,9 +260,14 @@ Red first; each step ends at a gate. Playwright is **written, not run**; Prettie
 
 ## 7. Edge cases and error handling
 
-- **Offline.** Edit and delete are local writes that upload later; if the server refuses one (the role changed, the
-  payment was deleted on another device), the connector discards the whole transaction — payment change and log row
-  together — and shows its toast; the local row may differ until the next sync.
+- **Offline.** Edit and delete are local writes that upload later. There are two kinds of refusal (spec 07, §8):
+  - **The guard or a CHECK raises** (`42501`, `23514` — for example the payment was deleted on another device, so
+    its row is frozen): the connector discards the whole transaction — payment change and log row together — and
+    shows its toast; the local row may differ until the next sync.
+  - **The UPDATE policy filters the row out** (the role was removed while the write waited in the queue): the
+    statement matches no row and raises nothing, so the transaction completes **without a toast**, the payment
+    change is dropped, **and the log row is still written** — the log then says a payment was edited or deleted
+    when it was not. It needs a role change while offline with writes queued.
 - **A double click.** A write queue in each dialog stops a second submit from overtaking the first, as in the record
   dialog.
 - **Editing a payment another device just deleted.** The database refuses it (the row is frozen); the user sees the
@@ -255,8 +276,8 @@ Red first; each step ends at a gate. Playwright is **written, not run**; Prettie
   was applied across several installments re-flows it. The totals always come from `allocatePayments`.
 - **A payment in another currency than the quote.** It stays excluded from the totals; its own currency is never
   edited.
-- **A user whose role was just removed.** The buttons disappear on the next render; a queued write is refused and
-  discarded.
+- **A user whose role was just removed.** The buttons disappear on the next render. A write already queued is
+  dropped silently by the policy, and its log row is still written (see **Offline**).
 - **Clerk.** Nothing new: no route, token or webhook is touched.
 
 ## 8. Risks
@@ -264,7 +285,9 @@ Red first; each step ends at a gate. Playwright is **written, not run**; Prettie
 - **R1 — the reason is hidden by the screen only (D6).** Deleted rows, reason included, sync to every role that reads
   payments (spec 08, D3); anyone inspecting their local database can read it. The Log tab does not carry it (D7).
 - **R2 — the log is written by the client (spec 07, D5).** A client can skip it or write a misleading entry; the
-  authoritative record is the row itself (who, when, why).
+  authoritative record is the row itself (who, when, why). It can also be wrong without anyone's intent: a write
+  the policy filters out (the role removed while it was queued) leaves its log row behind, because the
+  transaction completes (see §7).
 - **R3 — `BillingTab.tsx` grows** (518 lines before this spec). The switch, the greyed rows and the dialogs' wiring
   are added to it; nothing is extracted, as nothing was asked for.
 - **R4 — the file count is at the limit** (10 of 10).

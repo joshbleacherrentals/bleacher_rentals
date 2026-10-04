@@ -124,7 +124,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Payment History",
     description:
-      "The payments and balances on the Billing tab of a quote or booking. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes.",
+      "The payments and balances on the Billing tab of a quote or booking. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes. A deleted payment is hidden unless Show deleted is on; the reason it was deleted is shown only to those who can record payments.",
     category: "Day to Day Operations",
     roles: {
       admin: read(
@@ -170,11 +170,11 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Record a Payment",
     description:
-      "Entering a payment that did not come through Stripe — a check, an ACH transfer, or a card run by hand on a terminal — from the Billing tab of a quote or booking. A recorded payment can never be edited or deleted; a mistake is corrected by recording the same amount as a negative, so both entries stay on the record.",
+      "Entering a payment that did not come through Stripe — a check, an ACH transfer, or a card run by hand on a terminal — and correcting it afterwards. A manual payment can be edited (amount, date, method, payer, reference, notes, installment) or deleted with a reason; a deleted payment stays on the record, no longer counts, and cannot be restored. Stripe payments cannot be edited or deleted. A negative amount is still how a refund or a bounced check is recorded.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can record a card, ACH or check payment on any quote or booking, including a negative amount for a refund, a bounced check or a correction. Recording a refund here does not send money back through Stripe — that is done in Stripe.",
+        "Can record a card, ACH or check payment on any quote or booking, including a negative amount for a refund, a bounced check or a correction. Can edit and delete any manual payment on any quote or booking. Recording a refund here does not send money back through Stripe — that is done in Stripe.",
       ),
       account_manager: none(
         "No. Reading the payment history is a separate thing, and they can still do that.",

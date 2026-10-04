@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { FIELD_LABELS } from "../../../db/logEventChanges";
+import { usePaymentHistory } from "../../../hooks/usePaymentHistory";
+import { paymentLogLabel, type PaymentForEdit } from "../../../utils/paymentEdit";
 import { X, Eye, CheckCircle2, XCircle, Mail } from "lucide-react";
 import { getTrigger } from "@/features/automaticEmails/triggers";
 
@@ -39,6 +41,8 @@ const ACTION_CONFIG: Record<string, { icon: string; color: string; label: string
   line_item_add: { icon: "➕", color: "text-green-600", label: "Added" },
   line_item_remove: { icon: "➖", color: "text-red-600", label: "Removed" },
   line_item_change: { icon: "✏️", color: "text-amber-600", label: "Changed" },
+  payment_edit: { icon: "💳", color: "text-amber-600", label: "Payment edited" },
+  payment_delete: { icon: "🗑️", color: "text-red-600", label: "Payment deleted" },
 };
 
 export function isClientEvent(row: LogRow): boolean {
@@ -87,9 +91,17 @@ function formatValue(val: string | null): string {
   }
 }
 
-function getTitle(row: LogRow): string {
+/**
+ * A row's title. `payments` are the event's payments, so that a payment edit or deletion — whose
+ * field_name is `payment:<id>`, not a label — can say which payment it was.
+ */
+export function getTitle(row: LogRow, payments: readonly PaymentForEdit[] = []): string {
   const config = ACTION_CONFIG[row.action_type ?? "update"] ?? ACTION_CONFIG.update;
   const fieldLabel = FIELD_LABELS[row.field_name ?? ""] ?? row.field_name ?? "";
+
+  if (row.action_type === "payment_edit" || row.action_type === "payment_delete") {
+    return `${config.label}: ${paymentLogLabel(row.field_name, payments)}`;
+  }
 
   if (row.action_type === "create") {
     const name = [row.first_name, row.last_name].filter(Boolean).join(" ");
@@ -104,7 +116,31 @@ function getTitle(row: LogRow): string {
   return `${config.label}: ${fieldLabel}`;
 }
 
-function ChangeDetailModal({ log, onClose }: { log: LogRow; onClose: () => void }) {
+/**
+ * The second line of a payment row: what an edit changed (previous → next), or, for a deletion, the
+ * payment's description when the title could not carry it. Never a reason: a deletion's row does not
+ * have one (docs/specs/accountant-quotes-09, D7). Null for every other row.
+ */
+export function getDetail(row: LogRow, payments: readonly PaymentForEdit[] = []): string | null {
+  if (row.action_type === "payment_edit") {
+    return `${row.prev_value ?? "—"} → ${row.next_value ?? "—"}`;
+  }
+  if (row.action_type === "payment_delete") {
+    const label = paymentLogLabel(row.field_name, payments);
+    return row.prev_value && row.prev_value !== label ? row.prev_value : null;
+  }
+  return null;
+}
+
+function ChangeDetailModal({
+  log,
+  payments,
+  onClose,
+}: {
+  log: LogRow;
+  payments: readonly PaymentForEdit[];
+  onClose: () => void;
+}) {
   const userName = [log.first_name, log.last_name].filter(Boolean).join(" ") || "System";
 
   return (
@@ -117,7 +153,7 @@ function ChangeDetailModal({ log, onClose }: { log: LogRow; onClose: () => void 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-base">{getTitle(log)}</h3>
+          <h3 className="font-semibold text-base">{getTitle(log, payments)}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
@@ -138,6 +174,38 @@ function ChangeDetailModal({ log, onClose }: { log: LogRow; onClose: () => void 
               <p className="font-medium text-gray-800">{formatDateTime(log.changed_at)}</p>
             </div>
           </div>
+
+          {log.action_type === "payment_edit" && (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                  Previous
+                </span>
+                <p className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm whitespace-pre-wrap break-words">
+                  {formatValue(log.prev_value)}
+                </p>
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                  New
+                </span>
+                <p className="bg-green-50 border border-green-100 rounded-lg p-3 text-sm whitespace-pre-wrap break-words">
+                  {formatValue(log.next_value)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {log.action_type === "payment_delete" && (
+            <div className="text-sm">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                Deleted payment
+              </span>
+              <p className="font-medium text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">
+                {log.prev_value ?? paymentLogLabel(log.field_name, payments)}
+              </p>
+            </div>
+          )}
 
           {log.action_type === "update" && (
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -292,6 +360,11 @@ export function LogTab({ quoteId }: { quoteId: string }) {
 
   const { data, isLoading } = useTypedQuery(compiled, expect<LogRow>());
 
+  // Every payment of the event, deleted ones included: a payment row in the log names its payment by
+  // id, and a deleted payment still has to be named.
+  const { payments } = usePaymentHistory(quoteId);
+  const paymentDetail = (log: LogRow) => getDetail(log, payments);
+
   const emailLogCompiled = useMemo(
     () =>
       db
@@ -398,7 +471,10 @@ export function LogTab({ quoteId }: { quoteId: string }) {
                 >
                   <span className="text-base mt-0.5 shrink-0">{config.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{getTitle(log)}</p>
+                    <p className="text-sm font-medium text-gray-800">{getTitle(log, payments)}</p>
+                    {paymentDetail(log) && (
+                      <p className="text-xs text-gray-400 truncate">{paymentDetail(log)}</p>
+                    )}
                     {log.action_type === "update" && (log.prev_value || log.next_value) && (
                       <p className="text-xs text-gray-400 truncate">
                         {formatValue(log.prev_value)} → {formatValue(log.next_value)}
@@ -440,7 +516,13 @@ export function LogTab({ quoteId }: { quoteId: string }) {
           </div>
         ))}
 
-      {selectedLog && <ChangeDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+      {selectedLog && (
+        <ChangeDetailModal
+          log={selectedLog}
+          payments={payments}
+          onClose={() => setSelectedLog(null)}
+        />
+      )}
 
       {/* Automatic Emails */}
       {activeSubTab === "emails" &&

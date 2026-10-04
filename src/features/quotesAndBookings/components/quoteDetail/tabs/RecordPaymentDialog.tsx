@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,12 +14,21 @@ import { Currency } from "../../../types/quoteTypes";
 import { MANUAL_PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "../../../types/paymentTypes";
 import { formatMoney } from "../../../utils/formatMoney";
 import { formatDate } from "../../../utils/formatDate";
-import { evaluateRecordPaymentForm, emptyDraft } from "../../../utils/recordPaymentForm";
+import {
+  draftFromPayment,
+  emptyDraft,
+  evaluateRecordPaymentForm,
+} from "../../../utils/recordPaymentForm";
 import { recordManualPayment } from "../../../db/recordManualPayment";
+import { editManualPayment } from "../../../db/editManualPayment";
 import type { InstallmentAllocation } from "../../../utils/allocatePayments";
+import type { PaymentHistoryRow } from "../../../hooks/usePaymentHistory";
 
 /**
- * Records money that never touched Stripe.
+ * Records money that never touched Stripe — or, in `edit` mode, edits a manual payment that was
+ * already recorded (docs/specs/accountant-quotes-09, D3): the same fields and rules, one dialog.
+ * In edit mode the title and the button change, Save stays off until something differs, and the
+ * write goes through `editManualPayment`. The payment's currency is its own and never changes.
  *
  * Everything it decides — whether the amount is submittable, what the button
  * says, which label the Reference field carries — comes from
@@ -29,7 +38,7 @@ import type { InstallmentAllocation } from "../../../utils/allocatePayments";
  * See docs/specs/manual-payment-entry.md §6.2, §6.3.
  */
 
-export type RecordPaymentDialogProps = {
+type RecordPaymentDialogBaseProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventId: string;
@@ -45,6 +54,16 @@ export type RecordPaymentDialogProps = {
   /** Injected so the "no future dates" rule is testable and stable. */
   today?: string;
 };
+
+export type RecordPaymentDialogProps = RecordPaymentDialogBaseProps &
+  (
+    | { mode?: "record"; payment?: undefined }
+    | {
+        mode: "edit";
+        /** The manual payment being edited; its own currency is the one the form shows. */
+        payment: PaymentHistoryRow;
+      }
+  );
 
 function todayIso(): string {
   const now = new Date();
@@ -62,11 +81,26 @@ export function RecordPaymentDialog({
   defaultPayerName,
   recordedByUserUuid,
   today = todayIso(),
+  mode = "record",
+  payment,
 }: RecordPaymentDialogProps) {
-  const [draft, setDraft] = useState(() => emptyDraft({ payerName: defaultPayerName, today }));
+  const isEdit = mode === "edit" && payment !== undefined;
+  // What the payment said when the edit began; Save stays off until the draft says something else.
+  const original = useMemo(() => (payment ? draftFromPayment(payment) : null), [payment]);
+  const shownCurrency = (isEdit ? payment.currency : currency) as Currency;
+
+  const [draft, setDraft] = useState(
+    () => original ?? emptyDraft({ payerName: defaultPayerName, today }),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const state = evaluateRecordPaymentForm(draft, today, { currencyResolved, isSubmitting });
+  const state = evaluateRecordPaymentForm(
+    draft,
+    today,
+    isEdit && original
+      ? { mode: "edit", original, isSubmitting }
+      : { currencyResolved, isSubmitting },
+  );
 
   // Chained, like the QuickBooks flag on the tab behind this dialog: a second
   // click cannot overtake the first and record the payment twice.
@@ -78,7 +112,38 @@ export function RecordPaymentDialog({
   const handleSubmit = () => {
     if (!state.canSubmit || state.amountCents === null) return;
     if (!recordedByUserUuid) {
-      createErrorToast(["Cannot record a payment: your user account could not be identified."]);
+      createErrorToast([
+        `Cannot ${isEdit ? "edit" : "record"} a payment: your user account could not be identified.`,
+      ]);
+      return;
+    }
+
+    if (isEdit) {
+      // How the log words an installment: by its due date, as the list the user picked it from does.
+      const installmentLabel = (id: string | null) => {
+        if (!id) return "Not applied";
+        const found = installments.find((i) => i.installmentId === id);
+        return found
+          ? `Due ${formatDate(found.dueDate)}`
+          : "An installment no longer on the schedule";
+      };
+
+      setIsSubmitting(true);
+      writeQueue.current = writeQueue.current
+        .then(() =>
+          editManualPayment({
+            eventId,
+            payment,
+            draft,
+            changedByUserUuid: recordedByUserUuid,
+            installmentLabel,
+          }),
+        )
+        .then(() => onOpenChange(false))
+        .catch((err: any) => {
+          createErrorToast(["Failed to save the payment.", err?.message ?? ""]);
+        })
+        .finally(() => setIsSubmitting(false));
       return;
     }
 
@@ -117,10 +182,11 @@ export function RecordPaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Payment" : "Record Payment"}</DialogTitle>
           <DialogDescription>
-            For money that did not come through Stripe. Stripe payments appear here on their own
-            once the client pays online.
+            {isEdit
+              ? `Change what was recorded. The payment stays in ${shownCurrency}; its currency cannot change.`
+              : "For money that did not come through Stripe. Stripe payments appear here on their own once the client pays online."}
           </DialogDescription>
         </DialogHeader>
 
@@ -152,7 +218,7 @@ export function RecordPaymentDialog({
 
           <div>
             <label className={label} htmlFor="rp-amount">
-              Amount ({currency})
+              Amount ({shownCurrency})
             </label>
             <input
               id="rp-amount"
@@ -267,7 +333,7 @@ export function RecordPaymentDialog({
               state.isNegative ? "bg-red-700" : "bg-darkBlue"
             } disabled:bg-gray-300`}
           >
-            {isSubmitting ? "Recording…" : state.submitLabel}
+            {isSubmitting ? (isEdit ? "Saving…" : "Recording…") : state.submitLabel}
           </button>
         </DialogFooter>
       </DialogContent>

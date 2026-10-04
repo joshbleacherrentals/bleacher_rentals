@@ -242,6 +242,76 @@ describe("permission matrix", () => {
     });
   });
 
+  // docs/specs/accountant-quotes-09-payments-edit-delete-ui.md §3: a manual payment can be edited and
+  // deleted now. The matrix has to say so — it is the answer people get when they ask what they may do.
+  describe("Record a Payment and Payment History (spec 09)", () => {
+    const recordRow = PERMISSIONS.find((p) => p.label === "Record a Payment");
+    const historyRow = PERMISSIONS.find((p) => p.label === "Payment History");
+
+    it("no longer says a recorded payment can never be edited or deleted", () => {
+      expect(recordRow?.description).not.toMatch(/can never be edited or deleted/i);
+      expect(recordRow?.description).not.toMatch(/recording the same amount as a negative/i);
+    });
+
+    it("says a manual payment can be edited or deleted with a reason, and what that leaves behind", () => {
+      const text = recordRow?.description ?? "";
+      expect(text).toMatch(/can be edited/i);
+      expect(text).toMatch(/amount, date, method, payer, reference, notes, installment/i);
+      expect(text).toMatch(/deleted with a reason/i);
+      expect(text).toMatch(/stays on the record/i);
+      expect(text).toMatch(/no longer counts/i);
+      expect(text).toMatch(/cannot be restored/i);
+    });
+
+    it("says Stripe payments cannot be edited or deleted, and that a negative amount is still the refund", () => {
+      const text = recordRow?.description ?? "";
+      expect(text).toMatch(/Stripe payments cannot be edited or deleted/i);
+      expect(text).toMatch(/negative amount is still how a refund or a bounced check is recorded/i);
+    });
+
+    it("tells an admin they can edit and delete any manual payment on any quote or booking", () => {
+      expect(recordRow?.roles.admin.note).toMatch(
+        /edit and delete any manual payment on any quote or booking/i,
+      );
+    });
+
+    it("leaves the levels of Record a Payment as spec 06 set them: admin full, everyone else none", () => {
+      const levels = Object.fromEntries(
+        Object.entries(recordRow?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "none",
+        accountant: "none",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("says on Payment History that a deleted payment is hidden unless Show deleted is on, and who sees the reason", () => {
+      const text = historyRow?.description ?? "";
+      expect(text).toMatch(/hidden unless Show deleted is on/i);
+      expect(text).toMatch(/reason it was deleted is shown only to those who can record payments/i);
+    });
+
+    it("does not change who reads Payment History", () => {
+      const levels = Object.fromEntries(
+        Object.entries(historyRow?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "read",
+        account_manager: "read",
+        accountant: "read",
+        viewer: "read",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+  });
+
   // docs/specs/maintainer-dashboard-cells.md: a maintainer writes notes in dashboard cells,
   // and only edits the ones they wrote.
   describe("maintainer on the dashboard", () => {

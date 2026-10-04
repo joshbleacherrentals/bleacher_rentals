@@ -84,9 +84,14 @@ const DELETED = {
   deleteReason: "entered twice",
 };
 
-function render(contractTotalCents = 500000, can: Can = ADMIN) {
+function render(contractTotalCents = 500000, can: Can = ADMIN, initiallyShowDeleted = false) {
   return renderToStaticMarkup(
-    <BillingTab quote={quote} contractTotalCents={contractTotalCents} can={can} />,
+    <BillingTab
+      quote={quote}
+      contractTotalCents={contractTotalCents}
+      can={can}
+      initiallyShowDeleted={initiallyShowDeleted}
+    />,
   );
 }
 
@@ -327,6 +332,96 @@ describe("BillingTab", () => {
     });
   });
 
+  // ── Show deleted (docs/specs/accountant-quotes-09-payments-edit-delete-ui.md §3, §6.3) ──
+
+  describe("the Show deleted switch", () => {
+    const DELETED_ROW = { id: "gone", payerName: "Deleted Payer", amountCents: 5000, ...DELETED };
+    const switchOf = (html: string) => /<button[^>]*role="switch"[^>]*>/.exec(html)?.[0] ?? "";
+
+    it("S6: is there for every role that reads payments — admin, account manager and viewer alike", () => {
+      for (const can of [ADMIN, ACCOUNT_MANAGER, VIEWER]) {
+        const html = render(500000, can);
+        expect(switchOf(html)).not.toBe("");
+        expect(html).toContain("Show deleted");
+      }
+    });
+
+    it("is off to begin with, and says so to assistive technology", () => {
+      expect(switchOf(render())).toContain('aria-checked="false"');
+    });
+
+    it("S5: off, a deleted payment is not listed", () => {
+      mockPayments.mockReturnValue([
+        payment({ id: "live", payerName: "Live Payer", amountCents: 1000 }),
+        payment(DELETED_ROW),
+      ]);
+      const html = render();
+      expect(html).toContain("Live Payer");
+      expect(html).not.toContain("Deleted Payer");
+    });
+
+    it("S5: on, it is listed in the same table, in place", () => {
+      mockPayments.mockReturnValue([
+        payment({ id: "live", payerName: "Live Payer", amountCents: 1000 }),
+        payment(DELETED_ROW),
+      ]);
+      const html = render(500000, ADMIN, true);
+      expect(switchOf(html)).toContain('aria-checked="true"');
+      expect(html.indexOf("Live Payer")).toBeGreaterThan(-1);
+      expect(html.indexOf("Deleted Payer")).toBeGreaterThan(-1);
+      // One table, not a second one below the ledger (D5 A).
+      expect(html.match(/<table/g)?.length).toBe(1);
+    });
+
+    it("S5: on, a deleted payment is greyed, its amount struck through, with a Deleted badge", () => {
+      mockPayments.mockReturnValue([payment(DELETED_ROW)]);
+      const row = render(500000, ADMIN, true);
+      const tr =
+        /<tr[^>]*aria-label="Payment details for[^"]*"[^>]*>[\s\S]*?<\/tr>/.exec(row)?.[0] ?? "";
+      expect(tr).toContain("opacity-60");
+      expect(tr).toContain("line-through");
+      expect(tr).toContain(">Deleted</span>");
+    });
+
+    it("on, a payment that is not deleted is neither greyed nor struck through nor badged", () => {
+      mockPayments.mockReturnValue([payment({ id: "live", amountCents: 1000 })]);
+      const html = render(500000, ADMIN, true);
+      expect(html).not.toContain("line-through");
+      expect(html).not.toContain(">Deleted</span>");
+      expect(html).not.toContain("opacity-60");
+    });
+
+    it("on, a deleted payment's 'Applied To' says it was not counted because it was deleted", () => {
+      mockPayments.mockReturnValue([payment(DELETED_ROW)]);
+      expect(render(500000, ADMIN, true)).toContain("Not counted (deleted)");
+    });
+
+    it("S5: the totals are identical on or off", () => {
+      mockInstallments.mockReturnValue([installment()]);
+      mockPayments.mockReturnValue([
+        payment({ id: "live", amountCents: 100000, installmentId: "i1" }),
+        payment({ ...DELETED_ROW, amountCents: 170000, installmentId: null }),
+      ]);
+      const off = render(270000);
+      const on = render(270000, ADMIN, true);
+
+      expect(paymentsReceivedRow(on)).toBe(paymentsReceivedRow(off));
+      for (const figure of ["$1,000.00", "$1,700.00", "Partial"]) {
+        expect(on.includes(figure)).toBe(off.includes(figure));
+      }
+      // The deleted $1,700.00 is listed when on, and counted in no figure either way.
+      expect(on).toContain("Deleted Payer");
+      expect(paymentsReceivedRow(on)).toContain("$1,000.00");
+      expect(paymentsReceivedRow(on)).not.toContain("$2,700.00");
+    });
+
+    it("on, with only deleted payments, the list is shown and 'No payments' is not", () => {
+      mockPayments.mockReturnValue([payment(DELETED_ROW)]);
+      expect(render(500000, ADMIN, true)).not.toContain("No payments recorded yet");
+      expect(render(500000, ADMIN, false)).toContain("No payments recorded yet");
+    });
+  });
+
   // ── Manual payment entry (docs/specs/manual-payment-entry.md §6.1, §6.4) ──
 
   // docs/specs/accountant-quotes-06-am-read-only-payments.md: one answer, `can.recordPayment`. The
@@ -492,9 +587,12 @@ describe("BillingTab", () => {
       expect(cell).toContain("+2 more");
     });
 
-    it("says corrections are entered as negatives, since nothing can be deleted", () => {
+    // docs/specs/accountant-quotes-09-payments-edit-delete-ui.md §3 (1 A): a manual payment can be
+    // edited and deleted now, so the line under the table is about Stripe payments alone.
+    it("says Stripe payments cannot be edited or deleted, and no longer says corrections are negatives", () => {
       const html = render();
-      expect(html).toContain("record a negative amount");
+      expect(html).toContain("Stripe payments cannot be edited or deleted.");
+      expect(html).not.toContain("record a negative amount");
     });
   });
 });

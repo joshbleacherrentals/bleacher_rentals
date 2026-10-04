@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { FIELD_LABELS } from "../../../db/logEventChanges";
-import { isClientEvent, getClientTitle } from "./LogTab";
+import {
+  isClientEvent,
+  getClientTitle,
+  getTitle as logTitle,
+  getDetail as logDetail,
+} from "./LogTab";
 
 type LogRow = {
   id: string;
@@ -237,5 +242,108 @@ describe("formatValue", () => {
 
   it("returns non-JSON strings as-is", () => {
     expect(formatValue("not json {")).toBe("not json {");
+  });
+});
+
+// ── Payment rows (docs/specs/accountant-quotes-09-payments-edit-delete-ui.md §3, §6.3) ──
+//
+// The tests above exercise a copy of `getTitle`; these call the real one, because what matters here
+// is what LogTab does with a row whose field_name is `payment:<id>`.
+
+const PAYMENT = {
+  id: "11111111-2222-3333-4444-555555555555",
+  amountCents: 12000,
+  currency: "USD",
+  paidAt: new Date("2026-08-14T12:00:00").toISOString(),
+  createdAt: new Date("2026-08-14T15:30:00").toISOString(),
+  paymentMethodType: "ach",
+  entrySource: "manual" as const,
+  installmentId: null,
+  payerName: "Riverside High",
+  reference: null,
+  notes: null,
+};
+
+const paymentRow = (over: Partial<LogRow>): LogRow => ({
+  id: "log-1",
+  action_type: "payment_edit",
+  field_name: `payment:${PAYMENT.id}`,
+  prev_value: "Amount $100.00 · Method Check",
+  next_value: "Amount $120.00 · Method ACH Payment",
+  changed_at: "2026-08-15T10:00:00Z",
+  changed_by_user_uuid: "user-1",
+  first_name: "Sam",
+  last_name: "Admin",
+  ...over,
+});
+
+describe("payment rows — getTitle", () => {
+  it("names an edited payment by what it is, resolved from payment:<id>", () => {
+    expect(logTitle(paymentRow({}), [PAYMENT])).toBe(
+      "Payment edited: $120.00 · ACH Payment · Aug 14, 2026",
+    );
+  });
+
+  it("names a deleted payment the same way", () => {
+    expect(
+      logTitle(paymentRow({ action_type: "payment_delete", next_value: null }), [PAYMENT]),
+    ).toBe("Payment deleted: $120.00 · ACH Payment · Aug 14, 2026");
+  });
+
+  it("falls back to a short id when the payment is not among the event's payments", () => {
+    expect(logTitle(paymentRow({}), [])).toBe("Payment edited: Payment 11111111");
+  });
+
+  it("falls back to plain Payment when the field name carries no id", () => {
+    expect(logTitle(paymentRow({ field_name: "payment" }), [PAYMENT])).toBe(
+      "Payment edited: Payment",
+    );
+  });
+
+  it("never prints the raw payment:<id> field name", () => {
+    expect(logTitle(paymentRow({}), [])).not.toContain("payment:");
+    expect(logTitle(paymentRow({}), [PAYMENT])).not.toContain(PAYMENT.id);
+  });
+
+  it("leaves every other row exactly as it was", () => {
+    expect(
+      logTitle({ ...paymentRow({}), action_type: "update", field_name: "event_name" }, []),
+    ).toBe("Updated: Event Name");
+    expect(logTitle({ ...paymentRow({}), action_type: "sign", field_name: "signature" }, [])).toBe(
+      "Contract Signed",
+    );
+  });
+});
+
+describe("payment rows — getDetail", () => {
+  it("shows an edit as the previous text and the next text", () => {
+    expect(logDetail(paymentRow({}), [PAYMENT])).toBe(
+      "Amount $100.00 · Method Check → Amount $120.00 · Method ACH Payment",
+    );
+  });
+
+  it("shows a deletion as the description of the payment, when the title does not already say it", () => {
+    const row = paymentRow({
+      action_type: "payment_delete",
+      prev_value: "$120.00 · ACH Payment · Aug 14, 2026",
+      next_value: null,
+    });
+    // Found among the payments: the title already carries the description, so nothing repeats it.
+    expect(logDetail(row, [PAYMENT])).toBeNull();
+    // Not found: the title is only a short id, and the row's own description is all there is.
+    expect(logDetail(row, [])).toBe("$120.00 · ACH Payment · Aug 14, 2026");
+  });
+
+  it("S4: a deletion row shows no reason — it never carries one", () => {
+    const row = paymentRow({
+      action_type: "payment_delete",
+      prev_value: "$120.00 · ACH Payment · Aug 14, 2026",
+      next_value: null,
+    });
+    expect(`${logTitle(row, [])} ${logDetail(row, [])}`).not.toMatch(/reason/i);
+  });
+
+  it("has nothing to add for the rows it does not draw itself", () => {
+    expect(logDetail({ ...paymentRow({}), action_type: "sign" }, [])).toBeNull();
   });
 });
