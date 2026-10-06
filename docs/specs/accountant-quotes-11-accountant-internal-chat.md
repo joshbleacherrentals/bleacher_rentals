@@ -1,7 +1,11 @@
 # Accountant — the internal chat
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1–D4 answered 2026-10-03; the behaviour of §0 comes from
-the request, with two readings to confirm, marked in §0).
+Status: **IMPLEMENTED 2026-10-06, awaiting review** — not checked by hand in a browser (Clerk sign-in is unavailable
+here); Playwright specs written, not run; the `br_powersync` sync-rules diff is uncommitted and not deployed. 0 open decisions (D1–D4 answered 2026-10-03; the behaviour
+of §0 comes from the request, with two readings to confirm, marked in §0). Approved 2026-10-06 with three answers:
+`canJoin` / `canLeave` are not returned by the hook (1 C, §4), the four places get the capabilities through a new hook
+`useInternalChatCapabilities` (2 B, §4 and §8), and the tests that pin the old behaviour are rewritten first and added
+to §8 (the tests were written before this approval, at the user's request).
 Original request: №8. Implementation order: **11 of 11**. Needs
 [03](accountant-quotes-03-capabilities.md) (the capability system) and
 [04](accountant-quotes-04-accountant-quote-access.md) (the accountant opens the card, so its Messages tab).
@@ -122,10 +126,15 @@ accountant `useInternalChat`, `joinChat`, `leaveChat` and `postInChat` (when sub
 
 ## 4. What changes in the app
 
-- The four places of §2 read the capabilities instead of flags: `Header.tsx` (the bell: `useInternalChat`),
-  `app/messages/internal/layout.tsx` (`useInternalChat`), `useEventChatMemberAccess.ts` (returns `canWrite =
-postInChat`, `canManageMembers = manageChatMembers`, and `canJoin`, `canLeave`), `InternalMessagesSidebar.tsx`
-  (`manageChatMembers`, `leaveChat`). No chat component reads `isAdmin`, `isAccountManager` or `roles` any more.
+- **The hook (2 B)** — `src/features/eventChat/hooks/useInternalChatCapabilities.ts`, new: the one place of the chat
+  that reads the store's `roles` and calls `getInternalChatCapabilities`; it takes `isSubscribed` (false by default).
+- The four places of §2 read the capabilities through it instead of flags: `Header.tsx` (the bell: `useInternalChat`),
+  `app/messages/internal/layout.tsx` (`useInternalChat`), `useEventChatMemberAccess.ts` (returns `isSubscribed`,
+  `canWrite = postInChat` and `canManageMembers = manageChatMembers` — **not** `canJoin` / `canLeave`, 1 C: the Join
+  button and the Leave item depend on being subscribed, not on the role, so nothing would read them),
+  `InternalMessagesSidebar.tsx` (`manageChatMembers`, for a conversation the user is subscribed to). `joinChat` and
+  `leaveChat` stay in the function of §3, which the tests pin. No chat component reads `isAdmin`, `isAccountManager`
+  or `roles` any more; only the hook reads `roles`.
 - The message shown to a role without the chat (the layout and `MessagesTab`) becomes "Internal chat is available
   to admins, account managers and accountants only."
 - `useChatEligibleUsers.ts`: an active user is eligible when they are an admin, an account manager **or an
@@ -185,7 +194,7 @@ must be restarted.** Deployment order: migration → sync rules and restart → 
 
 ## 8. Files
 
-**Counted — 12 files** (over the limit of 10; one logic is not split across specs):
+**Counted — 13 files** (over the limit of 10; one logic is not split across specs; the 13th is the hook of 2 B):
 
 1. `src/features/userAccess/logic/getInternalChatCapabilities.ts` — new
 2. `src/features/userAccess/logic/getQuotesBookingsCapabilities.ts` — changed: delegates `useInternalChat`
@@ -199,11 +208,18 @@ must be restarted.** Deployment order: migration → sync rules and restart → 
 10. `src/features/quotesAndBookings/components/quoteDetail/tabs/MessagesTab.tsx` — changed: the message text
 11. `supabase/migrations/20261004180000_accountant_internal_chat.sql` — new
 12. `package.json` — changed: `test:db:accountantchat`, added to `test:db:all`
+13. `src/features/eventChat/hooks/useInternalChatCapabilities.ts` — new (2 B)
 
 **Not counted:** `br_powersync/config/sync_rules.yaml`; `src/features/userAccess/permissionPageData.ts`; tests —
 `supabase/tests/accountant_internal_chat.test.sql` and `getInternalChatCapabilities.test.ts` (new);
 `getQuotesBookingsCapabilities.test.ts`, `accessConfig.test.ts`, `useSidebarItems.test.ts`,
 `permissionPageData.test.ts`, `roleAccess.accountant.spec.ts` (edited); the Playwright specs of §7.
+
+**Added 2026-10-06 (tests that pin the old behaviour, rewritten first):** `MessagesTab.test.tsx` (the message text);
+the e2e `accountantQuoteCard.accountant.spec.ts` (S4: the chat, not the text), `quoteCapabilities.viewer.spec.ts` (S5:
+the new text) and `quoteCapabilities.admin.spec.ts` (S1: the new text is absent); the new e2e
+`src/features/eventChat/e2e/accountantChat.accountant.spec.ts` (S1–S6) and `internalChat.am.spec.ts` (S7). In
+`permissionPageData.test.ts` the "hidden-from-you note" check takes _Companies & Contacts_ instead of _Event Chat_.
 
 ## 9. Tests and implementation sequence
 
@@ -264,3 +280,9 @@ locally, by instruction).
    show "available to admins and account managers only").
 3. **`event_messages_insert` and `event_subscriptions_insert` do not pin `user_uuid` to the caller** for admins and account
    managers: a message or a subscription can be written in someone else's name.
+4. **`EventMessageMentions` is in no sync stream of `br_powersync/config/sync_rules.yaml` except the accountant's one added
+   here** (found at implementation, 2026-10-06): the admin, account manager and viewer streams carry `EventMessages`,
+   `EventSubscriptions`, `EventMessageReadReceipts` and `EventTypingIndicators`, but not the mentions. §6 says "as for
+   account managers", which does not hold for this table in the repository's file. Until it is added for them (or the
+   deployed file differs from the repository's), a mention reaches the accountant's device but not an admin's or an
+   account manager's — so S3's "the admin gets the notification" would not happen. Not changed: out of scope.

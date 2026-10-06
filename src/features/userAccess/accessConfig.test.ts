@@ -59,15 +59,26 @@ describe("mergeRoleConfigs — the maintainer role", () => {
 });
 
 describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accountant page)", () => {
-  it("lets an accountant open the Accountant page, Quotes & Bookings, the Work Trackers pages and the two pages every role may read", () => {
+  it("lets an accountant open the Accountant page, Quotes & Bookings, the Work Trackers pages, the chat and the two pages every role may read", () => {
     const config = mergeRoleConfigs(["accountant"]);
+    // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: /messages comes after
+    // /work-trackers, and /accountant stays first so that it stays the landing page.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
       "/work-trackers",
+      "/messages",
       "/permissions",
       "/changelog",
     ]);
+  });
+
+  it("lets an accountant open the internal chat, and /external by the same prefix (D4: reachable, a placeholder)", () => {
+    expect(canAccessPath(["accountant"], "/messages/internal")).toBe(true);
+    expect(
+      canAccessPath(["accountant"], "/messages/internal/00000000-0000-0000-0000-000000000000"),
+    ).toBe(true);
+    expect(canAccessPath(["accountant"], "/messages/external")).toBe(true);
   });
 
   it("lands an accountant-only user on the Accountant page — there is no dashboard for them", () => {
@@ -87,11 +98,18 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/all-work-trackers",
       "/work-tracker-types",
       "/companies-contacts",
-      "/messages",
       "/quickbooks",
       "/stripe-connections",
     ]) {
       expect(allowedPaths).not.toContain(path);
+    }
+  });
+
+  it("leaves /messages to the roles that had it: an admin and an account manager keep it, a viewer, maintainer, developer and driver still do not have it", () => {
+    expect(mergeRoleConfigs(["admin"]).allowedPaths).toContain("/messages");
+    expect(mergeRoleConfigs(["account_manager"]).allowedPaths).toContain("/messages");
+    for (const role of ["viewer", "maintainer", "developer", "driver"] as const) {
+      expect(mergeRoleConfigs([role]).allowedPaths, role).not.toContain("/messages");
     }
   });
 

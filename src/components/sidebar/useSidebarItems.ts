@@ -170,7 +170,9 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     icon: MessageSquare,
     children: [
       { label: "Internal", href: "/messages/internal" },
-      { label: "External", href: "/messages/external" },
+      // The accountant uses the internal chat (docs/specs/accountant-quotes-11, D4) and is not
+      // offered External, a placeholder: the roles that had the Messages item before them keep it.
+      { label: "External", href: "/messages/external", roles: ["admin", "account_manager"] },
     ],
   },
   {
@@ -360,7 +362,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
   ],
   driver: [],
   maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
-  accountant: ["quotes-bookings", "accountant", "work-trackers", "documentation"],
+  accountant: ["quotes-bookings", "accountant", "work-trackers", "messages", "documentation"],
 };
 
 export function useSidebarItems(roles: WebRole[]): SidebarItemConfig[] {

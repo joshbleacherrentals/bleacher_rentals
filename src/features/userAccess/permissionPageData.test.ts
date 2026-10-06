@@ -27,7 +27,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, and payments", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, and the internal chat", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -35,6 +35,7 @@ describe("permission matrix", () => {
         "Accounts Receivable",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
+        "Event Chat",
         "Events",
         "Payment History",
         "QuickBooks Invoice Flag",
@@ -45,8 +46,8 @@ describe("permission matrix", () => {
     });
 
     // docs/specs/accountant-quotes-04-accountant-quote-access.md: the accountant opens the list and
-    // any quote, read-only, plus the Files tab. The QuickBooks flag (05) and the payments (10) came
-    // with later specs; the internal chat (11) will have to edit this test on purpose.
+    // any quote, read-only, plus the Files tab. The QuickBooks flag (05), the payments (10) and the
+    // internal chat (11) came with later specs, each of which edited this test on purpose.
     describe("Quotes & Bookings, read-only", () => {
       it("reads events and payments, and changes neither", () => {
         for (const label of ["Events", "Payment History"]) {
@@ -72,9 +73,9 @@ describe("permission matrix", () => {
         expect(ROLE_DESCRIPTIONS.accountant).toMatch(/QuickBooks Invoice Flag/);
       });
 
-      it("records payments (spec 10), but still cannot use the internal chat", () => {
+      it("records payments (spec 10) and uses the internal chat (spec 11)", () => {
         expect(accountant("Record a Payment")?.level).toBe("full");
-        expect(accountant("Event Chat")?.level).toBe("none");
+        expect(accountant("Event Chat")?.level).toBe("custom");
       });
 
       it("has a Quote Files row: full for an admin, an account manager and an accountant; custom for a viewer", () => {
@@ -162,9 +163,11 @@ describe("permission matrix", () => {
     it("names the Accountant page and Quotes & Bookings in the role description and in every hidden-from-you note", () => {
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Accountant page/);
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Quotes & Bookings/);
-      // Event Chat stays none until spec 11; Record a Payment is no longer a hidden-from-you note.
-      expect(accountant("Event Chat")?.note).toMatch(/Accountant page/);
-      expect(accountant("Event Chat")?.note).toMatch(/Quotes & Bookings, read-only/);
+      // Record a Payment (spec 10) and Event Chat (spec 11) are no longer hidden-from-you notes;
+      // Companies & Contacts still is.
+      expect(accountant("Companies & Contacts")?.level).toBe("none");
+      expect(accountant("Companies & Contacts")?.note).toMatch(/Accountant page/);
+      expect(accountant("Companies & Contacts")?.note).toMatch(/Quotes & Bookings, read-only/);
     });
 
     it("no longer describes itself as having no permissions", () => {
@@ -366,6 +369,52 @@ describe("permission matrix", () => {
       ] as const) {
         expect(recordRow?.roles[role].level, role).toBe("none");
       }
+    });
+  });
+
+  // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: an accountant uses the internal
+  // chat — joins, reads, posts where they joined, edits their own messages, mentions and is mentioned,
+  // leaves — and adds and removes no one. The matrix is where people read it.
+  describe("Event Chat (spec 11)", () => {
+    const row = PERMISSIONS.find((p) => p.label === "Event Chat");
+    const levels = Object.fromEntries(
+      Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+    );
+
+    it("is custom for an accountant, and leaves every other role's answer where it was", () => {
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "custom",
+        accountant: "custom",
+        viewer: "read",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("tells an accountant what they can do in a chat", () => {
+      const note = row?.roles.accountant.note ?? "";
+      expect(note).toMatch(/read every event chat/i);
+      expect(note).toMatch(/join any of them and leave/i);
+      expect(note).toMatch(/post in the ones they have joined/i);
+      expect(note).toMatch(/edit only their own messages/i);
+      expect(note).toMatch(/mention other members and be mentioned/i);
+    });
+
+    it("tells an accountant what they cannot: add anyone else to a chat or remove anyone from one (D1)", () => {
+      const note = row?.roles.accountant.note ?? "";
+      expect(note).toMatch(/cannot add anyone else to a chat or remove anyone from one/i);
+    });
+
+    it("is no longer the 'hidden from you' note", () => {
+      expect(row?.roles.accountant.note).not.toMatch(
+        /Everything else on the web dashboard is hidden/i,
+      );
+    });
+
+    it("names the internal chat in the accountant's role description", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).toMatch(/internal chat/i);
     });
   });
 

@@ -3,18 +3,13 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
-import {
-  displayName,
-  useRoadmapUsers,
-} from "@/app/roadmap/_lib/hooks/useRoadmapUsers";
+import { displayName, useRoadmapUsers } from "@/app/roadmap/_lib/hooks/useRoadmapUsers";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
-import {
-  leaveEventChat,
-  markEventConversationUnread,
-} from "../db/conversationActions";
+import { leaveEventChat, markEventConversationUnread } from "../db/conversationActions";
 import { useEventChatConversations } from "../hooks/useEventChatConversations";
+import { useInternalChatCapabilities } from "../hooks/useInternalChatCapabilities";
 import { EventChatConversationListItem } from "./EventChatConversationListItem";
 import { EventChatMembersModal } from "./EventChatMembersModal";
 
@@ -26,8 +21,10 @@ export function InternalMessagesSidebar({ selectedEventUuid }: Props) {
   const router = useRouter();
   const { conversations } = useEventChatConversations();
   const { userMap } = useRoadmapUsers();
-  const { isAdmin, isAccountManager, userId } = usePermissionsStore();
-  const canManageMembers = isAdmin || isAccountManager;
+  const userId = usePermissionsStore((s) => s.userId);
+  // The list holds only the conversations the user is subscribed to, so every row is "a chat the
+  // user is in" — the same answer useEventChatMemberAccess gives inside one.
+  const { manageChatMembers: canManageMembers } = useInternalChatCapabilities(true);
 
   const [membersEventUuid, setMembersEventUuid] = useState<string | null>(null);
   const [busyEventUuid, setBusyEventUuid] = useState<string | null>(null);

@@ -1,6 +1,7 @@
 import { canAccessPath } from "../accessConfig";
 import { canEditOwnedEntity } from "./canEditOwnedEntity";
 import type { WebRole } from "./determineAccess";
+import { getInternalChatCapabilities } from "./getInternalChatCapabilities";
 
 /** Every role the app knows. `satisfies` makes a new WebRole fail to compile until it is listed. */
 const KNOWN_ROLES = {
@@ -46,7 +47,11 @@ export type QuotesBookingsCapabilities = {
    * account manager or an accountant, on any quote.
    */
   setQuickBooksFlag: boolean;
-  /** The Messages tab's internal chat. */
+  /**
+   * The Messages tab's internal chat. Delegates to getInternalChatCapabilities, so the rule — an
+   * admin, an account manager or an accountant — lives in one place
+   * (docs/specs/accountant-quotes-11-accountant-internal-chat.md).
+   */
   useInternalChat: boolean;
   /** Open in Dashboard. */
   openInDashboard: boolean;
@@ -98,7 +103,7 @@ export function getQuotesBookingsCapabilities(input: {
     // The one cell the accountant has: the database lets them change Events.is_qbo and no other
     // column (docs/specs/accountant-quotes-05-is-qbo-column.md).
     setQuickBooksFlag: isStaff || isAccountant,
-    useInternalChat: isStaff,
+    useInternalChat: getInternalChatCapabilities({ roles, isSubscribed: false }).useInternalChat,
     openInDashboard: canAccessPath(roles, "/dashboard"),
   };
 }

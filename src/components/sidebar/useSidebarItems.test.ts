@@ -148,12 +148,13 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Accountant, Work Trackers and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Accountant, Work Trackers, Messages and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
       "accountant",
       "work-trackers",
+      "messages",
       "documentation",
     ]);
 
@@ -171,12 +172,45 @@ describe("useSidebarItems", () => {
     expect(workTrackers.type).toBe("button");
     expect("href" in workTrackers && workTrackers.href).toBe("/work-trackers");
 
-    const docs = items[3];
+    // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: Messages, with Internal only.
+    const messages = items[3];
+    expect(messages.type).toBe("dropdown");
+    expect("label" in messages && messages.label).toBe("Messages");
+
+    const docs = items[4];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",
     );
     expect(hrefs).toEqual(["/permissions", "/changelog"]);
+  });
+
+  // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4 and D4: the accountant gets the
+  // Internal conversations only; /messages/external stays reachable by URL (a placeholder) but the
+  // sidebar does not offer it to them.
+  const messagesChildren = (roles: Parameters<typeof useSidebarItems>[0]) => {
+    const item = useSidebarItems(roles).find((i) => i.key === "messages");
+    if (!item || item.type !== "dropdown") return undefined;
+    return item.children.map((c) => c.label);
+  };
+
+  it("accountant's Messages offers Internal and not External", () => {
+    expect(messagesChildren(["accountant"])).toEqual(["Internal"]);
+  });
+
+  it("admin and account manager still see both Internal and External", () => {
+    expect(messagesChildren(["admin"])).toEqual(["Internal", "External"]);
+    expect(messagesChildren(["account_manager"])).toEqual(["Internal", "External"]);
+  });
+
+  it("an account manager who is also an accountant still sees both", () => {
+    expect(messagesChildren(["account_manager", "accountant"])).toEqual(["Internal", "External"]);
+  });
+
+  it("viewer, maintainer, developer and driver have no Messages", () => {
+    for (const role of ["viewer", "maintainer", "developer", "driver"] as const) {
+      expect(messagesChildren([role]), role).toBeUndefined();
+    }
   });
 
   it("accountant sees no Quality Assurance dropdown — it would open onto nothing", () => {

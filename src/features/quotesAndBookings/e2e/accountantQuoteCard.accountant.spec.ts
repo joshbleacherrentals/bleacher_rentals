@@ -92,11 +92,17 @@ test.describe("Quotes & Bookings (accountant)", () => {
     await expect(page.getByText("accountant-probe.txt")).toHaveCount(0);
   });
 
-  test("S4: Messages — the text for roles without the chat", async ({ page }) => {
+  // This used to assert the text for roles without the chat (docs/specs/accountant-quotes-04, D6). Since
+  // docs/specs/accountant-quotes-11 the accountant uses the chat: the Join button, or the menu once joined.
+  // What they can do in it is in src/features/eventChat/e2e/accountantChat.accountant.spec.ts.
+  test("S4: Messages — the chat, not the text for roles without it", async ({ page }) => {
     await page.goto(`${CARD}?tab=messages`);
     await expect(
-      page.getByText("Internal chat is available to admins and account managers only."),
+      page
+        .getByRole("button", { name: "Join chat" })
+        .or(page.getByRole("button", { name: "Chat menu" })),
     ).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Internal chat is available to admins")).toHaveCount(0);
   });
 
   test("S5: /quotes-bookings/new sends the accountant back to the list", async ({ page }) => {

@@ -11,7 +11,10 @@ vi.mock("@/features/eventChat/components/EventInternalChat", () => ({
 
 import { MessagesTab } from "./MessagesTab";
 
-const MESSAGE = "Internal chat is available to admins and account managers only.";
+// docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: the accountant uses the chat now, so
+// the text that stands in for it names three roles.
+const MESSAGE = "Internal chat is available to admins, account managers and accountants only.";
+const OLD_MESSAGE = "Internal chat is available to admins and account managers only.";
 
 const render = (useInternalChat: boolean) =>
   renderToStaticMarkup(<MessagesTab quoteId="evt-1" can={{ useInternalChat }} />);
@@ -28,6 +31,10 @@ describe("MessagesTab", () => {
     const html = render(false);
     expect(html).toContain(MESSAGE);
     expect(html).not.toContain('data-testid="internal-chat"');
+  });
+
+  it("no longer tells a role without the chat that it is for admins and account managers only", () => {
+    expect(render(false)).not.toContain(OLD_MESSAGE);
   });
 
   it("keeps the Internal and External tabs either way", () => {

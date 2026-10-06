@@ -32,13 +32,13 @@ export function MessagesTab({
         </TabsTrigger>
       </TabsList>
 
-      {/* Internal: admin/AM team chat — not visible on public quote page */}
+      {/* Internal: admin/AM/accountant team chat — not visible on public quote page */}
       <TabsContent value="internal">
         {can.useInternalChat ? (
           <EventInternalChat eventUuid={quoteId} />
         ) : (
           <p className="text-sm text-gray-500 py-8 text-center">
-            Internal chat is available to admins and account managers only.
+            Internal chat is available to admins, account managers and accountants only.
           </p>
         )}
       </TabsContent>

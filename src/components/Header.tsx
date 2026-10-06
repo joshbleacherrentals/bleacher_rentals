@@ -5,12 +5,11 @@ import { AlertsDropDown } from "@/features/alerts/components/AlertsDropDown";
 import { CurrentSprintHeaderLink } from "@/app/roadmap/_lib/components/CurrentSprintHeaderLink";
 import { ProductDropDown } from "@/features/changelog/components/ProductDropDown";
 import { EventChatNotificationsDropDown } from "@/features/eventChat/components/EventChatNotificationsDropDown";
-import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import { useInternalChatCapabilities } from "@/features/eventChat/hooks/useInternalChatCapabilities";
 
 const Header = () => {
   const environment = process.env.NEXT_PUBLIC_ENVIRONMENT;
-  const { isAdmin, isAccountManager } = usePermissionsStore();
-  const showChatNotifications = isAdmin || isAccountManager;
+  const { useInternalChat: showChatNotifications } = useInternalChatCapabilities();
 
   const getEnvironmentConfig = () => {
     if (environment === "development") {

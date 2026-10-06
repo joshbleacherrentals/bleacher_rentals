@@ -42,7 +42,9 @@ test.describe("Quote capabilities (admin)", () => {
 
     await expect(page.getByRole("tab", { name: "Internal" })).toBeVisible();
     await expect(
-      page.getByText("Internal chat is available to admins and account managers only."),
+      page.getByText(
+        "Internal chat is available to admins, account managers and accountants only.",
+      ),
     ).toHaveCount(0);
   });
 

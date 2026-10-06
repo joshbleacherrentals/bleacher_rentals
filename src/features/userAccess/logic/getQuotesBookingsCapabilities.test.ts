@@ -188,7 +188,8 @@ describe("the other roles", () => {
 
 // docs/specs/accountant-quotes-05-is-qbo-column.md: the accountant changes the QuickBooks Invoice
 // flag. docs/specs/accountant-quotes-10-accountant-writes-payments.md adds the payments: they record,
-// edit and delete them. Spec 11 (chat) will add a cell; it has to edit this block on purpose.
+// edit and delete them. docs/specs/accountant-quotes-11-accountant-internal-chat.md adds the internal
+// chat, the last cell: the accountant's column is the flag, the payments and the chat.
 describe("accountant", () => {
   it("can set the QuickBooks flag, on a quote they did not create", () => {
     expect(capsFor(["accountant"]).setQuickBooksFlag).toBe(true);
@@ -205,22 +206,27 @@ describe("accountant", () => {
     expect(capsFor(["accountant"]).recordPayment).toBe(true);
   });
 
-  it("can do nothing else: the flag and the payments are the only 'yes' in their column", () => {
+  it("uses the internal chat on the Messages tab (spec 11)", () => {
+    expect(capsFor(["accountant"]).useInternalChat).toBe(true);
+  });
+
+  it("can do nothing else: the flag, the payments and the chat are the only 'yes' in their column", () => {
     expect(capsFor(["accountant"])).toEqual({
       ...NOTHING,
       setQuickBooksFlag: true,
       recordPayment: true,
+      useInternalChat: true,
     });
   });
 
-  it("stays at the flag and the payments even with the zones and the ownership that would help a manager", () => {
+  it("stays at the flag, the payments and the chat even with the zones and the ownership that would help a manager", () => {
     expect(
       capsFor(["accountant"], {
         leadZoneIds: ["zone-a"],
         accountManagerZoneIds: ["zone-a"],
         quote: { createdByUserId: ME },
       }),
-    ).toEqual({ ...NOTHING, setQuickBooksFlag: true, recordPayment: true });
+    ).toEqual({ ...NOTHING, setQuickBooksFlag: true, recordPayment: true, useInternalChat: true });
   });
 
   it("cannot edit, delete or send a quote — the database refuses any other column too", () => {
@@ -228,7 +234,6 @@ describe("accountant", () => {
     expect(caps.manageQuote).toBe(false);
     expect(caps.sendToClient).toBe(false);
     expect(caps.createQuote).toBe(false);
-    expect(caps.useInternalChat).toBe(false);
     expect(caps.openInDashboard).toBe(false);
   });
 
@@ -313,6 +318,31 @@ describe("recordPayment: admin and accountant only", () => {
   });
 });
 
+// docs/specs/accountant-quotes-11-accountant-internal-chat.md §3: the Messages tab shows the chat to
+// the roles that may use it, and the message that stands in for it to everyone else. The rule lives in
+// getInternalChatCapabilities (its own test holds the whole table); this is the cell as the card sees it.
+describe("useInternalChat: admin, account manager and accountant", () => {
+  it.each(["admin", "account_manager", "accountant"] as const)(
+    "is true for the %s role",
+    (role) => {
+      expect(capsFor([role]).useInternalChat).toBe(true);
+      expect(capsFor([role], { quote: undefined }).useInternalChat).toBe(true);
+    },
+  );
+
+  it.each(["viewer", "maintainer", "developer", "driver"] as const)(
+    "is false for the %s role",
+    (role) => {
+      expect(capsFor([role]).useInternalChat).toBe(false);
+    },
+  );
+
+  it("is false with no roles, and for a role the function does not know", () => {
+    expect(capsFor([]).useInternalChat).toBe(false);
+    expect(capsFor(["superuser" as WebRole]).useInternalChat).toBe(false);
+  });
+});
+
 describe("roles are additive", () => {
   it("admin + viewer: admin's rights", () => {
     expect(capsFor(["admin", "viewer"])).toEqual(capsFor(["admin"]));
@@ -333,12 +363,13 @@ describe("roles are additive", () => {
     });
   });
 
-  it("viewer + accountant: the flag, the payments and the dashboard, still no create, manage or send", () => {
+  it("viewer + accountant: the flag, the payments, the chat and the dashboard, still no create, manage or send", () => {
     expect(capsFor(["viewer", "accountant"])).toEqual({
       ...NOTHING,
       openInDashboard: true,
       setQuickBooksFlag: true,
       recordPayment: true,
+      useInternalChat: true,
     });
   });
 });

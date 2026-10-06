@@ -42,8 +42,11 @@ test.describe("Quote capabilities (viewer)", () => {
 
   test("S5: the chat message stands in for the internal chat", async ({ page }) => {
     await page.goto(`${CARD}?tab=messages`);
+    // The text names three roles since docs/specs/accountant-quotes-11: the accountant uses the chat.
     await expect(
-      page.getByText("Internal chat is available to admins and account managers only."),
+      page.getByText(
+        "Internal chat is available to admins, account managers and accountants only.",
+      ),
     ).toBeVisible();
   });
 
