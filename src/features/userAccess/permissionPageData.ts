@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking the one thing they can change is the QuickBooks Invoice Flag. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -96,7 +96,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
       accountant: read(
-        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs. Cannot create, edit, delete or send one. The one thing they can change is the QuickBooks Invoice Flag.",
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments (see those rows).",
       ),
     },
   },
@@ -117,7 +117,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
-        "Can tick or untick the flag on any quote or booking, deleted ones included. It is the only thing an accountant can change on a quote or booking — the database refuses every other change.",
+        "Can tick or untick the flag on any quote or booking, deleted ones included. Apart from payments (see Record a Payment), it is the only thing an accountant can change on a quote or booking — the database refuses every other change.",
       ),
     },
   },
@@ -142,7 +142,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: read(
-        "Can see payments and balances, and open any payment to read it in full, but cannot change anything.",
+        "Can see every payment and open it to read in full, deleted payments and the reason they were deleted included. Changing payments is a separate thing — see Record a Payment.",
       ),
     },
   },
@@ -170,7 +170,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Record a Payment",
     description:
-      "Entering a payment that did not come through Stripe — a check, an ACH transfer, or a card run by hand on a terminal — and correcting it afterwards. A manual payment can be edited (amount, date, method, payer, reference, notes, installment) or deleted with a reason; a deleted payment stays on the record, no longer counts, and cannot be restored. Stripe payments cannot be edited or deleted. A negative amount is still how a refund or a bounced check is recorded.",
+      "Entering a payment that did not come through Stripe — a check, an ACH transfer, or a card run by hand on a terminal — and correcting it afterwards. A manual payment can be edited (amount, date, method, payer, reference, notes, installment) or deleted with a reason; a deleted payment stays on the record, no longer counts, and cannot be restored. Stripe payments cannot be edited or deleted. A negative amount is still how a refund or a bounced check is recorded. Only an administrator or an accountant can do this.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
@@ -187,7 +187,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can record, edit and delete any manual payment on any quote or booking — the same as an administrator.",
+      ),
     },
   },
   {

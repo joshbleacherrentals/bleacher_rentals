@@ -12,7 +12,8 @@
 --   * the accountant READS each table the AR tabs are built from — one named assertion per
 --     table, because a refused read is an empty result, not an error (a missing Contacts grant
 --     silently becomes empty contact columns, a missing SalesOffices grant a wrong currency);
---   * the accountant WRITES none of them (Events.is_qbo excepted since spec 05). An INSERT that RLS
+--   * the accountant WRITES none of them (Events.is_qbo excepted since spec 05, manual payments since
+--     accountant-quotes-10: accountant_writes_payments.test.sql asserts that side). An INSERT that RLS
 --     refuses raises 42501; an UPDATE or
 --     DELETE that RLS filters out does not raise, so every refusal is also checked by looking
 --     at the row afterwards;
@@ -174,13 +175,17 @@ SELECT is(
 SELECT is((SELECT event_name FROM public."Events" WHERE id = :'event'), 'AR probe event',
   '...and the Event is unchanged');
 
--- PaymentHistory (no UPDATE or DELETE policy exists for anyone)
+-- PaymentHistory. Since docs/specs/accountant-quotes-10 an accountant records, edits and soft-deletes
+-- MANUAL payments (accountant_writes_payments.test.sql asserts that). What is still refused, and
+-- what this fixture shows, is a row that is not manual: the fixture payment and the INSERT below
+-- both carry the table's default entry_source, 'stripe', which only the webhook (service role)
+-- writes. There is no DELETE policy for anyone.
 SELECT throws_ok(
   format('INSERT INTO public."PaymentHistory" (event_uuid, amount_cents, payer_name) VALUES (%L, 1, ''AR intruder'')', :'event'),
-  '42501', NULL, 'an accountant cannot record a payment');
+  '42501', NULL, 'an accountant cannot write a row that claims to be a Stripe payment');
 SELECT is(
   public.test_rows_affected(format('UPDATE public."PaymentHistory" SET amount_cents = 1 WHERE id = %L', :'payment')),
-  0, 'an accountant cannot update a payment');
+  0, 'an accountant cannot update a Stripe payment');
 SELECT is(
   public.test_rows_affected(format('DELETE FROM public."PaymentHistory" WHERE id = %L', :'payment')),
   0, 'an accountant cannot delete a payment');

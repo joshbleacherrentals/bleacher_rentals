@@ -17,9 +17,12 @@
 --   T7 — nobody may DELETE a payment row, ever (a mistake is a soft delete since
 --        accountant-quotes-07; UPDATE is fenced in payment_history_edit_soft_delete.test.sql)
 --   T8 — an account manager still READS the payment rows
+--   T9 — an accountant may insert a manual row, but still not one claiming to be Stripe
+--        (accountant-quotes-10; its edit and delete side is in accountant_writes_payments.test.sql)
 --
 -- See docs/specs/manual-payment-entry.md §4.2, §4.4, T3 and
--- docs/specs/accountant-quotes-06-am-read-only-payments.md §3, §7.1.
+-- docs/specs/accountant-quotes-06-am-read-only-payments.md §3, §7.1 and
+-- docs/specs/accountant-quotes-10-accountant-writes-payments.md §3, §7.1.
 -- ============================================================================
 
 \set ON_ERROR_STOP on
@@ -35,6 +38,7 @@ DECLARE
   v_am_id       UUID;
   v_lead_id     UUID;
   v_viewer_id   UUID;
+  v_acct_id     UUID;
   v_lead_row    UUID;
   v_zone        UUID;
   v_event       UUID;
@@ -54,6 +58,12 @@ BEGIN
     RETURNING id INTO v_viewer_id;
 
   INSERT INTO public."AccountManagers" (user_uuid, is_active) VALUES (v_am_id, true);
+
+  INSERT INTO public."Users" (email, clerk_user_id)
+    VALUES ('t-acct@example.test', 'clerk_t_acct')
+    RETURNING id INTO v_acct_id;
+
+  INSERT INTO public."Accountants" (user_uuid, is_active) VALUES (v_acct_id, true);
 
   -- A lead account manager: AccountManagerZones.is_lead. The policy never looks at it; the
   -- fixture exists so that the test can say "lead or not" and mean it.
@@ -183,6 +193,12 @@ BEGIN
   v_result := pg_temp.insert_as('clerk_t_admin', 'stripe');
   IF v_result <> 'denied' THEN RAISE EXCEPTION 'T4 FAILED: a client wrote a row claiming to be Stripe'; END IF;
 
+  v_result := pg_temp.insert_as('clerk_t_acct', 'manual');
+  IF v_result <> 'allowed' THEN RAISE EXCEPTION 'T9 FAILED: an accountant was denied (%)', v_result; END IF;
+
+  v_result := pg_temp.insert_as('clerk_t_acct', 'stripe');
+  IF v_result <> 'denied' THEN RAISE EXCEPTION 'T9 FAILED: an accountant wrote a row claiming to be Stripe'; END IF;
+
   RAISE NOTICE 'rls insert: OK';
 END $$;
 
@@ -200,7 +216,7 @@ DECLARE
   v_sub     TEXT;
   v_deleted INT;
 BEGIN
-  FOREACH v_sub IN ARRAY ARRAY['clerk_t_admin', 'clerk_t_am', 'clerk_t_lead', 'clerk_t_viewer'] LOOP
+  FOREACH v_sub IN ARRAY ARRAY['clerk_t_admin', 'clerk_t_am', 'clerk_t_lead', 'clerk_t_viewer', 'clerk_t_acct'] LOOP
     SET LOCAL ROLE authenticated;
     PERFORM set_config('request.jwt.claims', json_build_object('sub', v_sub)::text, true);
 

@@ -34,9 +34,11 @@ export type QuotesBookingsCapabilities = {
    */
   sendToClient: boolean;
   /**
-   * "+ Record Payment": drawn when true, not drawn when false — there is no disabled state. An
-   * admin only, on any quote: the database refuses every other role, so none is shown the button
-   * (docs/specs/accountant-quotes-06-am-read-only-payments.md; spec 10 adds the accountant).
+   * "+ Record Payment", and with it Edit and Delete on a manual payment: drawn when true, not drawn
+   * when false — there is no disabled state. An admin or an accountant, on any quote: the database
+   * refuses every other role, so none is shown the button
+   * (docs/specs/accountant-quotes-06-am-read-only-payments.md,
+   * docs/specs/accountant-quotes-10-accountant-writes-payments.md).
    */
   recordPayment: boolean;
   /**
@@ -90,7 +92,9 @@ export function getQuotesBookingsCapabilities(input: {
     createQuote: isStaff,
     manageQuote,
     sendToClient: isStaff,
-    recordPayment: isAdmin,
+    // Who the database lets write PaymentHistory (payment_history_insert and _update): an admin or
+    // an accountant, not tied to the quote's owner and not to manageQuote.
+    recordPayment: isAdmin || isAccountant,
     // The one cell the accountant has: the database lets them change Events.is_qbo and no other
     // column (docs/specs/accountant-quotes-05-is-qbo-column.md).
     setQuickBooksFlag: isStaff || isAccountant,

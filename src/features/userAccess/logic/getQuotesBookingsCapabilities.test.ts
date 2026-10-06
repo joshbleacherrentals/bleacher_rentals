@@ -186,9 +186,9 @@ describe("the other roles", () => {
   });
 });
 
-// docs/specs/accountant-quotes-05-is-qbo-column.md: the accountant changes exactly one thing on a
-// quote, the QuickBooks Invoice flag. Spec 10 (payments) and spec 11 (chat) will each add a cell;
-// they have to edit this block on purpose.
+// docs/specs/accountant-quotes-05-is-qbo-column.md: the accountant changes the QuickBooks Invoice
+// flag. docs/specs/accountant-quotes-10-accountant-writes-payments.md adds the payments: they record,
+// edit and delete them. Spec 11 (chat) will add a cell; it has to edit this block on purpose.
 describe("accountant", () => {
   it("can set the QuickBooks flag, on a quote they did not create", () => {
     expect(capsFor(["accountant"]).setQuickBooksFlag).toBe(true);
@@ -201,25 +201,32 @@ describe("accountant", () => {
     expect(capsFor(["accountant"], { quote: undefined }).setQuickBooksFlag).toBe(true);
   });
 
-  it("can do nothing else: the flag is the only 'yes' in their column", () => {
-    expect(capsFor(["accountant"])).toEqual({ ...NOTHING, setQuickBooksFlag: true });
+  it("can record, edit and delete payments, on a quote they did not create", () => {
+    expect(capsFor(["accountant"]).recordPayment).toBe(true);
   });
 
-  it("stays at the flag even with the zones and the ownership that would help a manager", () => {
+  it("can do nothing else: the flag and the payments are the only 'yes' in their column", () => {
+    expect(capsFor(["accountant"])).toEqual({
+      ...NOTHING,
+      setQuickBooksFlag: true,
+      recordPayment: true,
+    });
+  });
+
+  it("stays at the flag and the payments even with the zones and the ownership that would help a manager", () => {
     expect(
       capsFor(["accountant"], {
         leadZoneIds: ["zone-a"],
         accountManagerZoneIds: ["zone-a"],
         quote: { createdByUserId: ME },
       }),
-    ).toEqual({ ...NOTHING, setQuickBooksFlag: true });
+    ).toEqual({ ...NOTHING, setQuickBooksFlag: true, recordPayment: true });
   });
 
-  it("cannot edit, delete, send, or record a payment — the database refuses any other column too", () => {
+  it("cannot edit, delete or send a quote — the database refuses any other column too", () => {
     const caps = capsFor(["accountant"]);
     expect(caps.manageQuote).toBe(false);
     expect(caps.sendToClient).toBe(false);
-    expect(caps.recordPayment).toBe(false);
     expect(caps.createQuote).toBe(false);
     expect(caps.useInternalChat).toBe(false);
     expect(caps.openInDashboard).toBe(false);
@@ -232,10 +239,11 @@ describe("accountant", () => {
   });
 });
 
-// docs/specs/accountant-quotes-06-am-read-only-payments.md: until spec 10, only an admin records a
-// payment — the database refuses everyone else, so no other role is shown the button. There is one
-// answer (no "drawn but disabled" state any more), and it does not depend on the quote.
-describe("recordPayment: admin only", () => {
+// docs/specs/accountant-quotes-06-am-read-only-payments.md: only the roles the database lets write
+// payments are shown the button — no other role is. Spec 06 left an admin; after
+// docs/specs/accountant-quotes-10-accountant-writes-payments.md an accountant joins, on any quote
+// (D1). There is one answer (no "drawn but disabled" state), and it does not depend on the quote.
+describe("recordPayment: admin and accountant only", () => {
   const lead = { leadZoneIds: ["zone-a"], accountManagerZoneIds: ["zone-a"] };
   const junior = { leadZoneIds: [], accountManagerZoneIds: ["zone-b"] };
   const own = { quote: { createdByUserId: ME } };
@@ -244,6 +252,12 @@ describe("recordPayment: admin only", () => {
   it("is true for an admin, on any quote", () => {
     expect(capsFor(["admin"], own).recordPayment).toBe(true);
     expect(capsFor(["admin"], others).recordPayment).toBe(true);
+  });
+
+  it("is true for an accountant, on any quote: their own, someone else's, and none at all (D1)", () => {
+    expect(capsFor(["accountant"], own).recordPayment).toBe(true);
+    expect(capsFor(["accountant"], others).recordPayment).toBe(true);
+    expect(capsFor(["accountant"], { quote: undefined }).recordPayment).toBe(true);
   });
 
   it("is false for a lead account manager, on their own quote and on someone else's", () => {
@@ -261,7 +275,7 @@ describe("recordPayment: admin only", () => {
     expect(capsFor(["account_manager"], { quote: undefined }).recordPayment).toBe(false);
   });
 
-  it.each(["viewer", "maintainer", "developer", "driver", "accountant"] as const)(
+  it.each(["viewer", "maintainer", "developer", "driver"] as const)(
     "is false for a %s, even on a quote they created",
     (role) => {
       expect(capsFor([role], own).recordPayment).toBe(false);
@@ -273,13 +287,25 @@ describe("recordPayment: admin only", () => {
     expect(capsFor(["admin", "account_manager"], others).recordPayment).toBe(true);
     expect(capsFor(["admin", "viewer"], others).recordPayment).toBe(true);
     expect(capsFor(["account_manager", "viewer"], own).recordPayment).toBe(false);
-    expect(capsFor(["account_manager", "accountant"], own).recordPayment).toBe(false);
+  });
+
+  it("follows the accountant right when a user holds several roles", () => {
+    expect(capsFor(["account_manager", "accountant"], own).recordPayment).toBe(true);
+    expect(capsFor(["account_manager", "accountant"], others).recordPayment).toBe(true);
+    expect(capsFor(["viewer", "accountant"], others).recordPayment).toBe(true);
+    expect(capsFor(["admin", "accountant"], others).recordPayment).toBe(true);
   });
 
   it("is not tied to manageQuote: an account manager manages their own quote and still cannot record", () => {
     const caps = capsFor(["account_manager"], { ...junior, ...own });
     expect(caps.manageQuote).toBe(true);
     expect(caps.recordPayment).toBe(false);
+  });
+
+  it("is not tied to manageQuote the other way either: an accountant records and cannot manage the quote", () => {
+    const caps = capsFor(["accountant"], others);
+    expect(caps.manageQuote).toBe(false);
+    expect(caps.recordPayment).toBe(true);
   });
 
   it("is gone as a separate 'drawn' answer: showRecordPayment no longer exists", () => {
@@ -300,15 +326,19 @@ describe("roles are additive", () => {
     ).toBe(true);
   });
 
-  it("account manager + accountant: what the account manager has, and the dashboard", () => {
-    expect(capsFor(["account_manager", "accountant"])).toEqual(capsFor(["account_manager"]));
+  it("account manager + accountant: what the account manager has, and the payments", () => {
+    expect(capsFor(["account_manager", "accountant"])).toEqual({
+      ...capsFor(["account_manager"]),
+      recordPayment: true,
+    });
   });
 
-  it("viewer + accountant: the flag and the dashboard, still no create, manage, send or payment", () => {
+  it("viewer + accountant: the flag, the payments and the dashboard, still no create, manage or send", () => {
     expect(capsFor(["viewer", "accountant"])).toEqual({
       ...NOTHING,
       openInDashboard: true,
       setQuickBooksFlag: true,
+      recordPayment: true,
     });
   });
 });

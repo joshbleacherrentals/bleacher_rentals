@@ -27,8 +27,9 @@ async function tickAndRestore(page: Page) {
 }
 
 /**
- * The accountant changes exactly one thing on a quote, the QuickBooks Invoice flag
- * (docs/specs/accountant-quotes-05-is-qbo-column.md, S1, S2 and S5).
+ * The accountant changes the QuickBooks Invoice flag on a quote
+ * (docs/specs/accountant-quotes-05-is-qbo-column.md, S1, S2 and S5) — and, since
+ * docs/specs/accountant-quotes-10-accountant-writes-payments.md, the payments (recordPayment.accountant.spec.ts).
  *
  * Written, not run locally. This project only exists once E2E_ACCOUNTANT_EMAIL is configured (see
  * playwright.config.ts). The refusals — any other column, insert, delete — are asserted at the
@@ -57,7 +58,7 @@ test.describe("QuickBooks Invoice flag (accountant)", () => {
   // the seed has neither. The rule (any event, D3) is asserted in the SQL test.
   test.fixme("S2: the checkbox is enabled and works on a deleted quote and on a plain quote", async () => {});
 
-  test("S5: still nothing else — no Edit, Delete, Send To Client or Record Payment", async ({
+  test("S5: still nothing else on the quote — no Edit, Delete or Send To Client", async ({
     page,
   }) => {
     await page.goto(BILLING);
@@ -68,6 +69,5 @@ test.describe("QuickBooks Invoice flag (accountant)", () => {
     await expect(edit(page)).toHaveCount(0);
     await expect(remove(page)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send To Client" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "+ Record Payment" })).toHaveCount(0);
   });
 });

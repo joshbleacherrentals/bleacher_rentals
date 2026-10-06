@@ -23,7 +23,9 @@
 --     installment_id and leaves intended_installment_id; an installment only a deleted payment
 --     pointed at can then be removed; the malformed deletions are refused;
 --   * a deleted payment is frozen: no column changes and it cannot be restored;
---   * no DELETE removes a row for any role; no other role edits or deletes;
+--   * no DELETE removes a row for any role; no other role than an admin or an accountant edits or
+--     deletes (the accountant since accountant-quotes-10; accountant_writes_payments.test.sql
+--     asserts its side in full);
 --   * a row cannot be inserted already deleted; the ordinary manual insert still works;
 --   * the service role and the table owner are not blocked by the guard;
 --   * edits and soft deletes leave the quote hashes of the event as they were;
@@ -35,7 +37,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(117);
+SELECT plan(119);
 
 -- Rows affected by a statement, run as the current (RLS-bound) role.
 CREATE FUNCTION public.test_rows_affected(q text) RETURNS int
@@ -114,7 +116,9 @@ FROM (VALUES
   ('Refuse Me',  6000, 'ach'),
   ('Refuse Too', 6500, 'check'),
   ('Other Role', 2000, 'check'),
-  ('Service',    1500, 'check')
+  ('Service',    1500, 'check'),
+  ('Acct Edit',  1300, 'check'),
+  ('Acct Delete', 1400, 'check')
 ) AS v(payer, amount, method);
 SELECT id AS p_edit  FROM public."PaymentHistory" WHERE payer_name = 'Edit Me' \gset
 SELECT id AS p_imm   FROM public."PaymentHistory" WHERE payer_name = 'Immutable' \gset
@@ -122,6 +126,8 @@ SELECT id AS p_ref   FROM public."PaymentHistory" WHERE payer_name = 'Refuse Me'
 SELECT id AS p_ref2  FROM public."PaymentHistory" WHERE payer_name = 'Refuse Too' \gset
 SELECT id AS p_other FROM public."PaymentHistory" WHERE payer_name = 'Other Role' \gset
 SELECT id AS p_svc   FROM public."PaymentHistory" WHERE payer_name = 'Service' \gset
+SELECT id AS p_aedit FROM public."PaymentHistory" WHERE payer_name = 'Acct Edit' \gset
+SELECT id AS p_adel  FROM public."PaymentHistory" WHERE payer_name = 'Acct Delete' \gset
 
 INSERT INTO public."PaymentHistory"
   (event_uuid, installment_id, intended_installment_id, amount_cents, currency, status, payer_name,
@@ -508,7 +514,7 @@ RESET ROLE;
 SELECT is((SELECT count(*)::int FROM public."PaymentHistory"), :n_rows::int,
   '...and the table has as many rows as before (no hard delete, deleted rows included)');
 
--- ═══ OTHER ROLES: cannot edit or delete (the accountant until spec 10) ═══════
+-- ═══ OTHER ROLES: cannot edit or delete (the accountant can since spec 10) ═══
 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_pe_lead')::text, true);
@@ -541,13 +547,20 @@ SELECT is(public.test_rows_affected(format('UPDATE public."PaymentHistory" SET a
 SELECT is(public.test_rows_affected(format('UPDATE public."PaymentHistory" SET deleted_at = now(), deleted_by_user_uuid = %L, delete_reason = ''x'', installment_id = NULL WHERE id = %L', :'user_maint', :'p_other')), 0,
   'a maintainer deletes no payment');
 
+-- The accountant is not among the roles that cannot: since accountant-quotes-10 it edits and
+-- soft-deletes like an admin (accountant_writes_payments.test.sql asserts the whole of it). It is
+-- shown here on rows of its own, so that the snapshot of p_other below still holds for the rest.
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_pe_acct')::text, true);
-SELECT is(public.test_rows_affected(format('UPDATE public."PaymentHistory" SET amount_cents = 1 WHERE id = %L', :'p_other')), 0,
-  'an accountant edits no payment (until spec 10)');
-SELECT is(public.test_rows_affected(format('UPDATE public."PaymentHistory" SET deleted_at = now(), deleted_by_user_uuid = %L, delete_reason = ''x'', installment_id = NULL WHERE id = %L', :'user_acct', :'p_other')), 0,
-  'an accountant deletes no payment (until spec 10)');
+SELECT is(public.test_rows_affected(format('UPDATE public."PaymentHistory" SET amount_cents = 2222 WHERE id = %L', :'p_aedit')), 1,
+  'an accountant edits a payment (since spec 10)');
+SELECT is((SELECT amount_cents FROM public."PaymentHistory" WHERE id = :'p_aedit'), 2222,
+  '...and the amount really changed');
+SELECT is(public.test_rows_affected(format('UPDATE public."PaymentHistory" SET deleted_at = now(), deleted_by_user_uuid = %L, delete_reason = ''x'', installment_id = NULL WHERE id = %L', :'user_acct', :'p_adel')), 1,
+  'an accountant deletes a payment (since spec 10)');
+SELECT isnt((SELECT deleted_at FROM public."PaymentHistory" WHERE id = :'p_adel'), NULL::timestamptz,
+  '...and it is deleted');
 
 RESET ROLE;
 SELECT is((SELECT to_jsonb(p)::text FROM public."PaymentHistory" p WHERE p.id = :'p_other'), :'snap_other',

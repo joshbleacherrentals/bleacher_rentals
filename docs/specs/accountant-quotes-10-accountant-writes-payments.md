@@ -1,7 +1,10 @@
 # Accountant — records, edits and deletes payments
 
-Status: **DRAFT — awaiting "Approved"** — 0 open decisions (D1 answered 2026-10-03; the rule of §0 comes from the
-request).
+Status: **IMPLEMENTED 2026-10-06, awaiting review** — not checked by hand in a browser (Clerk sign-in is unavailable
+here); Playwright specs written, not run; the `br_powersync` comment edit is uncommitted and not deployed. 0 open
+decisions (D1 answered 2026-10-03; the rule of §0 comes from the request). Approved 2026-10-06 with two answers: the
+tests that this spec turns red are added to §6 (1, "add the edits"), and the three matrix sentences that would become
+false are rewritten (2 A, §4).
 Original request: №7. Implementation order: **10 of 11**. Needs
 [07](accountant-quotes-07-payments-soft-delete-db.md), [08](accountant-quotes-08-payments-readers-skip-deleted.md) and
 [09](accountant-quotes-09-payments-edit-delete-ui.md) (the rules, the readers and the screens, all admin-only),
@@ -77,7 +80,19 @@ every other table.
     read in full, deleted payments and the reason they were deleted included. Changing payments is a separate thing
     — see Record a Payment."
   - **Accountant texts:** the role description gains "records, edits and deletes manual payments".
-  - `permissionPageData.test.ts`: the accountant's guard adds the _Record a Payment_ row.
+  - **Three sentences that this spec makes false (added 2026-10-06, "Approved, 2 A")** — each says the
+    QuickBooks flag is the one thing an accountant changes on a quote; draft wording, for review:
+    - role description: "On a quote or booking the one thing they can change is the QuickBooks Invoice Flag." →
+      "On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete
+      manual payments.";
+    - _Events_, accountant note: "The one thing they can change is the QuickBooks Invoice Flag." → "What they can
+      change is the QuickBooks Invoice Flag and the payments (see those rows).";
+    - _QuickBooks Invoice Flag_, accountant note: "It is the only thing an accountant can change on a quote or
+      booking — the database refuses every other change." → "Apart from payments (see Record a Payment), it is the
+      only thing an accountant can change on a quote or booking — the database refuses every other change."
+  - `permissionPageData.test.ts`: the accountant's guard adds the _Record a Payment_ row; the pinned "only thing an
+    accountant can change" sentences follow the new wording; the "hidden-from-you note" check no longer takes the
+    _Record a Payment_ note (it is not a hidden-from-you note any more) and takes _Event Chat_, which stays `none`.
 - `br_powersync/config/sync_rules.yaml` (separate PR, not counted): the accountant block's comment stops saying the
   client writes nothing. No query changes.
 
@@ -107,6 +122,26 @@ tests — `supabase/tests/accountant_writes_payments.test.sql` (new); `payment_h
 `manual_payment_entry.test.sql`, `getQuotesBookingsCapabilities.test.ts`, `permissionPageData.test.ts` (edited); the
 Playwright specs `recordPayment.accountant.spec.ts` and `paymentEditDelete.accountant.spec.ts` (new); no
 `AppSchema.ts` or `database.types.ts`.
+
+**Added 2026-10-06 ("Approved, 1 add the edits")** — tests this spec turns red, edited on purpose:
+
+- `supabase/tests/accountant_receivables.test.sql` (line 180, "an accountant cannot record a payment", expects
+  `42501`): found at implementation — its fixture and its insert both carry the table's default `entry_source`
+  (`'stripe'`), so the migration would **not** have turned it red; it would have kept passing under a name that is
+  no longer true. It is renamed and re-commented so it says what it proves: an accountant cannot write a row that
+  claims to be Stripe, cannot update a Stripe payment, cannot delete. The accountant's own write is asserted in
+  `accountant_writes_payments.test.sql`; the plan stays 44;
+- `supabase/tests/payment_history_edit_soft_delete.test.sql` (named in §6 above): its two "an accountant edits /
+  deletes no payment (until spec 10)" assertions flip — an accountant edits and soft-deletes on two rows of its own
+  (`Acct Edit`, `Acct Delete`), so the snapshot of the row the other roles tried on still holds; plan 117 → 119;
+- `src/features/quotesAndBookings/e2e/accountantQuoteCard.accountant.spec.ts` (line 57) and
+  `accountantQuickBooksFlag.accountant.spec.ts` (S5, line 71): each asserted that an accountant has no "+ Record
+  Payment" button. The card spec now asserts it is visible; the flag spec's S5 keeps Edit, Delete and Send To Client
+  and drops the Record Payment line, which `recordPayment.accountant.spec.ts` now owns (Playwright, written, not
+  run);
+- `supabase/tests/manual_payment_entry.test.sql`: it has no accountant assertion to flip (only account manager and
+  viewer), so it gains one — an accountant may insert a manual row, and not a Stripe-claiming one (T9) — the
+  accountant joins the "no hard delete" loop (T7), and its header says so.
 
 ## 7. Tests and implementation sequence
 

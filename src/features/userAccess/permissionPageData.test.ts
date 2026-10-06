@@ -27,7 +27,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, and read access to Quotes & Bookings", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, and payments", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -39,13 +39,14 @@ describe("permission matrix", () => {
         "Payment History",
         "QuickBooks Invoice Flag",
         "Quote Files",
+        "Record a Payment",
         "Work Trackers",
       ]);
     });
 
     // docs/specs/accountant-quotes-04-accountant-quote-access.md: the accountant opens the list and
-    // any quote, read-only, plus the Files tab. Writing a payment, the QuickBooks flag and the
-    // internal chat come with later specs and have to edit this test on purpose.
+    // any quote, read-only, plus the Files tab. The QuickBooks flag (05) and the payments (10) came
+    // with later specs; the internal chat (11) will have to edit this test on purpose.
     describe("Quotes & Bookings, read-only", () => {
       it("reads events and payments, and changes neither", () => {
         for (const label of ["Events", "Payment History"]) {
@@ -54,12 +55,14 @@ describe("permission matrix", () => {
         expect(accountant("Events")?.note).toMatch(/cannot create, edit, delete or send/i);
       });
 
-      // docs/specs/accountant-quotes-05-is-qbo-column.md: the one thing an accountant changes on a
-      // quote or booking, and the database refuses every other change.
-      it("ticks the QuickBooks Invoice Flag — the only thing it can change on a quote", () => {
+      // docs/specs/accountant-quotes-05-is-qbo-column.md: the QuickBooks flag is what an accountant
+      // changes on a quote or booking itself, and the database refuses every other change; since
+      // docs/specs/accountant-quotes-10-accountant-writes-payments.md the payments are the other thing.
+      it("ticks the QuickBooks Invoice Flag — apart from payments, the only thing it can change on a quote", () => {
         const flag = accountant("QuickBooks Invoice Flag");
         expect(flag?.level).toBe("full");
         expect(flag?.note).toMatch(/any quote or booking, deleted ones included/i);
+        expect(flag?.note).toMatch(/apart from payments \(see Record a Payment\)/i);
         expect(flag?.note).toMatch(/only thing an accountant can change/i);
         expect(flag?.note).toMatch(/database refuses every other change/i);
       });
@@ -69,8 +72,8 @@ describe("permission matrix", () => {
         expect(ROLE_DESCRIPTIONS.accountant).toMatch(/QuickBooks Invoice Flag/);
       });
 
-      it("still cannot record a payment or use the internal chat", () => {
-        expect(accountant("Record a Payment")?.level).toBe("none");
+      it("records payments (spec 10), but still cannot use the internal chat", () => {
+        expect(accountant("Record a Payment")?.level).toBe("full");
         expect(accountant("Event Chat")?.level).toBe("none");
       });
 
@@ -159,8 +162,9 @@ describe("permission matrix", () => {
     it("names the Accountant page and Quotes & Bookings in the role description and in every hidden-from-you note", () => {
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Accountant page/);
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Quotes & Bookings/);
-      expect(accountant("Record a Payment")?.note).toMatch(/Accountant page/);
-      expect(accountant("Record a Payment")?.note).toMatch(/Quotes & Bookings, read-only/);
+      // Event Chat stays none until spec 11; Record a Payment is no longer a hidden-from-you note.
+      expect(accountant("Event Chat")?.note).toMatch(/Accountant page/);
+      expect(accountant("Event Chat")?.note).toMatch(/Quotes & Bookings, read-only/);
     });
 
     it("no longer describes itself as having no permissions", () => {
@@ -204,19 +208,19 @@ describe("permission matrix", () => {
   });
 
   // docs/specs/accountant-quotes-06-am-read-only-payments.md: an account manager (lead and junior
-  // alike) no longer records a payment; until spec 10 only an admin does. Spec 10 will edit this
-  // block on purpose when it gives the accountant the right.
-  describe("Record a Payment (spec 06)", () => {
+  // alike) no longer records a payment. Spec 06 left an admin only; docs/specs/accountant-quotes-10
+  // gave the accountant the right, so this block was edited on purpose.
+  describe("Record a Payment (spec 06, widened by spec 10)", () => {
     const row = PERMISSIONS.find((p) => p.label === "Record a Payment");
     const levels = Object.fromEntries(
       Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
     );
 
-    it("is full for an admin and none for every other role", () => {
+    it("is full for an admin and an accountant, and none for every other role", () => {
       expect(levels).toEqual({
         admin: "full",
         account_manager: "none",
-        accountant: "none",
+        accountant: "full",
         viewer: "none",
         developer: "none",
         driver: "none",
@@ -275,14 +279,14 @@ describe("permission matrix", () => {
       );
     });
 
-    it("leaves the levels of Record a Payment as spec 06 set them: admin full, everyone else none", () => {
+    it("leaves the levels of Record a Payment as spec 06 and 10 set them: admin and accountant full, everyone else none", () => {
       const levels = Object.fromEntries(
         Object.entries(recordRow?.roles ?? {}).map(([role, access]) => [role, access.level]),
       );
       expect(levels).toEqual({
         admin: "full",
         account_manager: "none",
-        accountant: "none",
+        accountant: "full",
         viewer: "none",
         developer: "none",
         driver: "none",
@@ -309,6 +313,59 @@ describe("permission matrix", () => {
         driver: "none",
         maintainer: "none",
       });
+    });
+  });
+
+  // docs/specs/accountant-quotes-10-accountant-writes-payments.md §4: only an admin and an accountant
+  // create, edit and delete payments, and the matrix is where people read it.
+  describe("Record a Payment and Payment History (spec 10)", () => {
+    const recordRow = PERMISSIONS.find((p) => p.label === "Record a Payment");
+    const historyRow = PERMISSIONS.find((p) => p.label === "Payment History");
+    const eventsRow = PERMISSIONS.find((p) => p.label === "Events");
+
+    it("tells an accountant they can record, edit and delete any manual payment, like an administrator", () => {
+      const row = recordRow?.roles.accountant;
+      expect(row?.level).toBe("full");
+      expect(row?.note).toMatch(
+        /record, edit and delete any manual payment on any quote or booking/i,
+      );
+      expect(row?.note).toMatch(/same as an administrator/i);
+    });
+
+    it("says in the description that only an administrator or an accountant can do it", () => {
+      expect(recordRow?.description).toMatch(
+        /Only an administrator or an accountant can do this\./,
+      );
+    });
+
+    it("keeps the accountant at read on Payment History, and points to Record a Payment for changing", () => {
+      const row = historyRow?.roles.accountant;
+      expect(row?.level).toBe("read");
+      expect(row?.note).toMatch(/deleted payments and the reason they were deleted included/i);
+      expect(row?.note).toMatch(/Changing payments is a separate thing — see Record a Payment/);
+    });
+
+    it("no longer says the QuickBooks flag is the one thing an accountant changes on a quote", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).not.toMatch(/the one thing they can change/i);
+      expect(eventsRow?.roles.accountant.note).not.toMatch(/the one thing they can change/i);
+      expect(ROLE_DESCRIPTIONS.accountant).toMatch(/QuickBooks Invoice Flag/);
+      expect(ROLE_DESCRIPTIONS.accountant).toMatch(/can record, edit and delete manual payments/i);
+      expect(eventsRow?.roles.accountant.note).toMatch(
+        /What they can change is the QuickBooks Invoice Flag and the payments/,
+      );
+    });
+
+    it("leaves every other role's Record a Payment answer where it was", () => {
+      expect(recordRow?.roles.admin.level).toBe("full");
+      for (const role of [
+        "account_manager",
+        "viewer",
+        "developer",
+        "driver",
+        "maintainer",
+      ] as const) {
+        expect(recordRow?.roles[role].level, role).toBe("none");
+      }
     });
   });
 
