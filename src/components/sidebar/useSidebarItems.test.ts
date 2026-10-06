@@ -148,13 +148,14 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Accountant, Work Trackers, Messages and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Accountant, Work Trackers, Messages, Companies & Contacts and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
       "accountant",
       "work-trackers",
       "messages",
+      "companies-contacts",
       "documentation",
     ]);
 
@@ -177,7 +178,13 @@ describe("useSidebarItems", () => {
     expect(messages.type).toBe("dropdown");
     expect("label" in messages && messages.label).toBe("Messages");
 
-    const docs = items[4];
+    // docs/specs/accountant-address-book.md §4: Companies & Contacts, after Messages.
+    const companiesContacts = items[4];
+    expect(companiesContacts.type).toBe("button");
+    expect("label" in companiesContacts && companiesContacts.label).toBe("Companies & Contacts");
+    expect("href" in companiesContacts && companiesContacts.href).toBe("/companies-contacts");
+
+    const docs = items[5];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",

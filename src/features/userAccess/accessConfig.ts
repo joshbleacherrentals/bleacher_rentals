@@ -133,9 +133,10 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     // Accountant page (AR and AR Deposits). docs/specs/accountant-quotes-04: Quotes & Bookings,
     // read-only — the prefix also reaches /new and /{id}/edit, which guard themselves by
     // capability. docs/specs/accountant-quotes-11: /messages, the internal chat — the prefix also
-    // reaches /messages/external, a placeholder the sidebar does not offer them (D4). Plus the two
-    // pages every role may read. Not /all-work-trackers or
-    // /work-tracker-types. With no /dashboard, defaultRedirect falls through
+    // reaches /messages/external, a placeholder the sidebar does not offer them (D4).
+    // docs/specs/accountant-address-book.md: /companies-contacts, where they create, edit and
+    // soft-delete companies, contacts and venues. Plus the two pages every role may read. Not
+    // /all-work-trackers or /work-tracker-types. With no /dashboard, defaultRedirect falls through
     // to the first path here, so /accountant must stay first. This must not be empty:
     // useAccessRedirect would bounce a user with no allowed path forever (the driver's [] is safe
     // only because a driver-only user is blocked before this config is read).
@@ -144,6 +145,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/quotes-bookings",
       "/work-trackers",
       "/messages",
+      "/companies-contacts",
       "/permissions",
       "/changelog",
     ],

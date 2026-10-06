@@ -362,7 +362,15 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
   ],
   driver: [],
   maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
-  accountant: ["quotes-bookings", "accountant", "work-trackers", "messages", "documentation"],
+  // docs/specs/accountant-address-book.md: Companies & Contacts, after Messages (ALL_ITEMS sets the order).
+  accountant: [
+    "quotes-bookings",
+    "accountant",
+    "work-trackers",
+    "messages",
+    "companies-contacts",
+    "documentation",
+  ],
 };
 
 export function useSidebarItems(roles: WebRole[]): SidebarItemConfig[] {

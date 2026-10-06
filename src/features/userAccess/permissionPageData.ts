@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -66,9 +66,10 @@ const MAINTAINER_NO_ACCESS_NOTE =
 
 // docs/specs/accountant-role.md, accountant-work-trackers.md, accountant-quotes-02 and -04: the
 // Accountant has the Work Trackers pages, the driver payment window, the Accountant page and
-// Quotes & Bookings read-only, and nothing else.
+// Quotes & Bookings read-only; docs/specs/accountant-address-book.md adds Companies & Contacts. It
+// has nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only. Everything else on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit. Everything else on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -278,7 +279,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can create, edit and delete any company, contact or venue — the same as an account manager, including the Quote Language. The page has no Venues tab: a venue is added or edited from the Default Venue field of a contact. Delete hides the record; nothing is removed from the database.",
+      ),
     },
   },
   {

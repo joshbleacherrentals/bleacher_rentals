@@ -13,7 +13,8 @@
 --     table, because a refused read is an empty result, not an error (a missing Contacts grant
 --     silently becomes empty contact columns, a missing SalesOffices grant a wrong currency);
 --   * the accountant WRITES none of them (Events.is_qbo excepted since spec 05, manual payments since
---     accountant-quotes-10: accountant_writes_payments.test.sql asserts that side). An INSERT that RLS
+--     accountant-quotes-10: accountant_writes_payments.test.sql asserts that side; Contacts and
+--     Companies since accountant-address-book: accountant_address_book.test.sql asserts that side). An INSERT that RLS
 --     refuses raises 42501; an UPDATE or
 --     DELETE that RLS filters out does not raise, so every refusal is also checked by looking
 --     at the row afterwards;
@@ -218,25 +219,27 @@ SELECT is(
 SELECT is((SELECT value_cents FROM public."EventLineItems" WHERE id = :'line_item'), 50000,
   '...and the line item is unchanged');
 
--- Contacts
-SELECT throws_ok(
-  'INSERT INTO public."Contacts" (first_name) VALUES (''AR intruder'')',
-  '42501', NULL, 'an accountant cannot create a contact');
+-- Contacts. Since docs/specs/accountant-address-book.md an accountant creates, edits and soft-deletes
+-- contacts (accountant_address_book.test.sql asserts the whole rule, hard delete included). The
+-- fixture contact is the one these assertions now change.
+SELECT lives_ok(
+  'INSERT INTO public."Contacts" (first_name) VALUES (''AR new contact'')',
+  'an accountant can create a contact');
 SELECT is(
   public.test_rows_affected(format('UPDATE public."Contacts" SET first_name = ''AR edited'' WHERE id = %L', :'contact')),
-  0, 'an accountant cannot update a contact');
-SELECT is((SELECT first_name FROM public."Contacts" WHERE id = :'contact'), 'AR probe contact',
-  '...and the contact is unchanged');
+  1, 'an accountant can update a contact');
+SELECT is((SELECT first_name FROM public."Contacts" WHERE id = :'contact'), 'AR edited',
+  '...and the contact is changed');
 
--- Companies
-SELECT throws_ok(
-  'INSERT INTO public."Companies" (company_name) VALUES (''AR intruder'')',
-  '42501', NULL, 'an accountant cannot create a company');
+-- Companies. Same: docs/specs/accountant-address-book.md.
+SELECT lives_ok(
+  'INSERT INTO public."Companies" (company_name) VALUES (''AR new company'')',
+  'an accountant can create a company');
 SELECT is(
   public.test_rows_affected(format('UPDATE public."Companies" SET company_name = ''AR edited'' WHERE id = %L', :'company')),
-  0, 'an accountant cannot update a company');
-SELECT is((SELECT company_name FROM public."Companies" WHERE id = :'company'), 'AR probe company',
-  '...and the company is unchanged');
+  1, 'an accountant can update a company');
+SELECT is((SELECT company_name FROM public."Companies" WHERE id = :'company'), 'AR edited',
+  '...and the company is changed');
 
 -- SalesOffices
 SELECT throws_ok(

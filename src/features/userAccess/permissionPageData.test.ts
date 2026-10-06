@@ -27,12 +27,13 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, and the internal chat", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the internal chat, and Companies & Contacts", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
       expect(granted.sort()).toEqual([
         "Accounts Receivable",
+        "Companies & Contacts",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
         "Event Chat",
@@ -163,11 +164,46 @@ describe("permission matrix", () => {
     it("names the Accountant page and Quotes & Bookings in the role description and in every hidden-from-you note", () => {
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Accountant page/);
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Quotes & Bookings/);
-      // Record a Payment (spec 10) and Event Chat (spec 11) are no longer hidden-from-you notes;
-      // Companies & Contacts still is.
-      expect(accountant("Companies & Contacts")?.level).toBe("none");
-      expect(accountant("Companies & Contacts")?.note).toMatch(/Accountant page/);
-      expect(accountant("Companies & Contacts")?.note).toMatch(/Quotes & Bookings, read-only/);
+      // Record a Payment (spec 10), Event Chat (spec 11) and Companies & Contacts
+      // (accountant-address-book) are no longer hidden-from-you notes; Dashboard Cells still is.
+      expect(accountant("Dashboard Cells")?.level).toBe("none");
+      expect(accountant("Dashboard Cells")?.note).toMatch(/Accountant page/);
+      expect(accountant("Dashboard Cells")?.note).toMatch(/Quotes & Bookings, read-only/);
+      expect(accountant("Dashboard Cells")?.note).toMatch(/Companies & Contacts/);
+    });
+
+    // docs/specs/accountant-address-book.md §4: an accountant creates, edits and soft-deletes
+    // companies, contacts and venues, like an account manager. The matrix is what account managers
+    // read when they ask what an accountant may do, so it must say what the database allows.
+    describe("Companies & Contacts", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Companies & Contacts");
+
+      it("is full for an admin, an account manager and an accountant; read for a viewer; none for the rest", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "full",
+          account_manager: "full",
+          accountant: "full",
+          viewer: "read",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("tells the accountant what they can do, and where venues are added", () => {
+        const note = accountant("Companies & Contacts")?.note ?? "";
+        expect(note).toMatch(/create, edit and delete any company, contact or venue/i);
+        expect(note).toMatch(/Quote Language/);
+        expect(note).toMatch(/Default Venue/);
+        expect(note).toMatch(/nothing is removed from the database/i);
+      });
+
+      it("is named in the role description", () => {
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Companies & Contacts/);
+      });
     });
 
     it("no longer describes itself as having no permissions", () => {

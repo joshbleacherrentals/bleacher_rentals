@@ -59,18 +59,30 @@ describe("mergeRoleConfigs — the maintainer role", () => {
 });
 
 describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accountant page)", () => {
-  it("lets an accountant open the Accountant page, Quotes & Bookings, the Work Trackers pages, the chat and the two pages every role may read", () => {
+  it("lets an accountant open the Accountant page, Quotes & Bookings, the Work Trackers pages, the chat, Companies & Contacts and the two pages every role may read", () => {
     const config = mergeRoleConfigs(["accountant"]);
     // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: /messages comes after
     // /work-trackers, and /accountant stays first so that it stays the landing page.
+    // docs/specs/accountant-address-book.md §4: /companies-contacts follows /messages.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
       "/work-trackers",
       "/messages",
+      "/companies-contacts",
       "/permissions",
       "/changelog",
     ]);
+  });
+
+  // docs/specs/accountant-address-book.md: the accountant creates, edits and soft-deletes companies,
+  // contacts and venues on /companies-contacts. Prefix match, like every other path.
+  it("lets an accountant open Companies & Contacts", () => {
+    expect(canAccessPath(["accountant"], "/companies-contacts")).toBe(true);
+  });
+
+  it("keeps the Accountant page as the landing page after Companies & Contacts was added", () => {
+    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
   });
 
   it("lets an accountant open the internal chat, and /external by the same prefix (D4: reachable, a placeholder)", () => {
@@ -97,7 +109,6 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/assets",
       "/all-work-trackers",
       "/work-tracker-types",
-      "/companies-contacts",
       "/quickbooks",
       "/stripe-connections",
     ]) {

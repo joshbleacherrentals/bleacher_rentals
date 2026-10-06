@@ -2,9 +2,10 @@ import { test, expect } from "@playwright/test";
 
 /**
  * The Accountant role (docs/specs/accountant-work-trackers.md, S1 and S7,
- * accountant-quotes-02-accountant-page.md, S1, accountant-quotes-04, S1 and accountant-quotes-11, S1): it lands
- * on the Accountant page, its sidebar offers Quotes & Bookings, Accountant, Work Trackers, Messages
- * (Internal only) and Documentation, and it is kept out of every other operational page.
+ * accountant-quotes-02-accountant-page.md, S1, accountant-quotes-04, S1, accountant-quotes-11, S1 and
+ * accountant-address-book.md, S1): it lands on the Accountant page, its sidebar offers Quotes &
+ * Bookings, Accountant, Work Trackers, Messages (Internal only), Companies & Contacts and
+ * Documentation, and it is kept out of every other operational page.
  *
  * This project only exists once E2E_ACCOUNTANT_EMAIL is configured (see playwright.config.ts), so
  * the file is inert until the Clerk user — with a seeded Users + Accountants row — is created.
@@ -25,7 +26,7 @@ test.describe("Role access (accountant)", () => {
     });
   });
 
-  test("the sidebar offers Quotes & Bookings, Accountant, Work Trackers, Messages and Documentation, and nothing operational else", async ({
+  test("the sidebar offers Quotes & Bookings, Accountant, Work Trackers, Messages, Companies & Contacts and Documentation, and nothing operational else", async ({
     page,
   }) => {
     await page.goto("/permissions");
@@ -39,6 +40,7 @@ test.describe("Role access (accountant)", () => {
       timeout: 60_000,
     });
     await expect(sidebar.getByText("Messages", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Companies & Contacts", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("Role Permissions")).toBeVisible();
     await expect(sidebar.getByText("What's New")).toBeVisible();
 

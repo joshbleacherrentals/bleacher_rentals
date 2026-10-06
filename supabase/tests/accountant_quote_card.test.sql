@@ -12,9 +12,11 @@
 --   * the accountant READS each table the card is built from — one named assertion per table,
 --     because a refused read is an empty result, not an error (a missing Venues grant is a card
 --     with no venue, a missing EventChangeLog grant a Log tab with nothing in it);
---   * the accountant WRITES none of them, with ONE deliberate exception (D10): EventChangeLog
---     keeps its open INSERT policy, because every change any role makes must be logged. Update and
---     delete there are refused. An INSERT that RLS refuses raises 42501; an UPDATE or DELETE that
+--   * the accountant WRITES none of them, with TWO exceptions: EventChangeLog keeps its open INSERT
+--     policy (D10), because every change any role makes must be logged — update and delete there are
+--     refused; and Venues, which an accountant creates and edits since
+--     docs/specs/accountant-address-book.md (accountant_address_book.test.sql asserts that side; a
+--     hard delete is still refused here). An INSERT that RLS refuses raises 42501; an UPDATE or DELETE that
 --     RLS filters out does not raise, so every refusal is also checked by looking at the row;
 --   * EventFiles and the event-files storage policies are asserted AS THEY ARE (open to any
 --     authenticated user), so a future change to them shows up here — spec 04 relies on them being
@@ -136,20 +138,21 @@ SELECT is((SELECT count(*)::int FROM public."EventChangeLog" WHERE id = :'change
 SELECT is((SELECT count(*)::int FROM public."EventEmailLog" WHERE id = :'emaillog'), 1,
   'an accountant can read EventEmailLog');
 
--- ═══ THE ACCOUNTANT: writes none of the three closed tables ═══════════════════
+-- ═══ THE ACCOUNTANT: writes the closed tables, except Venues ═══════════════════
 
--- Venues
-SELECT throws_ok(
-  format('INSERT INTO public."Venues" (name, address_uuid) VALUES (''QC intruder'', %L)', :'address'),
-  '42501', NULL, 'an accountant cannot create a venue');
+-- Venues. Since docs/specs/accountant-address-book.md an accountant creates and edits a venue; there
+-- is still no DELETE policy, so a hard delete removes nothing.
+SELECT lives_ok(
+  format('INSERT INTO public."Venues" (name, address_uuid) VALUES (''QC new venue'', %L)', :'address'),
+  'an accountant can create a venue');
 SELECT is(
   public.test_rows_affected(format('UPDATE public."Venues" SET name = ''QC edited'' WHERE id = %L', :'venue')),
-  0, 'an accountant cannot update a venue');
+  1, 'an accountant can update a venue');
 SELECT is(
   public.test_rows_affected(format('DELETE FROM public."Venues" WHERE id = %L', :'venue')),
   0, 'an accountant cannot delete a venue');
-SELECT is((SELECT name FROM public."Venues" WHERE id = :'venue'), 'Card probe venue',
-  '...and the venue is unchanged');
+SELECT is((SELECT name FROM public."Venues" WHERE id = :'venue'), 'QC edited',
+  '...and the venue is changed, not removed');
 
 -- BleacherTypes
 SELECT throws_ok(
