@@ -7,6 +7,7 @@ export type TeamTab =
   | "drivers"
   | "developers"
   | "maintainers"
+  | "accountants"
   | "viewers"
   | "all";
 
@@ -16,6 +17,7 @@ const tabs = [
   { id: "drivers" as const, label: "Drivers" },
   { id: "developers" as const, label: "Developers" },
   { id: "maintainers" as const, label: "Maintainers" },
+  { id: "accountants" as const, label: "Accountants" },
   { id: "viewers" as const, label: "Viewers" },
   { id: "all" as const, label: "All" },
 ];

@@ -9,6 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      Accountants: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          user_uuid: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_uuid: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_uuid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accountants_user_uuid_fkey"
+            columns: ["user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       AccountManagers: {
         Row: {
           created_at: string
@@ -557,6 +586,7 @@ export type Database = {
         Row: {
           bleacher_uuid: string | null
           created_at: string
+          created_by_user_uuid: string | null
           date: string | null
           id: string
           text: string | null
@@ -564,6 +594,7 @@ export type Database = {
         Insert: {
           bleacher_uuid?: string | null
           created_at?: string
+          created_by_user_uuid?: string | null
           date?: string | null
           id?: string
           text?: string | null
@@ -571,6 +602,7 @@ export type Database = {
         Update: {
           bleacher_uuid?: string | null
           created_at?: string
+          created_by_user_uuid?: string | null
           date?: string | null
           id?: string
           text?: string | null
@@ -581,6 +613,13 @@ export type Database = {
             columns: ["bleacher_uuid"]
             isOneToOne: false
             referencedRelation: "Bleachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Blocks_created_by_user_uuid_fkey"
+            columns: ["created_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
             referencedColumns: ["id"]
           },
         ]
@@ -2710,6 +2749,9 @@ export type Database = {
           amount_cents: number
           created_at: string
           currency: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by_user_uuid: string | null
           entry_source: string
           event_uuid: string
           id: string
@@ -2732,6 +2774,9 @@ export type Database = {
           amount_cents: number
           created_at?: string
           currency?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by_user_uuid?: string | null
           entry_source?: string
           event_uuid: string
           id?: string
@@ -2754,6 +2799,9 @@ export type Database = {
           amount_cents?: number
           created_at?: string
           currency?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by_user_uuid?: string | null
           entry_source?: string
           event_uuid?: string
           id?: string
@@ -2773,6 +2821,13 @@ export type Database = {
           stripe_receipt_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "PaymentHistory_deleted_by_user_uuid_fkey"
+            columns: ["deleted_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "PaymentHistory_event_uuid_fkey"
             columns: ["event_uuid"]
@@ -4030,6 +4085,7 @@ export type Database = {
           created_at: string
           driver_uuid: string
           id: string
+          is_paid: boolean
           qbo_bill_id: string | null
           status: Database["public"]["Enums"]["worktracker_group_status"]
           week_end: string
@@ -4039,6 +4095,7 @@ export type Database = {
           created_at?: string
           driver_uuid: string
           id?: string
+          is_paid?: boolean
           qbo_bill_id?: string | null
           status?: Database["public"]["Enums"]["worktracker_group_status"]
           week_end: string
@@ -4048,6 +4105,7 @@ export type Database = {
           created_at?: string
           driver_uuid?: string
           id?: string
+          is_paid?: boolean
           qbo_bill_id?: string | null
           status?: Database["public"]["Enums"]["worktracker_group_status"]
           week_end?: string

@@ -7,4 +7,5 @@ export type UserAccessData = {
   driver_id: string | null;
   developer_id: string | null;
   maintainer_id: string | null;
+  accountant_id: string | null;
 };

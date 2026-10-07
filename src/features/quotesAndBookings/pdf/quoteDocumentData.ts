@@ -327,11 +327,16 @@ export async function buildQuoteDocumentData(
         .eq("event_uuid", eventId)
         .order("due_date"),
 
-      // Payments actually received — the source of truth for every status below.
+      // Payments actually received — the source of truth for every status below. The public page and
+      // the PDF never receive a deleted payment: the filter is in the query, and `deletedAt` is mapped
+      // below as well (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md, D1).
       supabase
         .from("PaymentHistory")
-        .select("id, installment_id, amount_cents, currency, status, paid_at, created_at")
-        .eq("event_uuid", eventId),
+        .select(
+          "id, installment_id, amount_cents, currency, status, paid_at, created_at, deleted_at",
+        )
+        .eq("event_uuid", eventId)
+        .is("deleted_at", null),
 
       // Terms & Conditions
       (event as any).terms_and_conditions_uuid
@@ -422,6 +427,7 @@ export async function buildQuoteDocumentData(
       status: ph.status ?? "",
       paidAt: ph.paid_at,
       createdAt: ph.created_at ?? "",
+      deletedAt: ph.deleted_at ?? null,
     })),
     scheduleCurrency,
   );

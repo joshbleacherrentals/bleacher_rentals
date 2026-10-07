@@ -9,6 +9,10 @@ import type { EntrySource } from "../types/paymentTypes";
  * The payments an event actually received. This — not
  * `PaymentInstallments.status` — is what any money question is answered from.
  * See docs/specs/payment-accounting-truth.md.
+ *
+ * Returns EVERY row, soft-deleted ones included: `allocatePayments` leaves a deleted payment out of
+ * every figure, and a list hides it with `withoutDeleted`
+ * (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md).
  */
 
 type Row = {
@@ -28,6 +32,9 @@ type Row = {
   entry_source: string | null;
   recorded_by_user_uuid: string | null;
   reference: string | null;
+  deleted_at: string | null;
+  deleted_by_user_uuid: string | null;
+  delete_reason: string | null;
 };
 
 export type PaymentHistoryRow = {
@@ -48,6 +55,10 @@ export type PaymentHistoryRow = {
   entrySource: EntrySource;
   recordedByUserUuid: string | null;
   reference: string | null;
+  /** Set when the payment was soft-deleted. The row is still returned; see utils/deletedPayments. */
+  deletedAt: string | null;
+  deletedByUserUuid: string | null;
+  deleteReason: string | null;
 };
 
 export function usePaymentHistory(eventId: string | null) {
@@ -72,6 +83,9 @@ export function usePaymentHistory(eventId: string | null) {
           "entry_source",
           "recorded_by_user_uuid",
           "reference",
+          "deleted_at",
+          "deleted_by_user_uuid",
+          "delete_reason",
         ])
         .where("event_uuid", "=", eventId ?? "")
         .orderBy("created_at", "desc")
@@ -103,6 +117,9 @@ export function usePaymentHistory(eventId: string | null) {
         entrySource: r.entry_source === "manual" ? "manual" : "stripe",
         recordedByUserUuid: r.recorded_by_user_uuid,
         reference: r.reference,
+        deletedAt: r.deleted_at,
+        deletedByUserUuid: r.deleted_by_user_uuid,
+        deleteReason: r.delete_reason,
       })),
     [data],
   );

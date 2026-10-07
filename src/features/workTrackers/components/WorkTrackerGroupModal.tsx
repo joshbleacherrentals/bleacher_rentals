@@ -13,7 +13,13 @@ import { DateTime } from "luxon";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QboBillPreview } from "./QboBillPreview";
+import { MarkPaidButton } from "./MarkPaidButton";
+import { useWorkTrackerGroupPaid } from "../hooks/useWorkTrackerGroupPaid";
+import { canMarkGroupPaid } from "../util/workTrackerPageAccess";
+import { invalidateGroupQueries } from "../util/invalidateGroupQueries";
 import { Database } from "../../../../database.types";
+import { useUserAccess } from "@/features/userAccess/client";
+import { canAccessPath } from "@/features/userAccess/accessConfig";
 
 type WorkTrackerGroupModalProps = {
   isOpen: boolean;
@@ -35,6 +41,31 @@ type WorkTrackerData = {
   date: string | null;
 };
 
+// Its own component so the live read of the week's group exists only while the window is open: the
+// modal itself is mounted for every driver in the list, closed or not.
+function ModalMarkPaidButton({
+  driverUuid,
+  driverName,
+  startDate,
+  canMarkPaid,
+}: {
+  driverUuid: string;
+  driverName: string;
+  startDate: string;
+  canMarkPaid: boolean;
+}) {
+  const { groupId, isPaid } = useWorkTrackerGroupPaid(driverUuid, startDate);
+  return (
+    <MarkPaidButton
+      groupId={groupId}
+      driverName={driverName}
+      isPaid={isPaid}
+      canMarkPaid={canMarkPaid}
+      size="default"
+    />
+  );
+}
+
 export function WorkTrackerGroupModal({
   isOpen,
   onClose,
@@ -47,6 +78,7 @@ export function WorkTrackerGroupModal({
   const supabase = useClerkSupabaseClient();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const access = useUserAccess();
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -63,6 +95,18 @@ export function WorkTrackerGroupModal({
   const [currentStatus, setCurrentStatus] = useState<
     Database["public"]["Enums"]["worktracker_group_status"]
   >(groupData?.status || "draft");
+
+  // The Edit Profile link goes to the Team pages. A user who cannot open them would be bounced
+  // straight back out, so for them there is no link (docs/specs/accountant-work-trackers.md, D1).
+  // An accountant can open them since docs/specs/accountant-team.md, so it has the link too.
+  const canOpenDriverProfile = access.status === "active" && canAccessPath(access.roles, "/team");
+
+  const canMarkPaid =
+    access.status === "active" &&
+    canMarkGroupPaid({
+      isAdmin: access.roles.includes("admin"),
+      isAccountant: access.roles.includes("accountant"),
+    });
 
   // Format the date range for display
   const startDateObj = DateTime.fromISO(startDate);
@@ -196,10 +240,7 @@ export function WorkTrackerGroupModal({
 
         if (updateError) throw new Error(updateError.message);
 
-        await queryClient.invalidateQueries({
-          queryKey: ["drivers-for-week"],
-          refetchType: "active",
-        });
+        await invalidateGroupQueries(queryClient);
 
         setCurrentStatus("no_bill_ready_for_payment");
         createSuccessToast([
@@ -225,10 +266,7 @@ export function WorkTrackerGroupModal({
 
         if (updateError) throw new Error(updateError.message);
 
-        await queryClient.invalidateQueries({
-          queryKey: ["drivers-for-week"],
-          refetchType: "active",
-        });
+        await invalidateGroupQueries(queryClient);
 
         setCurrentStatus("draft");
         createSuccessToast(["Marked as Draft"]);
@@ -276,14 +314,7 @@ export function WorkTrackerGroupModal({
       }
 
       // Invalidate the drivers query to refresh the list
-      await queryClient.invalidateQueries({
-        queryKey: ["drivers-for-week"],
-        refetchType: "active",
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["driver-with-meta"],
-        refetchType: "active",
-      });
+      await invalidateGroupQueries(queryClient);
 
       setCurrentStatus("qbo_bill_created");
       createSuccessToast([
@@ -328,14 +359,7 @@ export function WorkTrackerGroupModal({
       if (!response.ok) throw new Error(data.error || "Failed to update bill");
 
       setSyncToken(null); // will be refreshed when QboBillPreview reloads
-      await queryClient.invalidateQueries({
-        queryKey: ["drivers-for-week"],
-        refetchType: "active",
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["driver-with-meta"],
-        refetchType: "active",
-      });
+      await invalidateGroupQueries(queryClient);
       createSuccessToast([
         `Bill updated successfully!`,
         `${driverName} - $${totalAmount.toFixed(2)}`,
@@ -349,7 +373,8 @@ export function WorkTrackerGroupModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      {/* `sm:` matters: the dialog's own `sm:max-w-lg` beats a bare `max-w-3xl` from 640px up. */}
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Work Tracker Group - {driverName}</DialogTitle>
         </DialogHeader>
@@ -408,16 +433,18 @@ export function WorkTrackerGroupModal({
                   <span className="text-sm text-gray-600">Driver</span>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold">{driverName}</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
-                      onClick={() => userUuid && router.push(`/team/${userUuid}/edit/driver`)}
-                      disabled={!userUuid}
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Edit Profile
-                    </Button>
+                    {canOpenDriverProfile && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
+                        onClick={() => userUuid && router.push(`/team/${userUuid}/edit/driver`)}
+                        disabled={!userUuid}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        Edit Profile
+                      </Button>
+                    )}
                   </div>
                 </div>
                 {hasVendor && (
@@ -473,8 +500,8 @@ export function WorkTrackerGroupModal({
             )}
 
             {/* Actions */}
-            <div className="flex justify-between items-center pt-4 border-t gap-2">
-              <div className="flex gap-2">
+            <div className="flex flex-wrap justify-between items-center pt-4 border-t gap-2">
+              <div className="flex flex-wrap gap-2">
                 {currentStatus !== "draft" && (
                   <Button
                     variant="outline"
@@ -495,9 +522,15 @@ export function WorkTrackerGroupModal({
                     Mark as Ready for Payment
                   </Button>
                 )}
+                <ModalMarkPaidButton
+                  driverUuid={driverUuid}
+                  driverName={driverName}
+                  startDate={startDate}
+                  canMarkPaid={canMarkPaid}
+                />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {hasVendor && vendorLinkedToQbo && currentStatus !== "qbo_bill_created" && (
                   <Button
                     onClick={handleCreateBill}

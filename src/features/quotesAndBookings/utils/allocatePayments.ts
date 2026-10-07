@@ -18,10 +18,17 @@
  * Placement is computed from aggregates rather than by walking payments in
  * order, which is what makes a refund and the payment it reverses commute.
  *
+ * A soft-deleted payment is returned but never counted: it is `excluded: "deleted"`, takes no
+ * part in any installment and none in `totalReceivedCents`, and a deleted refund reopens nothing.
+ * `deleted` wins over `status` and `currency`. This is the one place that decides it
+ * (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md).
+ *
  * Pure and deterministic: no clock, no I/O, no mutation of the caller's arrays.
  * See docs/specs/payment-accounting-truth.md and
  * docs/specs/manual-payment-entry.md §3.3–§3.4.
  */
+
+import { isDeletedPayment } from "./deletedPayments";
 
 export type AllocatablePayment = {
   id: string;
@@ -31,6 +38,8 @@ export type AllocatablePayment = {
   status: string;
   paidAt: string | null;
   createdAt: string;
+  /** Set when the payment was soft-deleted. Required, so that no caller can forget to map it. */
+  deletedAt: string | null;
 };
 
 export type AllocatableInstallment = {
@@ -55,7 +64,7 @@ export type PaymentAllocation = {
   parts: { installmentId: string; cents: number }[];
   unallocatedCents: number;
   /** Why the payment was not counted at all, if it wasn't. */
-  excluded: null | "currency" | "status";
+  excluded: null | "currency" | "status" | "deleted";
 };
 
 export type Allocation = {
@@ -143,13 +152,15 @@ export function allocatePayments(
   const byPayment = new Map<string, PaymentAllocation>();
   const foreignCurrencyPayments: Allocation["foreignCurrencyPayments"] = [];
 
-  // Split before allocating: a payment in another currency or a non-succeeded
-  // one is reported, but never touches a balance. Converting CAD into a USD
-  // total without a rate would be a silent FX error that looks correct.
+  // Split before allocating: a deleted payment, a payment in another currency or a
+  // non-succeeded one is reported, but never touches a balance. Converting CAD into a
+  // USD total without a rate would be a silent FX error that looks correct. A deleted
+  // payment is checked first: it is gone whatever its status or currency was.
   const counted: AllocatablePayment[] = [];
   for (const p of payments.toSorted(comparePayments)) {
-    const excluded: PaymentAllocation["excluded"] =
-      p.status !== COUNTED_STATUS
+    const excluded: PaymentAllocation["excluded"] = isDeletedPayment(p)
+      ? "deleted"
+      : p.status !== COUNTED_STATUS
         ? "status"
         : normalizeCurrency(p.currency) !== wantedCurrency
           ? "currency"

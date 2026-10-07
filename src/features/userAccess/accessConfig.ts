@@ -16,6 +16,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     allowedPaths: [
       "/dashboard",
       "/quotes-bookings",
+      "/accountant",
       "/team",
       "/assets",
       "/damage-reports",
@@ -78,10 +79,9 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     showSidebar: true,
   },
   developer: {
-    // The Sync Health page is listed on its own, not as "/dev-tools": the rest
-    // of /dev-tools (Stripe checkout, damage photos, QBO tax) stays admin and
-    // viewer only, and allowedPaths is matched by prefix.
-    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction", "/dev-tools/sync-health"],
+    // All of /dev-tools: the developer's Dev Tools sidebar section lists every
+    // page under it. Sync Health keeps its own page gate on top of this.
+    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction", "/dev-tools"],
     showSidebar: true,
   },
   viewer: {
@@ -113,15 +113,45 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
   maintainer: {
     // The annual inspection queue is the heart of this role's job, plus damage reports and
     // repairs (docs/specs/maintainer-damage-and-maintenance.md). /permissions so they can read
-    // what they are allowed to do, and /changelog so a release note is not invisible to them;
-    // without a dashboard, defaultRedirect falls through to the first path here, which is the queue.
+    // what they are allowed to do, and /changelog so a release note is not invisible to them.
+    // /dashboard so they can write notes in cells (docs/specs/maintainer-dashboard-cells.md);
+    // with it, defaultRedirect lands them there, the same as every other role that has one.
     allowedPaths: [
+      "/dashboard",
       "/annual-inspections",
       "/damage-reports",
       "/repairs",
       "/permissions",
       "/changelog",
       "/assets",
+    ],
+    showSidebar: true,
+  },
+  accountant: {
+    // docs/specs/accountant-work-trackers.md: the Work Trackers pages (every week, every driver,
+    // the payment modal, read-only work tracker details). docs/specs/accountant-quotes-02: the
+    // Accountant page (AR and AR Deposits). docs/specs/accountant-quotes-04: Quotes & Bookings,
+    // read-only — the prefix also reaches /new and /{id}/edit, which guard themselves by
+    // capability. docs/specs/accountant-quotes-11: /messages, the internal chat — the prefix also
+    // reaches /messages/external, a placeholder the sidebar does not offer them (D4).
+    // docs/specs/accountant-address-book.md: /companies-contacts, where they create, edit and
+    // soft-delete companies, contacts and venues. docs/specs/accountant-team.md: /team — the prefix
+    // also reaches /team/new and /team/{id}/edit/..., which guard themselves by edit access (the
+    // list is every user, a profile opens for a driver only, and the database is the lock). Plus
+    // the two pages every role may read. Not /all-work-trackers or /work-tracker-types. With no
+    // /dashboard, defaultRedirect falls through
+    // to the first path here, so /accountant must stay first. This must not be empty:
+    // useAccessRedirect would bounce a user with no allowed path forever (the driver's [] is safe
+    // only because a driver-only user is blocked before this config is read).
+    allowedPaths: [
+      "/accountant",
+      "/quotes-bookings",
+      "/work-trackers",
+      "/messages",
+      "/companies-contacts",
+      "/team",
+      "/permissions",
+      "/changelog",
     ],
     showSidebar: true,
   },
@@ -149,4 +179,13 @@ export function mergeRoleConfigs(roles: WebRole[]): MergedAccessConfig {
     : (allowedPaths[0] ?? "/");
 
   return { allowedPaths, defaultRedirect, showSidebar };
+}
+
+/**
+ * Whether these roles may open `pathname`, matched the way `useAccessRedirect` matches it (by
+ * path prefix). For UI that links somewhere: a link whose destination would bounce the user
+ * straight back out is a button that does nothing, so it is not shown.
+ */
+export function canAccessPath(roles: WebRole[], pathname: string): boolean {
+  return mergeRoleConfigs(roles).allowedPaths.some((p) => pathname.startsWith(p));
 }

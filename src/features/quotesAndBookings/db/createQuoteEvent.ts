@@ -9,6 +9,7 @@ import { normalizeLostFields } from "../utils/lostReason";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute } from "@/lib/powersync/typedQuery";
 import { toEventLineItemValues } from "./toEventLineItemValues";
+import { postFinanceBookedNotice, shouldNotifyFinanceBooked } from "../utils/notifyFinanceBooked";
 
 export async function createQuoteEvent(
   state: CreateQuoteState,
@@ -149,6 +150,10 @@ export async function createQuoteEvent(
       } as any)
       .compile(),
   );
+
+  if (shouldNotifyFinanceBooked(null, state.status || "draft")) {
+    postFinanceBookedNotice(eventUuid);
+  }
 
   return eventUuid;
 }

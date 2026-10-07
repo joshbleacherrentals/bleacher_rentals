@@ -22,6 +22,13 @@ const MaintainersCols = {
 } satisfies PowerSyncColsFor<"Maintainers">;
 const Maintainers = new Table(MaintainersCols, { indexes: { user_uuid: ["user_uuid"] } });
 
+const AccountantsCols = {
+  created_at: column.text,
+  is_active: column.integer,
+  user_uuid: column.text,
+} satisfies PowerSyncColsFor<"Accountants">;
+const Accountants = new Table(AccountantsCols, { indexes: { user_uuid: ["user_uuid"] } });
+
 const DevelopersCols = {
   created_at: column.text,
   is_active: column.integer,
@@ -196,6 +203,7 @@ const BlocksCols = {
   text: column.text,
   date: column.text,
   bleacher_uuid: column.text,
+  created_by_user_uuid: column.text,
 } satisfies PowerSyncColsFor<"Blocks">;
 const Blocks = new Table(BlocksCols, { indexes: { bleacher_uuid: ["bleacher_uuid"] } });
 
@@ -485,6 +493,7 @@ const WorkTrackerGroupsCols = {
   driver_uuid: column.text,
   qbo_bill_id: column.text,
   status: column.text,
+  is_paid: column.integer,
 } satisfies PowerSyncColsFor<"WorkTrackerGroups">;
 const WorkTrackerGroups = new Table(WorkTrackerGroupsCols, {
   indexes: {
@@ -1105,6 +1114,12 @@ const PaymentHistoryCols = {
   // Check number, ACH trace, terminal auth code; for Stripe rows, the method
   // Stripe reported.
   reference: column.text,
+  // Soft delete (docs/specs/accountant-quotes-07-payments-soft-delete-db.md): a row is
+  // deleted when deleted_at is set. Only a manual row can be, with its author and a reason,
+  // and a deleted row is frozen. Nothing reads these before specs 08 and 09.
+  deleted_at: column.text,
+  deleted_by_user_uuid: column.text,
+  delete_reason: column.text,
 } satisfies PowerSyncColsFor<"PaymentHistory">;
 const PaymentHistory = new Table(PaymentHistoryCols, {
   indexes: { event_uuid: ["event_uuid"], installment_id: ["installment_id"] },
@@ -1306,6 +1321,7 @@ export const AppSchema = new Schema({
   Bleachers,
   BleacherAnnualInspections,
   Maintainers,
+  Accountants,
   BleacherEvents,
   BleacherUsers,
   Blocks,
@@ -1408,6 +1424,7 @@ export type WorkTrackerInspectionsRecord = PowerSyncDB["WorkTrackerInspections"]
 export type InspectionQuestionsRecord = PowerSyncDB["InspectionQuestions"];
 export type BleacherAnnualInspectionsRecord = PowerSyncDB["BleacherAnnualInspections"];
 export type MaintainersRecord = PowerSyncDB["Maintainers"];
+export type AccountantsRecord = PowerSyncDB["Accountants"];
 export type DamageReportsRecord = PowerSyncDB["DamageReports"];
 export type DamageReportPhotosRecord = PowerSyncDB["DamageReportPhotos"];
 export type MaintenanceEventsRecord = PowerSyncDB["MaintenanceEvents"];

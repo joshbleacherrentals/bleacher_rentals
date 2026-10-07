@@ -10,6 +10,7 @@ const COLOR_MAP: Record<WebRole, string> = {
   viewer: "border-l-violet-500",
   driver: "border-l-blue-400",
   maintainer: "border-l-orange-500",
+  accountant: "border-l-teal-500",
 };
 
 type RoleCardProps = {

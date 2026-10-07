@@ -20,6 +20,8 @@ type DropdownProps<T> = {
   className?: string;
   formatSelectedLabel?: (label: string) => string;
   disabled?: boolean;
+  /** Shorter trigger, for dense side panels. */
+  compact?: boolean;
 };
 
 export function Dropdown<T>({
@@ -30,6 +32,7 @@ export function Dropdown<T>({
   className = "",
   formatSelectedLabel,
   disabled = false,
+  compact = false,
 }: DropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -113,7 +116,7 @@ export function Dropdown<T>({
           ref={buttonRef}
           onClick={() => !disabled && setIsOpen((prev) => !prev)}
           disabled={disabled}
-          className={`w-full h-[40px] min-w-0 flex items-center text-sm font-medium justify-between border rounded px-2 py-2 text-left transition-all disabled:opacity-100 ${
+          className={`w-full ${compact ? "h-8 py-1" : "h-[40px] py-2"} min-w-0 flex items-center text-sm font-medium justify-between border rounded px-2 text-left transition-all disabled:opacity-100 ${
             disabled
               ? "bg-gray-50 text-gray-700 cursor-default"
               : "bg-white text-muted-foreground cursor-pointer hover:shadow"

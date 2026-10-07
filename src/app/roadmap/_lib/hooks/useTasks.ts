@@ -63,6 +63,7 @@ export function useTasksForSprint(sprintId: string | null, showDeleted = false) 
         ])
         .where("sprint_id", "=", safeId)
         .$if(!showDeleted, (qb) => qb.where("deleted_at", "is", null))
+        .$if(showDeleted, (qb) => qb.where("deleted_at", "is not", null))
         .orderBy("sort_order", "asc")
         .orderBy("created_at", "asc")
         .compile(),

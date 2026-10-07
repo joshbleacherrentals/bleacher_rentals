@@ -6,12 +6,12 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 // session in playwright/.auth/<role>.json. A role's specs live in files named
 // *.<role>.spec.ts (e.g. dashboard.admin.spec.ts). Files without a role suffix
 // run on the default `chromium` project (the original E2E_CLERK_* user).
-const ROLES = ["admin", "am", "driver", "viewer", "developer", "maintainer"] as const;
+const ROLES = ["admin", "am", "driver", "viewer", "developer", "maintainer", "accountant"] as const;
 
 // A role with no credentials gets no project. auth.setup.ts already skips the
 // sign-in for one, but a project whose storageState file is missing fails at
-// launch rather than skipping — so the maintainer suite stays out of the run
-// until E2E_MAINTAINER_EMAIL exists, and joins it the day it does.
+// launch rather than skipping — so the maintainer and accountant suites stay out of the run
+// until E2E_MAINTAINER_EMAIL / E2E_ACCOUNTANT_EMAIL exist, and join it the day they do.
 const CREDENTIAL_ENV: Record<(typeof ROLES)[number], string> = {
   admin: "E2E_ADMIN_EMAIL",
   am: "E2E_AM_EMAIL",
@@ -19,6 +19,7 @@ const CREDENTIAL_ENV: Record<(typeof ROLES)[number], string> = {
   viewer: "E2E_VIEWER_EMAIL",
   developer: "E2E_DEVELOPER_EMAIL",
   maintainer: "E2E_MAINTAINER_EMAIL",
+  accountant: "E2E_ACCOUNTANT_EMAIL",
 };
 const CONFIGURED_ROLES = ROLES.filter((role) => !!process.env[CREDENTIAL_ENV[role]]);
 

@@ -212,6 +212,7 @@ export function useDashboardPowerSync(opts?: {
         blockUuid: bl.id,
         text: bl.text ?? "",
         date: bl.date ?? "",
+        createdByUserUuid: bl.created_by_user_uuid ?? null,
       }));
 
       // Work trackers

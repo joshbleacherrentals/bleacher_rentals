@@ -15,7 +15,8 @@ The maintainer role gets full create / read / edit / delete on **Damage Reports*
 ## Decisions I made (tell me if any are wrong)
 
 - **"Delete" is soft delete**, exactly as the app does it for everyone today (a `deleted` flag). Photo rows can be removed. Stored photo files can't be deleted by anyone; that is unchanged.
-- **Maintainers do not get the Dashboard**, only the two pages above.
+- **Maintainers do not get the Dashboard**, only the two pages above. _(Superseded 2026-10-01 by
+  [maintainer-dashboard-cells.md](maintainer-dashboard-cells.md): they now get it, for dashboard notes.)_
 - **Acknowledgements are read-only** for maintainers; they stay a driver/admin action.
 - Damage reports a maintainer creates are stamped with their own user, as for everyone.
 

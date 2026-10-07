@@ -35,8 +35,18 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
   const supabase = useClerkSupabaseClient();
   const { user } = useUser();
   const users = usePsUsers();
-  const { isOpen, key, blockUuid, bleacherUuid, date, text, workTrackerUuid, setField, resetForm } =
-    useSelectedBlockStore();
+  const {
+    isOpen,
+    key,
+    blockUuid,
+    createdByUserUuid,
+    bleacherUuid,
+    date,
+    text,
+    workTrackerUuid,
+    setField,
+    resetForm,
+  } = useSelectedBlockStore();
 
   // ── Permissions: determine if user can edit this cell ──
   const perms = usePermissionsStore();
@@ -49,6 +59,10 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
     accountManagerZoneIds: perms.accountManagerZoneIds,
     bleacherUuid,
     bleacher: bl ? { zoneUuid: bl.zoneUuid } : null,
+    // A maintainer edits an empty cell, or a note they wrote (docs/specs/maintainer-dashboard-cells.md).
+    isMaintainer: perms.isMaintainer,
+    currentUserUuid: perms.userId,
+    block: blockUuid ? { createdByUserUuid } : null,
   });
 
   // Open (unresolved) damage report on the clicked bleacher, if any. Read

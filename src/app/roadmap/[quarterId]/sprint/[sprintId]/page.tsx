@@ -11,7 +11,13 @@ import { useFeaturesForQuarter } from "../../../_lib/hooks/useFeatures";
 import { useRoadmapUsers, displayName } from "../../../_lib/hooks/useRoadmapUsers";
 import { PageHeaderWithBreadCrumbs as RoadmapHeader } from "@/components/PageHeaderWithBreadCrumbs";
 import { StatusPill } from "../../../_lib/components/StatusPill";
-import { DataTable, Row, Cell, TitleCell } from "../../../_lib/components/list/DataTable";
+import {
+  DataTable,
+  Row,
+  Cell,
+  TitleCell,
+  DeletedStatusCell,
+} from "../../../_lib/components/list/DataTable";
 import { EmptyState } from "../../../_lib/components/list/Panel";
 import { FilterPill } from "../../../_lib/components/list/FilterPill";
 import { TaskModal } from "../../../_lib/components/TaskModal";
@@ -55,10 +61,17 @@ export default function SprintDetailPage() {
 
   const [developerFilter, setDeveloperFilter] = useState<string | "all" | "unassigned">("all");
   const [showDeleted, setShowDeleted] = useState(false);
+  // Off by default; on, the list is just what is left to do.
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   const { quarter } = useQuarter(quarterId);
   const { sprint } = useSprint(sprintId);
-  const { tasks } = useTasksForSprint(sprintId, showDeleted);
+  const { tasks: allTasks } = useTasksForSprint(sprintId, showDeleted);
+  // Everything below (developer pills, their counts, the table) works from what is visible.
+  const tasks = useMemo(
+    () => (hideCompleted ? allTasks.filter((t) => t.status !== "completed") : allTasks),
+    [allTasks, hideCompleted],
+  );
   const { features } = useFeaturesForQuarter(quarterId);
   const { userMap } = useRoadmapUsers();
   const subscriptionsMap = useAllTaskSubscriptionsMap();
@@ -155,13 +168,15 @@ export default function SprintDetailPage() {
             {name} ({tasks.filter((t) => t.developer_uuid === uuid).length})
           </FilterPill>
         ))}
+        <FilterPill
+          className="ml-auto"
+          active={hideCompleted}
+          onClick={() => setHideCompleted((v) => !v)}
+        >
+          {hideCompleted ? "Completed Hidden" : "Hide Completed"}
+        </FilterPill>
         {isDeveloper && (
-          <FilterPill
-            tone="danger"
-            className="ml-auto"
-            active={showDeleted}
-            onClick={() => setShowDeleted((v) => !v)}
-          >
+          <FilterPill tone="danger" active={showDeleted} onClick={() => setShowDeleted((v) => !v)}>
             {showDeleted ? "Showing Deleted" : "Show Deleted"}
           </FilterPill>
         )}
@@ -169,7 +184,13 @@ export default function SprintDetailPage() {
 
       {filteredTasks.length === 0 ? (
         <EmptyState>
-          {tasks.length === 0 ? "No tasks in this sprint yet." : "No tasks match this filter."}
+          {tasks.length === 0
+            ? showDeleted
+              ? "No deleted tasks."
+              : hideCompleted && allTasks.length > 0
+                ? "Nothing left to do — every task is completed."
+                : "No tasks in this sprint yet."
+            : "No tasks match this filter."}
         </EmptyState>
       ) : (
         <DataTable
@@ -185,12 +206,21 @@ export default function SprintDetailPage() {
           {filteredTasks.map((t) => {
             const meta = TASK_STATUS_META[t.status];
             const feature = t.feature_id ? featureMap.get(t.feature_id) : null;
+            const isDeleted = !!t.deleted_at;
             return (
-              <Row key={t.id} onClick={() => router.push(`${baseUrl}?task=${t.id}`)}>
-                <TitleCell title={t.title} fallback="Untitled task" />
-                <Cell>
-                  <StatusPill label={meta.label} tone={meta.tone} />
-                </Cell>
+              <Row
+                key={t.id}
+                deleted={isDeleted}
+                onClick={() => router.push(`${baseUrl}?task=${t.id}`)}
+              >
+                <TitleCell title={t.title} fallback="Untitled task" deleted={isDeleted} />
+                {isDeleted ? (
+                  <DeletedStatusCell />
+                ) : (
+                  <Cell>
+                    <StatusPill label={meta.label} tone={meta.tone} />
+                  </Cell>
+                )}
                 <Cell className="text-rm-ink-muted">
                   {feature ? (
                     feature.title || "Untitled feature"
@@ -199,10 +229,12 @@ export default function SprintDetailPage() {
                   )}
                 </Cell>
                 <Cell>
-                  <SubscriberAvatars
-                    userUuids={subscriptionsMap.get(t.id) ?? []}
-                    userMap={userMap}
-                  />
+                  {!isDeleted && (
+                    <SubscriberAvatars
+                      userUuids={subscriptionsMap.get(t.id) ?? []}
+                      userMap={userMap}
+                    />
+                  )}
                 </Cell>
                 <Cell className="text-xs text-rm-ink-muted">
                   <span className="flex items-center gap-1">
@@ -215,9 +247,7 @@ export default function SprintDetailPage() {
                       : "—"}
                   </span>
                 </Cell>
-                <Cell>
-                  <TaskMessageBadge taskId={t.id} userUuid={userUuid} />
-                </Cell>
+                <Cell>{!isDeleted && <TaskMessageBadge taskId={t.id} userUuid={userUuid} />}</Cell>
               </Row>
             );
           })}

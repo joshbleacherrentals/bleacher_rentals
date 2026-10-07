@@ -21,7 +21,8 @@ import { useCurrentUserStore, TeamRoleTab } from "../state/useCurrentUserStore";
 import { useUserFormPaths } from "../hooks/useUserFormPaths";
 import { X } from "lucide-react";
 import { useState } from "react";
-import { useTeamPermissions } from "../hooks/useTeamPermissions";
+import { useTeamPermissions, type EditAccess } from "../hooks/useTeamPermissions";
+import { getAvailableRoles } from "../logic/teamRoles";
 
 const ROLE_LABELS: Record<TeamRoleTab, string> = {
   administrator: "Administrator",
@@ -30,18 +31,15 @@ const ROLE_LABELS: Record<TeamRoleTab, string> = {
   developer: "Developer",
   viewer: "Viewer",
   maintainer: "Maintainer",
+  accountant: "Accountant",
 };
 
-const ALL_ROLES: TeamRoleTab[] = [
-  "administrator",
-  "account-manager",
-  "driver",
-  "developer",
-  "viewer",
-  "maintainer",
-];
-
-export default function RoleNavigation() {
+/**
+ * `editAccess` narrows it for an accountant on a driver (docs/specs/accountant-team.md): the Basic
+ * User Info and Driver tabs and nothing that changes roles. Every other level, and no level at all,
+ * is the navigation as it always was.
+ */
+export default function RoleNavigation({ editAccess = "full" }: { editAccess?: EditAccess }) {
   const router = useRouter();
   const pathname = usePathname();
   const paths = useUserFormPaths();
@@ -49,13 +47,14 @@ export default function RoleNavigation() {
   const addRoleTab = useCurrentUserStore((s) => s.addRoleTab);
   const removeRoleTab = useCurrentUserStore((s) => s.removeRoleTab);
 
-  const { canAssignAdmin } = useTeamPermissions();
+  const permissions = useTeamPermissions();
   const [roleToRemove, setRoleToRemove] = useState<TeamRoleTab | null>(null);
 
-  const availableRoles = ALL_ROLES.filter(
-    (role) => !roleTabs.includes(role) && (role !== "administrator" || canAssignAdmin),
-  );
-  const shouldHighlightAddRole = roleTabs.length === 0;
+  const rolesAreFixed = editAccess === "driver-only";
+  const shownTabs = rolesAreFixed ? roleTabs.filter((role) => role === "driver") : roleTabs;
+
+  const availableRoles = rolesAreFixed ? [] : getAvailableRoles(roleTabs, permissions);
+  const shouldHighlightAddRole = !rolesAreFixed && roleTabs.length === 0;
 
   const handleRemoveRole = () => {
     if (roleToRemove) {
@@ -85,7 +84,7 @@ export default function RoleNavigation() {
         >
           Basic User Info
         </Link>
-        {roleTabs.map((role) => {
+        {shownTabs.map((role) => {
           const rolePath = paths[role === "account-manager" ? "accountManager" : role];
           return (
             <div
@@ -99,18 +98,20 @@ export default function RoleNavigation() {
               <Link href={rolePath} className="flex-1">
                 {ROLE_LABELS[role]}
               </Link>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setRoleToRemove(role);
-                }}
-                className=" text-lightBlue hover:bg-black/10 transition-all rounded-full p-0.5"
-                aria-label={`Remove ${ROLE_LABELS[role]} role`}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              {!rolesAreFixed && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setRoleToRemove(role);
+                  }}
+                  className=" text-lightBlue hover:bg-black/10 transition-all rounded-full p-0.5"
+                  aria-label={`Remove ${ROLE_LABELS[role]} role`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           );
         })}

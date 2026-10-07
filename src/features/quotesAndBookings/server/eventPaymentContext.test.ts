@@ -5,11 +5,17 @@ import { loadEventPaymentContext } from "./eventPaymentContext";
 
 type TableValue = Record<string, unknown> | Record<string, unknown>[] | null | undefined;
 
+type Call = { table: string; method: string; args: unknown[] };
+
 /**
  * Table-aware fake: `from(t).select().eq()...` resolves whatever `tables[t]`
- * holds — an object for `.single()` reads, an array for list reads.
+ * holds — an object for `.single()` reads, an array for list reads. Every builder call is pushed
+ * onto `calls`, so a test can assert which filters a query carried.
  */
-function fakeSupabase(tables: Record<string, TableValue>): SupabaseClient<Database> {
+function fakeSupabase(
+  tables: Record<string, TableValue>,
+  calls: Call[] = [],
+): SupabaseClient<Database> {
   const from = (table: string) => {
     const value = tables[table];
     const one = () =>
@@ -17,10 +23,17 @@ function fakeSupabase(tables: Record<string, TableValue>): SupabaseClient<Databa
         data: (Array.isArray(value) ? (value[0] ?? null) : (value ?? null)) as any,
         error: null,
       });
+    const record =
+      (method: string) =>
+      (...args: unknown[]) => {
+        calls.push({ table, method, args });
+        return chain;
+      };
     const chain: any = {
-      select: () => chain,
-      eq: () => chain,
-      order: () => chain,
+      select: record("select"),
+      eq: record("eq"),
+      is: record("is"),
+      order: record("order"),
       single: one,
       maybeSingle: one,
       then: (resolve: (r: { data: unknown[]; error: null }) => unknown) =>
@@ -53,6 +66,7 @@ const payment = (over: Record<string, unknown> = {}) => ({
   status: "succeeded",
   paid_at: "2026-09-01T10:00:00Z",
   created_at: "2026-09-01T10:00:00Z",
+  deleted_at: null,
   ...over,
 });
 
@@ -101,6 +115,41 @@ describe("loadEventPaymentContext", () => {
       "evt-1",
     );
     expect(ctx?.totalCents).toBe(22000);
+    expect(ctx?.paidCents).toBe(5000);
+    expect(ctx?.remainingCents).toBe(17000);
+  });
+
+  // docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md (D1): the public checkout
+  // never receives a deleted payment, so the query itself carries the filter — and if a row came
+  // back deleted anyway, it still would not count.
+  it("asks only for payments that are not deleted", async () => {
+    const calls: Call[] = [];
+    await loadEventPaymentContext(
+      fakeSupabase(seed({ PaymentHistory: [payment()] }), calls),
+      "evt-1",
+    );
+
+    const paymentCalls = calls.filter((c) => c.table === "PaymentHistory");
+    expect(paymentCalls).toContainEqual({
+      table: "PaymentHistory",
+      method: "is",
+      args: ["deleted_at", null],
+    });
+    expect(paymentCalls.find((c) => c.method === "select")?.args[0]).toContain("deleted_at");
+  });
+
+  it("does not count a payment that came back deleted anyway", async () => {
+    const ctx = await loadEventPaymentContext(
+      fakeSupabase(
+        seed({
+          PaymentHistory: [
+            payment({ id: "kept", amount_cents: 5000 }),
+            payment({ id: "gone", amount_cents: 9000, deleted_at: "2026-09-02T10:00:00Z" }),
+          ],
+        }),
+      ),
+      "evt-1",
+    );
     expect(ctx?.paidCents).toBe(5000);
     expect(ctx?.remainingCents).toBe(17000);
   });

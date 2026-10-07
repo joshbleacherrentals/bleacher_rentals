@@ -19,6 +19,7 @@ export const ROLE_LABELS: Record<WebRole, string> = {
   account_manager: "Account Manager",
   driver: "Driver",
   maintainer: "Maintainer",
+  accountant: "Accountant",
   viewer: "Viewer",
   developer: "Developer",
 };
@@ -27,17 +28,21 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   admin: "Full access to all features, settings, and team management.",
   account_manager:
     "Manages their own assigned bleachers, drivers, and events. Cannot delete or modify company-wide data, other managers' records, or anything outside their own scope. A low-risk role to add without worrying about unintended changes to shared data.",
-  developer: "Access to the product roadmap only.",
+  developer:
+    "Access to the product roadmap and the internal Dev Tools pages (Sync Health, Stripe Checkout, Damage Photos, QBO Sales Tax).",
   viewer: "Read-only access to operational data. Cannot create, edit, or delete anything.",
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can open a bleacher to read its history. Sees nothing else on the dashboard — no quotes, events, payments, or team management.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
+  accountant:
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
   "admin",
   "account_manager",
+  "accountant",
   "maintainer",
   "driver",
   "viewer",
@@ -55,6 +60,16 @@ const full = (note?: string): PermissionAccess => ({ level: "full", note });
 const read = (note?: string): PermissionAccess => ({ level: "read", note });
 const custom = (note: string): PermissionAccess => ({ level: "custom", note });
 const none = (note?: string): PermissionAccess => ({ level: "none", note });
+
+const MAINTAINER_NO_ACCESS_NOTE =
+  "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard. Everything else in the web app is hidden from them entirely.";
+
+// docs/specs/accountant-role.md, accountant-work-trackers.md, accountant-quotes-02 and -04: the
+// Accountant has the Work Trackers pages, the driver payment window, the Accountant page and
+// Quotes & Bookings read-only; docs/specs/accountant-address-book.md adds Companies & Contacts;
+// docs/specs/accountant-team.md adds the Team page. It has nothing else.
+const ACCOUNTANT_NO_ACCESS_NOTE =
+  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor. Everything else on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -78,8 +93,11 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "Can file a ticket to the developers from the mobile app, and edit their own for a short window afterwards. Has no access to the rest of the roadmap — they cannot see, edit or comment on anyone else's work.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: read(
+        "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
+      ),
+      accountant: read(
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments (see those rows).",
       ),
     },
   },
@@ -98,15 +116,16 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can see whether the flag is set, but the checkbox is disabled."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can tick or untick the flag on any quote or booking, deleted ones included. Apart from payments (see Record a Payment), it is the only thing an accountant can change on a quote or booking — the database refuses every other change.",
       ),
     },
   },
   {
     label: "Payment History",
     description:
-      "The payments and balances on the Billing tab of a quote or booking. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes.",
+      "The payments and balances on the Billing tab of a quote or booking. Amounts come from what Stripe actually collected, so a partial payment shows as partial rather than closing the whole installment. Clicking a row opens the full record of that payment — every installment it was applied to, the reference and the notes. A deleted payment is hidden unless Show deleted is on; the reason it was deleted is shown only to those who can record payments.",
     category: "Day to Day Operations",
     roles: {
       admin: read(
@@ -122,22 +141,44 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can see payments and balances, and open any payment to read it in full, but cannot change anything.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: read(
+        "Can see every payment and open it to read in full, deleted payments and the reason they were deleted included. Changing payments is a separate thing — see Record a Payment.",
       ),
+    },
+  },
+  {
+    label: "Accounts Receivable",
+    description:
+      "The Accountant page: the AR tab lists booked events with an amount due that should already have been paid, the AR Deposits tab lists those due later. Each shows the Amount Due and the Remaining Balance. Filters, search and sorting apply to both.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: read("Can open the Accountant page and see the balances of every booking."),
+      account_manager: none(
+        "The Accountant page is for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "The Accountant page is for accountants and administrators. A viewer still sees a booking's balance on the Billing tab of the quote.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: read("Can open the Accountant page and see the balances of every booking."),
     },
   },
   {
     label: "Record a Payment",
     description:
-      "Entering a payment that did not come through Stripe — a check, an ACH transfer, or a card run by hand on a terminal — from the Billing tab of a quote or booking. A recorded payment can never be edited or deleted; a mistake is corrected by recording the same amount as a negative, so both entries stay on the record.",
+      "Entering a payment that did not come through Stripe — a check, an ACH transfer, or a card run by hand on a terminal — and correcting it afterwards. A manual payment can be edited (amount, date, method, payer, reference, notes, installment) or deleted with a reason; a deleted payment stays on the record, no longer counts, and cannot be restored. Stripe payments cannot be edited or deleted. A negative amount is still how a refund or a bounced check is recorded. Only an administrator or an accountant can do this.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can record a card, ACH or check payment on any quote or booking, including a negative amount for a refund, a bounced check or a correction. Recording a refund here does not send money back through Stripe — that is done in Stripe.",
+        "Can record a card, ACH or check payment on any quote or booking, including a negative amount for a refund, a bounced check or a correction. Can edit and delete any manual payment on any quote or booking. Recording a refund here does not send money back through Stripe — that is done in Stripe.",
       ),
-      account_manager: custom(
-        "A lead account manager can do all of that on any quote or booking, including ones they did not create. Everyone else can only do it on the quotes they created — on other people's quotes the button is disabled. The same rule as every other edit on the page.",
+      account_manager: none(
+        "No. Reading the payment history is a separate thing, and they can still do that.",
       ),
       developer: none(
         "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
@@ -146,8 +187,9 @@ export const PERMISSIONS: PermissionEntry[] = [
         "No. Reading the payment history is a separate thing, and they can still do that.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can record, edit and delete any manual payment on any quote or booking — the same as an administrator.",
       ),
     },
   },
@@ -168,9 +210,29 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can read event chats and who is in them, but cannot post, join or leave."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: custom(
+        "Can read every event chat, join any of them and leave, and post in the ones they have joined. Can edit only their own messages, mention other members and be mentioned. Cannot add anyone else to a chat or remove anyone from one.",
       ),
+    },
+  },
+  {
+    label: "Quote Files",
+    description:
+      "The Files tab of a quote or booking — documents and photos attached to it. The app does not check the role on this tab, and neither does the database for a signed-in user.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can open, add and delete files on any quote or booking."),
+      account_manager: full("Can open, add and delete files on any quote or booking."),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: custom(
+        "Can open, add and delete files, although the rest of the quote is read-only for a viewer — the Files tab does not check the role.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full("Can open, add and delete files on any quote or booking."),
     },
   },
   {
@@ -191,9 +253,10 @@ export const PERMISSIONS: PermissionEntry[] = [
         "This user will be able to see all the cells and every detail but not able to create, edit, or delete any cells.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: custom(
+        "Maintainers can add a note to any empty cell, and edit or delete only the notes they wrote themselves. Notes written by anyone else, or written before this rule existed, are read-only for them. They cannot create events, work trackers, maintenance or sub-rentals from a cell.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -215,8 +278,9 @@ export const PERMISSIONS: PermissionEntry[] = [
         "This user can see companies, contacts and venues and every detail, but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can create, edit and delete any company, contact or venue — the same as an account manager, including the Quote Language. The page has no Venues tab: a venue is added or edited from the Default Venue field of a contact. Delete hides the record; nothing is removed from the database.",
       ),
     },
   },
@@ -241,8 +305,61 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "(in the mobile app only) Drivers only have access to work trackers that have been released and are assigned to them. They only have the ability to change the status and submit inspection forms to this work tracker. They cannot delete a work tracker or change any other information.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: read(
+        "The Dashboard shows work trackers, and a maintainer can read them there, but cannot create, edit or delete any. They still have no Work Trackers page.",
+      ),
+      accountant: custom(
+        "Opens the Work Trackers pages and sees every week, every driver (without having to switch on 'See All Drivers') and every trip in full, and can open any work tracker to read it. Cannot create, edit, delete or release work trackers — there is no Release All button for them. Has no Dashboard.",
+      ),
+    },
+  },
+  {
+    label: "Driver Payments & QuickBooks Bills",
+    description:
+      "The Payment Details window on a driver's week (Work Trackers page): the payment status of the week, and the QuickBooks bill created from it.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Can mark any driver's week Ready for Payment or back to Draft, and create or update its QuickBooks bill.",
+      ),
+      account_manager: full(
+        "Can mark a driver's week Ready for Payment or back to Draft, and create or update its QuickBooks bill, for any driver in the list they open — their own zones' drivers, or every driver with 'See All Drivers'.",
+      ),
+      developer: none(
+        "Unable to even access the pages where driver payments are shown, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Cannot change a payment status or create a QuickBooks bill — the database refuses both.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: custom(
+        "Can mark any driver's week Ready for Payment or back to Draft, and create or update its QuickBooks bill — for every driver, not only the ones in their zones. The bill carries the same QuickBooks Class an administrator's does. Cannot change the work trackers behind it.",
+      ),
+    },
+  },
+  {
+    label: "Driver Week Paid / Unpaid",
+    description:
+      "The Mark Paid / Mark Unpaid button on a driver's week, on the Work Trackers driver list, on the driver's own page and in the Payment Details window. It records by hand that the week has been paid; it does not move any money and does not change the week's payment status or its QuickBooks bill.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Can mark any driver's week Paid, and back to Unpaid if it was a mistake. Every week starts Unpaid.",
+      ),
+      account_manager: none(
+        "Cannot mark a week Paid or Unpaid — the button is not shown to them and the database refuses the change. They can still move a week between Draft and Ready for Payment and create its QuickBooks bill (see Driver Payments & QuickBooks Bills).",
+      ),
+      developer: none(
+        "Unable to even access the pages where driver payments are shown, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none(
+        "Cannot mark a week Paid or Unpaid — the button is not shown and the database refuses the change.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can mark any driver's week Paid, and back to Unpaid if it was a mistake — for every driver, not only the ones in their zones. Every week starts Unpaid.",
       ),
     },
   },
@@ -267,8 +384,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none(
         "The driver's own withdrawals and bleacher swaps are reported to the account managers of their zones, not back to them in the mobile app.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(
+        "An Accountant manages no zones, so no count is shown to them — not on the sidebar, not next to a week, not next to a driver.",
       ),
     },
   },
@@ -285,9 +403,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: full(
         "Drivers have full access to their profile in the mobile app. They can update their driver information, vehicle information, and legal information. They can also set their availability and accept and complete work trackers.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -312,6 +429,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: full(
         "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -338,6 +456,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: full(
         "Can create, view, edit, delete, and restore any damage report and its photos, regardless of who created it. Can see acknowledgements but not add them.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -364,6 +483,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: full(
         "This is the role's whole job. Can record an inspection on any bleacher, correct an earlier record, upload or replace the certificate, and edit the notes. The only role that is notified: a counter in the sidebar on Annual Inspections, and a highlight on the bleachers that crossed a date since the last visit. Opening the page marks them all read, so the next visit highlights only what is new since then.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 
@@ -384,9 +504,10 @@ export const PERMISSIONS: PermissionEntry[] = [
         "This user will be able to see all the bleachers and every detail but not able to create, edit, or delete any bleachers.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: read(
-        "Can open a bleacher to reach its annual inspection history, but cannot change anything about the bleacher itself.",
+      maintainer: full(
+        "Can add a bleacher, edit any of its details, and delete or restore it, on the Bleachers tab of the Assets page. Sees no add button or editable form on the Documents and Other Assets tabs — those stay Administrator-only.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -403,9 +524,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -423,9 +543,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -447,9 +566,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers do not have access to the web configuration pages. They see a line item's description on quotes they can open.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -471,9 +589,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers do not have access to the web configuration pages. They see the contract on quotes they can open.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -493,9 +610,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none(
         "Drivers do not have access to the web configuration pages. They interact with the inspection form only when completing inspections in the mobile app.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -519,9 +635,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "Drivers submit inspections through the mobile app when picking up or dropping off a bleacher. They can only submit inspections for work trackers assigned to them. Once submitted, an inspection cannot be edited or deleted by the driver.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -535,9 +650,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 
@@ -549,7 +663,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     roles: {
       admin: full("Can invite any type of team member, including other admins."),
       account_manager: custom(
-        "Can invite new team members, but cannot assign them the Admin role. Can only invite drivers and other standard roles.",
+        "Can invite new team members, but can only give them the Account Manager, Driver or Viewer role. Administrator, Developer, Maintainer and Accountant are granted by an admin only, so they are not offered.",
       ),
       developer: none(
         "Developers do not have access to the Team page. This role is limited to the product roadmap.",
@@ -558,9 +672,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers cannot invite team members. They have read-only access across the platform.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none("Can open the Team page but cannot add anyone."),
     },
   },
   {
@@ -580,8 +693,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can view all team member profiles and details, but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: custom(
+        "Sees every team member in the list but opens only drivers. On a driver they can change the payment info (currency, unit, tax, rates and tiers, deadhead, setup, teardown), the vendor company and the driver type, and can read the zones, phone, home address, vehicle and documents without changing them. They can also create, edit and delete vendor companies (a deleted vendor is hidden, not removed), including the QuickBooks connection and QuickBooks vendor it is linked to. They cannot change a driver's name, zones or roles, and cannot open anyone who is not a driver. Roles add up: someone who is also an account manager can also add a driver to their own zones.",
       ),
     },
   },
@@ -604,9 +718,8 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Viewers cannot deactivate team members. They have read-only access across the platform.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none("Can open the Team page but cannot deactivate anyone."),
     },
   },
 
@@ -626,9 +739,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can view all sales scorecard data but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -644,9 +756,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: read("Can view all driver scorecard data but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 
@@ -664,9 +775,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the development roadmap."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -684,9 +794,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       viewer: none("Viewers do not have access to the development roadmap."),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -710,9 +819,8 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: custom(
         "(in the mobile app only) Answers the survey, and can see their own past answers. Cannot see any other driver's responses, and has no access to the web page.",
       ),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
-      ),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -734,9 +842,29 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can view all tickets in the backlog and sprints but cannot create, edit, or move them.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(
-        "Maintainers work on annual inspections and nothing else. Everything else on the web dashboard is hidden from them entirely.",
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Dev Tools",
+    description:
+      "Internal pages under /dev-tools: Sync Health, Stripe Checkout, Damage Photos and QBO Sales Tax. They sit in the Dev Tools section of the sidebar.",
+    category: "Dev Tools",
+    roles: {
+      admin: custom(
+        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health is for developers only.",
       ),
+      account_manager: none("Dev Tools are internal pages for developers."),
+      developer: full(
+        "Sees the Dev Tools section in the sidebar and can use every page in it, including Sync Health. Stripe Checkout creates real checkout sessions and Damage Photos can delete stored photos.",
+      ),
+      viewer: custom(
+        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health is for developers only.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
 ];
