@@ -60,6 +60,7 @@ beforeEach(() => {
     create table "Drivers"         (id text primary key, user_uuid text, is_active integer);
     create table "Developers"      (id text primary key, user_uuid text, is_active integer);
     create table "Maintainers"     (id text primary key, user_uuid text, is_active integer);
+    create table "Accountants"     (id text primary key, user_uuid text, is_active integer);
   `);
 });
 
@@ -104,6 +105,24 @@ describe("buildIncompleteQuery", () => {
     const rows = run<any>(buildIncompleteQuery());
 
     expect(rows.map((r) => r.userUuid)).toEqual(["expired"]);
+  });
+
+  it("does not call an accountant incomplete — the role is what they were invited for", () => {
+    addUser("acct");
+    grant("Accountants", "acct");
+
+    const rows = run<any>(buildIncompleteQuery());
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it("still lists a user whose accountant row was deactivated", () => {
+    addUser("former-acct");
+    grant("Accountants", "former-acct", 0);
+
+    const rows = run<any>(buildIncompleteQuery());
+
+    expect(rows.map((r) => r.userUuid)).toEqual(["former-acct"]);
   });
 
   it("leaves the roles it already knew about alone", () => {

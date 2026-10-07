@@ -53,12 +53,16 @@ export function driverDocumentFields(state: CurrentUserState) {
   };
 }
 
-// Resolves the current user's admin flag via the same mechanism the RLS policies use
-// (auth.jwt() -> 'sub'), so it stays consistent with the database's row-level security.
-async function currentUserIsAdmin(supabase: TypedSupabaseClient): Promise<boolean> {
+// The roles of the signed-in user, from the same function the RLS policies use
+// (auth.jwt() -> 'sub'), so they stay consistent with the database's row-level security.
+async function currentUserRoles(supabase: TypedSupabaseClient): Promise<string[]> {
   const { data: roles, error } = await supabase.rpc("get_user_roles");
   if (error) throw new Error(error.message);
-  return (roles ?? []).includes("admin");
+  return roles ?? [];
+}
+
+async function currentUserIsAdmin(supabase: TypedSupabaseClient): Promise<boolean> {
+  return (await currentUserRoles(supabase)).includes("admin");
 }
 
 // Whether the current actor may update the Drivers row itself (pay, contact, etc.).
@@ -66,11 +70,17 @@ async function currentUserIsAdmin(supabase: TypedSupabaseClient): Promise<boolea
 // already shares a zone with the driver. A driver not yet in any of the AM's zones is
 // still added to the zone via syncDriverZoneAssignments (its own DriverZones RLS) — the
 // row-detail update is simply skipped until the driver is in one of the AM's zones.
-async function currentUserCanEditDriverRow(
+//
+// An accountant may update any driver's row too (docs/specs/accountant-team.md): the database
+// lets the accountant change only the pay and vendor columns, so this answer is about reaching the
+// row, not about which columns. It matters here for an account manager who is also an accountant,
+// on a driver outside their zones (spec D9): without it their pay and vendor edits would be skipped.
+export async function currentUserCanEditDriverRow(
   supabase: TypedSupabaseClient,
   driverUuid: string,
 ): Promise<boolean> {
-  if (await currentUserIsAdmin(supabase)) return true;
+  const roles = await currentUserRoles(supabase);
+  if (roles.includes("admin") || roles.includes("accountant")) return true;
 
   const { data: amId, error: amError } = await supabase.rpc("get_current_account_manager_id");
   if (amError) throw new Error(amError.message);
@@ -285,9 +295,69 @@ export async function createUser(
       if (maintError) throw maintError;
     }
 
+    // 7. If accountant, insert into Accountants table (admin-only under RLS)
+    if (state.isAccountant) {
+      const { error: acctError } = await supabase.from("Accountants").insert({
+        user_uuid: userUuid,
+        is_active: true,
+      });
+      if (acctError) throw acctError;
+    }
+
     return { success: true, userUuid };
   } catch (error) {
     console.error("Error creating user:", error);
+    return { success: false, error: toErrorMessage(error) };
+  }
+}
+
+/**
+ * Saves what an accountant may change on a driver: the pay fields and the vendor, and the pay
+ * tiers that go with them — and nothing else (docs/specs/accountant-team.md §6). It writes
+ * nothing to Users, Addresses, Vehicles, DriverZones or any role table, which is why an accountant
+ * does not go through `updateUser`. The database refuses every other column of Drivers as well.
+ *
+ * A write that RLS filters out raises no error: it matches no row. So the updated row is read back
+ * and "no row" is a failure, otherwise a refused save would look like a saved one.
+ */
+export async function updateDriverPayment(
+  supabase: TypedSupabaseClient,
+  state: CurrentUserState,
+): Promise<{ success: boolean; error?: string }> {
+  if (!state.existingUserUuid) {
+    return { success: false, error: "No user UUID provided" };
+  }
+  if (!state.isDriver) {
+    return { success: false, error: "This user is not a driver" };
+  }
+
+  try {
+    const userUuid = state.existingUserUuid;
+
+    const { data: driver, error: driverError } = await supabase
+      .from("Drivers")
+      .select("id")
+      .eq("user_uuid", userUuid)
+      .single();
+    if (driverError) throw driverError;
+    if (!driver) throw new Error("This user has no driver record");
+
+    const { data: updated, error: updateError } = await supabase
+      .from("Drivers")
+      .update({ ...driverPayFields(state), vendor_uuid: state.vendorUuid })
+      .eq("user_uuid", userUuid)
+      .select("id");
+    if (updateError) throw updateError;
+    if (!updated || updated.length === 0) {
+      throw new Error("The change was not saved — you may not be allowed to change this driver.");
+    }
+
+    // Tiers ride along with the pay fields they override, under the same permission.
+    await syncDriverPayRanges(supabase, driver.id, state.payRanges);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating driver payment info:", error);
     return { success: false, error: toErrorMessage(error) };
   }
 }
@@ -541,6 +611,36 @@ export async function updateUser(
         .update({ is_active: false })
         .eq("user_uuid", userUuid);
       if (maintDeactivateError) throw maintDeactivateError;
+    }
+
+    // 6. Handle Accountant role. Same shape as the maintainer block: revoking
+    // deactivates the row rather than deleting it.
+    const { data: existingAcct } = await supabase
+      .from("Accountants")
+      .select("id")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (state.isAccountant) {
+      if (!existingAcct) {
+        const { error: acctInsertError } = await supabase.from("Accountants").insert({
+          user_uuid: userUuid,
+          is_active: true,
+        });
+        if (acctInsertError) throw acctInsertError;
+      } else {
+        const { error: acctUpdateError } = await supabase
+          .from("Accountants")
+          .update({ is_active: true })
+          .eq("user_uuid", userUuid);
+        if (acctUpdateError) throw acctUpdateError;
+      }
+    } else if (existingAcct) {
+      const { error: acctDeactivateError } = await supabase
+        .from("Accountants")
+        .update({ is_active: false })
+        .eq("user_uuid", userUuid);
+      if (acctDeactivateError) throw acctDeactivateError;
     }
 
     return { success: true };
@@ -951,6 +1051,18 @@ export async function fetchUserById(
     if (maintainer && maintainer.is_active) {
       roleTabs.push("maintainer");
       result.isMaintainer = true;
+    }
+
+    // 6. Check if user is an accountant
+    const { data: accountant } = await supabase
+      .from("Accountants")
+      .select("id, is_active")
+      .eq("user_uuid", userUuid)
+      .single();
+
+    if (accountant && accountant.is_active) {
+      roleTabs.push("accountant");
+      result.isAccountant = true;
     }
 
     result.roleTabs = roleTabs;

@@ -17,6 +17,7 @@ function mapUserAccessRow(row: {
   Drivers: RoleRow[] | null;
   Developers: RoleRow[] | null;
   Maintainers: RoleRow[] | null;
+  Accountants: RoleRow[] | null;
 }): UserAccessData {
   return {
     id: row.id,
@@ -27,6 +28,7 @@ function mapUserAccessRow(row: {
     driver_id: activeRoleId(row.Drivers),
     developer_id: activeRoleId(row.Developers),
     maintainer_id: activeRoleId(row.Maintainers),
+    accountant_id: activeRoleId(row.Accountants),
   };
 }
 
@@ -48,7 +50,8 @@ export async function resolveUserAccessForRequest(clerkUserId: string): Promise<
       AccountManagers!AccountManagers_user_uuid_fkey(id, is_active),
       Drivers!Drivers_user_uuid_fkey(id, is_active),
       Developers!Developers_user_uuid_fkey(id, is_active),
-      Maintainers!maintainers_user_uuid_fkey(id, is_active)
+      Maintainers!maintainers_user_uuid_fkey(id, is_active),
+      Accountants!accountants_user_uuid_fkey(id, is_active)
     `,
     )
     .eq("clerk_user_id", clerkUserId)

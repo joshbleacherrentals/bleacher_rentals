@@ -32,6 +32,10 @@ export function QuotePublicView({
 }) {
   const { currency, language } = data;
   const s = quoteText(language);
+  const isSigned = !!data.contractSignature;
+  const numberLabel = isSigned
+    ? s.invoiceNumber(data.quoteNumber)
+    : s.quoteNumber(data.quoteNumber);
   const formatMoney = (cents: number) => formatQuoteMoney(cents, currency, language);
   const formatDate = (d: string) => formatQuoteDate(d, language);
 
@@ -91,8 +95,10 @@ export function QuotePublicView({
 
           {/* Right: INVOICE badge */}
           <div className="text-left sm:text-right">
-            <p className="text-3xl font-bold text-green-700">{s.invoiceBadge}</p>
-            <p className="text-sm mt-1">{s.invoiceNumber(data.quoteNumber)}</p>
+            <p className="text-3xl font-bold text-green-700">
+              {isSigned ? s.invoiceBadge : s.quoteBadge}
+            </p>
+            <p className="text-sm mt-1">{numberLabel}</p>
             {data.poNumber && <p className="text-sm">{s.poNumberShort(data.poNumber)}</p>}
           </div>
         </div>
@@ -178,6 +184,7 @@ export function QuotePublicView({
             <ChecksPayableBox
               company={data.company}
               quoteNumber={data.quoteNumber}
+              isSigned={isSigned}
               paymentInfo={data.company.paymentInfo}
               language={language}
               highlight={highlightPaymentBox}
@@ -259,7 +266,7 @@ export function QuotePublicView({
         {/* Footer */}
         <div className="px-4 sm:px-8 py-4 bg-gray-50 border-t flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <p className="text-xs text-gray-400">
-            {data.company.name} &middot; {s.invoiceNumber(data.quoteNumber)}
+            {data.company.name} &middot; {numberLabel}
           </p>
           <a
             href={`/api/quotes/${data.eventId}/pdf?lang=${language}`}

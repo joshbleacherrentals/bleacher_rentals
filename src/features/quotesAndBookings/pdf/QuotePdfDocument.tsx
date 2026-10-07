@@ -216,7 +216,9 @@ export function QuotePdfDocument({ data }: { data: QuoteDocumentData }) {
             ) : null}
           </View>
           <View>
-            <Text style={styles.quoteTitle}>{s.pdfQuoteTitle}</Text>
+            <Text style={styles.quoteTitle}>
+              {data.contractSignature ? s.pdfInvoiceTitle : s.pdfQuoteTitle}
+            </Text>
             <Text style={styles.quoteNumber}>{data.quoteNumber}</Text>
             <Text style={styles.quoteNumber}>{s.pdfDate(formatDate(data.quoteDate))}</Text>
             {data.validUntil ? (

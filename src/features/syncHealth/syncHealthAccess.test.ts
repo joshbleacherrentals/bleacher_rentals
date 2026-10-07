@@ -47,9 +47,10 @@ describe("access to /dev-tools/sync-health", () => {
     expect(guardAllows(["developer"])).toBe(true);
   });
 
-  it("a developer is not handed the rest of /dev-tools", () => {
-    // stripe-checkout, damage-photos, qbo-get-sales-tax stay admin/viewer only.
-    expect(mergeRoleConfigs(["developer"]).allowedPaths).not.toContain("/dev-tools");
+  it("a developer is handed all of /dev-tools", () => {
+    // Stripe checkout, damage photos and QBO tax sit beside Sync Health in the
+    // developer's Dev Tools menu, so the guard has to let them through.
+    expect(mergeRoleConfigs(["developer"]).allowedPaths).toContain("/dev-tools");
   });
 
   it("a developer passes the page gate", () => {

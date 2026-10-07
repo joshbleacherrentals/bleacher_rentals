@@ -80,6 +80,8 @@ export type BleacherBlock = {
   blockUuid: string;
   text: string;
   date: string;
+  /** Who wrote the note; null for notes that predate the column. */
+  createdByUserUuid: string | null;
 };
 
 export type BleacherWorkTracker = {
@@ -116,6 +118,8 @@ export type DashboardBlock = {
   blockUuid: string;
   text: string;
   date: string;
+  /** Who wrote the note; null for notes that predate the column. */
+  createdByUserUuid: string | null;
 };
 
 export type DashboardEvent = {

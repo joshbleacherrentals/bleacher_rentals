@@ -30,8 +30,11 @@ vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
 vi.mock("../../../hooks/useUserNames", () => ({
   useUserNames: () => new Map([["user-7", "Dana Whitfield"]]),
 }));
+// A bare input that keeps the one thing the tab decides: whether it is disabled.
 vi.mock("@/components/ui/checkbox", () => ({
-  Checkbox: () => null,
+  Checkbox: ({ disabled }: { disabled?: boolean }) => (
+    <input type="checkbox" data-testid="qbo-flag" disabled={disabled} />
+  ),
 }));
 
 import { BillingTab } from "./BillingTab";
@@ -67,13 +70,28 @@ function payment(over: object = {}) {
     recordedByUserUuid: null,
     reference: null,
     notes: null,
+    // Soft delete (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md).
+    deletedAt: null,
+    deletedByUserUuid: null,
+    deleteReason: null,
     ...over,
   };
 }
 
-function render(contractTotalCents = 500000, canEdit = true) {
+const DELETED = {
+  deletedAt: "2026-08-20T09:00:00.000+00:00",
+  deletedByUserUuid: "admin-1",
+  deleteReason: "entered twice",
+};
+
+function render(contractTotalCents = 500000, can: Can = ADMIN, initiallyShowDeleted = false) {
   return renderToStaticMarkup(
-    <BillingTab quote={quote} contractTotalCents={contractTotalCents} canEdit={canEdit} />,
+    <BillingTab
+      quote={quote}
+      contractTotalCents={contractTotalCents}
+      can={can}
+      initiallyShowDeleted={initiallyShowDeleted}
+    />,
   );
 }
 
@@ -89,18 +107,36 @@ function paymentsReceivedRow(html: string): string {
   return html.slice(start, html.indexOf("</div>", html.indexOf("Payments Received")));
 }
 
-/** The three identities the button distinguishes. */
-const ADMIN = { userId: "user-7", isAdmin: true, isAccountManager: false, leadZoneIds: ["z1"] };
-const AM = { userId: "user-7", isAdmin: false, isAccountManager: true, leadZoneIds: [] };
-const LEAD_AM = { userId: "user-7", isAdmin: false, isAccountManager: true, leadZoneIds: ["z1"] };
-const VIEWER = { userId: "user-7", isAdmin: false, isAccountManager: false, leadZoneIds: [] };
+/**
+ * What the page works out and hands down (docs/specs/accountant-quotes-03-capabilities.md): the
+ * tab reads these two answers and never asks who the user is. The store only supplies the user's
+ * own id, which the tab stamps on a payment it records.
+ */
+type Can = Parameters<typeof BillingTab>[0]["can"];
+
+/** An admin: Record Payment drawn, the QuickBooks flag settable. */
+const ADMIN: Can = { recordPayment: true, setQuickBooksFlag: true };
+/**
+ * An account manager, lead or junior (docs/specs/accountant-quotes-06-am-read-only-payments.md):
+ * no Record Payment, whatever the quote; the QuickBooks flag is theirs.
+ */
+const ACCOUNT_MANAGER: Can = { recordPayment: false, setQuickBooksFlag: true };
+/** A viewer: no button, and the flag is read-only. */
+const VIEWER: Can = { recordPayment: false, setQuickBooksFlag: false };
+
+const USER = { userId: "user-7" };
+
+/** The QuickBooks checkbox the tab drew, and the label next to it. */
+const qboCheckbox = (html: string) =>
+  html.match(/<input[^>]*data-testid="qbo-flag"[^>]*>/)?.[0] ?? "";
+const qboLabel = (html: string) => html.match(/<span[^>]*>QuickBooks Invoice<\/span>/)?.[0] ?? "";
 
 describe("BillingTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInstallments.mockReturnValue([]);
     mockPayments.mockReturnValue([]);
-    mockPerms.mockReturnValue(ADMIN);
+    mockPerms.mockReturnValue(USER);
     mockCurrencyResolved.mockReturnValue(true);
   });
 
@@ -232,39 +268,231 @@ describe("BillingTab", () => {
     expect(html).toContain("$1,000.00"); // full balance still due
   });
 
+  // ── Deleted payments (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md) ──
+  // The hook returns every row; the list hides the deleted ones, and the allocation — which still
+  // receives them — leaves them out of every figure.
+
+  describe("a deleted payment", () => {
+    it("is not listed", () => {
+      mockPayments.mockReturnValue([
+        payment({ id: "live", payerName: "Live Payer", amountCents: 1000 }),
+        payment({ id: "gone", payerName: "Deleted Payer", amountCents: 5000, ...DELETED }),
+      ]);
+
+      const html = render(500000);
+
+      expect(html).toContain("Live Payer");
+      expect(html).not.toContain("Deleted Payer");
+    });
+
+    it("is not in the received total or the balance", () => {
+      mockPayments.mockReturnValue([payment({ id: "gone", amountCents: 120000, ...DELETED })]);
+
+      const html = render(500000);
+
+      expect(paymentsReceivedRow(html)).toContain("$0.00");
+      expect(html).toContain("$5,000.00"); // the whole contract is still owed
+      expect(html).not.toContain("$1,200.00");
+    });
+
+    it("does not fill an installment it was applied to", () => {
+      mockInstallments.mockReturnValue([installment()]);
+      mockPayments.mockReturnValue([
+        payment({ id: "gone", amountCents: 270000, installmentId: "i1", ...DELETED }),
+      ]);
+
+      const html = render(270000);
+
+      expect(html).toContain("Unpaid");
+      expect(html).not.toContain("Paid</span>");
+      expect(html).not.toContain("Partial");
+      expect(html).toContain("$2,700.00"); // still owed in full
+    });
+
+    it("does not reopen an installment when it was a refund", () => {
+      mockInstallments.mockReturnValue([installment()]);
+      mockPayments.mockReturnValue([
+        payment({ id: "paid", amountCents: 270000, installmentId: "i1" }),
+        payment({ id: "refund", amountCents: -270000, installmentId: "i1", ...DELETED }),
+      ]);
+
+      const html = render(270000);
+
+      expect(html).toContain("Paid");
+      expect(html).toContain("$0.00"); // balance cleared
+      expect(html).not.toContain("-$2,700.00");
+    });
+
+    it("leaves 'No payments recorded yet' when every payment is deleted", () => {
+      mockPayments.mockReturnValue([payment({ id: "gone", ...DELETED })]);
+
+      const html = render(500000);
+
+      expect(html).toContain("No payments recorded yet");
+    });
+  });
+
+  // ── Show deleted (docs/specs/accountant-quotes-09-payments-edit-delete-ui.md §3, §6.3) ──
+
+  describe("the Show deleted switch", () => {
+    const DELETED_ROW = { id: "gone", payerName: "Deleted Payer", amountCents: 5000, ...DELETED };
+    const switchOf = (html: string) => /<button[^>]*role="switch"[^>]*>/.exec(html)?.[0] ?? "";
+
+    it("S6: is there for every role that reads payments — admin, account manager and viewer alike", () => {
+      for (const can of [ADMIN, ACCOUNT_MANAGER, VIEWER]) {
+        const html = render(500000, can);
+        expect(switchOf(html)).not.toBe("");
+        expect(html).toContain("Show deleted");
+      }
+    });
+
+    it("is off to begin with, and says so to assistive technology", () => {
+      expect(switchOf(render())).toContain('aria-checked="false"');
+    });
+
+    it("S5: off, a deleted payment is not listed", () => {
+      mockPayments.mockReturnValue([
+        payment({ id: "live", payerName: "Live Payer", amountCents: 1000 }),
+        payment(DELETED_ROW),
+      ]);
+      const html = render();
+      expect(html).toContain("Live Payer");
+      expect(html).not.toContain("Deleted Payer");
+    });
+
+    it("S5: on, it is listed in the same table, in place", () => {
+      mockPayments.mockReturnValue([
+        payment({ id: "live", payerName: "Live Payer", amountCents: 1000 }),
+        payment(DELETED_ROW),
+      ]);
+      const html = render(500000, ADMIN, true);
+      expect(switchOf(html)).toContain('aria-checked="true"');
+      expect(html.indexOf("Live Payer")).toBeGreaterThan(-1);
+      expect(html.indexOf("Deleted Payer")).toBeGreaterThan(-1);
+      // One table, not a second one below the ledger (D5 A).
+      expect(html.match(/<table/g)?.length).toBe(1);
+    });
+
+    it("S5: on, a deleted payment is greyed, its amount struck through, with a Deleted badge", () => {
+      mockPayments.mockReturnValue([payment(DELETED_ROW)]);
+      const row = render(500000, ADMIN, true);
+      const tr =
+        /<tr[^>]*aria-label="Payment details for[^"]*"[^>]*>[\s\S]*?<\/tr>/.exec(row)?.[0] ?? "";
+      expect(tr).toContain("opacity-60");
+      expect(tr).toContain("line-through");
+      expect(tr).toContain(">Deleted</span>");
+    });
+
+    it("on, a payment that is not deleted is neither greyed nor struck through nor badged", () => {
+      mockPayments.mockReturnValue([payment({ id: "live", amountCents: 1000 })]);
+      const html = render(500000, ADMIN, true);
+      expect(html).not.toContain("line-through");
+      expect(html).not.toContain(">Deleted</span>");
+      expect(html).not.toContain("opacity-60");
+    });
+
+    it("on, a deleted payment's 'Applied To' says it was not counted because it was deleted", () => {
+      mockPayments.mockReturnValue([payment(DELETED_ROW)]);
+      expect(render(500000, ADMIN, true)).toContain("Not counted (deleted)");
+    });
+
+    it("S5: the totals are identical on or off", () => {
+      mockInstallments.mockReturnValue([installment()]);
+      mockPayments.mockReturnValue([
+        payment({ id: "live", amountCents: 100000, installmentId: "i1" }),
+        payment({ ...DELETED_ROW, amountCents: 170000, installmentId: null }),
+      ]);
+      const off = render(270000);
+      const on = render(270000, ADMIN, true);
+
+      expect(paymentsReceivedRow(on)).toBe(paymentsReceivedRow(off));
+      for (const figure of ["$1,000.00", "$1,700.00", "Partial"]) {
+        expect(on.includes(figure)).toBe(off.includes(figure));
+      }
+      // The deleted $1,700.00 is listed when on, and counted in no figure either way.
+      expect(on).toContain("Deleted Payer");
+      expect(paymentsReceivedRow(on)).toContain("$1,000.00");
+      expect(paymentsReceivedRow(on)).not.toContain("$2,700.00");
+    });
+
+    it("on, with only deleted payments, the list is shown and 'No payments' is not", () => {
+      mockPayments.mockReturnValue([payment(DELETED_ROW)]);
+      expect(render(500000, ADMIN, true)).not.toContain("No payments recorded yet");
+      expect(render(500000, ADMIN, false)).toContain("No payments recorded yet");
+    });
+  });
+
   // ── Manual payment entry (docs/specs/manual-payment-entry.md §6.1, §6.4) ──
 
+  // docs/specs/accountant-quotes-06-am-read-only-payments.md: one answer, `can.recordPayment`. The
+  // button is drawn when it is true and not drawn when it is false — there is no disabled state.
   describe("the + Record Payment button", () => {
-    it("is offered to an admin", () => {
-      mockPerms.mockReturnValue(ADMIN);
-      const html = render(500000, true);
+    it("is offered to an admin, enabled", () => {
+      const html = render(500000, ADMIN);
       expect(html).toContain("+ Record Payment");
+      expect(html).toContain("Record a check, ACH or manual card payment");
       expect(html).not.toContain("disabled");
     });
 
-    it("S13: a lead AM may record a payment on a quote they did not create", () => {
-      // canEdit is what canEditOwnedEntity already answers for a lead: true on
-      // every quote. The tab only has to honour it.
-      mockPerms.mockReturnValue(LEAD_AM);
-      const html = render(500000, true);
-      expect(html).toContain("+ Record Payment");
-      expect(html).not.toContain("disabled");
+    it("S1: an account manager is not shown it — lead and junior get the same answer", () => {
+      const html = render(500000, ACCOUNT_MANAGER);
+      expect(html).not.toContain("+ Record Payment");
     });
 
-    it("S8: a junior AM on someone else's quote sees it disabled, and why", () => {
-      mockPerms.mockReturnValue(AM);
-      const html = render(500000, false);
-      expect(html).toContain("+ Record Payment");
-      expect(html).toContain("disabled");
-      expect(html).toContain("only record a payment on quotes you created");
+    it("S1: …but still reads the payment history in full", () => {
+      mockPayments.mockReturnValue([payment({ amountCents: 200 })]);
+
+      const html = render(500000, ACCOUNT_MANAGER);
+
+      expect(html).toContain("Payment History");
+      expect(html).toContain("Krista Timmermans");
+      expect(html).toContain("$2.00");
+      expect(html).toContain("Balance Due");
     });
 
-    it("S9: a viewer is not shown it at all", () => {
-      mockPerms.mockReturnValue(VIEWER);
-      const html = render(500000, false);
+    it("S3: a viewer is not shown it at all", () => {
+      const html = render(500000, VIEWER);
       expect(html).not.toContain("+ Record Payment");
       // …but the history is still fully readable.
       expect(html).toContain("Payment History");
+    });
+
+    it("is drawn by recordPayment alone", () => {
+      expect(render(500000, { ...ADMIN, recordPayment: false })).not.toContain("+ Record Payment");
+      expect(render(500000, { ...VIEWER, recordPayment: true })).toContain("+ Record Payment");
+    });
+
+    it("has no disabled state and no hint, whatever the answers", () => {
+      for (const can of [ADMIN, ACCOUNT_MANAGER, VIEWER]) {
+        const html = render(500000, can);
+        expect(html).not.toContain("only record a payment on quotes you created");
+        expect(html).not.toContain("cursor-not-allowed");
+      }
+    });
+  });
+
+  describe("the QuickBooks Invoice checkbox", () => {
+    it("S1: is enabled for an admin", () => {
+      const html = render(500000, ADMIN);
+      expect(qboCheckbox(html)).not.toBe("");
+      expect(qboCheckbox(html)).not.toContain("disabled");
+      expect(qboLabel(html)).not.toContain("text-gray-400");
+    });
+
+    it("S3: is enabled for an account manager, who cannot record a payment — bookkeeping is not the owner's job", () => {
+      const html = render(500000, ACCOUNT_MANAGER);
+      expect(qboCheckbox(html)).not.toContain("disabled");
+    });
+
+    it("S5: is disabled and greyed out for a viewer, who can still see it", () => {
+      const html = render(500000, VIEWER);
+      expect(qboCheckbox(html)).toContain("disabled");
+      expect(qboLabel(html)).toContain("text-gray-400");
+    });
+
+    it("follows setQuickBooksFlag alone, not the Record Payment answers", () => {
+      const html = render(500000, { recordPayment: true, setQuickBooksFlag: false });
+      expect(qboCheckbox(html)).toContain("disabled");
     });
   });
 
@@ -359,9 +587,12 @@ describe("BillingTab", () => {
       expect(cell).toContain("+2 more");
     });
 
-    it("says corrections are entered as negatives, since nothing can be deleted", () => {
+    // docs/specs/accountant-quotes-09-payments-edit-delete-ui.md §3 (1 A): a manual payment can be
+    // edited and deleted now, so the line under the table is about Stripe payments alone.
+    it("says Stripe payments cannot be edited or deleted, and no longer says corrections are negatives", () => {
       const html = render();
-      expect(html).toContain("record a negative amount");
+      expect(html).toContain("Stripe payments cannot be edited or deleted.");
+      expect(html).not.toContain("record a negative amount");
     });
   });
 });

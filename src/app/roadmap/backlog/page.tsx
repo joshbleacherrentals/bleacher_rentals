@@ -8,7 +8,13 @@ import { useBacklogTasks } from "../_lib/hooks/useBacklogTasks";
 import { useAllSprintsMap } from "../_lib/hooks/useSprints";
 import { PageHeaderWithBreadCrumbs as RoadmapHeader } from "@/components/PageHeaderWithBreadCrumbs";
 import { StatusPill, type StatusTone } from "../_lib/components/StatusPill";
-import { DataTable, Row, Cell, TitleCell } from "../_lib/components/list/DataTable";
+import {
+  DataTable,
+  Row,
+  Cell,
+  TitleCell,
+  DeletedStatusCell,
+} from "../_lib/components/list/DataTable";
 import { EmptyState } from "../_lib/components/list/Panel";
 import { FilterPill } from "../_lib/components/list/FilterPill";
 import { TaskModal } from "../_lib/components/TaskModal";
@@ -146,12 +152,21 @@ export default function BacklogPage() {
         >
           {visibleTasks.map((t) => {
             const meta = getStatusMeta(t.status, t.sprint_id);
+            const isDeleted = !!t.deleted_at;
             return (
-              <Row key={t.id} onClick={() => router.push(`${baseUrl}?ticket=${t.id}`)}>
-                <TitleCell title={t.title} fallback="Untitled ticket" />
-                <Cell>
-                  <StatusPill label={meta.label} tone={meta.tone} />
-                </Cell>
+              <Row
+                key={t.id}
+                deleted={isDeleted}
+                onClick={() => router.push(`${baseUrl}?ticket=${t.id}`)}
+              >
+                <TitleCell title={t.title} fallback="Untitled ticket" deleted={isDeleted} />
+                {isDeleted ? (
+                  <DeletedStatusCell />
+                ) : (
+                  <Cell>
+                    <StatusPill label={meta.label} tone={meta.tone} />
+                  </Cell>
+                )}
                 <Cell className="text-xs text-rm-ink-muted">
                   <span className="flex items-center gap-1">
                     <Calendar className="size-3" />
@@ -164,14 +179,14 @@ export default function BacklogPage() {
                   </span>
                 </Cell>
                 <Cell>
-                  <SubscriberAvatars
-                    userUuids={subscriptionsMap.get(t.id) ?? []}
-                    userMap={userMap}
-                  />
+                  {!isDeleted && (
+                    <SubscriberAvatars
+                      userUuids={subscriptionsMap.get(t.id) ?? []}
+                      userMap={userMap}
+                    />
+                  )}
                 </Cell>
-                <Cell>
-                  <TaskMessageBadge taskId={t.id} userUuid={userUuid} />
-                </Cell>
+                <Cell>{!isDeleted && <TaskMessageBadge taskId={t.id} userUuid={userUuid} />}</Cell>
               </Row>
             );
           })}

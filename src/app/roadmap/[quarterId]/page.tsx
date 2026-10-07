@@ -10,7 +10,13 @@ import { useSprintsForQuarter } from "../_lib/hooks/useSprints";
 import { useFeaturesForQuarter } from "../_lib/hooks/useFeatures";
 import { PageHeaderWithBreadCrumbs as RoadmapHeader } from "@/components/PageHeaderWithBreadCrumbs";
 import { StatusPill } from "../_lib/components/StatusPill";
-import { DataTable, Row, Cell, TitleCell } from "../_lib/components/list/DataTable";
+import {
+  DataTable,
+  Row,
+  Cell,
+  TitleCell,
+  DeletedStatusCell,
+} from "../_lib/components/list/DataTable";
 import { EmptyState, Panel, SectionHeading } from "../_lib/components/list/Panel";
 import { FilterPill } from "../_lib/components/list/FilterPill";
 import { FEATURE_STATUS_META } from "../_lib/constants";
@@ -151,12 +157,21 @@ export default function QuarterDetailPage() {
           >
             {features.map((f) => {
               const meta = FEATURE_STATUS_META[f.status];
+              const isDeleted = !!f.deleted_at;
               return (
-                <Row key={f.id} onClick={() => router.push(`${baseUrl}?feature=${f.id}`)}>
-                  <TitleCell title={f.title} fallback="Untitled feature" />
-                  <Cell>
-                    <StatusPill label={meta.label} tone={meta.tone} />
-                  </Cell>
+                <Row
+                  key={f.id}
+                  deleted={isDeleted}
+                  onClick={() => router.push(`${baseUrl}?feature=${f.id}`)}
+                >
+                  <TitleCell title={f.title} fallback="Untitled feature" deleted={isDeleted} />
+                  {isDeleted ? (
+                    <DeletedStatusCell />
+                  ) : (
+                    <Cell>
+                      <StatusPill label={meta.label} tone={meta.tone} />
+                    </Cell>
+                  )}
                   <Cell>
                     <div className="flex flex-wrap gap-1">
                       {f.sprint_ids.length === 0 ? (

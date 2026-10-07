@@ -20,5 +20,6 @@ export function useUserFormPaths() {
     developer: `${basePath}/developer`,
     viewer: `${basePath}/viewer`,
     maintainer: `${basePath}/maintainer`,
+    accountant: `${basePath}/accountant`,
   };
 }

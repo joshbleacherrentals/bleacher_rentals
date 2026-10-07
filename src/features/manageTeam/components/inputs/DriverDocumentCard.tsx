@@ -125,8 +125,23 @@ export function DriverDocumentCard({
     }
   };
 
+  // A disabled card cannot be changed, but the document can still be opened. The Driver Setup block
+  // of a form that is locked for the signed-in role does not take the pointer (the form wrapper's
+  // pointer-events-none), which would make the preview and the file name dead links, so the card
+  // opts back in; every control that changes something is hidden or disabled below.
+  //
+  // It is also faded, to say "read-only" — everything but the document itself: the preview and the
+  // file name are what the reader came to look at — and when the preview cannot load, or the file is
+  // a PDF, the icon that stands in for it. A parent's opacity cannot be undone by a child, so the
+  // card sits in no faded wrapper and fades its own parts.
+  const fade = disabled ? "opacity-60" : "";
+
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:border-gray-300">
+    <div
+      className={`rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:border-gray-300 ${
+        disabled ? "pointer-events-auto" : ""
+      }`}
+    >
       <div className="flex items-start gap-3">
         {/* Preview */}
         {showThumbnail ? (
@@ -149,7 +164,7 @@ export function DriverDocumentCard({
           <div
             className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-gray-400 ${
               file ? "border border-gray-200 bg-gray-50" : "border border-dashed border-gray-300"
-            }`}
+            } ${file ? "" : fade}`}
             aria-hidden="true"
           >
             {file?.kind === "pdf" ? (
@@ -167,7 +182,7 @@ export function DriverDocumentCard({
 
         {/* Body */}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${fade}`}>
             <span className="text-sm font-medium text-gray-900">{label}</span>
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_CLASSES[status.tone]}`}
@@ -176,7 +191,7 @@ export function DriverDocumentCard({
             </span>
           </div>
 
-          <p className="mt-0.5 truncate text-xs text-gray-500">
+          <p className={`mt-0.5 truncate text-xs text-gray-500 ${file && publicUrl ? "" : fade}`}>
             {file && publicUrl ? (
               <a
                 href={publicUrl}
@@ -191,7 +206,7 @@ export function DriverDocumentCard({
             )}
           </p>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className={`mt-2 flex flex-wrap items-center gap-2 ${fade}`}>
             <label className="flex items-center gap-1.5 text-xs text-gray-500">
               <span>Expires</span>
               <input

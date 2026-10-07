@@ -19,9 +19,15 @@ type SelectDriverZonesProps = {
   value: string[];
   onChange: (zoneUuids: string[]) => void;
   disabled?: boolean;
+  /**
+   * Shows every zone and every zone the driver is in, and cannot be changed. For someone who sees
+   * the zones without managing any of them — an accountant (docs/specs/accountant-team.md). Without
+   * it the selector shows only the zones the signed-in account manager manages.
+   */
+  readOnly?: boolean;
 };
 
-export function SelectDriverZones({ value, onChange, disabled }: SelectDriverZonesProps) {
+export function SelectDriverZones({ value, onChange, disabled, readOnly }: SelectDriverZonesProps) {
   const isAdmin = usePermissionsStore((s) => s.isAdmin);
   const accountManagerZoneIds = usePermissionsStore((s) => s.accountManagerZoneIds);
   const { data: zoneRows } = useTypedQuery(compiledZones, expect<ZoneRow>());
@@ -29,10 +35,10 @@ export function SelectDriverZones({ value, onChange, disabled }: SelectDriverZon
   const zones = zoneRows ?? [];
 
   const visibleZones = useMemo(() => {
-    if (isAdmin) return zones;
+    if (isAdmin || readOnly) return zones;
     const allowed = new Set(accountManagerZoneIds);
     return zones.filter((z) => allowed.has(z.id));
-  }, [zones, isAdmin, accountManagerZoneIds]);
+  }, [zones, isAdmin, readOnly, accountManagerZoneIds]);
 
   const options = useMemo(
     () =>
@@ -44,8 +50,8 @@ export function SelectDriverZones({ value, onChange, disabled }: SelectDriverZon
   );
 
   const manageableSet = useMemo(
-    () => new Set(isAdmin ? zones.map((z) => z.id) : accountManagerZoneIds),
-    [isAdmin, zones, accountManagerZoneIds],
+    () => new Set(isAdmin || readOnly ? zones.map((z) => z.id) : accountManagerZoneIds),
+    [isAdmin, readOnly, zones, accountManagerZoneIds],
   );
 
   const displayedSelection = useMemo(
@@ -74,7 +80,7 @@ export function SelectDriverZones({ value, onChange, disabled }: SelectDriverZon
       forceSelectedValues={displayedSelection}
       placeholder="Select zones..."
       variant="inverted"
-      disabled={disabled}
+      disabled={disabled || readOnly}
       className="w-full"
     />
   );

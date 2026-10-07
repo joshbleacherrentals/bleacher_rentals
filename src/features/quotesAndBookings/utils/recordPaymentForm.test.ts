@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  changedDraftFields,
+  draftFromPayment,
   evaluateRecordPaymentForm,
   emptyDraft,
   type RecordPaymentDraft,
@@ -164,5 +166,195 @@ describe("evaluateRecordPaymentForm", () => {
     it("says nothing once the currency is known", () => {
       expect(evaluate({ amountRaw: "50" }).currencyError).toBeNull();
     });
+  });
+});
+
+// ── Edit mode (docs/specs/accountant-quotes-09-payments-edit-delete-ui.md §3, §6.1) ──
+//
+// The same fields and rules as recording a payment. What differs: Save is disabled while nothing
+// has changed, and the currency never changes, so it never has to be waited for.
+
+/** A manual payment as the Billing tab holds it — paid on 14 Aug, noon local, against installment i1. */
+const PAYMENT = {
+  amountCents: 270000,
+  paidAt: new Date("2026-08-14T12:00:00").toISOString(),
+  createdAt: new Date("2026-08-14T15:30:00").toISOString(),
+  paymentMethodType: "ach",
+  installmentId: "i1",
+  payerName: "Riverside High",
+  reference: "TRACE-77",
+  notes: "second half",
+};
+
+describe("draftFromPayment", () => {
+  it("fills every field the form collects from the payment", () => {
+    expect(draftFromPayment(PAYMENT)).toEqual({
+      method: "ach",
+      amountRaw: "2700.00",
+      paidAtDate: "2026-08-14",
+      installmentId: "i1",
+      payerName: "Riverside High",
+      reference: "TRACE-77",
+      notes: "second half",
+    });
+  });
+
+  it("writes a refund with its minus sign, which the amount parser reads back", () => {
+    const refund = draftFromPayment({ ...PAYMENT, amountCents: -123456 });
+    expect(refund.amountRaw).toBe("-1234.56");
+    expect(
+      evaluateRecordPaymentForm(refund, TODAY, { mode: "edit", original: refund }).amountCents,
+    ).toBe(-123456);
+  });
+
+  it("turns missing optional text into empty strings, which is what the inputs hold", () => {
+    const bare = draftFromPayment({
+      ...PAYMENT,
+      reference: null,
+      notes: null,
+      installmentId: null,
+    });
+    expect(bare.reference).toBe("");
+    expect(bare.notes).toBe("");
+    expect(bare.installmentId).toBeNull();
+  });
+
+  it("takes the date the payment was dated, falling back to when it was recorded", () => {
+    expect(draftFromPayment({ ...PAYMENT, paidAt: null }).paidAtDate).toBe("2026-08-14");
+  });
+
+  it("reads PowerSync's timestamp shape as well as PostgREST's", () => {
+    // The local database returns `2026-08-13 19:00:40.247+00`; that is an instant, not a local date.
+    const instant = "2026-08-13 19:00:40.247+00";
+    const local = new Date(Date.parse("2026-08-13T19:00:40.247Z"));
+    const expected = new Date(local.getTime() - local.getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 10);
+    expect(draftFromPayment({ ...PAYMENT, paidAt: instant }).paidAtDate).toBe(expected);
+  });
+
+  it("falls back to check when a manual payment carries a method this form does not know", () => {
+    expect(draftFromPayment({ ...PAYMENT, paymentMethodType: "card" }).method).toBe("check");
+  });
+});
+
+describe("changedDraftFields", () => {
+  const original = draftFromPayment(PAYMENT);
+  const changed = (over: Partial<RecordPaymentDraft>) =>
+    changedDraftFields(original, { ...original, ...over });
+
+  it("is empty when nothing was touched", () => {
+    expect(changedDraftFields(original, { ...original })).toEqual([]);
+  });
+
+  it.each([
+    ["amount", { amountRaw: "2800.00" }],
+    ["paidAt", { paidAtDate: "2026-08-13" }],
+    ["method", { method: "check" as const }],
+    ["payer", { payerName: "Riverside High School" }],
+    ["reference", { reference: "TRACE-78" }],
+    ["notes", { notes: "third half" }],
+    ["installment", { installmentId: null }],
+  ] as const)("names %s when it is the only thing changed", (field, over) => {
+    expect(changed(over)).toEqual([field]);
+  });
+
+  it("names several at once, in the order the form lists them", () => {
+    expect(changed({ notes: "x", amountRaw: "1", method: "check", installmentId: "i2" })).toEqual([
+      "amount",
+      "method",
+      "notes",
+      "installment",
+    ]);
+  });
+
+  it("does not count a different way of typing the same amount", () => {
+    expect(changed({ amountRaw: "$2,700" })).toEqual([]);
+    expect(changed({ amountRaw: " 2700.0 " })).toEqual([]);
+  });
+
+  it("does not count whitespace around the text fields", () => {
+    expect(
+      changed({ payerName: "  Riverside High ", reference: " TRACE-77 ", notes: " second half " }),
+    ).toEqual([]);
+  });
+
+  it("counts clearing an optional field, and does not count filling it with nothing", () => {
+    expect(changed({ reference: "" })).toEqual(["reference"]);
+    const bare = draftFromPayment({ ...PAYMENT, reference: null });
+    expect(changedDraftFields(bare, { ...bare, reference: "   " })).toEqual([]);
+  });
+
+  it("counts an amount that does not parse as changed: it is not the amount that was there", () => {
+    expect(changed({ amountRaw: "abc" })).toEqual(["amount"]);
+  });
+});
+
+describe("evaluateRecordPaymentForm — edit mode", () => {
+  const original = draftFromPayment(PAYMENT);
+  const edit = (over: Partial<RecordPaymentDraft> = {}, isSubmitting = false) =>
+    evaluateRecordPaymentForm({ ...original, ...over }, TODAY, {
+      mode: "edit",
+      original,
+      isSubmitting,
+    });
+
+  it("disables Save while nothing has changed, and says so", () => {
+    const state = edit();
+    expect(state.nothingChanged).toBe(true);
+    expect(state.canSubmit).toBe(false);
+  });
+
+  it("enables Save as soon as something changes", () => {
+    const state = edit({ notes: "a new note" });
+    expect(state.nothingChanged).toBe(false);
+    expect(state.canSubmit).toBe(true);
+  });
+
+  it("disables Save again when the change is put back", () => {
+    expect(edit({ amountRaw: "100" }).canSubmit).toBe(true);
+    expect(edit({ amountRaw: "2700.00" }).canSubmit).toBe(false);
+  });
+
+  it("blocks a zero amount", () => {
+    const state = edit({ amountRaw: "0" });
+    expect(state.canSubmit).toBe(false);
+    expect(state.amountError).toMatch(/cannot be zero/i);
+  });
+
+  it("blocks a date in the future", () => {
+    const state = edit({ paidAtDate: "2026-08-15" });
+    expect(state.canSubmit).toBe(false);
+    expect(state.dateError).toMatch(/future/i);
+  });
+
+  it("blocks a payer cleared to nothing", () => {
+    expect(edit({ payerName: "   " }).canSubmit).toBe(false);
+    expect(edit({ payerName: "   " }).payerError).toBe("Who paid?");
+  });
+
+  it("does not wait for the currency: a payment's own currency never changes", () => {
+    const state = edit({ notes: "a new note" });
+    expect(state.currencyError).toBeNull();
+    expect(state.canSubmit).toBe(true);
+  });
+
+  it("says Save changes, not Record Payment — a refund edited is still not a new payment", () => {
+    expect(edit({ notes: "x" }).submitLabel).toBe("Save changes");
+    expect(edit({ amountRaw: "-50" }).submitLabel).toBe("Save changes");
+    expect(edit({ amountRaw: "-50" }).isNegative).toBe(true);
+  });
+
+  it("disables Save while a write is in flight", () => {
+    expect(edit({ notes: "x" }, true).canSubmit).toBe(false);
+  });
+
+  it("leaves recording a payment exactly as it was", () => {
+    const state = evaluateRecordPaymentForm(draft({ amountRaw: "50" }), TODAY, {
+      currencyResolved: true,
+    });
+    expect(state.nothingChanged).toBe(false);
+    expect(state.canSubmit).toBe(true);
+    expect(state.submitLabel).toBe("Record Payment");
   });
 });

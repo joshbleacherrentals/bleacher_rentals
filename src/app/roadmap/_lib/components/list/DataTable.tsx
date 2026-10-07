@@ -1,6 +1,7 @@
 "use client";
 
 import { Panel } from "./Panel";
+import { StatusPill } from "../StatusPill";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,11 +42,24 @@ export function DataTable({
   );
 }
 
-export function Row({ className, children, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
+/**
+ * `deleted` is how every roadmap list marks a soft-deleted row: faint red background and faded
+ * cells. Pair it with `TitleCell deleted` and `DeletedStatusCell`; a cell carrying
+ * `data-keep-opacity` (the status one) stays at full strength.
+ */
+export function Row({
+  className,
+  deleted,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLTableRowElement> & { deleted?: boolean }) {
   return (
     <tr
       className={cn(
-        "cursor-pointer border-b border-rm-hairline transition-colors last:border-0 hover:bg-rm-sunken motion-reduce:transition-none",
+        "cursor-pointer border-b border-rm-hairline transition-colors last:border-0 motion-reduce:transition-none",
+        deleted
+          ? "bg-rm-danger-soft/40 hover:bg-rm-danger-soft/70 [&>td:not([data-keep-opacity])]:opacity-60"
+          : "hover:bg-rm-sunken",
         className,
       )}
       {...props}
@@ -68,10 +82,27 @@ export function Cell({
 }
 
 /** Title cell that degrades to a muted "Untitled …" for drafts. */
-export function TitleCell({ title, fallback }: { title: string; fallback: string }) {
+export function TitleCell({
+  title,
+  fallback,
+  deleted,
+}: {
+  title: string;
+  fallback: string;
+  deleted?: boolean;
+}) {
   return (
-    <Cell className="font-medium">
+    <Cell className={cn("font-medium", deleted && "line-through")}>
       {title.trim() ? title : <span className="text-rm-ink-faint italic">{fallback}</span>}
+    </Cell>
+  );
+}
+
+/** Status cell for a deleted row: a red "Deleted" pill in place of the real status. */
+export function DeletedStatusCell() {
+  return (
+    <Cell data-keep-opacity>
+      <StatusPill label="Deleted" tone="danger" />
     </Cell>
   );
 }

@@ -49,14 +49,16 @@ type IncompleteUser = ReturnType<typeof useIncomplete>[number];
 function IncompleteTable({
   users,
   onRowClick,
+  className = "overflow-auto bg-white",
 }: {
   users: IncompleteUser[];
   onRowClick: (userUuid: string) => void;
+  className?: string;
 }) {
   return (
-    <div className="overflow-auto bg-white">
+    <div className={className}>
       <table className="w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+        <thead className="bg-gray-50 sticky top-0 z-10 shadow-[0_1px_0_0_var(--color-gray-200)]">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               User
@@ -95,7 +97,7 @@ function IncompleteTable({
                 </div>
               </td>
               <td className="px-4 py-4">
-                <div className="text-sm text-gray-900 break-words">{user.email}</div>
+                <div className="text-sm text-gray-900 [overflow-wrap:anywhere]">{user.email}</div>
               </td>
               <td className="px-4 py-4">
                 <StatusBadge statusUuid={user.statusUuid} />
@@ -144,8 +146,8 @@ export function IncompleteList({ showInactive = false }: { showInactive?: boolea
             </div>
             <p className="text-sm text-red-700 mt-1">
               The following users have been created but are not assigned any roles. Users must be an
-              Admin, Account Manager, Driver, Developer, Maintainer, or Viewer to access the
-              application.
+              Admin, Account Manager, Driver, Developer, Maintainer, Accountant, or Viewer to access
+              the application.
             </p>
           </div>
           <IncompleteTable users={activeUsers} onRowClick={handleClick} />
@@ -166,8 +168,8 @@ export function IncompleteList({ showInactive = false }: { showInactive?: boolea
       )}
 
       <Dialog open={deactivatedModalOpen} onOpenChange={setDeactivatedModalOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
+        <DialogContent className="flex h-[min(80vh,640px)] flex-col gap-4 sm:max-w-3xl">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2 text-red-900">
               <AlertTriangle className="h-5 w-5 text-red-600" />
               Deactivated Incomplete Users
@@ -176,8 +178,12 @@ export function IncompleteList({ showInactive = false }: { showInactive?: boolea
               These deactivated users were created but never assigned any roles.
             </DialogDescription>
           </DialogHeader>
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <IncompleteTable users={deactivatedUsers} onRowClick={handleClick} />
+          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200">
+            <IncompleteTable
+              users={deactivatedUsers}
+              onRowClick={handleClick}
+              className="h-full overflow-y-auto overflow-x-hidden bg-white [scrollbar-width:thin] [scrollbar-color:var(--color-gray-300)_transparent]"
+            />
           </div>
         </DialogContent>
       </Dialog>

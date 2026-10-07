@@ -7,7 +7,8 @@ export type WebRole =
   | "developer"
   | "viewer"
   | "driver"
-  | "maintainer";
+  | "maintainer"
+  | "accountant";
 
 export type BlockedReason =
   | "cannot-find-account"
@@ -35,6 +36,7 @@ export function determineUserAccess(userData: UserAccessData | null): AccessResu
   if (userData.developer_id) roles.push("developer");
   if (Boolean(userData.is_viewer)) roles.push("viewer");
   if (userData.maintainer_id) roles.push("maintainer");
+  if (userData.accountant_id) roles.push("accountant");
 
   if (roles.length === 0) {
     if (userData.driver_id) {

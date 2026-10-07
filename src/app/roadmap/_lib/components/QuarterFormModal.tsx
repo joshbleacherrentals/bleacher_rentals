@@ -14,6 +14,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   existing?: Quarter | null;
+  /** Starting values for a NEW quarter (e.g. the "create current quarter" card). */
+  defaults?: { year: number; quarter: number } | null;
   onSaved?: (quarterId: string) => void;
 };
 
@@ -36,17 +38,17 @@ function defaultSprintDates(year: number, quarter: number, sprintIndex: number) 
   };
 }
 
-export function QuarterFormModal({ open, onClose, existing, onSaved }: Props) {
-  const [year, setYear] = useState(existing?.year ?? CURRENT_YEAR);
-  const [quarter, setQuarter] = useState<number>(existing?.quarter ?? 1);
+export function QuarterFormModal({ open, onClose, existing, defaults, onSaved }: Props) {
+  const [year, setYear] = useState(existing?.year ?? defaults?.year ?? CURRENT_YEAR);
+  const [quarter, setQuarter] = useState<number>(existing?.quarter ?? defaults?.quarter ?? 1);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setYear(existing?.year ?? CURRENT_YEAR);
-      setQuarter(existing?.quarter ?? 1);
+      setYear(existing?.year ?? defaults?.year ?? CURRENT_YEAR);
+      setQuarter(existing?.quarter ?? defaults?.quarter ?? 1);
     }
-  }, [open, existing]);
+  }, [open, existing, defaults]);
 
   const handleSave = async () => {
     if (year < 2000 || year > 3000 || quarter < 1 || quarter > 4) {

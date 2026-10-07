@@ -17,6 +17,7 @@ const ROLES = [
   { role: "viewer", emailVar: "E2E_VIEWER_EMAIL", passwordVar: "E2E_VIEWER_PASSWORD" },
   { role: "developer", emailVar: "E2E_DEVELOPER_EMAIL", passwordVar: "E2E_DEVELOPER_PASSWORD" },
   { role: "maintainer", emailVar: "E2E_MAINTAINER_EMAIL", passwordVar: "E2E_MAINTAINER_PASSWORD" },
+  { role: "accountant", emailVar: "E2E_ACCOUNTANT_EMAIL", passwordVar: "E2E_ACCOUNTANT_PASSWORD" },
 ] as const;
 
 const authFileFor = (role: string) => path.join(process.cwd(), `playwright/.auth/${role}.json`);

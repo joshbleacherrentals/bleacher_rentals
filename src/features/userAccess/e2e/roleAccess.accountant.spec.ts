@@ -1,0 +1,64 @@
+import { test, expect } from "@playwright/test";
+
+/**
+ * The Accountant role (docs/specs/accountant-work-trackers.md, S1 and S7,
+ * accountant-quotes-02-accountant-page.md, S1, accountant-quotes-04, S1, accountant-quotes-11, S1 and
+ * accountant-address-book.md, S1): it lands on the Accountant page, its sidebar offers Quotes &
+ * Bookings, Team, Accountant, Work Trackers, Messages (Internal only), Companies & Contacts and
+ * Documentation (Team since docs/specs/accountant-team.md), and it is kept out of every other
+ * operational page.
+ *
+ * This project only exists once E2E_ACCOUNTANT_EMAIL is configured (see playwright.config.ts), so
+ * the file is inert until the Clerk user — with a seeded Users + Accountants row — is created.
+ */
+test.describe("Role access (accountant)", () => {
+  test("lands on the Accountant page, not on a 'no roles assigned' wall", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page).toHaveURL(/\/accountant/, { timeout: 60_000 });
+    await expect(page.getByText("No roles assigned")).toHaveCount(0);
+  });
+
+  test("the Role Permissions page has an Accountant column", async ({ page }) => {
+    await page.goto("/permissions");
+
+    await expect(page.getByRole("columnheader", { name: "Accountant" })).toBeVisible({
+      timeout: 60_000,
+    });
+  });
+
+  test("the sidebar offers Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts and Documentation, and nothing operational else", async ({
+    page,
+  }) => {
+    await page.goto("/permissions");
+
+    const sidebar = page.getByTestId("sidebar");
+    await expect(sidebar.getByText("Quotes & Bookings", { exact: true })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(sidebar.getByText("Team", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Accountant", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Work Trackers", { exact: true })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(sidebar.getByText("Messages", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Companies & Contacts", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Role Permissions")).toBeVisible();
+    await expect(sidebar.getByText("What's New")).toBeVisible();
+
+    for (const label of ["Dashboard", "Assets"]) {
+      await expect(sidebar.getByText(label, { exact: true }), label).toHaveCount(0);
+    }
+  });
+
+  test("is kept out of the pages it was not given", async ({ page }) => {
+    for (const path of ["/dashboard", "/assets", "/all-work-trackers", "/work-tracker-types"]) {
+      // A client-side redirect aborts the navigation. That is a refusal, not an error.
+      await page.goto(path).catch(() => {});
+
+      await expect(page, `accountant reached ${path}`).toHaveURL(/\/accountant/, {
+        timeout: 30_000,
+      });
+    }
+  });
+});

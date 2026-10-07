@@ -171,7 +171,8 @@ document.
 maintainer is unaffected, and an account manager who is also a maintainer gets
 the page. `defaultRedirect` falls back to the first allowed path when
 `/dashboard` is absent, so a maintainer-only user lands on
-`/annual-inspections` — which is the whole of their job.
+`/annual-inspections` — which is the whole of their job. _(Superseded 2026-10-01 by
+[maintainer-dashboard-cells.md](maintainer-dashboard-cells.md): `/dashboard` is now allowed, so they land there.)_
 
 ### 5.2 Sidebar — dropdown children need per-role filtering
 
@@ -291,7 +292,8 @@ Still needed from you, later: a Clerk user with a password, a seeded `Users` +
 
 ## 8. Edge cases
 
-- **Maintainer-only user, first login.** No `/dashboard`, so
+- **Maintainer-only user, first login.** _(Superseded 2026-10-01: `/dashboard` is now allowed, see
+  [maintainer-dashboard-cells.md](maintainer-dashboard-cells.md).)_ No `/dashboard`, so
   `defaultRedirect` is `/annual-inspections`. Verified by 7.2 rather than left
   to chance — the fallback is `allowedPaths[0]`, which depends on array order.
 - **Deactivated user.** `get_user_roles()` returns `{}` before it looks at any
