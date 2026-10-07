@@ -2822,6 +2822,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "PaymentHistory_deleted_by_user_uuid_fkey"
+            columns: ["deleted_by_user_uuid"]
+            isOneToOne: false
+            referencedRelation: "Users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "PaymentHistory_event_uuid_fkey"
             columns: ["event_uuid"]
             isOneToOne: false
