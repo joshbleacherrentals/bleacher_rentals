@@ -3,8 +3,11 @@
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { ContactPicker } from "@/components/ContactPicker";
 import { useContacts, type ContactOption } from "@/features/companiesContacts/hooks/useContacts";
+import { useCompaniesWithNotes } from "@/features/companiesContacts/hooks/useCompaniesWithNotes";
 import { useVenuesAll } from "@/features/venues/hooks/useVenuesAll";
 import { resolveVenueOnContactSelect } from "../../../utils/resolveVenueOnContactSelect";
+import { clientNotesFor } from "../../../utils/clientNotes";
+import { ClientNotes } from "./ClientNotes";
 
 export function ClientInfoSection() {
   const contactId = useCreateQuoteStore((s) => s.contactId);
@@ -13,6 +16,10 @@ export function ClientInfoSection() {
   const setField = useCreateQuoteStore((s) => s.setField);
   const { contacts } = useContacts();
   const { venues } = useVenuesAll();
+  const companyNotes = useCompaniesWithNotes();
+
+  const notesFor = (id: string | null) =>
+    clientNotesFor(contacts.find((c) => c.id === id) ?? null, companyNotes);
 
   const handleContactSelect = (contact: ContactOption) => {
     setField("contactId", contact.id);
@@ -54,6 +61,7 @@ export function ClientInfoSection() {
         onSelect={handleContactSelect}
         onClear={handleContactClear}
       />
+      <ClientNotes notes={notesFor(contactId)} />
 
       <div className="mt-3">
         <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -88,6 +96,7 @@ export function ClientInfoSection() {
               setField("financeContactEmail", "");
             }}
           />
+          <ClientNotes notes={notesFor(financeContactId)} />
         </div>
       )}
     </section>
