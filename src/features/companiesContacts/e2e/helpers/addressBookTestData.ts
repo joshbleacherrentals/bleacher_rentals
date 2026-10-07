@@ -128,6 +128,46 @@ export async function readContact(id: string) {
   return data;
 }
 
+/** A company row as stored, found by the name typed into the form, `deleted` included. */
+export async function findCompanyByName(name: string) {
+  const { data } = await admin()
+    .from("Companies")
+    .select("id, company_name, email, phone, deleted, billing_address_uuid, shipping_address_uuid")
+    .eq("company_name", name)
+    .maybeSingle();
+  return data;
+}
+
+/** A company row as stored, by id, `deleted` included. */
+export async function readCompanyRow(id: string) {
+  const { data } = await admin()
+    .from("Companies")
+    .select("id, company_name, email, phone, deleted, billing_address_uuid, shipping_address_uuid")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+
+/** A contact row as stored, found by the last name typed into the form, `deleted` included. */
+export async function findContactByLastName(lastName: string) {
+  const { data } = await admin()
+    .from("Contacts")
+    .select("id, first_name, last_name, email, deleted")
+    .eq("last_name", lastName)
+    .maybeSingle();
+  return data;
+}
+
+/** A contact row as stored, by id, `deleted` included. */
+export async function readContactRow(id: string) {
+  const { data } = await admin()
+    .from("Contacts")
+    .select("id, first_name, last_name, email, deleted")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+
 /** Deletes everything this spec seeded, contacts first so no company/venue is still referenced. */
 export async function cleanUp(prefix: string) {
   const db = admin();

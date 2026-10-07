@@ -13,6 +13,7 @@ import type { Allocation } from "../../../utils/allocatePayments";
 import { describeAppliedTo, describeOriginalTarget } from "../../../utils/describeAppliedTo";
 import { formatMoney } from "../../../utils/formatMoney";
 import { formatDate, formatDateTime } from "../../../utils/formatDate";
+import { isDeletedPayment } from "../../../utils/deletedPayments";
 import {
   REFERENCE_LABELS,
   paymentMethodLabel,
@@ -28,8 +29,11 @@ import {
  * neither fits in a table cell, and squeezing them in is what made the row
  * heights unreadable. They live here instead, one payment at a time.
  *
- * Read-only by design: a payment is corrected with an offsetting row, never by
- * editing this one. See docs/specs/manual-payment-entry.md §3.5.
+ * It reads, and for someone who writes payments it also starts a correction: a manual payment that
+ * is not deleted offers Edit and Delete (docs/specs/accountant-quotes-09). A Stripe payment offers
+ * neither — it cannot be edited or deleted — and a deleted payment is frozen. The reason, the author
+ * and the time of a deletion are shown only to those who write payments (D6).
+ * See docs/specs/manual-payment-entry.md §3.5.
  */
 
 export type PaymentDetailDialogProps = {
@@ -40,6 +44,14 @@ export type PaymentDetailDialogProps = {
   currency: Currency;
   /** Who entered it — "Stripe", or the staff name the tab already resolved. */
   recordedBy: string;
+  /** `can.recordPayment`: whether the viewer writes payments — Edit, Delete, and a deletion's details. */
+  canWrite: boolean;
+  /** Who deleted it, by name — shown only when `canWrite`. */
+  deletedBy: string;
+  /** Edit was pressed. The tab closes this dialog and opens the form. */
+  onEdit: () => void;
+  /** Delete was pressed. The tab closes this dialog and opens the reason prompt. */
+  onDelete: () => void;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -63,17 +75,27 @@ export function PaymentDetailDialog({
   allocation,
   currency,
   recordedBy,
+  canWrite,
+  deletedBy,
+  onEdit,
+  onDelete,
 }: PaymentDetailDialogProps) {
   const applied = describeAppliedTo(payment, allocation);
   const originalTarget = describeOriginalTarget(payment, allocation);
   const isRefund = payment.amountCents < 0;
+  const isDeleted = isDeletedPayment(payment);
+  const isManual = payment.entrySource === "manual";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-baseline gap-3">
-            <span className={isRefund ? "text-red-600" : "text-green-600"}>
+            <span
+              className={`${isRefund ? "text-red-600" : "text-green-600"} ${
+                isDeleted ? "line-through opacity-60" : ""
+              }`}
+            >
               {formatMoney(payment.amountCents, payment.currency as Currency)}
             </span>
             <span className="text-sm font-normal text-gray-500">
@@ -84,6 +106,15 @@ export function PaymentDetailDialog({
             {formatDateTime(payment.paidAt ?? payment.createdAt)}
           </DialogDescription>
         </DialogHeader>
+
+        {isDeleted && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <span className="mr-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase">
+              Deleted
+            </span>
+            This payment was deleted and no longer counts.
+          </div>
+        )}
 
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
           <Field label="Payer">
@@ -99,6 +130,19 @@ export function PaymentDetailDialog({
           <Field label="Status">{payment.status || "—"}</Field>
           <Field label="Recorded on">{formatDateTime(payment.createdAt)}</Field>
           <Field label="Currency">{payment.currency}</Field>
+          {/* Who, when and why: for those who write payments only. Everyone else sees that it was
+              deleted, and nothing more (spec 09, D6). */}
+          {isDeleted && canWrite && (
+            <>
+              <Field label="Deleted by">{deletedBy}</Field>
+              <Field label="Deleted on">{formatDateTime(payment.deletedAt)}</Field>
+              <div className="col-span-2">
+                <Field label="Reason">
+                  <span className="whitespace-pre-wrap">{payment.deleteReason || "—"}</span>
+                </Field>
+              </div>
+            </>
+          )}
         </dl>
 
         <div>
@@ -108,7 +152,9 @@ export function PaymentDetailDialog({
               <p className="px-3 py-2 text-sm text-amber-700">
                 {applied.reason === "currency"
                   ? `Not counted — this payment is in ${payment.currency}, the quote is in ${currency}.`
-                  : `Not counted — the payment status is "${payment.status}".`}
+                  : applied.reason === "deleted"
+                    ? "Not counted — this payment was deleted."
+                    : `Not counted — the payment status is "${payment.status}".`}
               </p>
             )}
             {applied.kind === "unapplied" && (
@@ -169,10 +215,28 @@ export function PaymentDetailDialog({
           </a>
         )}
 
-        <p className="text-xs text-gray-400">
-          Payments cannot be edited or deleted. To correct one, record a negative amount — both
-          entries stay visible.
-        </p>
+        {canWrite && isManual && !isDeleted && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="text-sm px-3 py-1.5 border border-darkBlue text-darkBlue rounded hover:bg-blue-50"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="text-sm px-3 py-1.5 border border-red-600 text-red-700 rounded hover:bg-red-50"
+            >
+              Delete
+            </button>
+          </div>
+        )}
+
+        {!isManual && (
+          <p className="text-xs text-gray-400">Stripe payments cannot be edited or deleted.</p>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -10,7 +10,8 @@ export type TeamRoleTab =
   | "driver"
   | "developer"
   | "viewer"
-  | "maintainer";
+  | "maintainer"
+  | "accountant";
 
 export type CurrentUserState = {
   // Basic user info
@@ -25,6 +26,7 @@ export type CurrentUserState = {
   isAccountManager: boolean;
   isDeveloper: boolean;
   isMaintainer: boolean;
+  isAccountant: boolean;
   isViewer: boolean;
   autoSubscribeToNewTickets: boolean;
   roleTabs: TeamRoleTab[];
@@ -109,6 +111,7 @@ const initialState: CurrentUserState = {
   isAccountManager: false,
   isDeveloper: false,
   isMaintainer: false,
+  isAccountant: false,
   isViewer: false,
   autoSubscribeToNewTickets: true,
   roleTabs: [],
@@ -171,6 +174,7 @@ export const useCurrentUserStore = create<CurrentUserStore>((set) => ({
         isDriver: role === "driver" ? true : state.isDriver,
         isDeveloper: role === "developer" ? true : state.isDeveloper,
         isMaintainer: role === "maintainer" ? true : state.isMaintainer,
+        isAccountant: role === "accountant" ? true : state.isAccountant,
         isViewer: role === "viewer" ? true : state.isViewer,
         // Default auto-subscribe to true when developer role is first added
         autoSubscribeToNewTickets: role === "developer" ? true : state.autoSubscribeToNewTickets,
@@ -193,6 +197,7 @@ export const useCurrentUserStore = create<CurrentUserStore>((set) => ({
         isDriver: role === "driver" ? false : state.isDriver,
         isDeveloper: role === "developer" ? false : state.isDeveloper,
         isMaintainer: role === "maintainer" ? false : state.isMaintainer,
+        isAccountant: role === "accountant" ? false : state.isAccountant,
         isViewer: role === "viewer" ? false : state.isViewer,
       };
     }),

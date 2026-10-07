@@ -14,6 +14,7 @@ import { useTodayIso } from "@/features/manageTeam/hooks/useTodayIso";
 import { useUserFormPaths } from "@/features/manageTeam/hooks/useUserFormPaths";
 import { CountryIndicator } from "@/features/manageTeam/components/CountryIndicator";
 import { useEditAccess } from "@/features/manageTeam/state/EditAccessContext";
+import { getEditCapabilities } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -72,11 +73,27 @@ export function DriverPageContent() {
   const setField = useCurrentUserStore((s) => s.setField);
   const existingUserUuid = useCurrentUserStore((s) => s.existingUserUuid);
 
-  // In "zones-only" access the surrounding form is locked (pointer-events-none). Every field
-  // except the zone multi-select is visually dimmed; the zone block re-enables interaction.
+  // In "zones-only", "driver-only" and "zones-and-driver" access the surrounding form is locked
+  // (pointer-events-none). A block that stays editable re-enables interaction for itself
+  // (pointer-events-auto); every other block is shown faded. Which block is which is
+  // `getEditCapabilities` (docs/specs/accountant-team.md).
   const editAccess = useEditAccess();
-  const zonesOnly = editAccess === "zones-only";
-  const dimmed = zonesOnly ? "opacity-60" : "";
+  const capabilities = getEditCapabilities(editAccess);
+  const locked = capabilities.lockedWithExceptions;
+  const zonesClass = !locked ? "" : capabilities.zones ? "pointer-events-auto" : "opacity-60";
+  const paymentClass = !locked
+    ? ""
+    : capabilities.paymentAndVendor
+      ? "pointer-events-auto"
+      : "opacity-60";
+  const setupLocked = locked && !capabilities.driverSetup;
+  // Driver Setup, when it is read-only, fades piece by piece instead of as a whole: an opacity on the
+  // section cannot be undone by the document cards inside it, and a document is what a reader opens
+  // this block to look at (the card fades its own label and expiry date, and not the file).
+  const setupFade = setupLocked ? "opacity-60" : "";
+  const setupInteractive = locked && capabilities.driverSetup ? "pointer-events-auto" : "";
+  // An accountant sees the zones without managing any: every zone, read-only.
+  const zonesReadOnly = editAccess === "driver-only";
 
   useEffect(() => {
     // Don't redirect while loading:
@@ -249,11 +266,12 @@ export function DriverPageContent() {
         <div className="space-y-3">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
             {/* Zones — stays interactive even when the rest of the form is locked. */}
-            <div className={zonesOnly ? "pointer-events-auto" : ""}>
+            <div className={zonesClass}>
               <label className="mb-1 block text-sm font-medium text-gray-700">Zones</label>
               <SelectDriverZones
                 value={assignedDriverZoneUuids}
                 onChange={(value) => setField("assignedDriverZoneUuids", value)}
+                readOnly={zonesReadOnly}
               />
               <p className="mt-1 text-xs text-gray-500">
                 Assign this driver to one or more zones. They will appear in Work Tracker driver
@@ -262,7 +280,7 @@ export function DriverPageContent() {
             </div>
 
             {/* Vendor Card / Ghost Card */}
-            <div className={dimmed}>
+            <div className={paymentClass}>
               <label className="mb-1 block text-sm font-medium text-gray-700">Vendor Company</label>
               <VendorSelection
                 value={vendorUuid}
@@ -272,7 +290,7 @@ export function DriverPageContent() {
             </div>
 
             {/* Driver Type Dropdown */}
-            <div className={`lg:w-[180px] ${dimmed}`}>
+            <div className={`lg:w-[180px] ${paymentClass}`}>
               <label className="mb-1 block text-sm font-medium text-gray-700">Driver Type</label>
               <Dropdown
                 options={driverTypeOptions}
@@ -296,7 +314,7 @@ export function DriverPageContent() {
           )}
         </div>
 
-        <div className={dimmed}>
+        <div className={paymentClass}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
@@ -388,8 +406,10 @@ export function DriverPageContent() {
       </section>
 
       {/* Driver Setup Section */}
-      <section className={`space-y-4 rounded-lg border border-gray-200 bg-white p-4 ${dimmed}`}>
-        <div>
+      <section
+        className={`space-y-4 rounded-lg border border-gray-200 bg-white p-4 ${setupInteractive}`}
+      >
+        <div className={setupFade}>
           <h2 className="text-lg font-semibold text-gray-900">Driver Setup</h2>
           <p className="text-sm text-gray-600">
             The Driver has the ability to set this data in their mobile application, so you&apos;re
@@ -398,7 +418,7 @@ export function DriverPageContent() {
         </div>
 
         <div className="space-y-3">
-          <div>
+          <div className={setupFade}>
             <label className="mb-1 block text-sm font-medium text-gray-700">Phone Number</label>
             <input
               type="tel"
@@ -409,7 +429,7 @@ export function DriverPageContent() {
             />
           </div>
 
-          <div>
+          <div className={setupFade}>
             <div className="flex items-end gap-3">
               <div className="flex-1">
                 <label className="mb-1 block text-sm font-medium text-gray-700">Home Address</label>
@@ -439,7 +459,7 @@ export function DriverPageContent() {
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-3">
+          <div className={`border-t border-gray-200 pt-3 ${setupFade}`}>
             <h3 className="mb-2 text-sm font-semibold text-gray-800">Vehicle Information</h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
@@ -494,7 +514,9 @@ export function DriverPageContent() {
           </div>
 
           <div className="border-t border-gray-200 pt-4">
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <div
+              className={`mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 ${setupFade}`}
+            >
               <h3 className="text-sm font-semibold text-gray-800">Document Uploads</h3>
               <p className="text-xs text-gray-500">JPG, PNG, HEIC, WebP or PDF · up to 5MB</p>
             </div>
@@ -503,7 +525,7 @@ export function DriverPageContent() {
                 doc.usaOnly && !isUSADriver ? (
                   <div
                     key={doc.type}
-                    className="rounded-lg border border-dashed border-gray-200 bg-gray-50/60 px-3 py-2.5"
+                    className={`rounded-lg border border-dashed border-gray-200 bg-gray-50/60 px-3 py-2.5 ${setupFade}`}
                   >
                     <p className="text-sm font-medium text-gray-500">{doc.label} not required</p>
                     <p className="mt-0.5 text-xs text-gray-500">
@@ -524,7 +546,7 @@ export function DriverPageContent() {
                     expiresOn={documentValues[doc.expiryField]}
                     onExpiresOnChange={(next) => setField(doc.expiryField, next)}
                     todayIso={todayIso}
-                    disabled={zonesOnly}
+                    disabled={setupLocked}
                   />
                 ),
               )}

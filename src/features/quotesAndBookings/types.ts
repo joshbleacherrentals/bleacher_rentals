@@ -14,6 +14,7 @@ export type QuotesBookingsEvent = {
   is_qbo: number | null;
   sales_office_uuid: string | null;
   deleted: number | null;
+  invoice_number: number | null;
   account_manager_first_name: string | null;
   account_manager_last_name: string | null;
   account_manager_email: string | null;
@@ -25,6 +26,19 @@ export type QuotesBookingsEvent = {
   contact_email: string | null;
   company_name: string | null;
 };
+
+/**
+ * The two balances the AR tabs show, per event. Both come from
+ * `computeAmountDue`, so they read the same as the event's Billing tab.
+ */
+export type ReceivableBalances = {
+  /** What the payment schedule says should have arrived by today and has not. */
+  amount_due_cents: number;
+  /** Everything still owed on the event: its total less what was received. */
+  remaining_balance_cents: number;
+};
+
+export type AccountsReceivableEvent = QuotesBookingsEvent & ReceivableBalances;
 
 export type QuotesBookingsFilters = {
   isOpen: boolean;

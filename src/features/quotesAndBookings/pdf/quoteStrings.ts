@@ -39,10 +39,16 @@ export const quoteStrings = {
   // ── Quote tab: header ────────────────────────────────────────────────
   eventInformation: { en: "Event Information", fr: "Renseignements sur l'événement" },
   locationVenue: { en: "Location / Venue", fr: "Lieu de l'événement" },
+  // The same document reads "Quote" until the client signs, then "Invoice".
   invoiceBadge: { en: "INVOICE", fr: "FACTURE" },
+  quoteBadge: { en: "QUOTE", fr: "DEVIS" },
   invoiceNumber: {
     en: (n: string) => `Invoice #${n}`,
     fr: (n: string) => `Facture nº ${n}`,
+  },
+  quoteNumber: {
+    en: (n: string) => `Quote #${n}`,
+    fr: (n: string) => `Devis nº ${n}`,
   },
   poNumberShort: {
     en: (n: string) => `PO #${n}`,
@@ -65,6 +71,10 @@ export const quoteStrings = {
   memoInvoice: {
     en: (n: string) => `Memo: Invoice #${n}`,
     fr: (n: string) => `Mention : facture nº ${n}`,
+  },
+  memoQuote: {
+    en: (n: string) => `Memo: Quote #${n}`,
+    fr: (n: string) => `Mention : devis nº ${n}`,
   },
 
   // ── Totals ───────────────────────────────────────────────────────────
@@ -242,6 +252,7 @@ export const quoteStrings = {
 
   // ── PDF ──────────────────────────────────────────────────────────────
   pdfQuoteTitle: { en: "QUOTE", fr: "DEVIS" },
+  pdfInvoiceTitle: { en: "INVOICE", fr: "FACTURE" },
   pdfDate: {
     en: (date: string) => `Date: ${date}`,
     fr: (date: string) => `Date : ${date}`,

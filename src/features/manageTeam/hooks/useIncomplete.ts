@@ -39,6 +39,9 @@ export function buildIncompleteQuery() {
     .leftJoin("Maintainers as maint", (join) =>
       join.onRef("maint.user_uuid", "=", "u.id").on("maint.is_active", "=", 1),
     )
+    .leftJoin("Accountants as acct", (join) =>
+      join.onRef("acct.user_uuid", "=", "u.id").on("acct.is_active", "=", 1),
+    )
     .select([
       "u.id as userUuid",
       "u.first_name as firstName",
@@ -56,6 +59,7 @@ export function buildIncompleteQuery() {
         eb("d.id", "is", null),
         eb("dev.id", "is", null),
         eb("maint.id", "is", null),
+        eb("acct.id", "is", null),
       ]),
     )
     .orderBy("u.first_name", "asc")

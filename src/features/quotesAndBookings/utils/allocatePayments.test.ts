@@ -26,6 +26,7 @@ function pay(amountCents: number, over: Partial<AllocatablePayment> = {}): Alloc
     status: "succeeded",
     paidAt: "2026-06-01T12:00:00.000+00:00",
     createdAt: "2026-06-01T12:00:00.000+00:00",
+    deletedAt: null,
     ...over,
   };
 }
@@ -602,5 +603,172 @@ describe("allocatePayments — negative amounts", () => {
       expect(summed).toBe(source);
     }
     assertInvariants(result);
+  });
+});
+
+// ── Soft-deleted payments (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md) ──
+//
+// A deleted payment is still returned, so a screen that chooses to show it can say what became of
+// it — but it is never counted, never placed, and never reopens anything.
+
+const DELETED_AT = "2026-06-10T09:00:00.000+00:00";
+
+describe("allocatePayments — deleted payments", () => {
+  it("excludes a deleted payment as 'deleted' and still returns it", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000)],
+      [pay(40000, { id: "gone", installmentId: "i1", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.byPayment).toEqual([
+      { paymentId: "gone", parts: [], unallocatedCents: 0, excluded: "deleted" },
+    ]);
+    assertInvariants(result);
+  });
+
+  it("does not count it in totalReceivedCents", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000)],
+      [pay(60000, { id: "kept" }), pay(40000, { id: "gone", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.totalReceivedCents).toBe(60000);
+    assertInvariants(result);
+  });
+
+  it("does not fill an installment it targeted", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000)],
+      [pay(100000, { id: "gone", installmentId: "i1", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.installments[0]).toMatchObject({
+      status: "unpaid",
+      allocatedCents: 0,
+      paidAt: null,
+    });
+    expect(result.allocatedCents).toBe(0);
+    assertInvariants(result);
+  });
+
+  it("does not fill an installment through the FIFO pool either", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000), inst("i2", "2026-09-16", 100000)],
+      [pay(150000, { id: "gone", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.installments.map((i) => i.status)).toEqual(["unpaid", "unpaid"]);
+    expect(result.unallocatedCents).toBe(0);
+    assertInvariants(result);
+  });
+
+  it("does not spill into unallocated when it is larger than the whole schedule", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000)],
+      [pay(900000, { id: "gone", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.unallocatedCents).toBe(0);
+    expect(result.totalReceivedCents).toBe(0);
+    assertInvariants(result);
+  });
+
+  it("a deleted refund (negative) does not reopen an installment", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 270000)],
+      [
+        pay(270000, { id: "paid", installmentId: "i1" }),
+        pay(-270000, {
+          id: "refund",
+          installmentId: "i1",
+          paidAt: "2026-06-05T12:00:00.000+00:00",
+          deletedAt: DELETED_AT,
+        }),
+      ],
+      "USD",
+    );
+
+    expect(result.installments[0]).toMatchObject({ status: "paid", allocatedCents: 270000 });
+    expect(result.totalReceivedCents).toBe(270000);
+    expect(result.byPayment.find((p) => p.paymentId === "refund")?.excluded).toBe("deleted");
+    assertInvariants(result);
+  });
+
+  it("a deleted untargeted refund does not un-fill the newest obligation", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000), inst("i2", "2026-09-16", 100000)],
+      [pay(200000, { id: "paid" }), pay(-100000, { id: "refund", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.installments.map((i) => i.status)).toEqual(["paid", "paid"]);
+    expect(result.totalReceivedCents).toBe(200000);
+    assertInvariants(result);
+  });
+
+  it("'deleted' wins over a status that would exclude it", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000)],
+      [pay(100000, { id: "gone", status: "pending", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.byPayment[0].excluded).toBe("deleted");
+  });
+
+  it("'deleted' wins over another currency, and is not reported as foreign", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000)],
+      [pay(100000, { id: "gone", currency: "CAD", deletedAt: DELETED_AT })],
+      "USD",
+    );
+
+    expect(result.byPayment[0].excluded).toBe("deleted");
+    expect(result.foreignCurrencyPayments).toEqual([]);
+  });
+
+  it("leaves every other figure as it was without the deleted row", () => {
+    const installments = [inst("i1", "2026-08-31", 100000), inst("i2", "2026-09-16", 100000)];
+    const live = [
+      pay(130000, { id: "a" }),
+      pay(-20000, { id: "b", paidAt: "2026-06-02T12:00:00.000+00:00" }),
+    ];
+    const deleted = pay(70000, { id: "gone", installmentId: "i2", deletedAt: DELETED_AT });
+
+    const without = allocatePayments(installments, live, "USD");
+    const withDeleted = allocatePayments(installments, [...live, deleted], "USD");
+
+    expect(withDeleted.installments).toEqual(without.installments);
+    expect(withDeleted.totalReceivedCents).toBe(without.totalReceivedCents);
+    expect(withDeleted.allocatedCents).toBe(without.allocatedCents);
+    expect(withDeleted.unallocatedCents).toBe(without.unallocatedCents);
+    expect(withDeleted.foreignCurrencyPayments).toEqual(without.foreignCurrencyPayments);
+    expect(withDeleted.byPayment.filter((p) => p.paymentId !== "gone")).toEqual(without.byPayment);
+  });
+
+  it("counts a payment whose deletedAt is null exactly as before", () => {
+    const result = allocatePayments(
+      [inst("i1", "2026-08-31", 100000)],
+      [pay(100000, { id: "kept", installmentId: "i1", deletedAt: null })],
+      "USD",
+    );
+
+    expect(result.installments[0]).toMatchObject({ status: "paid" });
+    expect(result.byPayment[0].excluded).toBeNull();
+  });
+
+  it("does not mutate its inputs when a payment is deleted", () => {
+    const installments = [inst("i1", "2026-08-31", 100000)];
+    const payments = [pay(50000, { id: "a" }), pay(50000, { id: "gone", deletedAt: DELETED_AT })];
+    const before = JSON.stringify({ installments, payments });
+
+    allocatePayments(installments, payments, "USD");
+
+    expect(JSON.stringify({ installments, payments })).toBe(before);
   });
 });

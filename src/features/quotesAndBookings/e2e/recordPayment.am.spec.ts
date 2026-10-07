@@ -4,44 +4,38 @@ const QUOTE = "85b35a1c-8992-41c5-b051-409f33ee7fc5";
 const BILLING = `/quotes-bookings/${QUOTE}?tab=billing`;
 
 /**
- * S13 — a lead account manager may record a payment on a quote they did not
- * create.
+ * S1 — an account manager reads the payment history and is offered nothing to press.
  *
- * **The seeded E2E account manager is a lead** (`AccountManagerZones.is_lead`
- * is true on the row added for driver-zones.am.spec.ts), so this project
- * exercises S13 and not S8. If this ever starts failing with a disabled button,
- * check that seed row before changing anything here — the rule is that a lead
- * edits everything, and `canEditOwnedEntity` decides it for every control on
- * the page, not just this one.
+ * Since docs/specs/accountant-quotes-06-am-read-only-payments.md an account manager cannot record
+ * a payment: the RLS insert policy names only admin, so the button is not drawn for any account
+ * manager, lead or junior. (The seeded E2E account manager is a lead — `AccountManagerZones.is_lead`
+ * is true on the row added for driver-zones.am.spec.ts — which makes this the harder case: the
+ * role that used to be enabled everywhere.) The refusal at the database is asserted in
+ * supabase/tests/manual_payment_entry.test.sql, not here.
  *
- * S8 — the junior AM who may not — has no e2e home until a second, non-lead
- * account manager is seeded. It is covered in BillingTab.test.tsx, where lead
- * status is an input rather than a fixture.
- *
- * docs/specs/manual-payment-entry.md §6.1, §7, §10.
+ * This file used to hold the lead account manager's S13 (offered the button and recorded a payment
+ * attributed to them) from docs/specs/manual-payment-entry.md; spec 06 supersedes it. S8, the
+ * junior's disabled button, had no e2e home and is gone with the disabled state.
  */
 
-test.describe("Record Payment (lead account manager)", () => {
-  test("S13: the button is offered on someone else's quote", async ({ page }) => {
+test.describe("Record Payment (account manager)", () => {
+  test("S1: the history is readable and there is no + Record Payment button", async ({ page }) => {
     await page.goto(BILLING);
     await expect(page.getByRole("heading", { name: "Payment History" })).toBeVisible();
 
-    const button = page.getByRole("button", { name: "+ Record Payment" });
-    await expect(button).toBeVisible();
-    await expect(button).toBeEnabled();
+    // The seeded Stripe payment is fully visible…
+    await expect(page.getByText("$2,700.00").first()).toBeVisible();
+    await expect(page.getByText("Stripe").first()).toBeVisible();
+
+    // …and there is nothing to press.
+    await expect(page.getByRole("button", { name: "+ Record Payment" })).toHaveCount(0);
   });
 
-  test("S13: and the payment they record is attributed to them", async ({ page }) => {
+  test("S1: a payment still opens in full", async ({ page }) => {
     await page.goto(BILLING);
 
-    await page.getByRole("button", { name: "+ Record Payment" }).click();
-    await page.getByRole("button", { name: "ACH Payment" }).click();
-    await page.getByLabel(/^Amount/).fill("500");
-    await page.getByLabel("ACH trace").fill("TRACE-77");
-    await page.getByRole("button", { name: "Record Payment", exact: true }).click();
+    await page.locator('[aria-label^="Payment details for"]').first().click();
 
-    await expect(page.getByRole("dialog")).toBeHidden();
-    await expect(page.getByText("TRACE-77")).toBeVisible();
-    await expect(page.getByText("E2E AM")).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeVisible();
   });
 });

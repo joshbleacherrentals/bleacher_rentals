@@ -11,6 +11,7 @@ function pay(amountCents: number, over: Partial<AllocatablePayment> = {}): Alloc
     status: "succeeded",
     paidAt: "2026-06-01T12:00:00.000+00:00",
     createdAt: "2026-06-01T12:00:00.000+00:00",
+    deletedAt: null,
     ...over,
   };
 }
@@ -75,6 +76,17 @@ describe("describeAppliedTo", () => {
       kind: "excluded",
       reason: "status",
     });
+  });
+
+  it("says a deleted payment was deleted, ahead of its status or currency", () => {
+    const deleted = "2026-06-10T09:00:00.000+00:00";
+    expect(describeOne([pay(100000, { deletedAt: deleted })])).toEqual({
+      kind: "excluded",
+      reason: "deleted",
+    });
+    expect(
+      describeOne([pay(100000, { deletedAt: deleted, status: "pending", currency: "CAD" })]),
+    ).toEqual({ kind: "excluded", reason: "deleted" });
   });
 
   it("spells out the amount on a refund, so a negative piece is never read as the whole", () => {

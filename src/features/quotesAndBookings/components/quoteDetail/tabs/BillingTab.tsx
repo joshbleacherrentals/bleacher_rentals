@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import type { QuotesBookingsCapabilities } from "@/features/userAccess/logic/getQuotesBookingsCapabilities";
 import { QuoteDetail } from "../../../db/fetchQuoteDetail";
 import { setEventIsQbo } from "../../../db/setEventIsQbo";
 import { useEventIsQbo } from "../../../hooks/useEventIsQbo";
@@ -12,6 +13,7 @@ import { usePaymentInstallments } from "../../../hooks/usePaymentInstallments";
 import { usePaymentHistory, PaymentHistoryRow } from "../../../hooks/usePaymentHistory";
 import { useEventCurrencyState } from "../../../hooks/useEventCurrency";
 import { allocatePayments, type Allocation } from "../../../utils/allocatePayments";
+import { isDeletedPayment, withoutDeleted } from "../../../utils/deletedPayments";
 import { formatMoney } from "../../../utils/formatMoney";
 import { Currency } from "../../../types/quoteTypes";
 import { formatDate, formatDateTime, formatTime } from "../../../utils/formatDate";
@@ -27,10 +29,15 @@ const RecordPaymentDialog = dynamic(
   { ssr: false },
 );
 
-// Same reasoning as above: a read-only detail view nobody opens until they
-// click a row.
+// Same reasoning as above: a detail view nobody opens until they click a row.
 const PaymentDetailDialog = dynamic(
   () => import("./PaymentDetailDialog").then((m) => m.PaymentDetailDialog),
+  { ssr: false },
+);
+
+// The reason prompt of a deletion: opened from the detail dialog, never otherwise.
+const DeletePaymentDialog = dynamic(
+  () => import("./DeletePaymentDialog").then((m) => m.DeletePaymentDialog),
   { ssr: false },
 );
 
@@ -145,11 +152,15 @@ function AppliedToCell({
   const applied = describeAppliedTo(payment, allocation);
 
   if (applied.kind === "excluded") {
-    return applied.reason === "currency" ? (
-      <span className="text-amber-700">Not counted ({payment.currency})</span>
-    ) : (
-      <span className="text-gray-400">Not counted ({payment.status})</span>
-    );
+    // Why it does not count: another currency, a status that is not "succeeded", or — only when
+    // Show deleted is on — because it was deleted (docs/specs/accountant-quotes-09, 2 A).
+    if (applied.reason === "currency") {
+      return <span className="text-amber-700">Not counted ({payment.currency})</span>;
+    }
+    if (applied.reason === "deleted") {
+      return <span className="text-gray-400">Not counted (deleted)</span>;
+    }
+    return <span className="text-gray-400">Not counted ({payment.status})</span>;
   }
   if (applied.kind === "unapplied") {
     return <span className="text-gray-400">Unapplied</span>;
@@ -193,11 +204,18 @@ function AppliedToCell({
 export function BillingTab({
   quote,
   contractTotalCents,
-  canEdit,
+  can,
+  initiallyShowDeleted = false,
 }: {
   quote: QuoteDetail;
   contractTotalCents: number;
-  canEdit: boolean;
+  /**
+   * What the page worked out for this user on this quote; the tab never asks who they are.
+   * `recordPayment` also governs editing and deleting a payment (spec 09, D2).
+   */
+  can: Pick<QuotesBookingsCapabilities, "recordPayment" | "setQuickBooksFlag">;
+  /** Where the Show deleted switch starts. Off, unless a test or a caller says otherwise. */
+  initiallyShowDeleted?: boolean;
 }) {
   const { installments: terms, isLoading, error: scheduleError } = usePaymentInstallments(quote.id);
   const installments = useMemo(
@@ -205,6 +223,14 @@ export function BillingTab({
     [terms, contractTotalCents],
   );
   const { payments, isLoading: paymentsLoading } = usePaymentHistory(quote.id);
+  // The hook returns every row. The allocation below still receives all of them — it leaves the
+  // deleted ones out of every figure itself — while the list shows only those that are not deleted
+  // (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md).
+  const visiblePayments = useMemo(() => withoutDeleted(payments), [payments]);
+  // "Show deleted" brings the deleted rows back into the same table, in place. Local to the tab, not
+  // in the URL. They never enter the allocation, so the figures are the same either way.
+  const [showDeleted, setShowDeleted] = useState(initiallyShowDeleted);
+  const listedPayments = showDeleted ? payments : visiblePayments;
   // Two answers, deliberately: the value paints the tab, the flag gates the
   // one place that writes it (§3.5, E5).
   const { currency, isResolved: currencyResolved } = useEventCurrencyState(quote.id);
@@ -214,11 +240,9 @@ export function BillingTab({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [openPaymentId, setOpenPaymentId] = useState<string | null>(null);
-
-  // A viewer is anyone who can read the page but holds neither of the roles the
-  // RLS insert policy names. Showing them a button the server would refuse is
-  // worse than showing nothing.
-  const isViewer = !perms.isAdmin && !perms.isAccountManager;
+  // Edit and Delete start in the detail dialog, which closes as they open.
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
   // Every figure on this tab comes from the money in PaymentHistory. The
   // schedule supplies only the terms — what is owed, and when.
@@ -231,9 +255,13 @@ export function BillingTab({
   // Held by id, not by value: the row keeps showing live data while the dialog
   // is open, and a payment that syncs away closes it instead of freezing a copy.
   const openPayment = payments.find((p) => p.id === openPaymentId) ?? null;
+  const editingPayment = payments.find((p) => p.id === editingPaymentId) ?? null;
+  const deletingPayment = payments.find((p) => p.id === deletingPaymentId) ?? null;
 
   const recordedByName = (p: PaymentHistoryRow) =>
     p.entrySource === "stripe" ? "Stripe" : (staffNames.get(p.recordedByUserUuid ?? "") ?? "Staff");
+  const deletedByName = (p: PaymentHistoryRow) =>
+    staffNames.get(p.deletedByUserUuid ?? "") ?? "Staff";
 
   const receivedCents = allocation.totalReceivedCents;
   const balanceDueCents = Math.max(0, contractTotalCents - receivedCents);
@@ -328,20 +356,20 @@ export function BillingTab({
       <div>
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">QuickBooks</h3>
         {/*
-          Gated on role, not on `canEdit`. Bookkeeping is not the quote owner's
-          job: whoever enters the invoice into QuickBooks ticks the box, on
-          anyone's quote (owner's call, 2026-09-03). That matches `events_update`,
-          which already lets any admin or account manager write this column, so
-          the box no longer promises a limit the database does not keep.
-          Viewers still see the state and cannot change it.
+          Gated on `can.setQuickBooksFlag`, not on `can.recordPayment`. Bookkeeping
+          is not the quote owner's job: whoever enters the invoice into QuickBooks
+          ticks the box, on anyone's quote (owner's call, 2026-09-03). That matches
+          `events_update`, which already lets any admin or account manager write
+          this column, so the box no longer promises a limit the database does not
+          keep. Everyone else still sees the state and cannot change it.
         */}
         <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
           <Checkbox
             checked={isQbo}
-            disabled={isViewer}
+            disabled={!can.setQuickBooksFlag}
             onCheckedChange={(checked) => handleQboChange(checked === true)}
           />
-          <span className={isViewer ? "text-gray-400" : ""}>QuickBooks Invoice</span>
+          <span className={can.setQuickBooksFlag ? "" : "text-gray-400"}>QuickBooks Invoice</span>
         </label>
       </div>
 
@@ -365,32 +393,46 @@ export function BillingTab({
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">
             Payment History
           </h3>
-          {/* A viewer is not shown a control they could never use. Everyone
-              else sees it, enabled on the same terms as every other edit on
-              this page — which means a lead AM may record a payment on a quote
-              they did not create. */}
-          {!isViewer && (
+          <div className="flex items-center gap-3">
+            {/* For every role that reads payments, not only those who write them: a deleted payment
+                is still part of the record. Off to begin with. */}
             <button
-              onClick={() => setDialogOpen(true)}
-              disabled={!canEdit}
-              title={
-                canEdit
-                  ? "Record a check, ACH or manual card payment"
-                  : "You can only record a payment on quotes you created."
-              }
-              className={
-                canEdit
-                  ? "text-xs font-medium text-darkBlue border border-darkBlue rounded px-2 py-1 hover:bg-blue-50"
-                  : "text-xs font-medium text-gray-400 border border-gray-300 rounded px-2 py-1 cursor-not-allowed"
-              }
+              type="button"
+              role="switch"
+              aria-checked={showDeleted}
+              onClick={() => setShowDeleted((on) => !on)}
+              className="flex items-center gap-1.5 text-xs text-gray-600"
             >
-              + Record Payment
+              <span
+                className={`relative inline-block h-4 w-7 rounded-full transition-colors ${
+                  showDeleted ? "bg-darkBlue" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
+                    showDeleted ? "left-3.5" : "left-0.5"
+                  }`}
+                />
+              </span>
+              Show deleted
             </button>
-          )}
+            {/* One answer: whoever may record a payment sees the button, enabled;
+                everyone else is not shown it. The database refuses the insert for
+                any other role, so there is no disabled state to explain. */}
+            {can.recordPayment && (
+              <button
+                onClick={() => setDialogOpen(true)}
+                title="Record a check, ACH or manual card payment"
+                className="text-xs font-medium text-darkBlue border border-darkBlue rounded px-2 py-1 hover:bg-blue-50"
+              >
+                + Record Payment
+              </button>
+            )}
+          </div>
         </div>
         {paymentsLoading ? (
           <p className="text-sm text-gray-400 py-4 text-center">Loading payments...</p>
-        ) : payments.length > 0 ? (
+        ) : listedPayments.length > 0 ? (
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-sm">
               <thead>
@@ -404,10 +446,9 @@ export function BillingTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {payments.map((p) => (
+                {listedPayments.map((p) => (
                   /* The whole row is the affordance — a payment has more to it
-                     than fits here, and there is nothing else a click could
-                     mean on a ledger nobody may edit. */
+                     than fits here. Edit and Delete start from the dialog it opens. */
                   <tr
                     key={p.id}
                     tabIndex={0}
@@ -419,7 +460,9 @@ export function BillingTab({
                         setOpenPaymentId(p.id);
                       }
                     }}
-                    className="cursor-pointer align-top hover:bg-blue-50/50 focus:bg-blue-50/50 focus:outline-none"
+                    className={`cursor-pointer align-top hover:bg-blue-50/50 focus:bg-blue-50/50 focus:outline-none ${
+                      isDeletedPayment(p) ? "bg-gray-50 opacity-60" : ""
+                    }`}
                   >
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <span className="block text-gray-900">
@@ -436,7 +479,14 @@ export function BillingTab({
                         p.amountCents < 0 ? "text-red-600" : "text-green-600"
                       }`}
                     >
-                      {formatMoney(p.amountCents, p.currency as Currency)}
+                      <span className={isDeletedPayment(p) ? "line-through" : ""}>
+                        {formatMoney(p.amountCents, p.currency as Currency)}
+                      </span>
+                      {isDeletedPayment(p) && (
+                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-700">
+                          Deleted
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="block text-gray-700 whitespace-nowrap">
@@ -480,12 +530,9 @@ export function BillingTab({
             No payments recorded yet.
           </p>
         )}
-        {/* Said once, plainly, because it will be the first question: there is
-            no edit or delete on a payment row, on purpose. */}
-        <p className="text-xs text-gray-400 mt-2">
-          Payments cannot be edited or deleted. To correct one, record a negative amount — both
-          entries stay visible.
-        </p>
+        {/* Said once, plainly, because it will be the first question. A manual payment can be
+            edited and deleted from the dialog a row opens; a Stripe payment cannot. */}
+        <p className="text-xs text-gray-400 mt-2">Stripe payments cannot be edited or deleted.</p>
       </div>
 
       {openPayment && (
@@ -496,6 +543,41 @@ export function BillingTab({
           allocation={allocation}
           currency={currency}
           recordedBy={recordedByName(openPayment)}
+          canWrite={can.recordPayment}
+          deletedBy={deletedByName(openPayment)}
+          onEdit={() => {
+            setEditingPaymentId(openPayment.id);
+            setOpenPaymentId(null);
+          }}
+          onDelete={() => {
+            setDeletingPaymentId(openPayment.id);
+            setOpenPaymentId(null);
+          }}
+        />
+      )}
+
+      {editingPayment && (
+        <RecordPaymentDialog
+          open={true}
+          onOpenChange={(open) => !open && setEditingPaymentId(null)}
+          mode="edit"
+          payment={editingPayment}
+          eventId={quote.id}
+          currency={currency}
+          currencyResolved={currencyResolved}
+          installments={allocation.installments}
+          defaultPayerName={editingPayment.payerName}
+          recordedByUserUuid={perms.userId}
+        />
+      )}
+
+      {deletingPayment && (
+        <DeletePaymentDialog
+          open={true}
+          onOpenChange={(open) => !open && setDeletingPaymentId(null)}
+          eventId={quote.id}
+          payment={deletingPayment}
+          deletedByUserUuid={perms.userId}
         />
       )}
 

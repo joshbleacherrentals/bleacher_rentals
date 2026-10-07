@@ -48,8 +48,10 @@ export function SignedInComponents({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (access.status === "active") {
       usePermissionsStore.setState({
+        roles: access.roles,
         isAdmin: access.roles.includes("admin"),
         isAccountManager: access.roles.includes("account_manager"),
+        isMaintainer: access.roles.includes("maintainer"),
         accountManagerId: access.accountManagerId,
         accountManagerZoneIds:
           amZoneRows?.filter((r) => r.zone_uuid != null).map((r) => r.zone_uuid!) ?? [],

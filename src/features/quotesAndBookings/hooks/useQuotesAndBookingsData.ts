@@ -33,6 +33,7 @@ export function useQuotesAndBookingsData(filters: QuotesBookingsFilters, showDel
         "e.is_qbo as is_qbo",
         "e.sales_office_uuid as sales_office_uuid",
         "e.deleted as deleted",
+        "e.invoice_number as invoice_number",
         "u.first_name as account_manager_first_name",
         "u.last_name as account_manager_last_name",
         "u.email as account_manager_email",

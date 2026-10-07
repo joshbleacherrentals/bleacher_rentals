@@ -825,6 +825,7 @@ export class MainGridCellRenderer implements ICellRenderer {
     store.setField("isOpen", true);
     store.setField("key", key);
     store.setField("blockUuid", existingBlock?.blockUuid ?? null);
+    store.setField("createdByUserUuid", existingBlock?.createdByUserUuid ?? null);
     store.setField("bleacherUuid", bleacher.bleacherUuid);
     store.setField("date", date);
     store.setField("text", existingBlock?.text ?? "");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { CreateQuoteForm } from "@/features/quotesAndBookings/components/createQuote/CreateQuoteForm";
 import {
   useCreateQuoteStore,
@@ -10,8 +11,31 @@ import {
 import { newQuoteFieldsToPrefill } from "@/features/quotesAndBookings/utils/newQuoteDefaults";
 import { useTermsAndConditions } from "@/features/termsAndConditions/hooks/useTermsAndConditions";
 import { useCurrentAmDefaultSalesOffice } from "@/features/quotesAndBookings/hooks/useCurrentAmDefaultSalesOffice";
+import { useQuotesBookingsCapabilities } from "@/features/quotesAndBookings/hooks/useQuotesBookingsCapabilities";
+import { newQuotePageDecision } from "@/features/quotesAndBookings/utils/quotePageGuard";
+import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 
+/**
+ * Only a role that can create a quote gets the form; any other is sent back to the list and
+ * nothing of the form is drawn — or touched: the form below, with its effects on the store, is
+ * not mounted for them. docs/specs/accountant-quotes-04-accountant-quote-access.md, D2 and D8.
+ */
 export default function NewQuotePage() {
+  const router = useRouter();
+  const can = useQuotesBookingsCapabilities();
+  // Empty until sign-in has filled the store; "not known yet" is waiting, never a redirect.
+  const rolesKnown = usePermissionsStore((state) => state.roles.length > 0);
+  const decision = newQuotePageDecision({ rolesKnown, can });
+
+  useEffect(() => {
+    if (decision === "redirect") router.replace("/quotes-bookings");
+  }, [decision, router]);
+
+  if (decision !== "form") return null;
+  return <NewQuoteForm />;
+}
+
+function NewQuoteForm() {
   const resetForm = useCreateQuoteStore((s) => s.resetForm);
   const editingEventId = useCreateQuoteStore((s) => s.editingEventId);
   // Null until PowerSync has the table, and when no template is marked default.

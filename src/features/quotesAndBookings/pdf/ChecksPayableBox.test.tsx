@@ -8,11 +8,12 @@ const company = {
   zip: "33702",
 };
 
-const render = (paymentInfo: string | null, language: "en" | "fr" = "en") =>
+const render = (paymentInfo: string | null, language: "en" | "fr" = "en", isSigned = true) =>
   renderToStaticMarkup(
     <ChecksPayableBox
       company={company}
       quoteNumber="487597792"
+      isSigned={isSigned}
       paymentInfo={paymentInfo}
       language={language}
     />,
@@ -25,6 +26,10 @@ describe("ChecksPayableBox", () => {
     expect(html).toContain("Bleacher Rentals Florida LLC");
     expect(html).toContain("7901 4th Street North");
     expect(html).toContain("Memo: Invoice #487597792");
+  });
+
+  it("calls the memo a quote until it is signed", () => {
+    expect(render(null, "en", false)).toContain("Memo: Quote #487597792");
   });
 
   it("shows the office's payment info when it has some", () => {
@@ -51,6 +56,7 @@ describe("ChecksPayableBox", () => {
       <ChecksPayableBox
         company={company}
         quoteNumber="1"
+        isSigned
         paymentInfo={null}
         language="en"
         highlight

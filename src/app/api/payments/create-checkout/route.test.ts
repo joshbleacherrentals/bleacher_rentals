@@ -27,6 +27,7 @@ vi.mock("@supabase/supabase-js", () => ({
       const chain: any = {
         select: () => chain,
         eq: () => chain,
+        is: () => chain,
         order: () => chain,
         single: one,
         maybeSingle: one,

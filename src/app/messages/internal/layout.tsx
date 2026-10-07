@@ -1,21 +1,19 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import { useInternalChatCapabilities } from "@/features/eventChat/hooks/useInternalChatCapabilities";
 import { InternalMessagesSidebar } from "@/features/eventChat/components/InternalMessagesSidebar";
 
 export default function InternalMessagesLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isAdmin, isAccountManager } = usePermissionsStore();
-  const canUseInternalChat = isAdmin || isAccountManager;
+  const { useInternalChat: canUseInternalChat } = useInternalChatCapabilities();
 
-  const selectedEventUuid =
-    pathname.match(/^\/messages\/internal\/([^/]+)/)?.[1] ?? null;
+  const selectedEventUuid = pathname.match(/^\/messages\/internal\/([^/]+)/)?.[1] ?? null;
 
   if (!canUseInternalChat) {
     return (
       <p className="text-sm text-gray-500 py-8 text-center">
-        Internal chat is available to admins and account managers only.
+        Internal chat is available to admins, account managers and accountants only.
       </p>
     );
   }

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Calendar, Inbox } from "lucide-react";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useQuarters } from "./_lib/hooks/useQuarters";
 import { PageHeaderWithBreadCrumbs as RoadmapHeader } from "@/components/PageHeaderWithBreadCrumbs";
 import { QuarterFormModal } from "./_lib/components/QuarterFormModal";
-import { quarterLabel, quarterDateRange } from "./_lib/types";
+import { QuarterYearList } from "./_lib/components/QuarterYearList";
+import { groupQuartersByYear } from "./_lib/util/groupQuartersByYear";
 import { useRoadmapAccessLevel } from "./_lib/hooks/useRoadmapAccessLevel";
 
 export default function RoadmapHomePage() {
@@ -19,6 +20,12 @@ export default function RoadmapHomePage() {
   const { isDeveloper, isLoading: accessLoading } = useRoadmapAccessLevel();
 
   const [editing, setEditing] = useState<string | null>(null);
+  // Set by the "Create <current quarter>" card so the modal opens on that quarter.
+  const [createDefaults, setCreateDefaults] = useState<{ year: number; quarter: number } | null>(
+    null,
+  );
+  const groups = useMemo(() => groupQuartersByYear(quarters), [quarters]);
+  const openCreate = (year: number, quarter: number) => setCreateDefaults({ year, quarter });
 
   useEffect(() => {
     if (!accessLoading && !isDeveloper) {
@@ -29,6 +36,7 @@ export default function RoadmapHomePage() {
   const closeModal = () => {
     if (newQuarter) router.push("/roadmap");
     setEditing(null);
+    setCreateDefaults(null);
   };
 
   const editingQuarter = quarters.find((q) => q.id === editing) ?? null;
@@ -72,46 +80,14 @@ export default function RoadmapHomePage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {quarters.map((q) => (
-            <div
-              key={q.id}
-              className="border rounded-lg p-4 hover:shadow-sm transition flex flex-col"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <Link
-                    href={`/roadmap/${q.id}`}
-                    className="text-lg font-semibold hover:text-darkBlue"
-                  >
-                    {quarterLabel(q.year, q.quarter)}
-                  </Link>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {quarterDateRange(q.year, q.quarter)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditing(q.id)}
-                  className="text-xs text-gray-500 hover:text-darkBlue cursor-pointer"
-                >
-                  Edit
-                </button>
-              </div>
-              <div className="mt-3 flex justify-end">
-                <Link href={`/roadmap/${q.id}`} className="text-sm text-darkBlue hover:underline">
-                  Open →
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
+        <QuarterYearList groups={groups} onEdit={setEditing} onCreate={openCreate} />
       )}
 
       <QuarterFormModal
-        open={newQuarter || editing !== null}
+        open={newQuarter || editing !== null || createDefaults !== null}
         onClose={closeModal}
         existing={editingQuarter}
+        defaults={createDefaults}
       />
     </div>
   );

@@ -17,7 +17,7 @@ export type SendResult = { sent: true; to: string } | { sent: false; reason: str
 
 // Finance wants a copy of every account-manager notification for these two
 // triggers. Hard-coded on purpose — this isn't a per-office setting yet.
-const FINANCE_EMAIL = "finance@bleacherrentals.com";
+export const FINANCE_EMAIL = "finance@bleacherrentals.com";
 const FINANCE_CC_TRIGGERS = new Set([QUOTE_SIGNED_AM, PAYMENT_MADE_AM]);
 
 /**
@@ -154,7 +154,11 @@ export async function resolveTriggerEmail(opts: ResolveOpts): Promise<ResolveRes
       templateId: template.id,
       from,
       to: recipient,
-      cc: FINANCE_CC_TRIGGERS.has(trigger) ? FINANCE_EMAIL : null,
+      // No CC when finance is already the recipient (the manual "booked" notice).
+      cc:
+        FINANCE_CC_TRIGGERS.has(trigger) && recipient.toLowerCase() !== FINANCE_EMAIL
+          ? FINANCE_EMAIL
+          : null,
       subject,
       htmlBody,
       storedAttachmentRows: storedAttachmentRows ?? [],

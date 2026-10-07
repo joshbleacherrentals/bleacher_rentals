@@ -1,5 +1,7 @@
 "use client";
 import { ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { InfoTooltip } from "@/components/InfoTooltip";
 
 export type Column<T> = {
   key: string;
@@ -7,7 +9,16 @@ export type Column<T> = {
   render: (row: T) => ReactNode;
   /** Horizontal alignment of the header and cells. Defaults to "left". */
   align?: "left" | "right";
+  /** Set to make the header a sort toggle; this key is what `onSort` receives. */
+  sortKey?: string;
+  /**
+   * An info icon beside the header that explains the column on hover. It sits
+   * next to the sort button, not in it, so clicking it never sorts.
+   */
+  headerTooltip?: { label: string; content: string };
 };
+
+export type DataTableSort = { key: string; direction: "asc" | "desc" };
 
 type DataTableProps<T> = {
   columns: Column<T>[];
@@ -17,7 +28,17 @@ type DataTableProps<T> = {
   isLoading?: boolean;
   loadingMessage?: string;
   onRowClick?: (row: T) => void;
+  /** The active sort, used to mark the header. Sorting the data is the caller's job. */
+  sort?: DataTableSort;
+  onSort?: (sortKey: string) => void;
 };
+
+function SortIcon({ direction }: { direction: "asc" | "desc" | null }) {
+  const className = "h-3 w-3 shrink-0";
+  if (direction === "asc") return <ArrowUp className={className} aria-hidden />;
+  if (direction === "desc") return <ArrowDown className={className} aria-hidden />;
+  return <ArrowUpDown className={`${className} opacity-40`} aria-hidden />;
+}
 
 export function DataTable<T>({
   columns,
@@ -27,6 +48,8 @@ export function DataTable<T>({
   isLoading = false,
   loadingMessage = "Loading...",
   onRowClick,
+  sort,
+  onSort,
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
@@ -42,16 +65,52 @@ export function DataTable<T>({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    column.align === "right" ? "text-right" : "text-left"
-                  }`}
-                >
-                  {column.header}
-                </th>
-              ))}
+              {columns.map((column) => {
+                const sortable = column.sortKey !== undefined && onSort !== undefined;
+                const direction =
+                  sortable && sort && sort.key === column.sortKey ? sort.direction : null;
+                const heading = sortable ? (
+                  <button
+                    type="button"
+                    onClick={() => onSort(column.sortKey!)}
+                    className={`inline-flex items-center gap-1 uppercase tracking-wider cursor-pointer select-none hover:text-gray-800 ${
+                      direction ? "text-gray-800" : ""
+                    } ${column.align === "right" ? "flex-row-reverse" : ""}`}
+                  >
+                    {column.header}
+                    <SortIcon direction={direction} />
+                  </button>
+                ) : (
+                  column.header
+                );
+                return (
+                  <th
+                    key={column.key}
+                    aria-sort={
+                      direction === "asc"
+                        ? "ascending"
+                        : direction === "desc"
+                          ? "descending"
+                          : undefined
+                    }
+                    className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                      column.align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {column.headerTooltip ? (
+                      <div className="inline-flex items-center gap-1">
+                        {heading}
+                        <InfoTooltip
+                          label={column.headerTooltip.label}
+                          content={column.headerTooltip.content}
+                        />
+                      </div>
+                    ) : (
+                      heading
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">

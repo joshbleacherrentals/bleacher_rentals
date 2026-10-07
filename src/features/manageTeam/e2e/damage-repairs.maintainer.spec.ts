@@ -26,11 +26,13 @@ test.describe("Damage reports and repairs (maintainer)", () => {
     await expect(page.getByRole("heading", { name: /repairs/i }).first()).toBeVisible();
   });
 
-  test("still cannot open the dashboard or the quotes", async ({ page }) => {
+  // The dashboard became theirs in docs/specs/maintainer-dashboard-cells.md, so it is also where
+  // a page they may not open sends them back to.
+  test("opens the dashboard, but still cannot open the quotes", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page).toHaveURL(/\/annual-inspections/);
+    await expect(page).toHaveURL(/\/dashboard/);
     await page.goto("/quotes-bookings");
-    await expect(page).toHaveURL(/\/annual-inspections/);
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 
   test("gets the admin-style controls: Show Deleted on both pages", async ({ page }) => {

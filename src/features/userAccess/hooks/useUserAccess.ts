@@ -47,6 +47,9 @@ export function useUserAccess(): UserAccessState {
       .leftJoin("Maintainers as maint", (join) =>
         join.onRef("maint.user_uuid", "=", "u.id").on("maint.is_active", "=", 1),
       )
+      .leftJoin("Accountants as acct", (join) =>
+        join.onRef("acct.user_uuid", "=", "u.id").on("acct.is_active", "=", 1),
+      )
       .select([
         "u.id as id",
         "u.status_uuid",
@@ -56,6 +59,7 @@ export function useUserAccess(): UserAccessState {
         "d.id as driver_id",
         "dev.id as developer_id",
         "maint.id as maintainer_id",
+        "acct.id as accountant_id",
       ])
       .where("u.clerk_user_id", "=", clerkUserIdForQuery)
       .limit(1)
@@ -102,7 +106,8 @@ export function useUserAccess(): UserAccessState {
           AccountManagers!AccountManagers_user_uuid_fkey(id, is_active),
           Drivers!Drivers_user_uuid_fkey(id, is_active),
           Developers!Developers_user_uuid_fkey(id, is_active),
-          Maintainers!maintainers_user_uuid_fkey(id, is_active)
+          Maintainers!maintainers_user_uuid_fkey(id, is_active),
+          Accountants!accountants_user_uuid_fkey(id, is_active)
         `,
         )
         .eq("clerk_user_id", clerkUserId)
@@ -130,6 +135,7 @@ export function useUserAccess(): UserAccessState {
         driver_id: activeId(row.Drivers),
         developer_id: activeId(row.Developers),
         maintainer_id: activeId(row.Maintainers),
+        accountant_id: activeId(row.Accountants),
       };
 
       setFallback({ clerkUserId, result: determineUserAccess(mapped) });

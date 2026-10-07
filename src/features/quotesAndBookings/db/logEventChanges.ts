@@ -10,7 +10,11 @@ export type ActionType =
   | "status_change"
   | "line_item_add"
   | "line_item_remove"
-  | "line_item_change";
+  | "line_item_change"
+  // A manual payment edited or soft-deleted (docs/specs/accountant-quotes-09). `field_name` carries
+  // `payment:<id>`; a deletion's row names the payment and never the reason.
+  | "payment_edit"
+  | "payment_delete";
 
 export const TRACKED_FIELDS = [
   "event_name",

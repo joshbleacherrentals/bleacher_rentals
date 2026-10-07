@@ -23,6 +23,7 @@ export function InQuickBooksSelect({
 
   return (
     <Dropdown
+      compact
       options={OPTIONS}
       selected={selected}
       onSelect={(next) => onChange(next === "any" ? null : next === "yes")}

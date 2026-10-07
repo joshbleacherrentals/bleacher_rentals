@@ -12,7 +12,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(27);
+SELECT plan(28);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 INSERT INTO public."UserStatuses" (id, status)
@@ -139,10 +139,15 @@ SELECT lives_ok(
   'a maintainer can delete a maintenance event');
 
 -- ── What stays out of reach ────────────────────────────────────────────────
-SELECT is((SELECT count(*)::int FROM public."Events" WHERE id = :'customer_event'), 0,
-  'a maintainer still cannot read customer events');
+-- Reading events was granted later, by docs/specs/maintainer-dashboard-cells.md: the dashboard
+-- draws them. Writing them was not.
+SELECT is((SELECT count(*)::int FROM public."Events" WHERE id = :'customer_event'), 1,
+  'a maintainer can read customer events (the dashboard shows them)');
+UPDATE public."Events" SET event_name = 'hijacked' WHERE id = :'customer_event';
 UPDATE public."Addresses" SET street = 'hijacked' WHERE id = :'customer_address';
 RESET ROLE;
+SELECT is((SELECT event_name FROM public."Events" WHERE id = :'customer_event'), 'Customer event',
+  'a maintainer still cannot edit an event');
 SELECT is((SELECT street FROM public."Addresses" WHERE id = :'customer_address'), '1 Customer Way',
   'a maintainer cannot edit an address that is not a repair''s');
 

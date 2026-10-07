@@ -126,6 +126,8 @@ export type DriverWithMeta = Tables<"Users"> & {
     qbo_bill_id: string | null;
     week_start: string;
     week_end: string;
+    /** Only the week's driver list reads this; the page and the payment window use useWorkTrackerGroupPaid. */
+    is_paid?: boolean;
   } | null;
 };
 

@@ -103,10 +103,14 @@ export async function loadEventPaymentContext(
       .from("PaymentInstallments")
       .select("id, due_date, percentage_bps")
       .eq("event_uuid", eventId),
+    // The checkout never receives a deleted payment: the filter is in the query, and `deletedAt` is
+    // mapped below as well, so a row that slipped through still would not count
+    // (docs/specs/accountant-quotes-08-payments-readers-skip-deleted.md, D1).
     supabase
       .from("PaymentHistory")
-      .select("id, installment_id, amount_cents, currency, status, paid_at, created_at")
-      .eq("event_uuid", eventId),
+      .select("id, installment_id, amount_cents, currency, status, paid_at, created_at, deleted_at")
+      .eq("event_uuid", eventId)
+      .is("deleted_at", null),
   ]);
 
   if (lineItemResult.error || installmentResult.error || paymentResult.error)
@@ -132,6 +136,7 @@ export async function loadEventPaymentContext(
     status: p.status ?? "",
     paidAt: p.paid_at,
     createdAt: p.created_at ?? "",
+    deletedAt: p.deleted_at,
   }));
 
   const allocation = allocatePayments(

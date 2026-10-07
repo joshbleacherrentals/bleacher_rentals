@@ -21,6 +21,7 @@ describe("determineUserAccess", () => {
       driver_id: "d-1",
       developer_id: "dev-1",
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "account-deactivated" });
@@ -36,6 +37,7 @@ describe("determineUserAccess", () => {
       driver_id: "d-1",
       developer_id: null,
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "driver-only" });
@@ -51,6 +53,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "no-roles-assigned" });
@@ -68,6 +71,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -88,6 +92,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -108,6 +113,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: "dev-1",
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -128,6 +134,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -150,6 +157,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: "dev-1",
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -170,6 +178,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: "dev-1",
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -190,6 +199,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: "dev-1",
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -210,6 +220,7 @@ describe("determineUserAccess", () => {
       driver_id: "d-1",
       developer_id: null,
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -230,6 +241,7 @@ describe("determineUserAccess", () => {
       driver_id: "d-1",
       developer_id: "dev-1",
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -250,6 +262,7 @@ describe("determineUserAccess", () => {
       driver_id: "d-1",
       developer_id: "dev-1",
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -272,6 +285,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: "m-1",
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -292,6 +306,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: "m-1",
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -312,6 +327,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: "m-1",
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
@@ -332,6 +348,7 @@ describe("determineUserAccess", () => {
       driver_id: null,
       developer_id: null,
       maintainer_id: "m-1",
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "account-deactivated" });
@@ -347,6 +364,7 @@ describe("determineUserAccess", () => {
       driver_id: "d-1",
       developer_id: null,
       maintainer_id: null,
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({ status: "blocked", reason: "driver-only" });
@@ -362,11 +380,130 @@ describe("determineUserAccess", () => {
       driver_id: "d-1",
       developer_id: null,
       maintainer_id: "m-1",
+      accountant_id: null,
     };
     const result = determineUserAccess(userData);
     expect(result).toEqual({
       status: "active",
       roles: ["maintainer", "driver"],
+      userId: "1",
+      accountManagerId: null,
+    });
+  });
+
+  // --- Accountant ---
+
+  it("active: accountant only — the role must not read as no roles assigned", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: null,
+      accountant_id: "a-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["accountant"],
+      userId: "1",
+      accountManagerId: null,
+    });
+  });
+
+  it("blocked: no-roles-assigned is unchanged when the accountant row is absent", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: null,
+      accountant_id: null,
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({ status: "blocked", reason: "no-roles-assigned" });
+  });
+
+  it("active: admin + accountant → both roles", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 1,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: null,
+      accountant_id: "a-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["admin", "accountant"],
+      userId: "1",
+      accountManagerId: null,
+    });
+  });
+
+  it("active: account manager + accountant → both roles", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: "am-1",
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: null,
+      accountant_id: "a-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["account_manager", "accountant"],
+      userId: "1",
+      accountManagerId: "am-1",
+    });
+  });
+
+  it("blocked: a deactivated accountant is still deactivated", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.inactive,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: null,
+      developer_id: null,
+      maintainer_id: null,
+      accountant_id: "a-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({ status: "blocked", reason: "account-deactivated" });
+  });
+
+  it("active: accountant + driver → accountant keeps the web session", () => {
+    const userData: UserAccessData = {
+      id: "1",
+      status_uuid: STATUSES.active,
+      is_admin: 0,
+      is_viewer: 0,
+      account_manager_id: null,
+      driver_id: "d-1",
+      developer_id: null,
+      maintainer_id: null,
+      accountant_id: "a-1",
+    };
+    const result = determineUserAccess(userData);
+    expect(result).toEqual({
+      status: "active",
+      roles: ["accountant", "driver"],
       userId: "1",
       accountManagerId: null,
     });
