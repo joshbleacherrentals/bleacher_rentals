@@ -13,7 +13,7 @@ import { IncompleteList } from "@/features/manageTeam/components/lists/Incomplet
 import TabNavigation, { TeamTab } from "../../features/manageTeam/components/inputs/TabNavigation";
 import SearchBar from "../../features/manageTeam/components/inputs/SearchBar";
 import { Toggle } from "@/components/Toggle";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useSearchQueryStore } from "@/features/manageTeam/state/useSearchQueryStore";
 import { useRealtimeHydrateCurrentUserStore } from "@/features/manageTeam/hooks/useUserById";
 import { PageHeader } from "@/components/PageHeader";
@@ -31,10 +31,34 @@ export type ExistingUser = {
   homeBases: { id: number; label: string }[];
 } | null;
 
+/**
+ * An accountant opens the profile of a driver and of nobody else (docs/specs/accountant-team.md,
+ * D5): the lists show every user, but a row that is not a driver's does not react to a click. The
+ * click is stopped before the row's own handler sees it, and the row stops looking clickable. Text
+ * stays selectable, so an email can still be copied.
+ *
+ * This is a convenience, not the lock: the database does not let an accountant read the Users row
+ * of anyone who is not a driver, and `getEditAccess` leaves such a profile read-only.
+ */
+function RowsNotClickable({ active, children }: { active: boolean; children: ReactNode }) {
+  if (!active) return <>{children}</>;
+  return (
+    <div
+      onClickCapture={(e) => {
+        if ((e.target as Element).closest("tbody tr")) e.stopPropagation();
+      }}
+      className="[&_tbody_tr]:cursor-default [&_tbody_tr]:hover:bg-transparent"
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function TeamPage() {
   useRealtimeHydrateCurrentUserStore();
   const router = useRouter();
-  const { canCreateUser } = useTeamPermissions();
+  const { canCreateUser, canOpenAnyProfile } = useTeamPermissions();
+  const rowsLocked = !canOpenAnyProfile;
   const [activeTab, setActiveTab] = useState<TeamTab>("admins");
   const [showInactive, setShowInactive] = useState(false);
   const setField = useSearchQueryStore((s) => s.setField);
@@ -75,13 +99,17 @@ export default function TeamPage() {
       </div>
 
       {/* Incomplete Users Alert - Shows regardless of tab */}
-      <IncompleteList showInactive={showInactive} />
+      <RowsNotClickable active={rowsLocked}>
+        <IncompleteList showInactive={showInactive} />
+      </RowsNotClickable>
 
       {/* Admins Section */}
       {activeTab === "admins" && (
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Admins</h2>
-          <AdminList showInactive={showInactive} />
+          <RowsNotClickable active={rowsLocked}>
+            <AdminList showInactive={showInactive} />
+          </RowsNotClickable>
         </div>
       )}
 
@@ -89,7 +117,9 @@ export default function TeamPage() {
       {activeTab === "account-managers" && (
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Account Managers</h2>
-          <AccountManagerList showInactive={showInactive} />
+          <RowsNotClickable active={rowsLocked}>
+            <AccountManagerList showInactive={showInactive} />
+          </RowsNotClickable>
         </div>
       )}
 
@@ -105,7 +135,9 @@ export default function TeamPage() {
       {activeTab === "developers" && (
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Developers</h2>
-          <DeveloperList showInactive={showInactive} />
+          <RowsNotClickable active={rowsLocked}>
+            <DeveloperList showInactive={showInactive} />
+          </RowsNotClickable>
         </div>
       )}
 
@@ -113,7 +145,9 @@ export default function TeamPage() {
       {activeTab === "maintainers" && (
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Maintainers</h2>
-          <MaintainerList showInactive={showInactive} />
+          <RowsNotClickable active={rowsLocked}>
+            <MaintainerList showInactive={showInactive} />
+          </RowsNotClickable>
         </div>
       )}
 
@@ -121,7 +155,9 @@ export default function TeamPage() {
       {activeTab === "accountants" && (
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Accountants</h2>
-          <AccountantList showInactive={showInactive} />
+          <RowsNotClickable active={rowsLocked}>
+            <AccountantList showInactive={showInactive} />
+          </RowsNotClickable>
         </div>
       )}
 
@@ -129,7 +165,9 @@ export default function TeamPage() {
       {activeTab === "viewers" && (
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewers</h2>
-          <ViewerList showInactive={showInactive} />
+          <RowsNotClickable active={rowsLocked}>
+            <ViewerList showInactive={showInactive} />
+          </RowsNotClickable>
         </div>
       )}
 
@@ -138,12 +176,16 @@ export default function TeamPage() {
         <div>
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Admins</h2>
-            <AdminList showInactive={showInactive} />
+            <RowsNotClickable active={rowsLocked}>
+              <AdminList showInactive={showInactive} />
+            </RowsNotClickable>
           </div>
 
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Account Managers</h2>
-            <AccountManagerList showInactive={showInactive} />
+            <RowsNotClickable active={rowsLocked}>
+              <AccountManagerList showInactive={showInactive} />
+            </RowsNotClickable>
           </div>
 
           <div className="mb-8">
@@ -153,22 +195,30 @@ export default function TeamPage() {
 
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Developers</h2>
-            <DeveloperList showInactive={showInactive} />
+            <RowsNotClickable active={rowsLocked}>
+              <DeveloperList showInactive={showInactive} />
+            </RowsNotClickable>
           </div>
 
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Maintainers</h2>
-            <MaintainerList showInactive={showInactive} />
+            <RowsNotClickable active={rowsLocked}>
+              <MaintainerList showInactive={showInactive} />
+            </RowsNotClickable>
           </div>
 
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Accountants</h2>
-            <AccountantList showInactive={showInactive} />
+            <RowsNotClickable active={rowsLocked}>
+              <AccountantList showInactive={showInactive} />
+            </RowsNotClickable>
           </div>
 
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewers</h2>
-            <ViewerList showInactive={showInactive} />
+            <RowsNotClickable active={rowsLocked}>
+              <ViewerList showInactive={showInactive} />
+            </RowsNotClickable>
           </div>
         </div>
       )}

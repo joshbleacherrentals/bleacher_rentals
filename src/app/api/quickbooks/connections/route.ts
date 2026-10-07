@@ -6,11 +6,14 @@ import {
   updateQboConnectionTaxCode,
 } from "@/features/quickbooks-integration/db";
 import { requireAdmin } from "@/features/userAccess/logic/requireAdmin";
+import { requireAdminOrAccountant } from "@/features/userAccess/logic/requireAdminOrAccountant";
 import { NextRequest, NextResponse } from "next/server";
 
+// Reading the list is open to an accountant too: the vendor modal on the Team page picks the
+// QuickBooks connection of a vendor (docs/specs/accountant-team.md). Every write stays admin-only.
 export async function GET() {
   try {
-    await requireAdmin();
+    await requireAdminOrAccountant();
     const connections = await getAllQboConnections();
     return NextResponse.json({ connections });
   } catch (error: any) {

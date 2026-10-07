@@ -148,10 +148,11 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Accountant, Work Trackers, Messages, Companies & Contacts and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
+      "team",
       "accountant",
       "work-trackers",
       "messages",
@@ -164,27 +165,33 @@ describe("useSidebarItems", () => {
     expect("label" in quotes && quotes.label).toBe("Quotes & Bookings");
     expect("href" in quotes && quotes.href).toBe("/quotes-bookings");
 
-    const accountantPage = items[1];
+    // docs/specs/accountant-team.md §6: Team, where ALL_ITEMS puts it — after Quotes & Bookings.
+    const team = items[1];
+    expect(team.type).toBe("button");
+    expect("label" in team && team.label).toBe("Team");
+    expect("href" in team && team.href).toBe("/team");
+
+    const accountantPage = items[2];
     expect(accountantPage.type).toBe("button");
     expect("label" in accountantPage && accountantPage.label).toBe("Accountant");
     expect("href" in accountantPage && accountantPage.href).toBe("/accountant");
 
-    const workTrackers = items[2];
+    const workTrackers = items[3];
     expect(workTrackers.type).toBe("button");
     expect("href" in workTrackers && workTrackers.href).toBe("/work-trackers");
 
     // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: Messages, with Internal only.
-    const messages = items[3];
+    const messages = items[4];
     expect(messages.type).toBe("dropdown");
     expect("label" in messages && messages.label).toBe("Messages");
 
     // docs/specs/accountant-address-book.md §4: Companies & Contacts, after Messages.
-    const companiesContacts = items[4];
+    const companiesContacts = items[5];
     expect(companiesContacts.type).toBe("button");
     expect("label" in companiesContacts && companiesContacts.label).toBe("Companies & Contacts");
     expect("href" in companiesContacts && companiesContacts.href).toBe("/companies-contacts");
 
-    const docs = items[5];
+    const docs = items[6];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",

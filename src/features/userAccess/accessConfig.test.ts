@@ -59,17 +59,19 @@ describe("mergeRoleConfigs — the maintainer role", () => {
 });
 
 describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accountant page)", () => {
-  it("lets an accountant open the Accountant page, Quotes & Bookings, the Work Trackers pages, the chat, Companies & Contacts and the two pages every role may read", () => {
+  it("lets an accountant open the Accountant page, Quotes & Bookings, the Work Trackers pages, the chat, Companies & Contacts, Team and the two pages every role may read", () => {
     const config = mergeRoleConfigs(["accountant"]);
     // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: /messages comes after
     // /work-trackers, and /accountant stays first so that it stays the landing page.
     // docs/specs/accountant-address-book.md §4: /companies-contacts follows /messages.
+    // docs/specs/accountant-team.md §6: /team follows /companies-contacts.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
       "/work-trackers",
       "/messages",
       "/companies-contacts",
+      "/team",
       "/permissions",
       "/changelog",
     ]);
@@ -79,6 +81,21 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
   // contacts and venues on /companies-contacts. Prefix match, like every other path.
   it("lets an accountant open Companies & Contacts", () => {
     expect(canAccessPath(["accountant"], "/companies-contacts")).toBe(true);
+  });
+
+  // docs/specs/accountant-team.md: the accountant opens /team, sees every user and edits a driver's
+  // payment info and vendor. Prefix match, so /team/new and /team/<id>/edit/... come with it; the
+  // screens guard themselves by edit access, and the database is the lock.
+  it("lets an accountant open Team, a driver's profile and the new-member form by the same prefix", () => {
+    expect(canAccessPath(["accountant"], "/team")).toBe(true);
+    expect(
+      canAccessPath(["accountant"], "/team/00000000-0000-0000-0000-000000000000/edit/driver"),
+    ).toBe(true);
+    expect(canAccessPath(["accountant"], "/team/new")).toBe(true);
+  });
+
+  it("keeps the Accountant page as the landing page after Team was added", () => {
+    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
   });
 
   it("keeps the Accountant page as the landing page after Companies & Contacts was added", () => {
@@ -105,7 +122,6 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     const { allowedPaths } = mergeRoleConfigs(["accountant"]);
     for (const path of [
       "/dashboard",
-      "/team",
       "/assets",
       "/all-work-trackers",
       "/work-tracker-types",
@@ -160,8 +176,14 @@ describe("canAccessPath — a link is shown only if its destination is reachable
     expect(canAccessPath(["account_manager"], "/work-trackers/2026-09-21/abc")).toBe(true);
   });
 
-  it("keeps an accountant away from the driver profile — they have no Team page", () => {
-    expect(canAccessPath(["accountant"], driverProfile)).toBe(false);
+  it("lets an accountant open the driver profile — they have the Team page (docs/specs/accountant-team.md)", () => {
+    expect(canAccessPath(["accountant"], driverProfile)).toBe(true);
+  });
+
+  it("still keeps a maintainer, a developer and a driver away from the driver profile", () => {
+    for (const role of ["maintainer", "developer", "driver"] as const) {
+      expect(canAccessPath([role], driverProfile), role).toBe(false);
+    }
   });
 
   it("lets an accountant into the Accountant page and keeps everyone else out of it", () => {
@@ -184,7 +206,8 @@ describe("canAccessPath — a link is shown only if its destination is reachable
     expect(canAccessPath(["accountant"], "/work-trackers/2026-09-21/abc")).toBe(true);
   });
 
-  it("is a union over the roles: an account manager who is also an accountant has Team", () => {
+  it("is a union over the roles: a viewer who is also an accountant has Team, and so does an account manager who is also an accountant", () => {
+    expect(canAccessPath(["viewer", "accountant"], driverProfile)).toBe(true);
     expect(canAccessPath(["accountant", "account_manager"], driverProfile)).toBe(true);
   });
 

@@ -363,8 +363,10 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
   driver: [],
   maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
   // docs/specs/accountant-address-book.md: Companies & Contacts, after Messages (ALL_ITEMS sets the order).
+  // docs/specs/accountant-team.md: Team, after Quotes & Bookings.
   accountant: [
     "quotes-bookings",
+    "team",
     "accountant",
     "work-trackers",
     "messages",

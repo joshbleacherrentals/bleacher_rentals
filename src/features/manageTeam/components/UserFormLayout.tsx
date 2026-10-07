@@ -4,7 +4,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import RoleNavigation from "./RoleNavigation";
 import { useUserFormSubmit } from "../hooks/useUserFormSubmit";
-import { useTeamPermissions, getEditAccess } from "../hooks/useTeamPermissions";
+import {
+  useTeamPermissions,
+  getEditAccess,
+  getEditCapabilities,
+} from "../hooks/useTeamPermissions";
 import { useCurrentUserStore } from "../state/useCurrentUserStore";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { EditAccessProvider } from "../state/EditAccessContext";
@@ -49,8 +53,13 @@ export function UserFormLayout({ children }: UserFormLayoutProps) {
 
   const isReadOnly = editAccess === "read-only";
   const isZonesOnly = editAccess === "zones-only";
-  // Both "full" and "zones-only" can save (zones-only persists just the zone assignment).
+  const isDriverOnly = editAccess === "driver-only";
+  const isZonesAndDriver = editAccess === "zones-and-driver";
+  // Every level but "read-only" can save: "zones-only" persists just the zone assignment,
+  // "driver-only" just the payment info and vendor (docs/specs/accountant-team.md).
   const canSave = !isReadOnly;
+  // The three partial levels lock the whole form; the driver page opts back in what stays editable.
+  const { lockedWithExceptions } = getEditCapabilities(editAccess);
 
   return (
     <main>
@@ -59,14 +68,18 @@ export function UserFormLayout({ children }: UserFormLayoutProps) {
         subtitle="Configure user details, roles, and permissions. All sections marked with * are required."
         action={
           canSave ? (
-            <PrimaryButton onClick={handleSubmit} loading={isSubmitting} loadingText="Saving...">
+            <PrimaryButton
+              onClick={() => handleSubmit(editAccess)}
+              loading={isSubmitting}
+              loadingText="Saving..."
+            >
               {existingUserUuid ? "Save Changes" : "Save & Send Invite"}
             </PrimaryButton>
           ) : undefined
         }
       />
 
-      {canSave && <RoleNavigation />}
+      {canSave && <RoleNavigation editAccess={editAccess} />}
 
       {isReadOnly && existingUserUuid && (
         <div className="mt-4 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
@@ -81,11 +94,26 @@ export function UserFormLayout({ children }: UserFormLayoutProps) {
         </div>
       )}
 
+      {isDriverOnly && (
+        <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          You can edit this driver&apos;s payment info, vendor and driver type. Everything else is
+          read-only.
+        </div>
+      )}
+
+      {isZonesAndDriver && (
+        <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          You can add this driver to your zones and edit their payment info, vendor and driver type.
+          Everything else is read-only.
+        </div>
+      )}
+
       <EditAccessProvider value={editAccess}>
-        {/* read-only locks everything; zones-only locks everything except the zone
-            multi-select, which re-enables itself with pointer-events-auto. */}
+        {/* read-only locks everything; zones-only, driver-only and zones-and-driver lock everything
+            except what the driver page opts back in with pointer-events-auto (the zone
+            multi-select, the payment info and the vendor). */}
         <div
-          className={`mt-6 ${isReadOnly && existingUserUuid ? "pointer-events-none opacity-60" : ""} ${isZonesOnly ? "pointer-events-none" : ""}`}
+          className={`mt-6 ${isReadOnly && existingUserUuid ? "pointer-events-none opacity-60" : ""} ${lockedWithExceptions ? "pointer-events-none" : ""}`}
         >
           {children}
         </div>

@@ -96,9 +96,9 @@ export function WorkTrackerGroupModal({
     Database["public"]["Enums"]["worktracker_group_status"]
   >(groupData?.status || "draft");
 
-  // The Edit Profile link goes to the Team pages. A user who cannot open them (an accountant)
-  // would be bounced straight back out, so for them there is no link
-  // (docs/specs/accountant-work-trackers.md, D1).
+  // The Edit Profile link goes to the Team pages. A user who cannot open them would be bounced
+  // straight back out, so for them there is no link (docs/specs/accountant-work-trackers.md, D1).
+  // An accountant can open them since docs/specs/accountant-team.md, so it has the link too.
   const canOpenDriverProfile = access.status === "active" && canAccessPath(access.roles, "/team");
 
   const canMarkPaid =

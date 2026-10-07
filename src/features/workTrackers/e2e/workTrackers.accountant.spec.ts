@@ -49,7 +49,7 @@ test.describe("Work Trackers (accountant)", () => {
     await expect(page.getByRole("button", { name: /Release All/ })).toHaveCount(0);
   });
 
-  test("S4 — the payment window: Ready for Payment and back, with no Edit Profile", async ({
+  test("S4 — the payment window: Ready for Payment and back, with Edit Profile", async ({
     page,
   }) => {
     await page.goto("/work-trackers");
@@ -64,8 +64,10 @@ test.describe("Work Trackers (accountant)", () => {
     await expect(modal.getByText("Payment Details")).toBeVisible({ timeout: 30_000 });
     await expect(modal.getByRole("button", { name: "Close" })).toBeVisible();
 
-    // D1: the Team pages are not the accountant's, so the link to them is not offered.
-    await expect(modal.getByRole("button", { name: /Edit Profile/ })).toHaveCount(0);
+    // accountant-work-trackers D1 hid the link because the accountant had no Team pages. It has them
+    // since docs/specs/accountant-team.md (C6), and the link is shown whenever the roles can reach
+    // /team, so it is offered now.
+    await expect(modal.getByRole("button", { name: /Edit Profile/ })).toHaveCount(1);
 
     const toReady = modal.getByRole("button", { name: "Mark as Ready for Payment" });
     if (await toReady.isVisible()) {

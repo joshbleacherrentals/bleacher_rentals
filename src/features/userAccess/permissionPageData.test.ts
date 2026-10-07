@@ -27,7 +27,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the internal chat, and Companies & Contacts", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the internal chat, Companies & Contacts, and Edit Team Members", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -36,6 +36,7 @@ describe("permission matrix", () => {
         "Companies & Contacts",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
+        "Edit Team Members",
         "Event Chat",
         "Events",
         "Payment History",
@@ -170,6 +171,72 @@ describe("permission matrix", () => {
       expect(accountant("Dashboard Cells")?.note).toMatch(/Accountant page/);
       expect(accountant("Dashboard Cells")?.note).toMatch(/Quotes & Bookings, read-only/);
       expect(accountant("Dashboard Cells")?.note).toMatch(/Companies & Contacts/);
+      // docs/specs/accountant-team.md: the Team page is no longer hidden from the accountant.
+      expect(accountant("Dashboard Cells")?.note).toMatch(/Team page/);
+    });
+
+    // docs/specs/accountant-team.md §6: the accountant sees every team member and edits a driver's
+    // payment info and vendor — and the vendor companies. The matrix is what the account managers
+    // read when they ask what an accountant may do, so it must say what the database allows.
+    describe("Edit Team Members", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Edit Team Members");
+
+      it("is custom for the accountant, and nothing else about the other roles changed", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "full",
+          account_manager: "custom",
+          accountant: "custom",
+          viewer: "read",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("tells the accountant what they can change on a driver", () => {
+        const note = accountant("Edit Team Members")?.note ?? "";
+        expect(note).toMatch(/payment info/i);
+        expect(note).toMatch(/currency, unit, tax, rates and tiers, deadhead, setup, teardown/);
+        expect(note).toMatch(/vendor company/i);
+        expect(note).toMatch(/driver type/i);
+      });
+
+      it("tells the accountant what they can only read, and what they cannot do", () => {
+        const note = accountant("Edit Team Members")?.note ?? "";
+        expect(note).toMatch(/zones, phone, home address, vehicle and documents/);
+        expect(note).toMatch(/without changing them/i);
+        expect(note).toMatch(/cannot change a driver's name, zones or roles/i);
+        expect(note).toMatch(/cannot open anyone who is not a driver/i);
+      });
+
+      it("says the vendor companies can be created, edited and deleted, QuickBooks link included", () => {
+        const note = accountant("Edit Team Members")?.note ?? "";
+        expect(note).toMatch(/create, edit and delete vendor companies/i);
+        expect(note).toMatch(/hidden, not removed/i);
+        expect(note).toMatch(/QuickBooks connection and QuickBooks vendor/);
+      });
+
+      it("says that roles add up for someone who is also an account manager", () => {
+        const note = accountant("Edit Team Members")?.note ?? "";
+        expect(note).toMatch(/also an account manager/i);
+        expect(note).toMatch(/own zones/);
+      });
+
+      it("is named in the role description", () => {
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(/Team page/);
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(/vendor/i);
+      });
+
+      it("still cannot invite or deactivate anyone, and the notes say the Team page is open", () => {
+        for (const label of ["Invite Team Members", "Deactivate Team Members"]) {
+          const entry = accountant(label);
+          expect(entry?.level, label).toBe("none");
+          expect(entry?.note, label).toMatch(/Can open the Team page but cannot/);
+        }
+      });
     });
 
     // docs/specs/accountant-address-book.md §4: an accountant creates, edits and soft-deletes
