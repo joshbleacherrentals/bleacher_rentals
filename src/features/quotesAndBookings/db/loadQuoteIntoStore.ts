@@ -5,6 +5,7 @@ import { fetchLineItemsForEvent } from "./fetchLineItems";
 import { resolveInvoiceDisplay } from "../utils/invoiceNumber";
 import { db, powerSyncDb } from "@/components/providers/SystemProvider";
 import type { LostReason } from "../utils/lostReason";
+import { taxOverrideFromSaved } from "../utils/taxOverride";
 
 /**
  * Fetches an event by ID (via PowerSync) and loads its data into useCreateQuoteStore for editing.
@@ -47,7 +48,12 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
   store.setField("pickupInstructions", data.pickupInstructions ?? "");
   store.setField("dropoffInstructions", data.dropoffInstructions ?? "");
   store.setField("taxPercent", data.taxPercent ?? null);
-  store.setField("taxOverrideCents", data.taxAmountCents ?? null);
+  // Only an amount typed by hand is an override. The saved amount is written either way, so treating
+  // it as one froze the tax of every quote that was opened for editing.
+  store.setField(
+    "taxOverrideCents",
+    taxOverrideFromSaved(data.isTaxOverridden, data.taxAmountCents),
+  );
 
   // Look up AccountManager by created_by_user_uuid
   if (data.createdByUserUuid) {

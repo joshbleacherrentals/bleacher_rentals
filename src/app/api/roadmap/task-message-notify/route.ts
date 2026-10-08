@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import * as postmark from "postmark";
+import { guardUserRecipients } from "@/features/devEmailAllowlist/server/guardRecipients";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -91,10 +92,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: 0, reason: "no_users_found" });
   }
 
-  const recipients = users.filter((u) => !!u.email);
-  console.log("[notify] recipients with email:", recipients.length);
-  if (recipients.length === 0) {
+  const withEmail = users.filter((u) => !!u.email);
+  console.log("[notify] recipients with email:", withEmail.length);
+  if (withEmail.length === 0) {
     return NextResponse.json({ sent: 0, reason: "no_emails_on_users" });
+  }
+
+  // Development only: drop anyone who is not on the allowed emails list.
+  const { allowed: recipients, blocked } = await guardUserRecipients(supabase, withEmail);
+  if (recipients.length === 0) {
+    return NextResponse.json({ sent: 0, reason: "blocked_in_development", blocked });
   }
 
   const taskTitle = task?.title ?? "a task";

@@ -27,6 +27,7 @@ import {
   Wrench,
   ImageIcon,
   Receipt,
+  MailCheck,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -286,6 +287,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "QBO Sales Tax",
         href: "/dev-tools/qbo-get-sales-tax",
         icon: QuickBooksIcon,
+      },
+      {
+        type: "button",
+        key: "allowed-emails",
+        label: "Allowed Emails",
+        href: "/dev-tools/allowed-emails",
+        icon: MailCheck,
       },
     ],
   },

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { QuoteDocumentData } from "@/features/quotesAndBookings/pdf/quoteDocumentData";
 import {
   QUOTE_SENT_CLIENT,
@@ -25,6 +25,9 @@ type FakeConfig = {
   template?: { id: string; subject: string; html_body: string } | null;
   attachments?: Array<{ file_name: string; storage_path: string; mime_type: string | null }>;
   download?: { ok: boolean };
+  // Rows of DevAllowedEmails, or an error reading them.
+  allowedEmails?: string[];
+  allowedEmailsError?: { message: string };
 };
 
 function makeSupabase(cfg: FakeConfig) {
@@ -40,7 +43,15 @@ function makeSupabase(cfg: FakeConfig) {
   const supabase: any = {
     from(table: string) {
       const builder: any = {
-        select: () => builder,
+        select: () =>
+          table === "DevAllowedEmails"
+            ? Promise.resolve({
+                data: cfg.allowedEmailsError
+                  ? null
+                  : (cfg.allowedEmails ?? []).map((email) => ({ email })),
+                error: cfg.allowedEmailsError ?? null,
+              })
+            : builder,
         eq: () => builder,
         is: () => builder,
         maybeSingle: () => Promise.resolve(singleFor(table)),
@@ -353,5 +364,101 @@ describe("resolveTriggerEmail — what the quote send preview shows", () => {
       ok: false,
       reason: expect.stringContaining("No active email template"),
     });
+  });
+});
+
+describe("development email allowlist", () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_ENVIRONMENT", "development");
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    errorSpy.mockRestore();
+  });
+
+  it("sends to an allowed recipient and drops the finance CC that is not on the list", async () => {
+    const { supabase, inserted } = makeSupabase({
+      ...READY,
+      allowedEmails: ["sam@bleacherrentals.com"],
+    });
+    const r = await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      trigger: QUOTE_SIGNED_AM,
+      eventId: "e1",
+      docData: doc(),
+    });
+    expect(r).toEqual({ sent: true, to: "sam@bleacherrentals.com" });
+    const sent = mockSendEmail.mock.calls[0][0];
+    expect(sent.To).toBe("sam@bleacherrentals.com");
+    expect(sent).not.toHaveProperty("Cc");
+    expect(lastEmailLog(inserted)).toMatchObject({ status: "sent" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("finance@bleacherrentals.com"));
+  });
+
+  it("does not send when the recipient is not on the list, and says why in the email log", async () => {
+    const { supabase, inserted } = makeSupabase({ ...READY, allowedEmails: [] });
+    const r = await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      trigger: QUOTE_SIGNED_CLIENT,
+      eventId: "e1",
+      docData: doc(),
+    });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(r).toMatchObject({
+      sent: false,
+      reason: expect.stringContaining("jordan@example.com"),
+    });
+    expect(lastEmailLog(inserted)).toMatchObject({
+      status: "failed",
+      reason: expect.stringContaining("/dev-tools/allowed-emails"),
+    });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("jordan@example.com"));
+  });
+
+  it("does not send when the allowlist cannot be read", async () => {
+    const { supabase } = makeSupabase({
+      ...READY,
+      allowedEmailsError: { message: "boom" },
+    });
+    const r = await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      trigger: QUOTE_SIGNED_CLIENT,
+      eventId: "e1",
+      docData: doc(),
+    });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(r.sent).toBe(false);
+  });
+
+  it.each(["staging", "production", undefined])(
+    "changes nothing when NEXT_PUBLIC_ENVIRONMENT is %j: the empty list is never consulted",
+    async (env) => {
+      vi.unstubAllEnvs();
+      if (env) vi.stubEnv("NEXT_PUBLIC_ENVIRONMENT", env);
+      const { supabase } = makeSupabase({ ...READY, allowedEmails: [] });
+      const r = await sendTriggerEmail({
+        supabaseAdmin: supabase,
+        trigger: QUOTE_SIGNED_AM,
+        eventId: "e1",
+        docData: doc(),
+      });
+      expect(r).toEqual({ sent: true, to: "sam@bleacherrentals.com" });
+      expect(mockSendEmail.mock.calls[0][0].Cc).toBe("finance@bleacherrentals.com");
+    },
+  );
+
+  it("does not filter the send preview, which sends nothing", async () => {
+    const { supabase } = makeSupabase({ ...READY, allowedEmails: [] });
+    const r = await resolveTriggerEmail({
+      supabaseAdmin: supabase,
+      trigger: QUOTE_SIGNED_CLIENT,
+      eventId: "e1",
+      docData: doc(),
+    });
+    expect(r.ok).toBe(true);
   });
 });

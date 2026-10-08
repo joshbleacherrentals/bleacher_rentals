@@ -143,13 +143,18 @@ export function EntitySearchSelect<T extends { id: string }>({
   // lands, so it never sees an editable field to attach a suggestion to.
   const [inputReadOnly, setInputReadOnly] = useState(true);
 
+  // `portalTarget` is a dependency because the panel — and so the input — only mounts once it is
+  // set, which happens in a layout effect AFTER `open` flips. On a picker's first open this effect
+  // used to run before the input existed, so focus silently did nothing and the user had to click
+  // the search box. `preventScroll`: the panel is already placed beside the card, and a scroll
+  // here would trip the close-on-scroll listener below.
   useEffect(() => {
     if (open) {
-      inputRef.current?.focus();
+      if (portalTarget) inputRef.current?.focus({ preventScroll: true });
     } else {
       setInputReadOnly(true);
     }
-  }, [open]);
+  }, [open, portalTarget]);
 
   useEffect(() => {
     if (!open) return;

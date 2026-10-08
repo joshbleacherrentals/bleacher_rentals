@@ -17,6 +17,7 @@ import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
 import { toEventLineItemValues } from "./toEventLineItemValues";
 import { postFinanceBookedNotice, shouldNotifyFinanceBooked } from "../utils/notifyFinanceBooked";
+import { taxOverrideFlag } from "../utils/taxOverride";
 
 type OldEventRow = {
   event_name: string | null;
@@ -40,6 +41,7 @@ type OldEventRow = {
   dropoff_instructions: string | null;
   tax_percent: number | null;
   tax_amount_cents: number | null;
+  is_tax_overridden: number | null;
   contract_revenue_cents: number | null;
   po_number: string | null;
   created_by_user_uuid: string | null;
@@ -158,6 +160,7 @@ export async function updateQuoteEvent(
         "dropoff_instructions",
         "tax_percent",
         "tax_amount_cents",
+        "is_tax_overridden",
         "contract_revenue_cents",
         "po_number",
         "created_by_user_uuid",
@@ -203,6 +206,7 @@ export async function updateQuoteEvent(
     contract_revenue_cents: contractRevenueCents,
     tax_percent: state.taxPercent,
     tax_amount_cents: effectiveTaxCents,
+    is_tax_overridden: taxOverrideFlag(state.taxOverrideCents),
     notes: state.clientFacingNotes || null,
     internal_notes: state.internalNotes || null,
     external_notes: state.clientFacingNotes || null,
