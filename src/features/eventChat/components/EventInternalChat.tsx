@@ -585,7 +585,9 @@ export function EventInternalChat({
                           {isMe ? "You" : displayName(user)}
                         </span>
                         <span className="text-[10px] text-gray-400">
-                          {new Date(msg.created_at).toLocaleTimeString(undefined, {
+                          {new Date(msg.created_at).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
                             hour: "numeric",
                             minute: "2-digit",
                           })}
