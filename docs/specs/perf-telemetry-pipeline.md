@@ -1,6 +1,9 @@
 # Performance telemetry — the pipeline: event, buffer, batch, table
 
-Status: **AWAITING APPROVAL** — 0 open decisions (D1–D7 answered by the user).
+Status: **IMPLEMENTED 2026-10-08, awaiting review** (approved the same day) — 0 open
+decisions (D1–D7 answered by the user). Not exercised in a real browser (Clerk sign-in is
+unavailable here); the migration is applied to no database, only dry-run in a rolled-back
+transaction on the local one. What differs from the text below is in §15.
 Request (user, 2026-10-08): a minimal Performance Metrics + Monitoring + RUM system for
 Supabase / PostgreSQL / PowerSync / local SQLite / Next.js. Measure first, find the
 bottleneck second, optimise third. No second monitoring service, no personal data.
@@ -351,3 +354,31 @@ Written first (red), per the TDD rule.
 - **D7.** `appVersion`. Options: the `package.json` version, or the version plus a short
   git SHA. **User's answer:** the `package.json` version. Consequence stated before the
   choice: two deploys with the same version cannot be told apart.
+
+## 15. What differs from the text above
+
+- **A rejected batch is dropped, not retried (§4).** A `400` or `413` can never succeed, and
+  retrying it would block every event behind it for ever. The transport drops that batch and
+  reports it through `app.telemetry_dropped`; `401`, `5xx` and network errors still keep the
+  events and retry, as written.
+- **A batch is also capped by size (§4).** 100 events of this shape can approach the 64 KB
+  limit of the route, which would turn a healthy batch into a `413`. The client stops a batch
+  at 75% of the cap (48 KB) even when it holds fewer than 100 events.
+- **Attrs handling is stricter in one place (§2 vs §6).** An `attrs` key off the allow-list is
+  stripped and the event kept; an `attrs` value of the wrong type or over 64 characters
+  refuses the whole event. The spec said both "drops the rest" and "refuses"; this is how the
+  two were reconciled.
+- **No flush storm after a failure.** After a failed send, reaching 50 events does not start
+  another send; only the 10-second timer retries.
+- **`tabRole` defaults to `unknown`.** The election (Web Locks) is spec 2. This spec supplies
+  `setTabRole()` and reads the role when each event is recorded.
+- **`eventContext.ts` reads `roles` from `usePermissionsStore`**, a `lib` module importing a
+  feature store; the store is the only place the roles already live.
+- **Final flush** sends at most 5 chunks per page hide.
+- **One more counted file:** `package.json` (the `test:db:perfevents` script, also added to
+  `test:db:all`). Counted: 10.
+- **Verified:** `npm run tc`; `npm run test` (282 files, 3117 tests); the SQL test 13/13 in a
+  rolled-back transaction, and red when the table is made normal and a policy is added; every
+  query in `docs/PERFORMANCE_QUERIES.md` runs against sample rows. **Not verified:** a browser
+  sending to `/api/telemetry` behind Clerk; `npm run build`; the migration on any database
+  beyond the dry run.

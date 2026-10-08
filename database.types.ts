@@ -2914,6 +2914,69 @@ export type Database = {
           },
         ]
       }
+      PerfEvents: {
+        Row: {
+          app_version: string
+          attrs: Json | null
+          browser: string | null
+          device_class: string | null
+          duration_ms: number | null
+          env: string
+          error_kind: string | null
+          event_at: string
+          id: string
+          name: string
+          network_type: string | null
+          os: string | null
+          outcome: string
+          received_at: string
+          roles: string[] | null
+          rtt_ms: number | null
+          session_id: string
+          tab_role: string
+        }
+        Insert: {
+          app_version: string
+          attrs?: Json | null
+          browser?: string | null
+          device_class?: string | null
+          duration_ms?: number | null
+          env: string
+          error_kind?: string | null
+          event_at: string
+          id?: string
+          name: string
+          network_type?: string | null
+          os?: string | null
+          outcome: string
+          received_at?: string
+          roles?: string[] | null
+          rtt_ms?: number | null
+          session_id: string
+          tab_role: string
+        }
+        Update: {
+          app_version?: string
+          attrs?: Json | null
+          browser?: string | null
+          device_class?: string | null
+          duration_ms?: number | null
+          env?: string
+          error_kind?: string | null
+          event_at?: string
+          id?: string
+          name?: string
+          network_type?: string | null
+          os?: string | null
+          outcome?: string
+          received_at?: string
+          roles?: string[] | null
+          rtt_ms?: number | null
+          session_id?: string
+          tab_role?: string
+        }
+        Relationships: []
+      }
       PriceDurations: {
         Row: {
           created_at: string
