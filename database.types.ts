@@ -2240,6 +2240,7 @@ export type Database = {
           internal_notes: string | null
           invoice_number: number | null
           is_qbo: boolean
+          is_tax_overridden: boolean
           lenient: boolean
           lost_reason: Database["public"]["Enums"]["event_lost_reason"] | null
           lost_reason_note: string | null
@@ -2284,6 +2285,7 @@ export type Database = {
           internal_notes?: string | null
           invoice_number?: number | null
           is_qbo?: boolean
+          is_tax_overridden?: boolean
           lenient: boolean
           lost_reason?: Database["public"]["Enums"]["event_lost_reason"] | null
           lost_reason_note?: string | null
@@ -2328,6 +2330,7 @@ export type Database = {
           internal_notes?: string | null
           invoice_number?: number | null
           is_qbo?: boolean
+          is_tax_overridden?: boolean
           lenient?: boolean
           lost_reason?: Database["public"]["Enums"]["event_lost_reason"] | null
           lost_reason_note?: string | null

@@ -38,6 +38,7 @@ export const TRACKED_FIELDS = [
   "dropoff_instructions",
   "tax_percent",
   "tax_amount_cents",
+  "is_tax_overridden",
   "contract_revenue_cents",
   "po_number",
   "created_by_user_uuid",
@@ -65,6 +66,7 @@ export const FIELD_LABELS: Record<string, string> = {
   dropoff_instructions: "Dropoff Instructions",
   tax_percent: "Tax %",
   tax_amount_cents: "Tax Amount",
+  is_tax_overridden: "Tax Typed By Hand",
   contract_revenue_cents: "Contract Total",
   po_number: "PO Number",
   created_by_user_uuid: "Account Manager",
@@ -223,6 +225,10 @@ export async function logEventChanges(
       // The log is read by people, not by the enum.
       prevDisplay = lostReasonLabel(oldVal as string | null);
       nextDisplay = lostReasonLabel(newVal as string | null);
+    } else if (key === "is_tax_overridden") {
+      // Stored as 0/1; the log is read by people.
+      prevDisplay = oldVal == null ? null : oldVal ? "Yes" : "No";
+      nextDisplay = newVal == null ? null : newVal ? "Yes" : "No";
     } else if (CENTS_FIELDS.has(key)) {
       prevDisplay = oldVal != null ? formatCentsForLog(oldVal, currency) : null;
       nextDisplay = newVal != null ? formatCentsForLog(newVal, currency) : null;

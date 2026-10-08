@@ -243,6 +243,7 @@ const EventsCols = {
   terms_and_conditions_uuid: column.text,
   tax_percent: column.real,
   tax_amount_cents: column.integer,
+  is_tax_overridden: column.integer,
   finance_contact_uuid: column.text,
   content_hash: column.text,
   contract_hash: column.text,
