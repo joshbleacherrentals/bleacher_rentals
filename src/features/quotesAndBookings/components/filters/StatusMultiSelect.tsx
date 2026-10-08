@@ -6,6 +6,7 @@ const STATUS_OPTIONS = [
   { label: "Quoted", value: "quoted" },
   { label: "Booked", value: "booked" },
   { label: "Lost", value: "lost" },
+  { label: "Draft", value: "draft" },
 ];
 
 type StatusMultiSelectProps = {
@@ -20,7 +21,7 @@ export function StatusMultiSelect({ values, onChange }: StatusMultiSelectProps) 
       onValueChange={onChange}
       forceSelectedValues={values}
       placeholder="Select status"
-      maxCount={3}
+      maxCount={4}
     />
   );
 }

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
 import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
+import { StatusQuickToggle } from "@/features/quotesAndBookings/components/StatusQuickToggle";
 import {
   FilterSidebar,
   countActiveFilters,
@@ -271,6 +272,7 @@ export default function QuotesBookingsPage() {
           subtitle="View all events — click a column header to sort"
           action={
             <div className="flex items-center gap-2">
+              <StatusQuickToggle statuses={filters.statuses} onStatusesChange={setStatuses} />
               <button
                 type="button"
                 role="switch"
