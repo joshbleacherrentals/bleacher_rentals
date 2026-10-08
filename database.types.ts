@@ -1140,6 +1140,24 @@ export type Database = {
           },
         ]
       }
+      DevAllowedEmails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       Developers: {
         Row: {
           auto_subscribe_to_new_tickets: boolean
@@ -2222,6 +2240,7 @@ export type Database = {
           internal_notes: string | null
           invoice_number: number | null
           is_qbo: boolean
+          is_tax_overridden: boolean
           lenient: boolean
           lost_reason: Database["public"]["Enums"]["event_lost_reason"] | null
           lost_reason_note: string | null
@@ -2266,6 +2285,7 @@ export type Database = {
           internal_notes?: string | null
           invoice_number?: number | null
           is_qbo?: boolean
+          is_tax_overridden?: boolean
           lenient: boolean
           lost_reason?: Database["public"]["Enums"]["event_lost_reason"] | null
           lost_reason_note?: string | null
@@ -2310,6 +2330,7 @@ export type Database = {
           internal_notes?: string | null
           invoice_number?: number | null
           is_qbo?: boolean
+          is_tax_overridden?: boolean
           lenient?: boolean
           lost_reason?: Database["public"]["Enums"]["event_lost_reason"] | null
           lost_reason_note?: string | null
@@ -2895,6 +2916,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      PerfEvents: {
+        Row: {
+          app_version: string
+          attrs: Json | null
+          browser: string | null
+          device_class: string | null
+          duration_ms: number | null
+          env: string
+          error_kind: string | null
+          event_at: string
+          id: string
+          name: string
+          network_type: string | null
+          os: string | null
+          outcome: string
+          received_at: string
+          roles: string[] | null
+          rtt_ms: number | null
+          session_id: string
+          tab_role: string
+        }
+        Insert: {
+          app_version: string
+          attrs?: Json | null
+          browser?: string | null
+          device_class?: string | null
+          duration_ms?: number | null
+          env: string
+          error_kind?: string | null
+          event_at: string
+          id?: string
+          name: string
+          network_type?: string | null
+          os?: string | null
+          outcome: string
+          received_at?: string
+          roles?: string[] | null
+          rtt_ms?: number | null
+          session_id: string
+          tab_role: string
+        }
+        Update: {
+          app_version?: string
+          attrs?: Json | null
+          browser?: string | null
+          device_class?: string | null
+          duration_ms?: number | null
+          env?: string
+          error_kind?: string | null
+          event_at?: string
+          id?: string
+          name?: string
+          network_type?: string | null
+          os?: string | null
+          outcome?: string
+          received_at?: string
+          roles?: string[] | null
+          rtt_ms?: number | null
+          session_id?: string
+          tab_role?: string
+        }
+        Relationships: []
       }
       PriceDurations: {
         Row: {

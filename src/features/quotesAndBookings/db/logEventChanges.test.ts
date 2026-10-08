@@ -46,6 +46,36 @@ describe("logEventChanges", () => {
     mockInsert.mockResolvedValue({ error: null });
   });
 
+  it("shows a tax override turning off as Yes -> No, not 1 -> 0", async () => {
+    await logEventChanges(
+      mockSupabase,
+      "event-1",
+      "user-1",
+      { is_tax_overridden: 1 },
+      { is_tax_overridden: 0 },
+    );
+
+    expect(mockInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        field_name: "is_tax_overridden",
+        prev_value: "Yes",
+        next_value: "No",
+      }),
+    ]);
+  });
+
+  it("logs nothing when the tax override flag did not change", async () => {
+    await logEventChanges(
+      mockSupabase,
+      "event-1",
+      "user-1",
+      { is_tax_overridden: 0 },
+      { is_tax_overridden: 0 },
+    );
+
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
   it("inserts a row for each changed field", async () => {
     await logEventChanges(
       mockSupabase,

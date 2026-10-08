@@ -38,6 +38,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     termsAndConditionsUuid: null,
     taxPercent: null,
     taxAmountCents: null,
+    isTaxOverridden: false,
     bookedAt: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     // Left null so the AccountManager lookup (a real PowerSync query) is
@@ -95,4 +96,29 @@ it("retains the draft when installment loading fails", async () => {
   const before = useCreateQuoteStore.getState().paymentInstallments;
   expect(await loadQuoteIntoStore("event-1")).toBeNull();
   expect(useCreateQuoteStore.getState().paymentInstallments).toEqual(before);
+});
+
+describe("loadQuoteIntoStore — tax override", () => {
+  it("leaves tax automatic for a saved quote whose tax was not typed by hand", async () => {
+    // The bug: any saved tax amount used to load as an override, so editing a price left the tax stale.
+    fetchQuoteDetailMock.mockResolvedValue(
+      makeQuoteDetail({ taxPercent: 7, taxAmountCents: 70000, isTaxOverridden: false }),
+    );
+
+    await loadQuoteIntoStore("event-1");
+
+    const state = useCreateQuoteStore.getState();
+    expect(state.taxOverrideCents).toBeNull();
+    expect(state.taxPercent).toBe(7);
+  });
+
+  it("keeps the typed amount for a quote whose tax was overridden", async () => {
+    fetchQuoteDetailMock.mockResolvedValue(
+      makeQuoteDetail({ taxPercent: 7, taxAmountCents: 12345, isTaxOverridden: true }),
+    );
+
+    await loadQuoteIntoStore("event-1");
+
+    expect(useCreateQuoteStore.getState().taxOverrideCents).toBe(12345);
+  });
 });
