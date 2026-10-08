@@ -29,7 +29,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   account_manager:
     "Manages their own assigned bleachers, drivers, and events. Cannot delete or modify company-wide data, other managers' records, or anything outside their own scope. A low-risk role to add without worrying about unintended changes to shared data.",
   developer:
-    "Access to the product roadmap and the internal Dev Tools pages (Sync Health, Stripe Checkout, Damage Photos, QBO Sales Tax).",
+    "Access to the product roadmap and the internal Dev Tools pages (Sync Health, Stripe Checkout, Damage Photos, QBO Sales Tax, Allowed Emails).",
   viewer: "Read-only access to operational data. Cannot create, edit, or delete anything.",
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
@@ -849,19 +849,36 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Dev Tools",
     description:
-      "Internal pages under /dev-tools: Sync Health, Stripe Checkout, Damage Photos and QBO Sales Tax. They sit in the Dev Tools section of the sidebar.",
+      "Internal pages under /dev-tools: Sync Health, Stripe Checkout, Damage Photos, QBO Sales Tax and Allowed Emails. They sit in the Dev Tools section of the sidebar.",
     category: "Dev Tools",
     roles: {
       admin: custom(
-        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health is for developers only.",
+        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health and Allowed Emails are for developers only.",
       ),
       account_manager: none("Dev Tools are internal pages for developers."),
       developer: full(
-        "Sees the Dev Tools section in the sidebar and can use every page in it, including Sync Health. Stripe Checkout creates real checkout sessions and Damage Photos can delete stored photos.",
+        "Sees the Dev Tools section in the sidebar and can use every page in it, including Sync Health and Allowed Emails. Stripe Checkout creates real checkout sessions and Damage Photos can delete stored photos.",
       ),
       viewer: custom(
-        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health is for developers only.",
+        "Can open Stripe Checkout, Damage Photos and QBO Sales Tax by direct link, but the Dev Tools menu is not shown in their sidebar. Sync Health and Allowed Emails are for developers only.",
       ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Development Email Allowlist",
+    description:
+      "The Allowed Emails page under Dev Tools: the addresses the development environment is allowed to email. It has no effect in production or staging.",
+    category: "Dev Tools",
+    roles: {
+      admin: none("Only developers can see or change the list."),
+      account_manager: none("Dev Tools are internal pages for developers."),
+      developer: full(
+        "Can add, change and remove allowed addresses. In the development environment an email to any address not on the list is not sent, and the server logs a console error naming it.",
+      ),
+      viewer: none("Only developers can see or change the list."),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),

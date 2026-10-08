@@ -1210,6 +1210,12 @@ const EmailTriggerBindings = new Table(EmailTriggerBindingsCols, {
   indexes: { sales_office_uuid: ["sales_office_uuid"] },
 });
 
+const DevAllowedEmailsCols = {
+  email: column.text,
+  created_at: column.text,
+} satisfies PowerSyncColsFor<"DevAllowedEmails">;
+const DevAllowedEmails = new Table(DevAllowedEmailsCols);
+
 const EventEmailLogCols = {
   event_uuid: column.text,
   trigger: column.text,
@@ -1392,6 +1398,7 @@ export const AppSchema = new Schema({
   EmailTemplates,
   EmailTriggerBindings,
   EventEmailLog,
+  DevAllowedEmails,
 });
 
 export type PowerSyncDB = (typeof AppSchema)["types"];

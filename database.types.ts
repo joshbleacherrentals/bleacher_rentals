@@ -1140,6 +1140,24 @@ export type Database = {
           },
         ]
       }
+      DevAllowedEmails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       Developers: {
         Row: {
           auto_subscribe_to_new_tickets: boolean
