@@ -1,5 +1,6 @@
 "use client";
 import { ReactNode } from "react";
+import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { InfoTooltip } from "@/components/InfoTooltip";
 
@@ -28,6 +29,13 @@ type DataTableProps<T> = {
   isLoading?: boolean;
   loadingMessage?: string;
   onRowClick?: (row: T) => void;
+  /**
+   * Makes every row a real link, so Cmd/Ctrl-click, middle-click and right-click → "Open in New
+   * Tab" work like any other link; a plain click still navigates in-app. Use this instead of
+   * `onRowClick` for rows that open a page — when set, `onRowClick` is ignored. Cells must not
+   * contain their own links or buttons, since anchors cannot nest.
+   */
+  getRowHref?: (row: T) => string;
   /** The active sort, used to mark the header. Sorting the data is the caller's job. */
   sort?: DataTableSort;
   onSort?: (sortKey: string) => void;
@@ -48,6 +56,7 @@ export function DataTable<T>({
   isLoading = false,
   loadingMessage = "Loading...",
   onRowClick,
+  getRowHref,
   sort,
   onSort,
 }: DataTableProps<T>) {
@@ -121,24 +130,43 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              data.map((row) => (
-                <tr
-                  key={keyExtractor(row)}
-                  className={`hover:bg-gray-50 transition-colors ${onRowClick ? "cursor-pointer" : ""}`}
-                  onClick={() => onRowClick?.(row)}
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={`px-4 py-4 whitespace-nowrap ${
-                        column.align === "right" ? "text-right" : ""
-                      }`}
-                    >
-                      {column.render(row)}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              data.map((row) => {
+                const href = getRowHref?.(row);
+                return (
+                  <tr
+                    key={keyExtractor(row)}
+                    className={`hover:bg-gray-50 transition-colors ${
+                      href || onRowClick ? "cursor-pointer" : ""
+                    }`}
+                    onClick={href ? undefined : () => onRowClick?.(row)}
+                  >
+                    {columns.map((column, index) => (
+                      <td
+                        key={column.key}
+                        className={`whitespace-nowrap ${href ? "p-0" : "px-4 py-4"} ${
+                          column.align === "right" ? "text-right" : ""
+                        }`}
+                      >
+                        {href ? (
+                          // The link fills the whole cell, so a click or right-click anywhere on the
+                          // row lands on an anchor. No prefetch: a page of rows would otherwise
+                          // request every quote up front. Only the first cell takes a tab stop.
+                          <Link
+                            href={href}
+                            prefetch={false}
+                            tabIndex={index === 0 ? undefined : -1}
+                            className="block px-4 py-4"
+                          >
+                            {column.render(row)}
+                          </Link>
+                        ) : (
+                          column.render(row)
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

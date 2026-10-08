@@ -367,7 +367,7 @@ export default function QuotesBookingsPage() {
           emptyMessage="No events found"
           isLoading={isLoading}
           loadingMessage="Loading events..."
-          onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
+          getRowHref={(event) => `/quotes-bookings/${event.id}`}
           sort={sort}
           onSort={(key) => setSort((current) => nextSort(current, key as SortKey))}
         />
