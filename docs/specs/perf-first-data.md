@@ -1,6 +1,7 @@
 # Performance telemetry — time to first usable data
 
-Status: **BLOCKED** — 2 open decisions (D1, D2) and one dependency on spec 2 (P1).
+Status: **BLOCKED on the probe only** — 0 open decisions (D1, D2 answered by the user);
+one dependency on spec 2 (P1).
 Spec 5 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md).
 Request (user, 2026-10-08): `time_to_first_usable_data` and `first_data_available`; a
 fast-looking result that is really a fallback must not pass for a local one.
@@ -48,16 +49,33 @@ rows are not synced to this device). So the end point has two kinds:
 `attrs.status` is the resulting status (`active` or `blocked`), `attrs.roles` is not
 duplicated (the event already has `roles`).
 
-## 2. Cold start and warm start
+## 2. Cold start and warm start (D2)
 
 A device's first-ever load downloads the data before `useUserAccess` can answer, and a
 returning user answers from what is already stored. Their times differ by an order of
-magnitude and must not share a percentile. The tag is `attrs.cold: true | false`, taken
-from `hasSynced` at the moment the database is ready.
+magnitude and must not share a percentile. The tag is `attrs.cold: true | false`.
 
-**Dependency on spec 2 (P1).** `hasSynced` is only a usable cold-start flag if it
-survives a reload. If the probe in spec 2 shows it does not, `cold` cannot be computed
-this way and D2 decides the alternative.
+**Definition (user, 2026-10-08):** `cold` is `initial_sync_completed === false`, where
+`initial_sync_completed` is a flag in `localStorage`, written `true` by the lifecycle
+observer (spec 2) when `sync.initial` ends, i.e. when the first complete sync of this
+browser profile finishes.
+
+- The flag belongs to the browser profile, not to a user: the local database file name is
+  fixed, so two people signing in on one profile share one database.
+- **If probe P1 (spec 2) shows `hasSynced` survives a reload,** `hasSynced` already says
+  the same thing and no flag is created; `cold` is then `!hasSynced` at the moment the
+  database is ready. **To confirm at review:** the user's answer was given for the case
+  where `hasSynced` does not survive.
+- `localStorage` can be unavailable or cleared (private window, blocked site data). Reads
+  and writes are wrapped in `try/catch`; when it cannot be read, `cold` is not set at all
+  rather than guessed. Clearing site data clears the local database too, so a missing
+  flag and a missing database go together.
+
+**`sync_scope` is not `cold`.** A user who gains a role later downloads a large new set of
+buckets on a device that has long since completed its initial sync. That is a different
+event from a cold start and must not be called one. The user asked for it to be tracked
+as a separate `sync_scope`; **how it is defined and measured is not decided and is not in
+this spec**, to be agreed in its own spec. Until then such a download is `cold: false`.
 
 ## 3. Design
 
@@ -101,20 +119,19 @@ hook knows `needsFallback`. This replaces the placement listed in spec 1 §9
 ## 6. Files
 
 - **Edited:** `src/features/userAccess/hooks/useUserAccess.ts`,
-  `src/lib/perf/telemetryEvent.ts` (registry name and `attrs` allow-list).
+  `src/lib/perf/telemetryEvent.ts` (registry name and `attrs` allow-list); the flag write
+  is part of spec 2's observer, not this spec.
 - **Tests (not counted):** additions to the hook's tests.
 - **Counted: 2.**
 
 ## 7. Decisions
 
-- **D1.** _What "first usable data" means._ Options: (a) the access result only, as in
-  §1: the shell can render; (b) the access result and, in addition, a second metric
-  `ui.page_ready` for the first page the user lands on (per-page definitions to be
-  agreed, a larger scope that needs its own spec); (c) the access result, with the
-  dashboard grid's first non-empty render added as `ui.dashboard_ready` only.
-  **User's answer:** _unanswered._
-- **D2.** _How the cold flag is obtained if `hasSynced` does not survive a reload._ Only
-  needed if the probe in spec 2 says so. Options: (a) record the flag in `localStorage`
-  at the end of the first successful sync; (b) infer it from whether `Users` has a row for
-  the user when the database becomes ready; (c) drop the flag and let the percentiles mix
-  cold and warm loads. **User's answer:** _unanswered — BLOCKED on spec 2 / P1._
+- **D1.** _What "first usable data" means._ Options were: the access result only; the
+  access result plus `ui.page_ready`; the access result plus `ui.dashboard_ready`.
+  **User's answer:** the access result plus `ui.page_ready`, with the definition of
+  `page_ready` in a separate spec. This spec adds `ui.first_data` only; the name
+  `ui.page_ready` is **not** in the registry until that spec exists.
+- **D2.** _How the cold flag is obtained._ Options were: `localStorage`; whether a `Users`
+  row exists; no flag. **User's answer:** `localStorage`, with `cold` defined as
+  `initial_sync_completed === false`, and role-driven data growth kept apart as a separate
+  `sync_scope` that is not called a cold start (§2).

@@ -70,7 +70,7 @@ export type PerfEvent = {
   errorKind: string | null; // classified, never error.message (§7)
   at: number; // Date.now() at the end of the measured span (ordering only)
   sessionId: string; // C2
-  tabRole: "first" | "other"; // multi-tab: the shared worker reports one connection
+  tabRole: "leader" | "follower" | "unknown"; // multi-tab (Web Locks); see §11
   appVersion: string; // package.json version (D7)
   env: "development" | "production";
   browser: string; // family + major, e.g. "chrome 141"
@@ -145,7 +145,7 @@ CREATE UNLOGGED TABLE public."PerfEvents" (
   outcome       text        NOT NULL CHECK (outcome IN ('ok', 'error')),
   error_kind    text,
   session_id    uuid        NOT NULL,
-  tab_role      text        NOT NULL CHECK (tab_role IN ('first', 'other')),
+  tab_role      text        NOT NULL CHECK (tab_role IN ('leader', 'follower', 'unknown')),
   app_version   text        NOT NULL,
   env           text        NOT NULL,
   browser       text,
@@ -243,9 +243,11 @@ dashboard is specified later, that spec asks the question and updates the matrix
   removes the unconditional `LogLevel.DEBUG` in production.
 - **3. Connector.** `powersync.credentials`, `sync.upload`, `classifyError` at the call
   sites in `BackendConnector.ts`.
-- **4. SQLite.** `sqlite.query`, `write`, `tx`, `batch` in `typedQuery.ts`. Development
-  records each call; production records an aggregate per window (the user has not yet
-  chosen the production shape, so that is open in spec 4).
+- **4. SQLite.** `sqlite.query`, `write`, `batch` in `typedQuery.ts` (there is no
+  separate `tx`: the only write transaction is the batch). Development records each call;
+  production records calls over 50 ms individually and the rest as one aggregate per key
+  per 10 s (decided in spec 4). Its percentile query is added to
+  `docs/PERFORMANCE_QUERIES.md` by spec 4.
 - **5. UI.** `ui.first_data` in `useUserAccess.ts`, tagged `source: local|fallback`
   so the Supabase fallback does not pollute the local figure.
 
@@ -277,9 +279,13 @@ view, no migration object.
   page.
 - **PowerSync offline:** telemetry does not use PowerSync, so it is independent of the
   sync being measured.
-- **Several tabs:** every tab has its own buffer and `sessionId`; `tabRole` marks the
-  first tab so a shared-worker event is not counted once per tab. How `first` is decided
-  is part of spec 2's probe.
+- **Several tabs (decided 2026-10-08, user):** every tab has its own buffer and
+  `sessionId`. `tabRole` is `leader` for the one tab that currently holds the Web Lock
+  `powersync-telemetry-leader`, `follower` for the others, and `unknown` where
+  `navigator.locks` does not exist. The role is read **at the moment the event is
+  recorded**, because it can change: when the leader closes the lock is released and
+  another tab becomes leader. Which metrics only the leader records is in spec 2 (§1a);
+  the rest are per tab.
 - **Clock skew:** `at` is client wall-clock and can be wrong; `received_at` is the
   server's. The queries filter by `received_at`.
 - **Buffer overflow:** FIFO drop; the number of dropped events is itself reported as a

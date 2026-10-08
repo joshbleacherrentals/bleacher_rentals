@@ -1,6 +1,6 @@
 # Performance telemetry — SQLite calls: query, write, batch
 
-Status: **BLOCKED** — 3 open decisions (D1–D3).
+Status: **AWAITING APPROVAL** — 0 open decisions (D1–D3 answered by the user).
 Spec 4 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md).
 Independent of specs 2 and 3.
 Request (user, 2026-10-08): measure query, insert, update, delete, transaction and batch
@@ -52,20 +52,44 @@ rows) and `statements` for a batch.
 ## 2. Development and production
 
 **Development.** Every call is recorded and printed with `console.debug`, with the
-normalised SQL (`watcherKeyFromSql`) and **without parameters**.
+normalised SQL (`watcherKeyFromSql`) and **without parameters**. No aggregation.
 
-**Production.** The SQL text is never sent. Only `op` and `tables` go in `attrs`.
-How often an event is produced is decision D1.
+**Production (D1, D2).** The SQL text is never sent; `attrs` carry `op` and `tables`
+only. Two kinds of event:
+
+- **Slow or failed call, individual:** a call that takes **more than 50 ms**, and every
+  call that fails (`outcome: "error"`), is one event with its own `durationMs`.
+- **Everything else, aggregated:** the calls of 50 ms or less are counted in memory per
+  `(name, op, tables)` and flushed as **one event per key per 10 seconds** (and on
+  `pagehide`). Its `durationMs` is null; its `attrs` are `count`, `sumMs`, `maxMs`, and
+  `b1` to `b6`, the number of calls with a duration up to 1, 2, 5, 10, 20 and 50 ms
+  (cumulative edges, each call is counted once in the first bucket that holds it).
+  The bucket edges are mine: **to confirm at review.**
+- A call is in exactly one of the two kinds, never both.
+
+**What this does to the percentiles (said plainly).** The total number of calls is
+`count` of the aggregates plus the number of individual events. A percentile that lands
+above 50 ms is exact, taken from the individual events. A percentile that lands at or
+below 50 ms is known only to the width of a bucket (for example "between 5 and 10 ms").
+The queries in `docs/PERFORMANCE_QUERIES.md` return the bucket, not an invented number.
 
 ## 3. Design
 
 - Wrap the three helpers in `typedQuery.ts`. Existing `countDbRead` / `countDbWrite` /
   `countDbBatch` calls stay exactly where they are.
-- The four direct `powerSyncDb.getAll` calls are in
-  `termsAndConditionsDb.ts` (2), `fetchQuoteDetail.ts` and `loadQuoteIntoStore.ts`.
-  Decision D3 says what to do with them.
 - A small `timed(kind, sql, run)` helper in `src/lib/perf/sqliteTiming.ts` holds the
-  common code so the three helpers stay three lines each.
+  common code, including the production aggregator, so the three helpers stay three
+  lines each.
+- **The four direct `powerSyncDb.getAll` calls (D3)** move to `typedGetAll`:
+  `termsAndConditionsDb.ts` (2), `fetchQuoteDetail.ts` and `loadQuoteIntoStore.ts`. All four
+  already build a compiled Kysely query, so the call is the only change.
+  - **Risk:** `typedGetAll` enforces that the row type equals the Kysely result exactly
+    (`expect<T>()`). `TermsAndConditionsRow`, `Row` in `fetchQuoteDetail.ts` and the inline
+    `{ id: string }` may differ in nullability; the type check then fails and the row type
+    is corrected to the real one. `npm run tc` shows this; no behaviour changes.
+  - **Side effect:** these calls now increment the read counter of `perfTrace.ts`. Any
+    existing trace that covers them reports a higher `reads` than before; that is the
+    counter becoming correct, not a regression.
 
 ## 4. Edge cases
 
@@ -88,33 +112,28 @@ How often an event is produced is decision D1.
 - **Vitest, `typedQuery`:** each helper still returns what it returned before (the
   existing tests keep passing); a batch records one event with `statements`; a read
   records `rows` as a number.
-- **Vitest, production mode:** no SQL text in any event.
+- **Vitest, production mode:** no SQL text in any event; a 50 ms call is aggregated, a
+  51 ms call is individual; a failed call is individual whatever its duration; a call is
+  never in both kinds; the aggregate carries `count`, `sumMs`, `maxMs` and buckets whose
+  sum equals `count`; it flushes after 10 s and on `pagehide`; an empty window emits
+  nothing.
 - **Playwright:** none; SKIPPED as the standing rule says.
 
 ## 6. Files
 
 - **Created:** `src/lib/perf/sqliteTiming.ts`.
-- **Edited:** `src/lib/powersync/typedQuery.ts`, `src/lib/perf/telemetryEvent.ts`; plus
-  the four call sites if D3 chooses to route them: `termsAndConditionsDb.ts`,
-  `fetchQuoteDetail.ts`, `loadQuoteIntoStore.ts`.
+- **Edited:** `src/lib/powersync/typedQuery.ts`, `src/lib/perf/telemetryEvent.ts`,
+  `termsAndConditionsDb.ts`, `fetchQuoteDetail.ts`, `loadQuoteIntoStore.ts`,
+  `docs/PERFORMANCE_QUERIES.md` (the bucket-aware percentile query).
 - **Tests (not counted):** `sqliteTiming.test.ts`, additions to the `typedQuery` tests.
-- **Counted: 3 without the call sites, 6 with them.**
+- **Counted: 7** (the cap is 10).
 
 ## 7. Decisions
 
-- **D1.** _How often production produces an event for a SQLite call._ The user decided
-  100% of events and that slow ones are never removed from percentiles, and also asked not
-  to log every query in production by default. These pull in opposite directions for the
-  highest-volume metric. Options: (a) one event per call, 100%; exact percentiles, the
-  largest table growth; (b) one aggregate event per `(op, tables)` per 10 seconds with
-  `count`, `sumMs`, `maxMs` and a small fixed set of duration buckets; the volume is a
-  few events per window, percentiles are read from the buckets and are approximate, and
-  single slow calls are only visible as `maxMs`; (c) one event per call only above a
-  threshold the user names, plus (b) for the rest. **User's answer:** _unanswered._
-- **D2.** _What "slow" means for any threshold in D1._ Only needed if D1 is (c). The user
-  names the number of milliseconds, or says to derive it from the first weeks of data.
-  **User's answer:** _unanswered._
-- **D3.** _The four direct `getAll` calls._ Options: (a) leave them, so they are not
-  measured; (b) route them through `typedGetAll` (a behaviour-neutral change to three
-  more files, and they gain the compile-time `expect<T>()` check); (c) wrap them in place
-  with `timed`. **User's answer:** _unanswered._
+- **D1.** _How often production produces an event for a SQLite call._ Options were: one
+  event per call; one aggregate per key per 10 s; slow calls individually plus an
+  aggregate for the rest. **User's answer:** slow calls individually plus an aggregate.
+- **D2.** _What "slow" means._ **User's answer:** 50 ms (strictly more than 50 ms is
+  individual).
+- **D3.** _The four direct `getAll` calls._ Options were: leave them; route them through
+  `typedGetAll`; wrap them in place. **User's answer:** route them through `typedGetAll`.

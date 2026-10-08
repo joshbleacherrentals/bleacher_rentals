@@ -1,6 +1,7 @@
 # Performance telemetry — PowerSync lifecycle: open, connect, reconnect, initial sync
 
-Status: **BLOCKED** — 4 open decisions (D1–D4) and 4 facts to measure first (P1–P4).
+Status: **BLOCKED** — 0 open decisions (D1–D4 answered by the user); 5 facts to measure
+first (P1–P5). Cannot be approved before the probe.
 Spec 2 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md), which must
 be approved and implemented first (the `metrics` API and the event type come from it).
 Request (user, 2026-10-08): measure application startup, the PowerSync connection and the
@@ -65,6 +66,29 @@ status), not a timer. They are never both emitted for one connect.
 and not replication latency; `sync.initial` is not "PowerSync latency". The stage names
 say which stage was timed.
 
+## 1a. Which tab records what (D2)
+
+The PowerSync connection is shared by all tabs (shared worker); a tab is not. So:
+
+- **Connection-level, recorded only by the leader tab** (`tabRole: "leader"`):
+  `powersync.connect`, `powersync.disconnect`, `powersync.reconnect`.
+- **Per tab, recorded by every tab:** `app.start`, `sqlite.open`, and (other specs)
+  `ui.first_data`, `sqlite.*`, `powersync.credentials`, `sync.upload`.
+- **No Web Locks (`unknown`):** every tab records the connection-level metrics, tagged
+  `unknown`, so they can be filtered or counted knowing they may repeat.
+- **How the role is found:** a lock named `powersync-telemetry-leader` is requested with
+  `ifAvailable: true`; if granted, the tab is `leader` and never releases it until the tab
+  closes; if not, the tab is `follower` and queues a normal request; when that is granted
+  (the leader closed) the tab becomes `leader`. The role is not "the first tab forever".
+- **Every tab runs the state machine**, because each tab calls `connect()` and gets its
+  own `statusChanged` (to be confirmed by P3); only the _emission_ is gated by the role.
+  A new leader therefore has its own complete spans. A span that was running in a leader
+  that then closed is lost; it is not reconstructed.
+
+**To confirm at review (my reading of the request):** `sync.initial` and `sync.catchup`
+are connection-level too (one download is shared), so they are recorded by the leader
+only. The request named only connect, disconnect and reconnect.
+
 ## 2. Facts to measure first (the probe)
 
 None of these can be answered from the SDK types. A temporary, uncommitted logger prints
@@ -80,10 +104,14 @@ browser and the findings are written into this section before the spec is approv
   dominated by planned restarts (D1).
 - **P3.** With two tabs open (shared worker), does each tab receive its own
   `statusChanged`, and does each tab's `connect()` produce its own `connected` transition
-  or only the first? This sets how `tabRole` is decided (D2).
+  or only the first? The leader rule in §1a depends on it.
 - **P4.** When does the `connect()` promise resolve: at the first `connected`, or
   earlier? §1 does not depend on it, but the answer is recorded so nobody later times the
   promise by mistake.
+- **P5.** Can a tab tell that the shared database worker was already running when it
+  opened the database (D4 tags such an open `attrs.shared: true`)? If the SDK exposes
+  nothing, the tag is replaced by "the open took under a few milliseconds" only if the
+  user agrees; otherwise `sqlite.open` is recorded without the tag.
 
 _Findings:_ **not yet measured.** This session cannot sign in through Clerk; the probe is
 run in a signed-in browser by the user or in a session that has one.
@@ -155,22 +183,20 @@ production.
 
 ## 7. Decisions
 
-- **D1.** _Planned stream restarts._ Applies only if P2 shows they look like reconnects.
-  Options: (a) record them like any reconnect, with `attrs.planned: true` set when the
-  restart follows a credentials refresh within the same second, so queries can include or
-  exclude them; (b) do not record them at all, which hides a real reconnect that happens
-  to coincide with one; (c) record them and leave them unmarked, so every reconnect
-  figure includes them. **User's answer:** _unanswered — BLOCKED on P2._
-- **D2.** _How `tabRole` is decided._ Options: (a) the tab that holds a Web Locks lock is
-  `first`, the rest `other` (precise, fails on browsers without `navigator.locks`);
-  (b) a `BroadcastChannel` election (works everywhere, can briefly report two firsts);
-  (c) every tab is `first`; the figures then count one shared connection once per open
-  tab, and queries cannot tell them apart. **User's answer:**
-  _unanswered — BLOCKED on P3._
-- **D3.** _PowerSync log level._ It is DEBUG everywhere today. Options: (a) DEBUG in
-  development, WARN in production; (b) DEBUG in development, ERROR in production; (c) leave
-  it as it is and treat it as a separate change. **User's answer:** _unanswered._
-- **D4.** _`sqlite.open` outliers._ The database can be opened by another tab already, in
-  which case the open is near-instant. Options: (a) record every open and tag
-  `attrs.shared: true` when the shared worker was already running; (b) record only the
-  tab that actually opens the database. **User's answer:** _unanswered._
+- **D1.** _Planned stream restarts_ (only if P2 shows they look like reconnects).
+  Options were: mark them, drop them, or record them unmarked. **User's answer:** record
+  them with a mark: `attrs.planned: true` when the restart follows a credentials refresh
+  within the same second, so queries can include or exclude them. (The one-second window
+  and the signal it needs, a timestamp of the last credentials fetch written by spec 3's
+  connector code, are mine: **to confirm at review**. Without spec 3, `planned` is never
+  set.)
+- **D2.** _How `tabRole` is decided._ Options were: Web Locks, `BroadcastChannel`, all
+  tabs `first`. **User's answer:** Web Locks as the main mechanism, with `unknown` for
+  browsers without `navigator.locks`; roles `leader` / `follower` / `unknown`; only the
+  leader records connection-level metrics, tabs record their own; the lock is the
+  _current_ leader, not "the first tab for ever". Written as §1a.
+- **D3.** _PowerSync log level._ **User's answer:** DEBUG in development, WARN in
+  production.
+- **D4.** _`sqlite.open` in a tab where another tab already opened the database._
+  **User's answer:** record every open, tag `attrs.shared: true` when the shared worker
+  was already running (P5 says whether that is detectable).

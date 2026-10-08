@@ -1,8 +1,8 @@
 # Performance telemetry — the connector: credentials and upload
 
-Status: **BLOCKED** — 2 open decisions (D1, D2).
+Status: **AWAITING APPROVAL** — 0 open decisions (D1, D2 answered by the user).
 Spec 3 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md) (the
-`metrics` API and `classifyError`). Independent of spec 2.
+`metrics` API and `classifyError`). Independent of spec 2, except one optional link (§3).
 Request (user, 2026-10-08): connect duration must be attributable; upload must be measured
 and linked to errors; no personal or row data in telemetry.
 Branch: `q4-sprint1-finance-role`.
@@ -14,14 +14,16 @@ Branch: `q4-sprint1-finance-role`.
 - `powersync.credentials`: obtaining the PowerSync token (Clerk and the Next.js route).
 - `sync.upload`: one run of `uploadData`, the path of a local write to Supabase.
 
+Both are **per tab**: every tab records its own (spec 2 §1a).
+
 **Why `powersync.credentials` exists.** `powersync.connect` (spec 2) includes the
 credentials fetch. Without this metric a slow connect cannot be assigned to Clerk and
 Next.js or to the WebSocket handshake. It is the only way to separate those two.
 
 **Not part of this spec:** the toast that tells the user a change was discarded (it stays
 as it is), retry behaviour of the upload queue, the Supabase request time of each single
-operation, and the time between a local write and its confirmation arriving back through
-the sync stream (not measurable from the client, see spec 1 §9).
+operation, bytes uploaded (D1), and the time between a local write and its confirmation
+arriving back through the sync stream (not measurable from the client, see spec 1 §9).
 
 ## 1. Where each metric starts and ends
 
@@ -44,7 +46,7 @@ Outcomes:
   `attrs.discarded: true`;
 - thrown for a retry: `outcome: "error"`, `errorKind` from `classifyError`. The SDK
   retries after a delay and calls `uploadData` again, which produces a new event; the
-  event count therefore equals the attempt count.
+  event count therefore equals the attempt count (D2).
 
 ## 2. What is never recorded
 
@@ -52,6 +54,7 @@ Outcomes:
   The existing `console.error` / `console.debug` lines and the toast are not touched, and
   nothing they print is copied into an event.
 - The Supabase URL, the token, the JWT payload and its expiry.
+- The size of the uploaded data (D1): no byte count or estimate is recorded.
 
 ## 3. Design
 
@@ -66,6 +69,11 @@ Edit `src/lib/powersync/BackendConnector.ts` only:
 and from `fetch` failures; for Supabase errors with a Postgres `code` the kind is
 `pg:<code>` and nothing else is read from the object.
 
+**Optional link to spec 2 (D1 of that spec).** When a fetch goes to the network the
+connector writes `lastCredentialsFetchAt` (a `performance.now()` value) to a tiny
+module-level variable. Spec 2 reads it to set `attrs.planned` on a reconnect. If spec 2 is
+not built, the variable is written and never read; it holds no data beyond one number.
+
 ## 4. Edge cases
 
 - **Two callers asking for credentials at once:** the second gets the in-flight promise;
@@ -76,6 +84,8 @@ and from `fetch` failures; for Supabase errors with a Postgres `code` the kind i
 - **A transaction with hundreds of operations:** one event, `ops` large; the 64 KB batch
   cap of spec 1 is unaffected because one event is small.
 - **Offline:** the fetch fails, `errorKind: "network"`; the queue stays and retries.
+- **Several tabs:** the shared worker asks one tab's connector at a time; the event is
+  recorded by whichever tab ran the code, with that tab's `tabRole`.
 
 ## 5. Tests
 
@@ -83,9 +93,10 @@ and from `fetch` failures; for Supabase errors with a Postgres `code` the kind i
   records `shared`; a fetch that returns non-OK records an error with the classified kind
   and never the response text; a returned token never appears in any recorded event.
 - **Vitest, upload:** an empty queue records nothing; a successful transaction records
-  `ok` with `ops`; a fatal code (`23505`, `42501`) records `pg:<code>` with `discarded:
-true` and the existing toast is still raised; a network error records `network`; a
-  Supabase error whose message contains a row never reaches an event.
+  `ok` with `ops`; a fatal code (`23505`, `42501`) records `pg:<code>` with
+  `discarded: true` and the existing toast is still raised; a network error records
+  `network`; a Supabase error whose message contains a row never reaches an event; no
+  byte count appears in any event.
 - **Playwright:** none; reported SKIPPED, as the standing rule says.
 
 ## 6. Files
@@ -97,13 +108,8 @@ true` and the existing toast is still raised; a network error records `network`;
 
 ## 7. Decisions
 
-- **D1.** _Bytes uploaded._ The request lists it "if technically possible". The browser
-  does not report the size of a `fetch` body made by the Supabase client, so it can only
-  be estimated. Options: (a) not recorded, the metric stays honest; (b) estimated as the
-  length of `JSON.stringify` of each entry's `opData`, recorded as `attrs.approxBytes` and
-  named approximate; it reads the length only and the content is never stored.
-  **User's answer:** _unanswered._
-- **D2.** _Is every upload an event?_ The default of spec 1 is 100% of events. Uploads are
-  rare compared with reads, so volume is small. Options: (a) one event per attempt, as
-  written in §1; (b) one event per attempt but only when `ops` is at least a number the
-  user names. **User's answer:** _unanswered._
+- **D1.** _Bytes uploaded._ The browser does not report the size of a `fetch` body made by
+  the Supabase client. Options were: not recorded, or an estimate from the length of each
+  entry's `opData`. **User's answer:** not recorded.
+- **D2.** _Is every upload attempt an event?_ Options were: every attempt, or only when
+  `ops` reaches a number the user names. **User's answer:** every attempt.
