@@ -246,7 +246,7 @@ dashboard is specified later, that spec asks the question and updates the matrix
 - **4. SQLite.** `sqlite.query`, `write`, `tx`, `batch` in `typedQuery.ts`. Development
   records each call; production records an aggregate per window (the user has not yet
   chosen the production shape, so that is open in spec 4).
-- **5. UI.** `ui.first_data` in `SignedInComponents.tsx`, tagged `source: local|fallback`
+- **5. UI.** `ui.first_data` in `useUserAccess.ts`, tagged `source: local|fallback`
   so the Supabase fallback does not pollute the local figure.
 
 **Not measurable, said here so nobody expects them:** bytes received (the WebSocket is
