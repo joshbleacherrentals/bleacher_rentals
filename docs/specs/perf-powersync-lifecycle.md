@@ -1,7 +1,8 @@
 # Performance telemetry — PowerSync lifecycle: open, connect, reconnect, initial sync
 
-Status: **BLOCKED** — 0 open decisions (D1–D4 answered by the user); 5 facts to measure
-first (P1–P5). Cannot be approved before the probe.
+Status: **BLOCKED** — 0 open decisions (D1–D5 answered by the user); 1 fact still to observe
+(P1, `hasSynced` after a reload). P2 explained (token lifetime; an hour-long run is optional),
+P3 answered on the local dev server, P4 and P5 from the SDK source.
 Spec 2 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md), which must
 be approved and implemented first (the `metrics` API and the event type come from it).
 Request (user, 2026-10-08): measure application startup, the PowerSync connection and the
@@ -34,7 +35,9 @@ Branch: `q4-sprint1-finance-role`.
 the IndexedDB open and the schema apply. It cannot be split further from outside the
 SDK. Note: the database is created lazily on first access of the `powerSyncDb` or `db`
 proxy, which can be before the provider mounts; the start is the construction, not the
-mount.
+mount. There is no `shared` tag (D4): a tab cannot tell that the shared worker already
+existed, so a near-instant open in a second tab is recorded like any other and can be told
+apart only by its duration.
 
 **`powersync.connect`.** _Starts_ when the provider calls `instance.connect(...)`. _Ends_
 at the first status with `connected === true`. It does **not** end when the `connect()`
@@ -47,7 +50,8 @@ spec 3 measures that part on its own so the two can be told apart.
 
 **`powersync.reconnect`.** _Starts_ at the disconnect above. _Ends_ at the next
 `connected === true`. `outcome: "error"` and an `errorKind` when `downloadError` was set
-during the gap.
+during the gap. `attrs.cause: "tab_connect"` when the gap was started by another tab calling
+`connect()` (D5, below); without that attribute the cause is not known.
 
 **`sync.initial`.** Only when the device had never synced: `hasSynced` was `false` when
 `connect()` was called (P1). _Starts_ at that `connect()` call. _Ends_ when `hasSynced`
@@ -113,8 +117,43 @@ browser and the findings are written into this section before the spec is approv
   nothing, the tag is replaced by "the open took under a few milliseconds" only if the
   user agrees; otherwise `sqlite.open` is recorded without the tag.
 
-_Findings:_ **not yet measured.** This session cannot sign in through Clerk; the probe is
-run in a signed-in browser by the user or in a session that has one.
+_Findings (2026-10-08, from the SDK source and the user's DevTools runs on the local dev server):_
+
+- **P1 — from source, not yet observed.** The SDK restores `hasSynced` / `lastSyncedAt` from the
+  database when it opens (`powersync_offline_sync_status()`), so it very likely survives a
+  reload. The offline-reload test did not answer it: with the network off Chrome cannot load the
+  page itself (there is no service worker), so the app never started. Still to observe: the
+  status read at `waitForReady()` on a device that has synced before.
+- **P2 — explained, one check left.** One `stream` WebSocket stayed open for **4 minutes**
+  (22:06:35 to about 22:10:33) with only a 14 B ping and a 14 B reply every 20 s after the
+  opening exchange (864 B and 579 B up, 946 B and 61 B down). The earlier ~40 s restart
+  (2026-10-01) came from the **60 s lifetime of the PowerSync JWT template**: the SDK asks for
+  a new token before the old one expires and restarts the stream (`FetchCredentials` in the
+  SDK source). The lifetime has since been raised to **3600 s** (user, 2026-10-08), so a
+  planned restart should now happen about **once per token lifetime, near an hour**, which a
+  4-minute run cannot show.
+  - The marks every ~50 s on the tab's Network timeline are **probably Clerk's own session
+    refresh**, not `/api/powersync/credentials` (our connector caches the token until 30 s
+    before it expires). Not yet confirmed: the name of one of those requests decides it.
+  - Still to observe: one sync-worker socket left open for over an hour, expecting one
+    close and reopen near the token's expiry. Also unknown: whether production uses the same
+    3600 s (Clerk development and production instances have separate templates).
+- **P3 — answered for the local dev server.** The first socket ended at about 22:10:33, at
+  the same moment a second `stream` socket opened (22:10:33.784, the same opening exchange)
+  and after four quiet minutes, so the cause is the second tab's `connect()`: **opening a
+  tab replaces the shared WebSocket for every tab.** Closing the second tab opened no new
+  socket. Every tab still receives `statusChanged` (source). The exact gap between the old
+  socket closing and the new one opening is not visible in DevTools.
+- **P4 — answered from source.** `connect()` resolves when the status stops being `connecting`:
+  at the first connection **or** at the first download error. Never time the promise.
+- **P5 — answered from source: not detectable.** The sync and database workers are created with
+  `new SharedWorker(url, ...)`; the SDK exposes nothing that says a worker already existed.
+  D4's `attrs.shared` tag cannot be set from the tab (see decision D4 below).
+
+**Consequence for D1 and for reconnects.** A second tab's `connect()` resets the shared
+connection (P3, observed), so a leader tab can see a disconnect and a reconnect that **another tab caused**. That
+is a cause the request did not list, and `attrs.planned` (token refresh) does not cover it. How
+to record it is a new decision, **D5**, below.
 
 ## 3. Design
 
@@ -165,6 +204,11 @@ production.
   `sync.initial`; `connected` true then false then true yields one disconnect event with
   `n: 1` and one reconnect with the gap; a second loss gives `n: 2`; `downloadError`
   during the gap gives `outcome: "error"`; a repeated identical status yields nothing.
+- **Vitest, `tabCoordination`:** the tab that gets the lock is `leader` and sets the role;
+  a second tab is `follower` and becomes `leader` when the lock is released; without
+  `navigator.locks` the role stays `unknown`; a connect note received within a second before a
+  disconnect makes the reconnect carry `cause: "tab_connect"`, a note older than that or none
+  does not; with no `BroadcastChannel` nothing is tagged and nothing throws.
 - **Vitest, `observeSync`:** with a fake `registerListener`, events reach `metrics`;
   unsubscribing stops them.
 - **Vitest, `SystemProvider`:** the existing `SystemProvider.test.ts` keeps passing; a new
@@ -175,11 +219,14 @@ production.
 
 ## 6. Files
 
-- **Created:** `src/lib/powersync/syncObserver.ts`.
+- **Created:** `src/lib/powersync/syncObserver.ts`, `src/lib/perf/tabCoordination.ts`
+  (the Web Locks leader lock of D2 and the `BroadcastChannel` connect notes of D5; it calls
+  `setTabRole` from spec 1).
 - **Edited:** `src/components/providers/SystemProvider.tsx`, `src/lib/perf/telemetryEvent.ts`
   (registry names and `attrs` allow-lists).
-- **Tests (not counted):** `syncObserver.test.ts`, additions to `SystemProvider.test.ts`.
-- **Counted: 3.**
+- **Tests (not counted):** `syncObserver.test.ts`, `tabCoordination.test.ts`, additions to
+  `SystemProvider.test.ts`.
+- **Counted: 4.**
 
 ## 7. Decisions
 
@@ -197,6 +244,12 @@ production.
   _current_ leader, not "the first tab for ever". Written as §1a.
 - **D3.** _PowerSync log level._ **User's answer:** DEBUG in development, WARN in
   production.
-- **D4.** _`sqlite.open` in a tab where another tab already opened the database._
-  **User's answer:** record every open, tag `attrs.shared: true` when the shared worker
-  was already running (P5 says whether that is detectable).
+- **D4.** _`sqlite.open` in a tab where another tab already opened the database._ First
+  answer: record every open and tag it `shared`. Reopened because P5 showed the tag cannot be
+  set. **User's answer (2026-10-08):** no tag. Every open is still recorded.
+- **D5.** _A reconnect caused by another tab opening._ Options were: (a) an ordinary
+  reconnect; (b) an ordinary reconnect tagged with its cause; (c) change `SystemProvider` so
+  that only the leader calls `connect()`. **User's answer:** (b) — count it as a reconnect and
+  mark its cause, `attrs.cause: "tab_connect"`. How the cause is known (a `BroadcastChannel`
+  note sent by a tab just before it calls `connect()`, and a one-second window) is mine: **to
+  confirm at review.** Where the channel is unavailable, no tag is set.
