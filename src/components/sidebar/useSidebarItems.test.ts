@@ -269,6 +269,7 @@ describe("useSidebarItems", () => {
       "/dev-tools/stripe-checkout",
       "/dev-tools/damage-photos",
       "/dev-tools/qbo-get-sales-tax",
+      "/dev-tools/allowed-emails",
     ]);
   });
 

@@ -23,6 +23,8 @@ export type QuoteDetail = {
   termsAndConditionsUuid: string | null;
   taxPercent: number | null;
   taxAmountCents: number | null;
+  /** Whether the tax amount was typed by hand (Events.is_tax_overridden), not worked out. */
+  isTaxOverridden: boolean;
   bookedAt: string | null;
   createdAt: string;
   createdByUserUuid: string | null;
@@ -80,6 +82,7 @@ type Row = {
   terms_and_conditions_uuid: string | null;
   tax_percent: number | null;
   tax_amount_cents: number | null;
+  is_tax_overridden: number | null;
   booked_at: string | null;
   created_at: string;
   created_by_user_uuid: string | null;
@@ -135,6 +138,7 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
       "e.terms_and_conditions_uuid as terms_and_conditions_uuid",
       "e.tax_percent as tax_percent",
       "e.tax_amount_cents as tax_amount_cents",
+      "e.is_tax_overridden as is_tax_overridden",
       "e.booked_at as booked_at",
       "e.created_at as created_at",
       "e.created_by_user_uuid as created_by_user_uuid",
@@ -190,6 +194,7 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
     termsAndConditionsUuid: r.terms_and_conditions_uuid,
     taxPercent: r.tax_percent,
     taxAmountCents: r.tax_amount_cents,
+    isTaxOverridden: r.is_tax_overridden === 1,
     bookedAt: r.booked_at,
     createdAt: r.created_at,
     createdByUserUuid: r.created_by_user_uuid,

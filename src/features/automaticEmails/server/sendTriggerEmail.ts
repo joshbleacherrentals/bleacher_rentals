@@ -12,6 +12,8 @@ import {
 } from "@/features/automaticEmails/variables";
 import { logEmailSend } from "./logEmailSend";
 import { PAYMENT_MADE_AM, QUOTE_SIGNED_AM } from "@/features/automaticEmails/triggers";
+import { ALLOWED_EMAILS_PATH } from "@/features/devEmailAllowlist/logic/allowlist";
+import { guardEmailRecipients } from "@/features/devEmailAllowlist/server/guardRecipients";
 
 export type SendResult = { sent: true; to: string } | { sent: false; reason: string };
 
@@ -191,6 +193,19 @@ export async function sendTriggerEmail(opts: {
   if (!resolved.ok) return resolve({ sent: false, reason: resolved.reason }, resolved.templateId);
   const { email } = resolved;
 
+  // Development only: an address that is not on the allowed emails list gets nothing. The attempt
+  // is logged as failed so the quote's Automatic Emails tab says why.
+  const guarded = await guardEmailRecipients(supabaseAdmin, { to: email.to, cc: email.cc });
+  if (!guarded.to) {
+    return resolve(
+      {
+        sent: false,
+        reason: `Blocked in development — not on the allowed emails list (${ALLOWED_EMAILS_PATH}): ${guarded.blocked.join(", ")}`,
+      },
+      email.templateId,
+    );
+  }
+
   const storedAttachments: EmailAttachment[] = [];
   for (const row of email.storedAttachmentRows) {
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
@@ -216,8 +231,8 @@ export async function sendTriggerEmail(opts: {
   const client = new postmark.ServerClient(process.env.POSTMARK_API_KEY!);
   await client.sendEmail({
     From: email.from,
-    To: email.to,
-    ...(email.cc ? { Cc: email.cc } : {}),
+    To: guarded.to,
+    ...(guarded.cc ? { Cc: guarded.cc } : {}),
     Subject: email.subject,
     HtmlBody: email.htmlBody,
     MessageStream: "outbound",
@@ -233,5 +248,5 @@ export async function sendTriggerEmail(opts: {
       : {}),
   });
 
-  return resolve({ sent: true, to: email.to }, email.templateId);
+  return resolve({ sent: true, to: guarded.to }, email.templateId);
 }

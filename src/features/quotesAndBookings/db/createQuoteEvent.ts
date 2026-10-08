@@ -10,6 +10,7 @@ import { db } from "@/components/providers/SystemProvider";
 import { typedExecute } from "@/lib/powersync/typedQuery";
 import { toEventLineItemValues } from "./toEventLineItemValues";
 import { postFinanceBookedNotice, shouldNotifyFinanceBooked } from "../utils/notifyFinanceBooked";
+import { taxOverrideFlag } from "../utils/taxOverride";
 
 export async function createQuoteEvent(
   state: CreateQuoteState,
@@ -73,6 +74,7 @@ export async function createQuoteEvent(
         contract_revenue_cents: contractRevenueCents,
         tax_percent: state.taxPercent,
         tax_amount_cents: effectiveTaxCents,
+        is_tax_overridden: taxOverrideFlag(state.taxOverrideCents),
         lenient: 0,
         must_be_clean: 0,
         deleted: 0,
