@@ -36,6 +36,19 @@ function browserSink(event: PerfEvent): void {
   transport.enqueue(event);
 }
 
+/**
+ * Sends what the transport holds, now, by the beacon path. For a module that holds events of
+ * its own until the page goes away (the SQLite aggregate): it records them, then calls this, so
+ * the order in which page listeners were added does not decide whether they get out.
+ */
+export function flushTelemetryNow(): void {
+  try {
+    transport?.flushFinal();
+  } catch {
+    // Nothing to do: the events stay buffered.
+  }
+}
+
 const BADGE_STYLE =
   "background:#7c3aed;color:#fff;font-weight:700;padding:2px 6px;border-radius:3px";
 const HEADLINE_STYLE = "color:#7c3aed;font-weight:700";

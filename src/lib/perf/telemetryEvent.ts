@@ -24,8 +24,28 @@ export const METRIC_NAMES = [
   // spec 3 — docs/specs/perf-connector.md
   "powersync.credentials",
   "sync.upload",
+  // spec 4 — docs/specs/perf-sqlite.md
+  "sqlite.query",
+  "sqlite.write",
+  "sqlite.batch",
 ] as const;
 export type MetricName = (typeof METRIC_NAMES)[number];
+
+const SQLITE_ATTRS = [
+  "op",
+  "tables",
+  "rows",
+  "statements",
+  "count",
+  "sumMs",
+  "maxMs",
+  "b1",
+  "b2",
+  "b3",
+  "b4",
+  "b5",
+  "b6",
+] as const;
 
 /** Per metric, the `attrs` keys the route keeps. Anything else is dropped. */
 export const ATTR_ALLOWLIST: Record<MetricName, readonly string[]> = {
@@ -39,6 +59,11 @@ export const ATTR_ALLOWLIST: Record<MetricName, readonly string[]> = {
   "sync.catchup": ["ops", "hidden"],
   "powersync.credentials": ["source"],
   "sync.upload": ["ops", "tables", "discarded"],
+  // An individual call carries op, tables and rows or statements; the production aggregate
+  // carries count, sumMs, maxMs and the six duration buckets instead.
+  "sqlite.query": SQLITE_ATTRS,
+  "sqlite.write": SQLITE_ATTRS,
+  "sqlite.batch": SQLITE_ATTRS,
 };
 
 export type Outcome = "ok" | "error";

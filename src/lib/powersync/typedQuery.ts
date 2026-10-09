@@ -11,6 +11,7 @@ import {
   countWatcherMount,
   countWatcherUnmount,
 } from "@/lib/perf/perfTrace";
+import { timed } from "@/lib/perf/sqliteTiming";
 
 export type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
@@ -78,7 +79,9 @@ export function typedGetAll<C extends CompiledQuery<any>, TExpected>(
   // Counted so a trace can report how many sequential worker round-trips a save
   // actually costs — that number, not any single query, is what makes it slow.
   countDbRead();
-  return powerSyncDb.getAll<TExpected>(compiled.sql, compiled.parameters as any[]);
+  return timed("sqlite.query", compiled.sql, () =>
+    powerSyncDb.getAll<TExpected>(compiled.sql, compiled.parameters as any[]),
+  );
 }
 
 /**
@@ -91,7 +94,9 @@ export function typedExecute(compiled: CompiledQuery<any>) {
   // Each call is its own transaction, and each one wakes every watched query on
   // the tables it touches — see `countDbRead` above.
   countDbWrite();
-  return powerSyncDb.execute(compiled.sql, compiled.parameters as any[]);
+  return timed("sqlite.write", compiled.sql, () =>
+    powerSyncDb.execute(compiled.sql, compiled.parameters as any[]),
+  );
 }
 
 /**
@@ -111,9 +116,14 @@ export function typedExecuteBatch(statements: CompiledQuery<any>[]): Promise<voi
   // One transaction, `statements.length` statements — counted separately so a
   // trace shows work being batched rather than appearing to vanish.
   countDbBatch(statements.length);
-  return powerSyncDb.writeTransaction(async (tx) => {
-    for (const statement of statements) {
-      await tx.execute(statement.sql, statement.parameters as any[]);
-    }
-  });
+  return timed(
+    "sqlite.batch",
+    statements.map((statement) => statement.sql),
+    () =>
+      powerSyncDb.writeTransaction(async (tx) => {
+        for (const statement of statements) {
+          await tx.execute(statement.sql, statement.parameters as any[]);
+        }
+      }),
+  );
 }

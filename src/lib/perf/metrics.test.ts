@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetEventContextForTests } from "./eventContext";
-import { metrics, setMetricsSink } from "./metrics";
+import { flushTelemetryNow, metrics, setMetricsSink } from "./metrics";
 import type { PerfEvent } from "./telemetryEvent";
 
 let events: PerfEvent[];
@@ -141,5 +141,11 @@ describe("console output", () => {
     metrics.start("app.telemetry_dropped").fail("timeout");
     metrics.count("app.telemetry_dropped");
     for (const spy of [debug, log, warn, error]) expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("flushTelemetryNow", () => {
+  it("does nothing, and does not throw, before any event created the transport", () => {
+    expect(() => flushTelemetryNow()).not.toThrow();
   });
 });

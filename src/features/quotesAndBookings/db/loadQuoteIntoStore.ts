@@ -3,7 +3,8 @@ import { fetchPaymentInstallments } from "./paymentInstallments";
 import { fetchQuoteDetail } from "./fetchQuoteDetail";
 import { fetchLineItemsForEvent } from "./fetchLineItems";
 import { resolveInvoiceDisplay } from "../utils/invoiceNumber";
-import { db, powerSyncDb } from "@/components/providers/SystemProvider";
+import { db } from "@/components/providers/SystemProvider";
+import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
 import type { LostReason } from "../utils/lostReason";
 import { taxOverrideFromSaved } from "../utils/taxOverride";
 
@@ -66,10 +67,7 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
         .where("is_active", "=", 1)
         .limit(1)
         .compile();
-      const amRows = await powerSyncDb.getAll<{ id: string }>(
-        amQuery.sql,
-        amQuery.parameters as any[],
-      );
+      const amRows = await typedGetAll(amQuery, expect<{ id: string }>());
       if (amRows.length > 0) {
         store.setField("accountManagerId", amRows[0].id);
       }

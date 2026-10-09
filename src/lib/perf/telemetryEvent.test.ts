@@ -94,6 +94,51 @@ describe("spec 3 names", () => {
   });
 });
 
+describe("spec 4 names", () => {
+  const edges = { b1: 1, b2: 1, b3: 1, b4: 1, b5: 1, b6: 1 };
+
+  it("keeps the attrs of an individual call", () => {
+    const keep = (name: string, attrs: Record<string, unknown>) =>
+      validateEvent(valid({ name, attrs }))?.attrs;
+
+    expect(
+      keep("sqlite.query", { op: "select", tables: "Users", rows: 3, sql: "select 1" }),
+    ).toEqual({
+      op: "select",
+      tables: "Users",
+      rows: 3,
+    });
+    expect(keep("sqlite.write", { op: "update", tables: "Events", params: "x" })).toEqual({
+      op: "update",
+      tables: "Events",
+    });
+    expect(keep("sqlite.batch", { op: "insert", tables: "Alerts", statements: 3 })).toEqual({
+      op: "insert",
+      tables: "Alerts",
+      statements: 3,
+    });
+  });
+
+  it("keeps the whole aggregate and accepts it with no duration", () => {
+    const event = validateEvent(
+      valid({
+        name: "sqlite.query",
+        durationMs: null,
+        attrs: { op: "select", tables: "Users", count: 6, sumMs: 79.5, maxMs: 50, ...edges },
+      }),
+    );
+    expect(event?.durationMs).toBeNull();
+    expect(event?.attrs).toEqual({
+      op: "select",
+      tables: "Users",
+      count: 6,
+      sumMs: 79.5,
+      maxMs: 50,
+      ...edges,
+    });
+  });
+});
+
 describe("validateEvent", () => {
   it("accepts a valid event unchanged", () => {
     expect(validateEvent(valid())).toEqual(valid());
