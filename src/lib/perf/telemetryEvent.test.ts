@@ -139,6 +139,27 @@ describe("spec 4 names", () => {
   });
 });
 
+describe("spec 5 name", () => {
+  it("ui.first_data keeps source, status, cold and hidden and nothing else", () => {
+    const event = validateEvent(
+      valid({
+        name: "ui.first_data",
+        attrs: { source: "fallback", status: "blocked", cold: true, hidden: false, userId: "u1" },
+      }),
+    );
+    expect(event?.attrs).toEqual({
+      source: "fallback",
+      status: "blocked",
+      cold: true,
+      hidden: false,
+    });
+  });
+
+  it("ui.page_ready is not in the registry (its own spec defines it)", () => {
+    expect(validateEvent(valid({ name: "ui.page_ready" }))).toBeNull();
+  });
+});
+
 describe("validateEvent", () => {
   it("accepts a valid event unchanged", () => {
     expect(validateEvent(valid())).toEqual(valid());
@@ -152,7 +173,7 @@ describe("validateEvent", () => {
 
   it("refuses a name outside the registry", () => {
     expect(validateEvent(valid({ name: "syncTime" }))).toBeNull();
-    expect(validateEvent(valid({ name: "ui.first_data" }))).toBeNull();
+    expect(validateEvent(valid({ name: "ui.page_ready" }))).toBeNull();
     expect(validateEvent(valid({ name: 5 }))).toBeNull();
   });
 

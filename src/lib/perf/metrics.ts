@@ -1,3 +1,4 @@
+import type { WebRole } from "@/features/userAccess/logic/determineAccess";
 import { classifyError, isErrorKind } from "./classifyError";
 import { getEventContext } from "./eventContext";
 import type { Attrs, MetricName, Outcome, PerfEvent } from "./telemetryEvent";
@@ -59,6 +60,11 @@ type Recorded = {
   outcome?: Outcome;
   errorKind?: string | null;
   attrs?: Attrs | null;
+  /**
+   * For an event recorded at the very moment the roles become known, before the permissions
+   * store has them. Otherwise the store's roles are used.
+   */
+  roles?: WebRole[] | null;
 };
 
 function emit(recorded: Recorded): void {
@@ -73,6 +79,7 @@ function emit(recorded: Recorded): void {
       errorKind: recorded.errorKind ?? null,
       at: Date.now(),
       ...context,
+      roles: recorded.roles ?? context.roles,
       attrs,
     };
 

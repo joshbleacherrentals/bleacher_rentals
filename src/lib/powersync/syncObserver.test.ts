@@ -5,6 +5,7 @@ import type { PerfEvent } from "@/lib/perf/telemetryEvent";
 import {
   connectWithObserver,
   credentialsFetchedWithin,
+  getColdStart,
   initialState,
   markCredentialsFetched,
   observeSync,
@@ -644,6 +645,37 @@ describe("per-tab metrics", () => {
     await trackSqliteOpen({ waitForReady: () => Promise.reject({ code: "ENOENT" }) });
     await settle();
     expect(events[0]).toMatchObject({ name: "sqlite.open", outcome: "error" });
+  });
+
+  it("remembers whether the device had synced when the database became ready", async () => {
+    expect(getColdStart()).toBeNull();
+    await trackSqliteOpen({
+      waitForReady: () => Promise.resolve(),
+      currentStatus: { hasSynced: false },
+    });
+    expect(getColdStart()).toBe(true);
+  });
+
+  it("is warm when it had synced", async () => {
+    await trackSqliteOpen({
+      waitForReady: () => Promise.resolve(),
+      currentStatus: { hasSynced: true },
+    });
+    expect(getColdStart()).toBe(false);
+  });
+
+  it("stays unknown when the status is not there or the database fails to open", async () => {
+    await trackSqliteOpen({ waitForReady: () => Promise.resolve() });
+    expect(getColdStart()).toBeNull();
+    await trackSqliteOpen({ waitForReady: () => Promise.reject(new Error("no")) });
+    expect(getColdStart()).toBeNull();
+  });
+
+  it("does not change the answer once it is known: the first sync later flips hasSynced", async () => {
+    const status = { hasSynced: false };
+    await trackSqliteOpen({ waitForReady: () => Promise.resolve(), currentStatus: status });
+    status.hasSynced = true;
+    expect(getColdStart()).toBe(true);
   });
 
   it("recordAppStart records one app.start per page load, with the navigation type", () => {

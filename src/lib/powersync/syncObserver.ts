@@ -413,7 +413,8 @@ export function connectWithObserver(
 // Per-tab metrics
 // ---------------------------------------------------------------------------
 
-function trackHidden(): { stop: () => boolean } {
+/** "Was the page hidden at any point since this was called". `stop()` ends the tracking. */
+export function trackHidden(): { stop: () => boolean } {
   let seen = pageHidden();
   const off = onPageHidden(() => {
     seen = true;
@@ -426,15 +427,36 @@ function trackHidden(): { stop: () => boolean } {
   };
 }
 
-/** From the construction of the database to `waitForReady()`. Call right after constructing it. */
+let coldStart: boolean | null = null;
+
+/**
+ * Whether this load began on a device that had never synced: `hasSynced` was false at the moment
+ * the local database became ready. Read then and kept, because the first sync flips `hasSynced`
+ * to true before the page has anything to show. Null until the database is ready or when its
+ * status is not available. Spec: docs/specs/perf-first-data.md §2.
+ */
+export function getColdStart(): boolean | null {
+  return coldStart;
+}
+
+/**
+ * From the construction of the database to `waitForReady()`, and the cold-start state at that
+ * moment. Call right after constructing the database.
+ */
 export function trackSqliteOpen(
-  db: Pick<AbstractPowerSyncDatabase, "waitForReady">,
+  db: Pick<AbstractPowerSyncDatabase, "waitForReady"> & {
+    currentStatus?: { hasSynced?: boolean };
+  },
 ): Promise<void> {
   const hidden = trackHidden();
   const handle = metrics.start("sqlite.open");
 
   return db.waitForReady().then(
-    () => handle.end({ hidden: hidden.stop() }),
+    () => {
+      if (coldStart === null && db.currentStatus)
+        coldStart = !(db.currentStatus.hasSynced ?? false);
+      handle.end({ hidden: hidden.stop() });
+    },
     (error: unknown) => handle.fail(error, { hidden: hidden.stop() }),
   );
 }
@@ -472,5 +494,6 @@ export function credentialsFetchedWithin(withinMs: number, now = performance.now
 /** Test seam. */
 export function resetSyncObserverForTests(): void {
   appStartRecorded = false;
+  coldStart = null;
   lastCredentialsAt = null;
 }

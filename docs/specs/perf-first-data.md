@@ -1,7 +1,8 @@
 # Performance telemetry — time to first usable data
 
-Status: **AWAITING APPROVAL** — 0 open decisions (D1, D2 answered by the user); the probe
-dependency (spec 2, P1) is resolved: `hasSynced` survives a reload.
+Status: **IMPLEMENTED 2026-10-09, awaiting review** (approved the same day) — 0 open decisions
+(D1, D2 answered by the user). Not run in a real browser by me; covered by unit tests. What
+differs from the text below is in §8.
 Spec 5 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md).
 Request (user, 2026-10-08): `time_to_first_usable_data` and `first_data_available`; a
 fast-looking result that is really a fallback must not pass for a local one.
@@ -136,3 +137,28 @@ hook knows `needsFallback`. This replaces the placement listed in spec 1 §9
   `sync_scope` that is not called a cold start (§2). **Revised 2026-10-09 (user agreed):** the
   answer was given for the case where `hasSynced` does not survive a reload; it does, so `cold`
   is `!hasSynced` at database-ready and no flag is stored.
+
+## 8. What differs from the text above
+
+- **`cold` is captured when the database becomes ready, in `trackSqliteOpen`, not read in the
+  hook.** §2 said to read `currentStatus.hasSynced` after `waitForReady()`, which is right, but
+  the hook only learns the answer when the first sync has already flipped `hasSynced` to true
+  (the local rows arrive with that sync), so reading it there would call every cold start warm.
+  `syncObserver.ts` now keeps the value it saw at the moment of readiness (`getColdStart()`, null
+  when unknown, in which case `attrs.cold` is left out). A cold start is therefore only visible
+  in `ui.first_data` of the load it happened in.
+- **`metrics.record` takes an optional `roles`.** The store that normally fills an event's roles
+  is set by `SignedInComponents` after this moment, so the hook passes the roles of the access
+  result it just resolved; for a blocked user they are null.
+- **`attrs.hidden` is tracked from the moment the hook's module loads**, with the tracker spec 2
+  uses for its spans. A page hidden before the module loaded is not seen.
+- **The hook's return is one value, computed once.** The three early returns became a single
+  `result`, so the reporting effect can sit after them without a conditional hook; the values
+  returned are the same as before.
+- **How it is tested.** The repo has no DOM renderer, so the test replaces React's hooks with
+  plain functions that run at once and calls `useUserAccess()` directly: one call is a render
+  plus its effects. That exercises the real effect and the real flag, not a copy of them.
+- **Files counted: 4** (`useUserAccess.ts`, `telemetryEvent.ts`, `syncObserver.ts`,
+  `metrics.ts`); the spec said 2.
+- **Verified:** `npm run tc`; the whole Vitest suite. **Not verified:** a browser run; what
+  `ui.first_data` shows against a real cold start.

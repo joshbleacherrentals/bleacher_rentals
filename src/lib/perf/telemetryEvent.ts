@@ -28,6 +28,8 @@ export const METRIC_NAMES = [
   "sqlite.query",
   "sqlite.write",
   "sqlite.batch",
+  // spec 5 — docs/specs/perf-first-data.md. `ui.page_ready` is not here: its own spec defines it.
+  "ui.first_data",
 ] as const;
 export type MetricName = (typeof METRIC_NAMES)[number];
 
@@ -64,6 +66,7 @@ export const ATTR_ALLOWLIST: Record<MetricName, readonly string[]> = {
   "sqlite.query": SQLITE_ATTRS,
   "sqlite.write": SQLITE_ATTRS,
   "sqlite.batch": SQLITE_ATTRS,
+  "ui.first_data": ["source", "status", "cold", "hidden"],
 };
 
 export type Outcome = "ok" | "error";

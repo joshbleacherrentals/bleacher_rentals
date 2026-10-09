@@ -105,6 +105,18 @@ describe("metrics.record and metrics.count", () => {
   });
 });
 
+describe("metrics.record roles override", () => {
+  it("uses the roles it is given instead of the store's", () => {
+    metrics.record({ name: "app.telemetry_dropped", durationMs: 1, roles: ["admin", "driver"] });
+    expect(events[0].roles).toEqual(["admin", "driver"]);
+  });
+
+  it("falls back to the store's roles when none are given", () => {
+    metrics.record({ name: "app.telemetry_dropped", durationMs: 1 });
+    expect(events[0].roles).toBeNull();
+  });
+});
+
 describe("failure isolation", () => {
   it("swallows an error thrown by the sink", () => {
     setMetricsSink(() => {
