@@ -21,6 +21,9 @@ export const METRIC_NAMES = [
   "powersync.reconnect",
   "sync.initial",
   "sync.catchup",
+  // spec 3 — docs/specs/perf-connector.md
+  "powersync.credentials",
+  "sync.upload",
 ] as const;
 export type MetricName = (typeof METRIC_NAMES)[number];
 
@@ -34,6 +37,8 @@ export const ATTR_ALLOWLIST: Record<MetricName, readonly string[]> = {
   "powersync.reconnect": ["hidden", "cause", "planned"],
   "sync.initial": ["ops", "buckets", "hidden"],
   "sync.catchup": ["ops", "hidden"],
+  "powersync.credentials": ["source"],
+  "sync.upload": ["ops", "tables", "discarded"],
 };
 
 export type Outcome = "ok" | "error";

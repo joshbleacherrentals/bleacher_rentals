@@ -80,6 +80,20 @@ describe("spec 2 names", () => {
   });
 });
 
+describe("spec 3 names", () => {
+  it("keeps the attrs the connector metrics define and nothing else", () => {
+    const keep = (name: string, attrs: Record<string, unknown>) =>
+      validateEvent(valid({ name, attrs }))?.attrs;
+
+    expect(keep("powersync.credentials", { source: "cache", token: "x" })).toEqual({
+      source: "cache",
+    });
+    expect(
+      keep("sync.upload", { ops: 3, tables: "Addresses,Events", discarded: true, approxBytes: 9 }),
+    ).toEqual({ ops: 3, tables: "Addresses,Events", discarded: true });
+  });
+});
+
 describe("validateEvent", () => {
   it("accepts a valid event unchanged", () => {
     expect(validateEvent(valid())).toEqual(valid());
