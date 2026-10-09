@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { CopyAddressButton } from "@/components/CopyAddressButton";
 import type { VenuePickerValue } from "@/features/venues/types";
 
 type VenueCardProps = {
@@ -23,31 +24,35 @@ export function VenueCard({ value, onClick, className }: VenueCardProps) {
   const Element = onClick ? "button" : "div";
 
   return (
-    <Element
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className={cn(
-        "w-full rounded-md border px-3 py-2.5 text-left transition",
-        onClick && "cursor-pointer hover:bg-gray-50 hover:border-gray-300",
-        className,
-      )}
-    >
-      {!address ? (
-        <span className="text-sm text-gray-400">Select venue...</span>
-      ) : (
-        <div className="space-y-0.5">
-          {name && <div className="text-sm font-semibold text-darkBlue">{name}</div>}
-          <div className={cn("text-sm", name ? "text-gray-600" : "font-medium text-gray-900")}>
-            {address.street}
-          </div>
-          {(address.city || address.stateProvince) && (
-            <div className="text-sm text-gray-600">
-              {[address.city, address.stateProvince].filter(Boolean).join(", ")}
+    <div className={cn("relative w-full", className)}>
+      <Element
+        type={onClick ? "button" : undefined}
+        onClick={onClick}
+        className={cn(
+          "w-full rounded-md border px-3 py-2.5 text-left transition",
+          // Room for the copy button so a long street never runs underneath it.
+          address && "pr-11",
+          onClick && "cursor-pointer hover:bg-gray-50 hover:border-gray-300",
+        )}
+      >
+        {!address ? (
+          <span className="text-sm text-gray-400">Select venue...</span>
+        ) : (
+          <div className="space-y-0.5">
+            {name && <div className="text-sm font-semibold text-darkBlue">{name}</div>}
+            <div className={cn("text-sm", name ? "text-gray-600" : "font-medium text-gray-900")}>
+              {address.street}
             </div>
-          )}
-          {address.zipPostal && <div className="text-sm text-gray-600">{address.zipPostal}</div>}
-        </div>
-      )}
-    </Element>
+            {(address.city || address.stateProvince) && (
+              <div className="text-sm text-gray-600">
+                {[address.city, address.stateProvince].filter(Boolean).join(", ")}
+              </div>
+            )}
+            {address.zipPostal && <div className="text-sm text-gray-600">{address.zipPostal}</div>}
+          </div>
+        )}
+      </Element>
+      {address && <CopyAddressButton address={address} className="absolute right-1.5 top-1.5" />}
+    </div>
   );
 }
