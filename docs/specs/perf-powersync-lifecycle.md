@@ -1,8 +1,8 @@
 # Performance telemetry — PowerSync lifecycle: open, connect, reconnect, initial sync
 
-Status: **BLOCKED** — 0 open decisions (D1–D5 answered by the user); 1 fact still to observe
-(P1, `hasSynced` after a reload). P2 explained (token lifetime; an hour-long run is optional),
-P3 answered on the local dev server, P4 and P5 from the SDK source.
+Status: **IMPLEMENTED 2026-10-09, awaiting review** (approved the same day) — 0 open decisions
+(D1–D5 answered by the user). Not run in a real browser by me (Clerk sign-in is unavailable
+here); the observer is covered by unit tests only. What differs from the text below is in §8.
 Spec 2 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md), which must
 be approved and implemented first (the `metrics` API and the event type come from it).
 Request (user, 2026-10-08): measure application startup, the PowerSync connection and the
@@ -39,10 +39,14 @@ mount. There is no `shared` tag (D4): a tab cannot tell that the shared worker a
 existed, so a near-instant open in a second tab is recorded like any other and can be told
 apart only by its duration.
 
-**`powersync.connect`.** _Starts_ when the provider calls `instance.connect(...)`. _Ends_
-at the first status with `connected === true`. It does **not** end when the `connect()`
-promise resolves (P4). It includes the credentials fetch (Clerk and `/api/powersync/credentials`);
-spec 3 measures that part on its own so the two can be told apart.
+**`powersync.connect`.** _Starts_ at the **later** of two moments: the provider's
+`instance.connect(...)` call and the local database becoming ready. _Ends_ at the first status
+with `connected === true`. The probe showed why: `connect()` waits for the database inside the
+SDK, so a call made before the database is ready would otherwise count the database's opening
+twice, once here and once in `sqlite.open` (353 ms of a 1.3 s `connect()` in the probe run).
+It does **not** end when the `connect()` promise resolves, although in the probe the two were
+the same millisecond (P4). It includes the credentials fetch; spec 3 measures that part on its
+own. **To confirm at review:** this start rule is mine; the alternative is the plain call time.
 
 **`powersync.disconnect`.** An event at each transition from `connected: true` to
 `false`, with `attrs.n` (1, 2, 3 ... within the session) and `attrs.hadError` (whether
@@ -51,7 +55,10 @@ spec 3 measures that part on its own so the two can be told apart.
 **`powersync.reconnect`.** _Starts_ at the disconnect above. _Ends_ at the next
 `connected === true`. `outcome: "error"` and an `errorKind` when `downloadError` was set
 during the gap. `attrs.cause: "tab_connect"` when the gap was started by another tab calling
-`connect()` (D5, below); without that attribute the cause is not known.
+`connect()` (D5, below); without that attribute the cause is not known. The status flaps
+while reconnecting (`connecting` true, false, true within a millisecond, several identical
+statuses in a row), so only two transitions count: `connected` true to false starts the gap,
+the next `connected` false to true ends it; everything between is ignored.
 
 **`sync.initial`.** Only when the device had never synced: `hasSynced` was `false` when
 `connect()` was called (P1). _Starts_ at that `connect()` call. _Ends_ when `hasSynced`
@@ -60,8 +67,11 @@ becomes `true`. `attrs`: `ops` (the last `downloadProgress.totalOperations` seen
 
 **`sync.catchup`.** Only when `hasSynced` was already `true` at `connect()`. _Starts_ at
 that call. _Ends_ at the first `lastSyncedAt` newer than the one seen at the start, which
-is the first complete checkpoint of the session. `attrs`: `ops` as above (0 when nothing
-changed). This is what a returning user waits for; `sync.initial` happens once per device.
+is the first complete checkpoint of the session. The end is the **time the status event
+arrived**, not the value of `lastSyncedAt`: the probe showed `lastSyncedAt` has one-second
+resolution (every value ended `.000`) and can be `null` for a moment while connecting, so a
+`null` is ignored and the value is used only to see that it changed. `attrs`: `ops` as above (0
+when nothing changed). This is what a returning user waits for; `sync.initial` happens once per device.
 
 **The two sync metrics share one signal** (the SDK's own `hasSynced` / `lastSyncedAt`
 status), not a timer. They are never both emitted for one connect.
@@ -119,11 +129,12 @@ browser and the findings are written into this section before the spec is approv
 
 _Findings (2026-10-08, from the SDK source and the user's DevTools runs on the local dev server):_
 
-- **P1 — from source, not yet observed.** The SDK restores `hasSynced` / `lastSyncedAt` from the
-  database when it opens (`powersync_offline_sync_status()`), so it very likely survives a
-  reload. The offline-reload test did not answer it: with the network off Chrome cannot load the
-  page itself (there is no service worker), so the app never started. Still to observe: the
-  status read at `waitForReady()` on a device that has synced before.
+- **P1 — answered: yes, it survives a reload.** The probe (a reload of a device that had
+  synced 17 minutes earlier) showed `hasSynced: true` and `lastSyncedAt` set in the very first
+  status after the database was ready, before the tab had connected. The offline-reload test
+  earlier could not show this (Chrome cannot load the page offline), so the probe replaced it.
+  `sync.initial` and `sync.catchup` therefore split on `hasSynced`; no `localStorage` flag is
+  needed for spec 2. (Spec 5's `cold` flag follows its own answer; see that spec.)
 - **P2 — explained, one check left.** One `stream` WebSocket stayed open for **4 minutes**
   (22:06:35 to about 22:10:33) with only a 14 B ping and a 14 B reply every 20 s after the
   opening exchange (864 B and 579 B up, 946 B and 61 B down). The earlier ~40 s restart
@@ -149,6 +160,24 @@ _Findings (2026-10-08, from the SDK source and the user's DevTools runs on the l
 - **P5 — answered from source: not detectable.** The sync and database workers are created with
   `new SharedWorker(url, ...)`; the SDK exposes nothing that says a worker already existed.
   D4's `attrs.shared` tag cannot be set from the tab (see decision D4 below).
+
+**Probe run, one tab (2026-10-08, local dev; the `clock` values in the probe are UTC, the
+DevTools network times are local, so `19:51` in the probe is `22:51` there):**
+
+- First load: `connect()` called 2 ms after the probe started; status restored at +353 ms
+  (`hasSynced: true`); `connecting` at +534 ms; `connected` at +1 302 ms, in the same
+  millisecond the `connect()` promise resolved. So `powersync.connect` was about 1.3 s from
+  the call, or about 0.95 s from the database being ready.
+- Right after `connected`: `downloading` true with `opsTotal: 0`, then `downloading` false
+  with a new `lastSyncedAt` within 22 ms. A returning user with nothing new waits about as
+  long for `sync.catchup` as for `connect`.
+- Two disconnects followed, both with **no error**: at +62.0 s (down 0.72 s, then connected
+  again, again a zero-operation checkpoint) and at +123.5 s (down 1.31 s). Both fell within
+  0.3 s of this tab being hidden or shown, and no earlier than 58 s after the previous
+  connect; the first minute of the page was quiet. The other tab's log was not captured, so
+  this run cannot say whether they were the second tab's `connect()` or something else. The
+  earlier 4-minute run with one tab (22:06 to 22:10 local) had no disconnect, which points
+  at the tab, not at a timer. An idle single-tab run with the probe would settle it.
 
 **Consequence for D1 and for reconnects.** A second tab's `connect()` resets the shared
 connection (P3, observed), so a leader tab can see a disconnect and a reconnect that **another tab caused**. That
@@ -253,3 +282,30 @@ production.
   mark its cause, `attrs.cause: "tab_connect"`. How the cause is known (a `BroadcastChannel`
   note sent by a tab just before it calls `connect()`, and a one-second window) is mine: **to
   confirm at review.** Where the channel is unavailable, no tag is set.
+
+## 8. What differs from the text above
+
+- **The later-of start also applies to `sync.initial` and `sync.catchup`.** The user confirmed
+  the rule for `powersync.connect` ("do not record the wait for the database"); the same wait
+  would otherwise sit inside both sync metrics, so they start at the same moment. **To
+  confirm at review.**
+- **`hasSynced` is read when the database becomes ready, not at the `connect()` call.** Until
+  it is ready the SDK's status is a default, so a read at the call would always say "never
+  synced" for a tab that connects first (the probe: the call came 353 ms before ready).
+- **`connectWithObserver` is the one entry point.** `SystemProvider`'s effect now calls it: it
+  starts the tab coordination, observes, announces the connect to the other tabs, connects, and
+  its cleanup unsubscribes before it disconnects. The effect's behaviour toward the SDK is
+  otherwise the same call with the same arguments.
+- **`app.start` is recorded when `SystemProvider` is first loaded** (browser only, so for a
+  signed-in page load), not "on the first metrics event".
+- **`markCredentialsFetched()` exists but nothing calls it yet.** It is spec 3's connector that
+  will; until then `attrs.planned` is never set.
+- **A follower tab keeps its state machine running** and records nothing; the role is read when
+  each event is emitted, so a follower that becomes leader mid-span emits that span.
+- **Failed first connection:** one `powersync.connect` with `outcome: "error"` for the first
+  failure, and, when a retry succeeds, a second one with `outcome: "ok"` measured from the same
+  start. Queries that want "how long the user waited" take the `ok` rows.
+- **Files counted: 4** as planned (`syncObserver.ts`, `tabCoordination.ts`,
+  `SystemProvider.tsx`, `telemetryEvent.ts`).
+- **Verified:** `npm run tc`; the whole Vitest suite. **Not verified:** a browser run with the
+  telemetry on; production's token lifetime; an hour-long run for the planned restart.

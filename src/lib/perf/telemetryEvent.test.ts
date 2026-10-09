@@ -38,6 +38,48 @@ describe("registry", () => {
   });
 });
 
+describe("spec 2 names", () => {
+  it.each([
+    "app.start",
+    "sqlite.open",
+    "powersync.connect",
+    "powersync.disconnect",
+    "powersync.reconnect",
+    "sync.initial",
+    "sync.catchup",
+  ])("%s is in the registry and keeps only its own attrs", (name) => {
+    const event = validateEvent(valid({ name, attrs: { sql: "select 1", email: "a@b.c" } }));
+    expect(event).not.toBeNull();
+    expect(event?.attrs).toBeNull();
+  });
+
+  it("keeps the attrs each lifecycle metric defines", () => {
+    const keep = (name: string, attrs: Record<string, unknown>) =>
+      validateEvent(valid({ name, attrs }))?.attrs;
+
+    expect(keep("app.start", { navType: "reload" })).toEqual({ navType: "reload" });
+    expect(keep("sqlite.open", { hidden: true })).toEqual({ hidden: true });
+    expect(keep("powersync.connect", { hidden: false })).toEqual({ hidden: false });
+    expect(keep("powersync.disconnect", { n: 2, hadError: true })).toEqual({
+      n: 2,
+      hadError: true,
+    });
+    expect(
+      keep("powersync.reconnect", { hidden: false, cause: "tab_connect", planned: true }),
+    ).toEqual({
+      hidden: false,
+      cause: "tab_connect",
+      planned: true,
+    });
+    expect(keep("sync.initial", { ops: 40, buckets: 3, hidden: false })).toEqual({
+      ops: 40,
+      buckets: 3,
+      hidden: false,
+    });
+    expect(keep("sync.catchup", { ops: 0, hidden: false })).toEqual({ ops: 0, hidden: false });
+  });
+});
+
 describe("validateEvent", () => {
   it("accepts a valid event unchanged", () => {
     expect(validateEvent(valid())).toEqual(valid());
@@ -51,7 +93,7 @@ describe("validateEvent", () => {
 
   it("refuses a name outside the registry", () => {
     expect(validateEvent(valid({ name: "syncTime" }))).toBeNull();
-    expect(validateEvent(valid({ name: "powersync.connect" }))).toBeNull();
+    expect(validateEvent(valid({ name: "ui.first_data" }))).toBeNull();
     expect(validateEvent(valid({ name: 5 }))).toBeNull();
   });
 

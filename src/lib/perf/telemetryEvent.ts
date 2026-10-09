@@ -11,12 +11,29 @@ import { isErrorKind } from "./classifyError";
  * the other specs add theirs here, so a name outside this list neither compiles nor is
  * accepted by the route.
  */
-export const METRIC_NAMES = ["app.telemetry_dropped"] as const;
+export const METRIC_NAMES = [
+  "app.telemetry_dropped",
+  // spec 2 — docs/specs/perf-powersync-lifecycle.md
+  "app.start",
+  "sqlite.open",
+  "powersync.connect",
+  "powersync.disconnect",
+  "powersync.reconnect",
+  "sync.initial",
+  "sync.catchup",
+] as const;
 export type MetricName = (typeof METRIC_NAMES)[number];
 
 /** Per metric, the `attrs` keys the route keeps. Anything else is dropped. */
 export const ATTR_ALLOWLIST: Record<MetricName, readonly string[]> = {
   "app.telemetry_dropped": ["dropped"],
+  "app.start": ["navType"],
+  "sqlite.open": ["hidden"],
+  "powersync.connect": ["hidden"],
+  "powersync.disconnect": ["n", "hadError"],
+  "powersync.reconnect": ["hidden", "cause", "planned"],
+  "sync.initial": ["ops", "buckets", "hidden"],
+  "sync.catchup": ["ops", "hidden"],
 };
 
 export type Outcome = "ok" | "error";

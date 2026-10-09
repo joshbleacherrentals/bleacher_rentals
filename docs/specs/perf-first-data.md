@@ -1,7 +1,7 @@
 # Performance telemetry — time to first usable data
 
-Status: **BLOCKED on the probe only** — 0 open decisions (D1, D2 answered by the user);
-one dependency on spec 2 (P1).
+Status: **AWAITING APPROVAL** — 0 open decisions (D1, D2 answered by the user); the probe
+dependency (spec 2, P1) is resolved: `hasSynced` survives a reload.
 Spec 5 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md).
 Request (user, 2026-10-08): `time_to_first_usable_data` and `first_data_available`; a
 fast-looking result that is really a fallback must not pass for a local one.
@@ -55,21 +55,20 @@ A device's first-ever load downloads the data before `useUserAccess` can answer,
 returning user answers from what is already stored. Their times differ by an order of
 magnitude and must not share a percentile. The tag is `attrs.cold: true | false`.
 
-**Definition (user, 2026-10-08):** `cold` is `initial_sync_completed === false`, where
-`initial_sync_completed` is a flag in `localStorage`, written `true` by the lifecycle
-observer (spec 2) when `sync.initial` ends, i.e. when the first complete sync of this
-browser profile finishes.
+**Definition (updated 2026-10-09, user agreed):** `cold` is `true` when the SDK's
+`hasSynced` was `false` at the moment the local database became ready, and `false` otherwise,
+that is `cold === !hasSynced` read from `powerSyncDb.currentStatus` after `waitForReady()`.
+This is the same meaning as the user's first answer (`initial_sync_completed === false`), taken
+from the SDK instead of from a `localStorage` flag, because the probe in spec 2 showed that
+`hasSynced` survives a reload (it was `true`, with `lastSyncedAt` set, in the first status after
+a reload of a device that had synced 17 minutes earlier). No `localStorage` flag is created.
 
-- The flag belongs to the browser profile, not to a user: the local database file name is
+- The state belongs to the browser profile, not to a user: the local database file name is
   fixed, so two people signing in on one profile share one database.
-- **If probe P1 (spec 2) shows `hasSynced` survives a reload,** `hasSynced` already says
-  the same thing and no flag is created; `cold` is then `!hasSynced` at the moment the
-  database is ready. **To confirm at review:** the user's answer was given for the case
-  where `hasSynced` does not survive.
-- `localStorage` can be unavailable or cleared (private window, blocked site data). Reads
-  and writes are wrapped in `try/catch`; when it cannot be read, `cold` is not set at all
-  rather than guessed. Clearing site data clears the local database too, so a missing
-  flag and a missing database go together.
+- It is the same value spec 2 splits `sync.initial` from `sync.catchup` on, so the two specs
+  never disagree about what a first load is.
+- Clearing site data clears the local database and its `hasSynced` together, so a cleared
+  profile is correctly cold again.
 
 **`sync_scope` is not `cold`.** A user who gains a role later downloads a large new set of
 buckets on a device that has long since completed its initial sync. That is a different
@@ -134,4 +133,6 @@ hook knows `needsFallback`. This replaces the placement listed in spec 1 §9
 - **D2.** _How the cold flag is obtained._ Options were: `localStorage`; whether a `Users`
   row exists; no flag. **User's answer:** `localStorage`, with `cold` defined as
   `initial_sync_completed === false`, and role-driven data growth kept apart as a separate
-  `sync_scope` that is not called a cold start (§2).
+  `sync_scope` that is not called a cold start (§2). **Revised 2026-10-09 (user agreed):** the
+  answer was given for the case where `hasSynced` does not survive a reload; it does, so `cold`
+  is `!hasSynced` at database-ready and no flag is stored.
