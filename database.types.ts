@@ -4770,6 +4770,74 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: number
       }
+      perf_breakdown: {
+        Args: { p_env: string; p_metric: string; p_since: string; p_version: string | null }
+        Returns: {
+          calls: number | null
+          dimension: string
+          errors: number
+          max_ms: number | null
+          n: number
+          p50: number | null
+          p95: number | null
+          p99: number | null
+          slow_calls: number | null
+          value: string
+        }[]
+      }
+      perf_errors: {
+        Args: { p_env: string; p_since: string; p_version: string | null }
+        Returns: {
+          count: number
+          first_seen: string
+          kind: string
+          last_seen: string
+          max_ms: number | null
+          median_ms: number | null
+          name: string
+        }[]
+      }
+      perf_health: {
+        Args: { p_env: string; p_since: string; p_version: string | null }
+        Returns: {
+          dropped: number
+          events: number
+          loads: number
+          newest: string | null
+          oldest: string | null
+          size_bytes: number
+          table_rows: number
+        }[]
+      }
+      perf_percentiles: {
+        Args: { p_env: string; p_since: string; p_version: string | null }
+        Returns: {
+          errors: number
+          max_ms: number
+          n: number
+          name: string
+          p50: number
+          p75: number
+          p90: number
+          p95: number
+          p99: number
+        }[]
+      }
+      perf_sqlite: {
+        Args: { p_env: string; p_since: string; p_version: string | null }
+        Returns: {
+          calls: number
+          kind: string
+          name: string
+          p: number
+          slow_calls: number
+          value: number
+        }[]
+      }
+      perf_versions: {
+        Args: { p_env: string; p_since: string }
+        Returns: { app_version: string; events: number }[]
+      }
       recompute_driver_scorecard_bucket: {
         Args: { p_driver: string; p_year: number }
         Returns: undefined
