@@ -11,12 +11,62 @@ import { isErrorKind } from "./classifyError";
  * the other specs add theirs here, so a name outside this list neither compiles nor is
  * accepted by the route.
  */
-export const METRIC_NAMES = ["app.telemetry_dropped"] as const;
+export const METRIC_NAMES = [
+  "app.telemetry_dropped",
+  // spec 2 — docs/specs/perf-powersync-lifecycle.md
+  "app.start",
+  "sqlite.open",
+  "powersync.connect",
+  "powersync.disconnect",
+  "powersync.reconnect",
+  "sync.initial",
+  "sync.catchup",
+  // spec 3 — docs/specs/perf-connector.md
+  "powersync.credentials",
+  "sync.upload",
+  // spec 4 — docs/specs/perf-sqlite.md
+  "sqlite.query",
+  "sqlite.write",
+  "sqlite.batch",
+  // spec 5 — docs/specs/perf-first-data.md. `ui.page_ready` is not here: its own spec defines it.
+  "ui.first_data",
+] as const;
 export type MetricName = (typeof METRIC_NAMES)[number];
+
+const SQLITE_ATTRS = [
+  "op",
+  "tables",
+  "rows",
+  "statements",
+  "count",
+  "sumMs",
+  "maxMs",
+  "b1",
+  "b2",
+  "b3",
+  "b4",
+  "b5",
+  "b6",
+] as const;
 
 /** Per metric, the `attrs` keys the route keeps. Anything else is dropped. */
 export const ATTR_ALLOWLIST: Record<MetricName, readonly string[]> = {
   "app.telemetry_dropped": ["dropped"],
+  "app.start": ["navType"],
+  "sqlite.open": ["hidden"],
+  "powersync.connect": ["hidden"],
+  "powersync.disconnect": ["n", "hadError"],
+  "powersync.reconnect": ["hidden", "cause", "planned"],
+  "sync.initial": ["ops", "buckets", "hidden"],
+  "sync.catchup": ["ops", "hidden"],
+  "powersync.credentials": ["source"],
+  "sync.upload": ["ops", "tables", "discarded"],
+  // An individual call carries op, tables and rows or statements; the production aggregate
+  // carries count, sumMs, maxMs and the six duration buckets instead.
+  "sqlite.query": SQLITE_ATTRS,
+  "sqlite.write": SQLITE_ATTRS,
+  "sqlite.batch": SQLITE_ATTRS,
+  "ui.first_data": ["source", "status", "cold", "hidden"],
 };
 
 export type Outcome = "ok" | "error";

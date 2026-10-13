@@ -1,6 +1,8 @@
 # Performance telemetry — the connector: credentials and upload
 
-Status: **AWAITING APPROVAL** — 0 open decisions (D1, D2 answered by the user).
+Status: **IMPLEMENTED 2026-10-09, awaiting review** (approved the same day) — 0 open decisions
+(D1, D2 answered by the user). Not run in a real browser by me (Clerk sign-in is unavailable
+here); covered by unit tests only. What differs from the text below is in §8.
 Spec 3 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md) (the
 `metrics` API and `classifyError`). Independent of spec 2, except one optional link (§3).
 Request (user, 2026-10-08): connect duration must be attributable; upload must be measured
@@ -113,3 +115,22 @@ not built, the variable is written and never read; it holds no data beyond one n
   entry's `opData`. **User's answer:** not recorded.
 - **D2.** _Is every upload attempt an event?_ Options were: every attempt, or only when
   `ops` reaches a number the user names. **User's answer:** every attempt.
+
+## 8. What differs from the text above
+
+- **The credentials error now carries the HTTP status.** `fetchCredentials` threw
+  `new Error(await res.text())`; it now throws the same error with a `status` property added, so
+  a 503 is classified `http_5xx` instead of `unknown`. The message and the rejection are the
+  same as before.
+- **The discard branch records in a `finally`.** If completing the discarded transaction fails,
+  the event is still recorded (as the discard) and the failure still propagates. The spec said
+  `finally` is not used; the handle records once whichever path runs, so a path cannot record
+  twice, and a lost discard event would have been the worse outcome.
+- **`markCredentialsFetched()` is called when a network fetch succeeds**, not when it starts, so
+  a failed fetch does not mark a refresh. Spec 2's `attrs.planned` now has its signal.
+- **Two additions for tests and attrs:** `resetCredentialsCacheForTests()` (the cache lives at
+  module level) and `joinTables()`, which sorts the distinct table names and cuts them to 64
+  characters.
+- **Files counted: 2** as planned (`BackendConnector.ts`, `telemetryEvent.ts`).
+- **Verified:** `npm run tc`; the whole Vitest suite. **Not verified:** a browser run, or what
+  the two metrics show against production.

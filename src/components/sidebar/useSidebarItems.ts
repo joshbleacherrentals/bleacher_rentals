@@ -24,6 +24,7 @@ import {
   Sparkles,
   Layers,
   Activity,
+  Gauge,
   Wrench,
   ImageIcon,
   Receipt,
@@ -266,6 +267,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Sync Health",
         href: "/dev-tools/sync-health",
         icon: Activity,
+      },
+      {
+        type: "button",
+        key: "performance",
+        label: "Performance",
+        href: "/dev-tools/performance",
+        icon: Gauge,
       },
       {
         type: "button",

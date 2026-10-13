@@ -15,10 +15,20 @@ import {
 import { wrapPowerSyncWithKysely } from "@powersync/kysely-driver";
 import { DummyDriver, Kysely, SqliteDialect } from "kysely";
 import React, { Suspense, useEffect, useMemo } from "react";
+import { connectWithObserver, recordAppStart, trackSqliteOpen } from "@/lib/powersync/syncObserver";
+
+// The SDK logs a line per sync event at DEBUG: useful while developing, noise for every real
+// user. docs/specs/perf-powersync-lifecycle.md D3.
+export function chooseLogLevel(nodeEnv: string | undefined) {
+  return nodeEnv === "production" ? LogLevel.WARN : LogLevel.DEBUG;
+}
 
 const logger = createBaseLogger();
 logger.useDefaults();
-logger.setLevel(LogLevel.DEBUG);
+logger.setLevel(chooseLogLevel(process.env.NODE_ENV));
+
+// One count event per page load, the denominator for every other metric.
+if (typeof window !== "undefined") recordAppStart();
 
 let _powerSyncDb: PowerSyncDatabase | undefined;
 let _db: Kysely<PowerSyncDB> | undefined;
@@ -42,7 +52,7 @@ export function chooseVfs() {
 function createPowerSyncDb() {
   const vfs = chooseVfs();
 
-  return new PowerSyncDatabase({
+  const instance = new PowerSyncDatabase({
     schema: AppSchema,
     database: new WASQLiteOpenFactory({
       dbFilename: "bleacherrentalsVFS.db",
@@ -63,6 +73,10 @@ function createPowerSyncDb() {
       worker: "/@powersync/worker/SharedSyncImplementation.umd.js",
     },
   });
+
+  // From the construction to `waitForReady()`: the time the local database takes to open.
+  void trackSqliteOpen(instance);
+  return instance;
 }
 
 export function getPowerSyncDb(): PowerSyncDatabase {
@@ -124,14 +138,11 @@ export const SystemProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!instance || !connector) return;
 
-    instance.connect(connector, {
+    // Observes the connection, then connects; the cleanup stops observing before it disconnects.
+    return connectWithObserver(instance, connector, {
       params: { app: "web" },
       connectionMethod: SyncStreamConnectionMethod.WEB_SOCKET,
     });
-
-    return () => {
-      instance.disconnect?.();
-    };
   }, [connector, instance]);
 
   if (!isSignedIn || !connector || !instance) return null;
