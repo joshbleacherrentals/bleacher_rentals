@@ -57,7 +57,6 @@ export async function POST(req: NextRequest) {
   try {
     await requireAuth();
     const body = await req.json();
-    workTrackerGroupId = body.workTrackerGroupId;
     const { driverUuid, startDate, billId, syncToken } = body;
 
     if (!driverUuid || !startDate) {
@@ -69,6 +68,35 @@ export async function POST(req: NextRequest) {
 
     // Get Supabase client
     const supabase = createServerSupabaseClient();
+
+    // The client names the group to record the bill against. Check it is this driver's group for
+    // this week before anything else: a stale payment window once sent one driver's uuid with
+    // another driver's group id, and the bill landed on the wrong group. `workTrackerGroupId`
+    // stays unset until it passes, so the error paths below never write to someone else's group.
+    if (body.workTrackerGroupId) {
+      const { data: group, error: groupError } = await supabase
+        .from("WorkTrackerGroups")
+        .select("id, driver_uuid, week_start")
+        .eq("id", body.workTrackerGroupId)
+        .maybeSingle();
+
+      if (groupError) {
+        return NextResponse.json(
+          { error: `Failed to verify work tracker group: ${groupError.message}` },
+          { status: 500 },
+        );
+      }
+      if (!group) {
+        return NextResponse.json({ error: "Work tracker group not found" }, { status: 400 });
+      }
+      if (group.driver_uuid !== driverUuid || group.week_start !== startDate) {
+        return NextResponse.json(
+          { error: "Work tracker group does not belong to this driver and week" },
+          { status: 400 },
+        );
+      }
+      workTrackerGroupId = group.id;
+    }
 
     // Calculate end date (7 days after start)
     const endDate = DateTime.fromISO(startDate).plus({ days: 7 }).toISODate();
