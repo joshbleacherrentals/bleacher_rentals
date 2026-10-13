@@ -12,7 +12,8 @@
 --   * the table is UNLOGGED and is NOT in the `powersync` publication — the whole reason the
 --     table is built this way, so a later "make it durable" edit fails here instead of quietly
 --     loading the replication slot with telemetry;
---   * RLS is on with no policy: `anon` and `authenticated` read nothing and cannot insert;
+--   * RLS is on and no policy allows a write: `anon` and a user who is not a developer read
+--     nothing and cannot insert (the developer-only read is in perf_dashboard.test.sql);
 --   * the table refuses an outcome or a tab role outside its sets;
 --   * the retention job exists, and the statement it runs deletes a row older than 30 days
 --     and keeps a newer one.
@@ -41,10 +42,12 @@ SELECT is(
   (SELECT relrowsecurity FROM pg_class WHERE oid = 'public."PerfEvents"'::regclass),
   true, 'row level security is on');
 
+-- The performance dashboard (20261009120000_perf_dashboard.sql) adds one policy: a SELECT for
+-- developers, tested in perf_dashboard.test.sql. Nothing lets an API role write.
 SELECT is(
   (SELECT count(*)::int FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'PerfEvents'),
-  0, 'there is no policy, so no API role gets in');
+    WHERE schemaname = 'public' AND tablename = 'PerfEvents' AND cmd <> 'SELECT'),
+  0, 'no policy lets an API role write, so only the service role can');
 
 SELECT has_index('public', 'PerfEvents', 'PerfEvents_name_received_idx',
   'the (name, received_at) index exists');
