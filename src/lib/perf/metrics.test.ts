@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetEventContextForTests } from "./eventContext";
-import { metrics, setMetricsSink } from "./metrics";
+import { flushTelemetryNow, metrics, setMetricsSink } from "./metrics";
 import type { PerfEvent } from "./telemetryEvent";
 
 let events: PerfEvent[];
@@ -105,6 +105,18 @@ describe("metrics.record and metrics.count", () => {
   });
 });
 
+describe("metrics.record roles override", () => {
+  it("uses the roles it is given instead of the store's", () => {
+    metrics.record({ name: "app.telemetry_dropped", durationMs: 1, roles: ["admin", "driver"] });
+    expect(events[0].roles).toEqual(["admin", "driver"]);
+  });
+
+  it("falls back to the store's roles when none are given", () => {
+    metrics.record({ name: "app.telemetry_dropped", durationMs: 1 });
+    expect(events[0].roles).toBeNull();
+  });
+});
+
 describe("failure isolation", () => {
   it("swallows an error thrown by the sink", () => {
     setMetricsSink(() => {
@@ -141,5 +153,11 @@ describe("console output", () => {
     metrics.start("app.telemetry_dropped").fail("timeout");
     metrics.count("app.telemetry_dropped");
     for (const spy of [debug, log, warn, error]) expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("flushTelemetryNow", () => {
+  it("does nothing, and does not throw, before any event created the transport", () => {
+    expect(() => flushTelemetryNow()).not.toThrow();
   });
 });

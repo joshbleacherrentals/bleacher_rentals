@@ -3,6 +3,8 @@
 import { QuoteDetail } from "../../../db/fetchQuoteDetail";
 import { useEventLineItems, EventLineItemRow } from "../../../hooks/useEventLineItems";
 import { useEventCurrency } from "../../../hooks/useEventCurrency";
+import { useEventTypeName } from "../../../hooks/useEventTypeName";
+import { eventTypeDisplay } from "../../../utils/eventTypeDisplay";
 import { formatMoney } from "../../../utils/formatMoney";
 import { formatLostReason } from "../../../utils/lostReason";
 import { DateTime } from "luxon";
@@ -200,6 +202,12 @@ function formatSignedAt(iso: string): string {
 export function ContractTab({ quote }: { quote: QuoteDetail }) {
   const { lineItems, isLoading } = useEventLineItems(quote.id);
   const currency = useEventCurrency(quote.id);
+  const eventType = useEventTypeName(quote.eventTypeUuid);
+  const eventTypeLabel = eventTypeDisplay({
+    eventTypeUuid: quote.eventTypeUuid,
+    name: eventType.name,
+    isLoading: eventType.isLoading,
+  });
   const [signature, setSignature] = useState<SignatureInfo>(null);
   const [contactSheetOpen, setContactSheetOpen] = useState(false);
   const [venueSheetOpen, setVenueSheetOpen] = useState(false);
@@ -266,6 +274,12 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
               <span className="text-gray-500">Event Name:</span>{" "}
               <span className="font-medium">{quote.eventName}</span>
             </div>
+            {eventTypeLabel && (
+              <div>
+                <span className="text-gray-500">Event Type:</span>{" "}
+                <span className="font-medium">{eventTypeLabel}</span>
+              </div>
+            )}
             <div>
               <span className="text-gray-500">Status:</span>{" "}
               <span

@@ -7,6 +7,9 @@ import {
 } from "@powersync/web";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
+import { MAX_ATTR_STRING } from "@/lib/perf/telemetryEvent";
+import { metrics } from "@/lib/perf/metrics";
+import { markCredentialsFetched } from "./syncObserver";
 
 /// Postgres Response codes that we cannot recover from by retrying.
 const FATAL_RESPONSE_CODES = [
@@ -30,6 +33,20 @@ let _cachedCredentials: { endpoint: string; token: string; expiresAt: number } |
 let _inflight: Promise<{ endpoint: string; token: string }> | null = null;
 const CREDENTIALS_TTL_MS = 50_000;
 
+/** Test seam: the cache and the in-flight request live at module level. */
+export function resetCredentialsCacheForTests() {
+  _cachedCredentials = null;
+  _inflight = null;
+}
+
+/**
+ * The distinct table names of a transaction, sorted and cut to the attrs string cap, for the
+ * `sync.upload` event. Names only: never an id or a value.
+ */
+export function joinTables(tables: string[]): string {
+  return [...new Set(tables)].sort().join(",").slice(0, MAX_ATTR_STRING);
+}
+
 export class BackendConnector implements PowerSyncBackendConnector {
   client: SupabaseClient;
   supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -45,28 +62,48 @@ export class BackendConnector implements PowerSyncBackendConnector {
   }
 
   async fetchCredentials() {
-    if (_cachedCredentials && Date.now() < _cachedCredentials.expiresAt) {
-      return { endpoint: _cachedCredentials.endpoint, token: _cachedCredentials.token };
-    }
+    // `powersync.credentials`: Clerk and the Next.js route, timed apart from the WebSocket
+    // handshake that `powersync.connect` also covers. Never records the token or the endpoint.
+    const span = metrics.start("powersync.credentials");
 
-    if (_inflight) return _inflight;
+    try {
+      if (_cachedCredentials && Date.now() < _cachedCredentials.expiresAt) {
+        span.end({ source: "cache" });
+        return { endpoint: _cachedCredentials.endpoint, token: _cachedCredentials.token };
+      }
 
-    _inflight = (async () => {
-      const res = await fetch("/api/powersync/credentials?template=powersync", {
-        cache: "no-store",
+      if (_inflight) {
+        const shared = await _inflight;
+        span.end({ source: "shared" });
+        return shared;
+      }
+
+      _inflight = (async () => {
+        const res = await fetch("/api/powersync/credentials?template=powersync", {
+          cache: "no-store",
+        });
+        if (!res.ok) throw Object.assign(new Error(await res.text()), { status: res.status });
+        const { endpoint, token } = await res.json();
+        const base64 = token.split(".")[1];
+        const payload = JSON.parse(atob(base64.replace(/-/g, "+").replace(/_/g, "/")));
+        const expiresAt = payload.exp
+          ? payload.exp * 1000 - 30_000
+          : Date.now() + CREDENTIALS_TTL_MS;
+        _cachedCredentials = { endpoint, token, expiresAt };
+        // Spec 2 reads this to tell a planned stream restart from a lost connection.
+        markCredentialsFetched();
+        return { endpoint, token };
+      })().finally(() => {
+        _inflight = null;
       });
-      if (!res.ok) throw new Error(await res.text());
-      const { endpoint, token } = await res.json();
-      const base64 = token.split(".")[1];
-      const payload = JSON.parse(atob(base64.replace(/-/g, "+").replace(/_/g, "/")));
-      const expiresAt = payload.exp ? payload.exp * 1000 - 30_000 : Date.now() + CREDENTIALS_TTL_MS;
-      _cachedCredentials = { endpoint, token, expiresAt };
-      return { endpoint, token };
-    })().finally(() => {
-      _inflight = null;
-    });
 
-    return _inflight;
+      const fetched = await _inflight;
+      span.end({ source: "network" });
+      return fetched;
+    } catch (error) {
+      span.fail(error);
+      throw error;
+    }
   }
 
   async uploadData(database: AbstractPowerSyncDatabase): Promise<void> {
@@ -75,6 +112,13 @@ export class BackendConnector implements PowerSyncBackendConnector {
     if (!transaction) {
       return;
     }
+
+    // `sync.upload`: one attempt. An empty queue returned above and is not an upload. The
+    // attrs are a count and table names; no id, value, byte count or error text.
+    const upload = metrics.start("sync.upload", {
+      ops: transaction.crud.length,
+      tables: joinTables(transaction.crud.map((op) => op.table)),
+    });
 
     let lastOp: CrudEntry | null = null;
     try {
@@ -108,6 +152,7 @@ export class BackendConnector implements PowerSyncBackendConnector {
       }
 
       await transaction.complete();
+      upload.end();
     } catch (ex: any) {
       console.debug(ex);
       if (typeof ex.code == "string" && FATAL_RESPONSE_CODES.some((regex) => regex.test(ex.code))) {
@@ -136,10 +181,15 @@ export class BackendConnector implements PowerSyncBackendConnector {
           "Reload and check whether it is there; if not, please report this.",
         ]);
 
-        await transaction.complete();
+        try {
+          await transaction.complete();
+        } finally {
+          upload.fail(ex, { discarded: true });
+        }
       } else {
         // Error may be retryable - e.g. network error or temporary server error.
         // Throwing an error here causes this call to be retried after a delay.
+        upload.fail(ex);
         throw ex;
       }
     }

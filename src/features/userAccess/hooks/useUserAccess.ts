@@ -10,6 +10,9 @@ import { useEffect, useMemo, useState } from "react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
+import { metrics } from "@/lib/perf/metrics";
+import type { Attrs } from "@/lib/perf/telemetryEvent";
+import { getColdStart, trackHidden } from "@/lib/powersync/syncObserver";
 import type { UserAccessData } from "../types";
 
 export type { UserAccessData } from "../types";
@@ -24,6 +27,46 @@ export type UserAccessState =
 // A driver-only user, for instance, may have no role rows in the local DB and
 // would otherwise be told "no roles assigned" instead of seeing DriverWelcome.
 const FALLBACK_REASONS: BlockedReason[] = ["no-roles-assigned", "cannot-find-account"];
+
+// `ui.first_data`: once per page load, from the start of the page to the first moment the app
+// knows who the user is and what they may see. Spec: docs/specs/perf-first-data.md.
+let firstDataReported = false;
+const hiddenBeforeAnswer = typeof window !== "undefined" ? trackHidden() : null;
+
+/** Test seam. */
+export function resetFirstDataForTests(): void {
+  firstDataReported = false;
+}
+
+function reportFirstData(
+  state: Exclude<UserAccessState, { status: "loading" }>,
+  source: "local" | "fallback",
+): void {
+  if (firstDataReported) return;
+  firstDataReported = true;
+
+  try {
+    // Technical context only: no user id, no account manager id, no email. The roles go in the
+    // event's own `roles` field; the store that normally fills it is set after this moment.
+    const attrs: Attrs = {
+      source,
+      status: state.status,
+      hidden: hiddenBeforeAnswer?.stop() ?? false,
+    };
+    const cold = getColdStart();
+    if (cold !== null) attrs.cold = cold;
+
+    metrics.record({
+      name: "ui.first_data",
+      // `performance.now()` is the time since the navigation began.
+      durationMs: performance.now(),
+      attrs,
+      roles: state.status === "active" ? state.roles : null,
+    });
+  } catch {
+    // Telemetry never breaks the access check.
+  }
+}
 
 export function useUserAccess(): UserAccessState {
   const { user } = useUser();
@@ -146,11 +189,19 @@ export function useUserAccess(): UserAccessState {
     };
   }, [clerkUserId, needsFallback, supabase]);
 
-  if (!needsFallback) return localState;
-
   // While the authoritative check is in flight, stay on the loading screen so we
   // don't flash "No roles assigned" before resolving to e.g. DriverWelcome.
-  if (!fallback || fallback.clerkUserId !== clerkUserId) return { status: "loading" };
+  const result: UserAccessState = !needsFallback
+    ? localState
+    : !fallback || fallback.clerkUserId !== clerkUserId
+      ? { status: "loading" }
+      : fallback.result;
 
-  return fallback.result;
+  // The first time the answer is known. The source is `fallback` when it only came after the
+  // Supabase request, so that figure is not mistaken for a local one.
+  useEffect(() => {
+    if (result.status !== "loading") reportFirstData(result, needsFallback ? "fallback" : "local");
+  }, [result, needsFallback]);
+
+  return result;
 }

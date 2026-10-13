@@ -266,6 +266,7 @@ describe("useSidebarItems", () => {
   it("developer sees a Dev Tools section with every /dev-tools page", () => {
     expect(devToolsHrefs(["developer"])).toEqual([
       "/dev-tools/sync-health",
+      "/dev-tools/performance",
       "/dev-tools/stripe-checkout",
       "/dev-tools/damage-photos",
       "/dev-tools/qbo-get-sales-tax",

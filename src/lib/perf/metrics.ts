@@ -1,3 +1,4 @@
+import type { WebRole } from "@/features/userAccess/logic/determineAccess";
 import { classifyError, isErrorKind } from "./classifyError";
 import { getEventContext } from "./eventContext";
 import type { Attrs, MetricName, Outcome, PerfEvent } from "./telemetryEvent";
@@ -36,6 +37,19 @@ function browserSink(event: PerfEvent): void {
   transport.enqueue(event);
 }
 
+/**
+ * Sends what the transport holds, now, by the beacon path. For a module that holds events of
+ * its own until the page goes away (the SQLite aggregate): it records them, then calls this, so
+ * the order in which page listeners were added does not decide whether they get out.
+ */
+export function flushTelemetryNow(): void {
+  try {
+    transport?.flushFinal();
+  } catch {
+    // Nothing to do: the events stay buffered.
+  }
+}
+
 const BADGE_STYLE =
   "background:#7c3aed;color:#fff;font-weight:700;padding:2px 6px;border-radius:3px";
 const HEADLINE_STYLE = "color:#7c3aed;font-weight:700";
@@ -46,6 +60,11 @@ type Recorded = {
   outcome?: Outcome;
   errorKind?: string | null;
   attrs?: Attrs | null;
+  /**
+   * For an event recorded at the very moment the roles become known, before the permissions
+   * store has them. Otherwise the store's roles are used.
+   */
+  roles?: WebRole[] | null;
 };
 
 function emit(recorded: Recorded): void {
@@ -60,6 +79,7 @@ function emit(recorded: Recorded): void {
       errorKind: recorded.errorKind ?? null,
       at: Date.now(),
       ...context,
+      roles: recorded.roles ?? context.roles,
       attrs,
     };
 

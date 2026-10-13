@@ -1,4 +1,5 @@
-import { db, powerSyncDb } from "@/components/providers/SystemProvider";
+import { db } from "@/components/providers/SystemProvider";
+import { expect, typedGetAll, type CompiledResultOf } from "@/lib/powersync/typedQuery";
 
 export type QuoteDetail = {
   id: string;
@@ -165,7 +166,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
     .where("e.id", "=", eventId)
     .compile();
 
-  const rows = await powerSyncDb.getAll<Row>(compiled.sql, compiled.parameters as any[]);
+  // Every column is nullable in the local schema; this function has always read them as `Row`.
+  const rows = (await typedGetAll(compiled, expect<CompiledResultOf<typeof compiled>>())) as Row[];
 
   if (rows.length === 0) return null;
 
