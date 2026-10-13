@@ -358,3 +358,25 @@ files.
    its access rules are unknown to the repository.
 3. **A viewer can add and delete files** (§4's row says so, as the user asked for the matrix to
    describe what is).
+
+## 10. Amendment 2026-10-13 — the Contract tab's "Event Type" line
+
+PR #413 added a read-only **Event Type** line under Event Name on the Contract tab. It is read from
+the local `EventTypes` table (`useEventTypeName`), which the accountant did not have: `event_types_select`
+named admin, account manager and viewer only, and `br_powersync` sent the table to the same three. The
+line would have said "Unknown" on every quote the accountant opens (R3 above, again).
+
+**Decision (the user, 2026-10-13): give the accountant `EventTypes`, read only.**
+
+- Migration `20261013120000_event_types_accountant_select.sql`: `event_types_select` also names
+  `accountant`. `event_types_insert`, `event_types_update` and `event_types_delete` are not touched, so
+  an accountant still cannot add, rename or delete a type.
+- Sync rule: one whole-table accountant stream for `EventTypes`, beside `BleacherTypes` in
+  `br_powersync/config/sync_rules.yaml`. Same shape as its neighbours, so the accountant's bucket
+  count does not grow (spec 02 §6). **The PowerSync service must be restarted.**
+- Deployment order: migration → sync rules and restart → app. In the other order the line says
+  "Unknown" until the sync catches up; nothing breaks.
+- Test: `supabase/tests/event_types_accountant_select.test.sql` (`npm run test:db:eventtypesaccountant`).
+- A retired type is readable on purpose: a quote keeps pointing at the type it was saved with.
+- Matrix: no new row. The accountant's Quotes & Bookings text already says they open any quote and
+  its Contract tab; the type is part of what they read there.

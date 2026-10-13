@@ -38,6 +38,128 @@ describe("registry", () => {
   });
 });
 
+describe("spec 2 names", () => {
+  it.each([
+    "app.start",
+    "sqlite.open",
+    "powersync.connect",
+    "powersync.disconnect",
+    "powersync.reconnect",
+    "sync.initial",
+    "sync.catchup",
+  ])("%s is in the registry and keeps only its own attrs", (name) => {
+    const event = validateEvent(valid({ name, attrs: { sql: "select 1", email: "a@b.c" } }));
+    expect(event).not.toBeNull();
+    expect(event?.attrs).toBeNull();
+  });
+
+  it("keeps the attrs each lifecycle metric defines", () => {
+    const keep = (name: string, attrs: Record<string, unknown>) =>
+      validateEvent(valid({ name, attrs }))?.attrs;
+
+    expect(keep("app.start", { navType: "reload" })).toEqual({ navType: "reload" });
+    expect(keep("sqlite.open", { hidden: true })).toEqual({ hidden: true });
+    expect(keep("powersync.connect", { hidden: false })).toEqual({ hidden: false });
+    expect(keep("powersync.disconnect", { n: 2, hadError: true })).toEqual({
+      n: 2,
+      hadError: true,
+    });
+    expect(
+      keep("powersync.reconnect", { hidden: false, cause: "tab_connect", planned: true }),
+    ).toEqual({
+      hidden: false,
+      cause: "tab_connect",
+      planned: true,
+    });
+    expect(keep("sync.initial", { ops: 40, buckets: 3, hidden: false })).toEqual({
+      ops: 40,
+      buckets: 3,
+      hidden: false,
+    });
+    expect(keep("sync.catchup", { ops: 0, hidden: false })).toEqual({ ops: 0, hidden: false });
+  });
+});
+
+describe("spec 3 names", () => {
+  it("keeps the attrs the connector metrics define and nothing else", () => {
+    const keep = (name: string, attrs: Record<string, unknown>) =>
+      validateEvent(valid({ name, attrs }))?.attrs;
+
+    expect(keep("powersync.credentials", { source: "cache", token: "x" })).toEqual({
+      source: "cache",
+    });
+    expect(
+      keep("sync.upload", { ops: 3, tables: "Addresses,Events", discarded: true, approxBytes: 9 }),
+    ).toEqual({ ops: 3, tables: "Addresses,Events", discarded: true });
+  });
+});
+
+describe("spec 4 names", () => {
+  const edges = { b1: 1, b2: 1, b3: 1, b4: 1, b5: 1, b6: 1 };
+
+  it("keeps the attrs of an individual call", () => {
+    const keep = (name: string, attrs: Record<string, unknown>) =>
+      validateEvent(valid({ name, attrs }))?.attrs;
+
+    expect(
+      keep("sqlite.query", { op: "select", tables: "Users", rows: 3, sql: "select 1" }),
+    ).toEqual({
+      op: "select",
+      tables: "Users",
+      rows: 3,
+    });
+    expect(keep("sqlite.write", { op: "update", tables: "Events", params: "x" })).toEqual({
+      op: "update",
+      tables: "Events",
+    });
+    expect(keep("sqlite.batch", { op: "insert", tables: "Alerts", statements: 3 })).toEqual({
+      op: "insert",
+      tables: "Alerts",
+      statements: 3,
+    });
+  });
+
+  it("keeps the whole aggregate and accepts it with no duration", () => {
+    const event = validateEvent(
+      valid({
+        name: "sqlite.query",
+        durationMs: null,
+        attrs: { op: "select", tables: "Users", count: 6, sumMs: 79.5, maxMs: 50, ...edges },
+      }),
+    );
+    expect(event?.durationMs).toBeNull();
+    expect(event?.attrs).toEqual({
+      op: "select",
+      tables: "Users",
+      count: 6,
+      sumMs: 79.5,
+      maxMs: 50,
+      ...edges,
+    });
+  });
+});
+
+describe("spec 5 name", () => {
+  it("ui.first_data keeps source, status, cold and hidden and nothing else", () => {
+    const event = validateEvent(
+      valid({
+        name: "ui.first_data",
+        attrs: { source: "fallback", status: "blocked", cold: true, hidden: false, userId: "u1" },
+      }),
+    );
+    expect(event?.attrs).toEqual({
+      source: "fallback",
+      status: "blocked",
+      cold: true,
+      hidden: false,
+    });
+  });
+
+  it("ui.page_ready is not in the registry (its own spec defines it)", () => {
+    expect(validateEvent(valid({ name: "ui.page_ready" }))).toBeNull();
+  });
+});
+
 describe("validateEvent", () => {
   it("accepts a valid event unchanged", () => {
     expect(validateEvent(valid())).toEqual(valid());
@@ -51,7 +173,7 @@ describe("validateEvent", () => {
 
   it("refuses a name outside the registry", () => {
     expect(validateEvent(valid({ name: "syncTime" }))).toBeNull();
-    expect(validateEvent(valid({ name: "powersync.connect" }))).toBeNull();
+    expect(validateEvent(valid({ name: "ui.page_ready" }))).toBeNull();
     expect(validateEvent(valid({ name: 5 }))).toBeNull();
   });
 

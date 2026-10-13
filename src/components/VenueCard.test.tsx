@@ -49,10 +49,31 @@ describe("VenueCard", () => {
     expect(html).toContain("Select venue...");
   });
 
-  it("renders as a button when onClick is provided, a div otherwise", () => {
+  it("renders the card as a button when onClick is provided, a div otherwise", () => {
+    const buttonsIn = (html: string) => html.match(/<button/g)?.length ?? 0;
     const clickable = renderToStaticMarkup(<VenueCard value={venueValue} onClick={() => {}} />);
     const staticCard = renderToStaticMarkup(<VenueCard value={venueValue} />);
-    expect(clickable.startsWith("<button")).toBe(true);
-    expect(staticCard.startsWith("<div")).toBe(true);
+    // The copy button is always there; the card itself is a second button only when clickable.
+    expect(buttonsIn(clickable)).toBe(2);
+    expect(buttonsIn(staticCard)).toBe(1);
+  });
+
+  it("never nests the copy button inside the clickable card — a button cannot contain a button", () => {
+    const html = renderToStaticMarkup(<VenueCard value={venueValue} onClick={() => {}} />);
+    const card = html.match(/<button[^>]*>[\s\S]*?<\/button>/)![0];
+    expect(card).not.toContain("Copy address");
+  });
+
+  it("offers a Copy address button when there is an address", () => {
+    expect(renderToStaticMarkup(<VenueCard value={venueValue} />)).toContain(
+      'aria-label="Copy address"',
+    );
+    expect(renderToStaticMarkup(<VenueCard value={manualValue} />)).toContain(
+      'aria-label="Copy address"',
+    );
+  });
+
+  it("offers nothing to copy when no venue is picked", () => {
+    expect(renderToStaticMarkup(<VenueCard value={emptyValue} />)).not.toContain("Copy address");
   });
 });

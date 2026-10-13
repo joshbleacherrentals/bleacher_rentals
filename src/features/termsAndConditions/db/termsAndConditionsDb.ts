@@ -1,5 +1,5 @@
-import { db, powerSyncDb } from "@/components/providers/SystemProvider";
-import { typedExecute } from "@/lib/powersync/typedQuery";
+import { db } from "@/components/providers/SystemProvider";
+import { expect, typedExecute, typedGetAll } from "@/lib/powersync/typedQuery";
 
 /**
  * Contract templates, read and written local-first.
@@ -20,6 +20,17 @@ export type TermsAndConditionsRow = {
   deleted: number;
 };
 
+// What the query really returns: every column is nullable in the local schema. The app has
+// always read these as set, so rows are handed on typed as `TermsAndConditionsRow`; the exact
+// shape is still checked here, so a schema change breaks this line, not a page.
+type TermsAndConditionsRaw = {
+  id: string;
+  name: string | null;
+  html_content: string | null;
+  created_at: string | null;
+  deleted: number | null;
+};
+
 export async function fetchAllTermsAndConditions(): Promise<TermsAndConditionsRow[]> {
   const compiled = db
     .selectFrom("TermsAndConditions")
@@ -28,7 +39,8 @@ export async function fetchAllTermsAndConditions(): Promise<TermsAndConditionsRo
     .orderBy("created_at", "desc")
     .compile();
 
-  return powerSyncDb.getAll<TermsAndConditionsRow>(compiled.sql, compiled.parameters as any[]);
+  const rows = await typedGetAll(compiled, expect<TermsAndConditionsRaw>());
+  return rows as TermsAndConditionsRow[];
 }
 
 export async function fetchTermsAndConditionsById(
@@ -40,10 +52,10 @@ export async function fetchTermsAndConditionsById(
     .where("id", "=", id)
     .compile();
 
-  const rows = await powerSyncDb.getAll<TermsAndConditionsRow>(
-    compiled.sql,
-    compiled.parameters as any[],
-  );
+  const rows = (await typedGetAll(
+    compiled,
+    expect<TermsAndConditionsRaw>(),
+  )) as TermsAndConditionsRow[];
   return rows[0] ?? null;
 }
 

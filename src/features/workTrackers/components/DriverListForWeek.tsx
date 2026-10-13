@@ -183,9 +183,12 @@ export function DriverListForWeek({ startDate }: Props) {
         </tr>
       </tbody>
       <tbody>
-        {drivers.map((row, index) => (
+        {drivers.map((row) => (
           <tr
-            key={index}
+            // Not the index: each row holds a payment window whose state is seeded from this
+            // driver's group once. Filtering or re-sorting by index handed one driver's window to
+            // another, and a bill was recorded against the wrong driver's group.
+            key={row.driver_uuid}
             className={`border-b h-12 border-gray-200 transition-all duration-100 ease-in-out cursor-pointer ${
               row.hasCrossBorderTrips ? "bg-yellow-100 hover:bg-yellow-200" : "hover:bg-gray-100"
             }`}

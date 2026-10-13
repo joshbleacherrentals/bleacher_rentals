@@ -1,6 +1,9 @@
 # Performance telemetry — SQLite calls: query, write, batch
 
-Status: **AWAITING APPROVAL** — 0 open decisions (D1–D3 answered by the user).
+Status: **IMPLEMENTED 2026-10-09, awaiting review** (approved the same day) — 0 open decisions
+(D1–D3 answered by the user). Not run in a real browser by me; covered by unit tests, and the
+percentile query was run on sample rows in a rolled-back transaction. What differs from the text
+below is in §8.
 Spec 4 of 5. Builds on [perf-telemetry-pipeline.md](perf-telemetry-pipeline.md).
 Independent of specs 2 and 3.
 Request (user, 2026-10-08): measure query, insert, update, delete, transaction and batch
@@ -137,3 +140,35 @@ The queries in `docs/PERFORMANCE_QUERIES.md` return the bucket, not an invented 
   individual).
 - **D3.** _The four direct `getAll` calls._ Options were: leave them; route them through
   `typedGetAll`; wrap them in place. **User's answer:** route them through `typedGetAll`.
+
+## 8. What differs from the text above
+
+- **The four direct `getAll` calls keep their row types, with a cast.** §3 expected the row type
+  to be "corrected to the real one". It cannot be without a visible change: every column is
+  nullable in the local schema, while `TermsAndConditionsRow` and the `Row` of
+  `fetchQuoteDetail.ts` say `string` and are read that way across the app. Making them nullable
+  would ripple through the pages and change how a `null` is handled, which is a behaviour
+  change nobody asked for. So each call checks the **exact** shape the query returns
+  (`TermsAndConditionsRaw`, `CompiledResultOf<typeof compiled>`), so a schema change still breaks
+  that line, and hands the rows on typed as before (`as ...Row[]`). The fourth call
+  (`loadQuoteIntoStore.ts`, `{ id: string }`) matched exactly and needed nothing. A nullable
+  row type, if wanted, is its own change.
+- **`flushTelemetryNow()` in `metrics.ts`** (one function, plus a test). The aggregate must
+  reach the transport before the page goes away, and the order in which two page listeners were
+  added would otherwise decide whether it does. The aggregate's listener records the aggregates
+  and then asks the transport to send what it holds.
+- **`tables` for writes.** `tablesInSql` only reads `from` and `join`, so an `INSERT` or an
+  `UPDATE` would have had no table; `sqliteTiming.ts` also reads `insert into "X"` and
+  `update "X"`.
+- **A batch of mixed statements has `op: "other"`**, a batch of one kind keeps that kind, and
+  its `tables` is the union of its statements' tables. The spec did not say.
+- **`docs/PERFORMANCE_QUERIES.md`** gets section 8, and sections 1 and 2 now leave the
+  `sqlite.*` names out: for them they would have shown only the slow calls, which looks like
+  the whole truth and is not.
+- **Files counted: 8** (`sqliteTiming.ts`, `typedQuery.ts`, `telemetryEvent.ts`, `metrics.ts`,
+  the three call sites; the queries document is a document); the spec said 7.
+- **Verified:** `npm run tc`; the whole Vitest suite; the section 8 query on 103 sample calls
+  (the p50 landed in a bucket, the p99 on an exact 80 ms). **Not verified:** a browser run with
+  production's `NODE_ENV`, where the aggregate is what is sent. In the user's local database the
+  other lifecycle and connector metrics were already arriving (2026-10-09), so the pipe works
+  end to end.
