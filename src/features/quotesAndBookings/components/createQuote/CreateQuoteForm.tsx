@@ -22,6 +22,7 @@ import { EditPaymentScheduleModal } from "./modals/EditPaymentScheduleModal";
 import { createQuoteEvent } from "../../db/createQuoteEvent";
 import { updateQuoteEvent } from "../../db/updateQuoteEvent";
 import { logQuoteSentLocal } from "../../db/logQuoteSentLocal";
+import { fetchLineItemsForEvent } from "../../db/fetchLineItems";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToast, createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
@@ -31,6 +32,8 @@ import { triage } from "@/features/alerts/triage";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { useNavigationGuard } from "../../hooks/useNavigationGuard";
 import { UnsavedChangesDialog } from "./modals/UnsavedChangesDialog";
+import { PriceChangeDialog } from "./modals/PriceChangeDialog";
+import { summarizePriceReview, type PriceReview } from "../../utils/linePrice";
 import { draftSaveDefaults, validateQuoteForSend } from "../../utils/quoteValidation";
 import { validateLostReason } from "../../utils/lostReason";
 import { cleanRecipients } from "../../utils/sendQuote";
@@ -43,6 +46,11 @@ export function CreateQuoteForm() {
   const supabase = useClerkSupabaseClient();
   const currentUserUuid = useCurrentUserUuid();
   const [saving, setSaving] = useState(false);
+  const currency = useCreateQuoteStore((s) => s.currency);
+  // Set while a save waits for the person to approve prices that differ from the saved ones.
+  const [priceReview, setPriceReview] = useState<
+    (PriceReview & { resolve: (ok: boolean) => void }) | null
+  >(null);
   const [sendTarget, setSendTarget] = useState<{ eventId: string; recipients: string[] } | null>(
     null,
   );
@@ -84,6 +92,32 @@ export function CreateQuoteForm() {
   };
 
   /**
+   * Before an existing quote is overwritten: if any line's price differs from the saved one — a
+   * matrix price that moved, a changed event type or dates, or a price typed here — show the
+   * change and wait for a yes. Resolves true when it is fine to save. A new quote has nothing
+   * saved to differ from.
+   */
+  const confirmPriceChanges = async (): Promise<boolean> => {
+    if (!isEditing) return true;
+    let review: PriceReview;
+    try {
+      const stored = await fetchLineItemsForEvent(editingEventId);
+      review = summarizePriceReview(stored, useCreateQuoteStore.getState().lineItems);
+    } catch (error) {
+      // A safety net, not a gate: failing to read must not stop the quote from being saved.
+      console.error("Could not compare line item prices before saving:", error);
+      return true;
+    }
+    if (review.changes.length === 0) return true;
+    return new Promise<boolean>((resolve) => setPriceReview({ ...review, resolve }));
+  };
+
+  const settlePriceReview = (approved: boolean) => {
+    priceReview?.resolve(approved);
+    setPriceReview(null);
+  };
+
+  /**
    * Persist the quote without navigating — a draft has no required fields,
    * so this always succeeds unless the write itself fails. Returns the event
    * id on success (used by the Save button and the unsaved-changes guard),
@@ -91,6 +125,7 @@ export function CreateQuoteForm() {
    */
   const persistQuote = async (): Promise<string | null> => {
     if (!validateLost()) return null;
+    if (!(await confirmPriceChanges())) return null;
     setSaving(true);
     try {
       // event_name/start/end are NOT NULL columns — default a blank one so an
@@ -142,6 +177,7 @@ export function CreateQuoteForm() {
 
   const handlePreviewPdf = async () => {
     if (!validateLost() || !validateRequiredFields()) return;
+    if (!(await confirmPriceChanges())) return;
     setSaving(true);
     try {
       const state = useCreateQuoteStore.getState();
@@ -180,6 +216,7 @@ export function CreateQuoteForm() {
       return;
     }
 
+    if (!(await confirmPriceChanges())) return;
     setSaving(true);
     try {
       let eventId: string;
@@ -321,6 +358,17 @@ export function CreateQuoteForm() {
           onBeforeSend={markQuoted}
           onSent={handleSent}
           onDone={handleSendDone}
+        />
+      )}
+      {priceReview && (
+        <PriceChangeDialog
+          open
+          currency={currency}
+          changes={priceReview.changes}
+          totalBeforeCents={priceReview.totalBeforeCents}
+          totalAfterCents={priceReview.totalAfterCents}
+          onConfirm={() => settlePriceReview(true)}
+          onCancel={() => settlePriceReview(false)}
         />
       )}
       <UnsavedChangesDialog

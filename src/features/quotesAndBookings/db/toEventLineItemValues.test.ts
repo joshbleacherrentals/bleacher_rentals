@@ -31,6 +31,7 @@ describe("toEventLineItemValues", () => {
       value_cents: 50000,
       quantity: 2,
       currency: "USD",
+      is_price_overridden: false,
     });
   });
 
@@ -66,6 +67,29 @@ describe("toEventLineItemValues", () => {
       value_cents: -2500,
       quantity: 1,
       currency: "CAD",
+      is_price_overridden: false,
     });
+  });
+
+  it("saves a hand-set price as overridden, so the next edit does not re-price it", () => {
+    expect(
+      toEventLineItemValues(
+        lineItem({ overridePrice: true, unitPriceCents: 540000 }),
+        "evt-1",
+        "USD",
+      ),
+    ).toMatchObject({ value_cents: 540000, is_price_overridden: true });
+  });
+
+  it("saves a matrix-following price as not overridden", () => {
+    expect(
+      toEventLineItemValues(lineItem({ overridePrice: false }), "evt-1", "USD").is_price_overridden,
+    ).toBe(false);
+  });
+
+  it("saves a draft persisted before the flag existed as overridden", () => {
+    const legacy = lineItem({});
+    delete (legacy as Partial<LineItem>).overridePrice;
+    expect(toEventLineItemValues(legacy, "evt-1", "USD").is_price_overridden).toBe(true);
   });
 });

@@ -2031,6 +2031,7 @@ export type Database = {
           event_uuid: string | null
           header: string
           id: string
+          is_price_overridden: boolean
           is_template: boolean
           quantity: number | null
           value_cents: number
@@ -2045,6 +2046,7 @@ export type Database = {
           event_uuid?: string | null
           header: string
           id?: string
+          is_price_overridden?: boolean
           is_template?: boolean
           quantity?: number | null
           value_cents: number
@@ -2059,6 +2061,7 @@ export type Database = {
           event_uuid?: string | null
           header?: string
           id?: string
+          is_price_overridden?: boolean
           is_template?: boolean
           quantity?: number | null
           value_cents?: number

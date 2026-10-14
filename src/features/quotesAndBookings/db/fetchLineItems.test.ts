@@ -85,6 +85,7 @@ describe("toLineItem", () => {
         quantity: 2,
         value_cents: 50000,
         description: "Seats 300.\n- guard rails",
+        is_price_overridden: 0,
       }),
     ).toEqual({
       id: "1",
@@ -110,6 +111,7 @@ describe("toLineItem", () => {
         quantity: 1,
         value_cents: 3000,
         description: null,
+        is_price_overridden: 1,
       }).description,
     ).toBeNull();
   });
@@ -123,7 +125,43 @@ describe("toLineItem", () => {
         quantity: 1,
         value_cents: -2500,
         description: "Returning customer",
+        is_price_overridden: 0,
       }).description,
     ).toBe("Returning customer");
+  });
+
+  describe("whether the price was typed by hand", () => {
+    const row = {
+      id: "p1",
+      header: "10 Row",
+      bleacher_type_uuid: "bt-10",
+      quantity: 2,
+      value_cents: 540000,
+      description: null,
+    };
+
+    it("loads a hand-set price as overridden, so it stays editable and is never re-priced", () => {
+      expect(toLineItem({ ...row, is_price_overridden: 1 })).toMatchObject({
+        unitPriceCents: 540000,
+        overridePrice: true,
+      });
+    });
+
+    it("loads a matrix-following price as not overridden", () => {
+      expect(toLineItem({ ...row, is_price_overridden: 0 }).overridePrice).toBe(false);
+    });
+
+    it("treats a row synced without the flag as overridden: keeping a price is the safe mistake", () => {
+      expect(toLineItem({ ...row, is_price_overridden: null }).overridePrice).toBe(true);
+    });
+
+    it("never touches the saved price, whichever way the flag is set", () => {
+      for (const flag of [0, 1, null]) {
+        expect(toLineItem({ ...row, is_price_overridden: flag })).toMatchObject({
+          unitPriceCents: 540000,
+          lineTotalCents: 1080000,
+        });
+      }
+    });
   });
 });
