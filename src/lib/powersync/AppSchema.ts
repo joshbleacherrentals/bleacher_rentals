@@ -972,6 +972,7 @@ const EventLineItemsCols = {
   description: column.text,
   event_uuid: column.text,
   header: column.text,
+  is_price_overridden: column.integer,
   is_template: column.integer,
   quantity: column.integer,
   value_cents: column.integer,

@@ -90632,6 +90632,65 @@ SET "contract_revenue_cents" = public.payment_schedule_total_cents("id"),
     "booked_at" = CASE WHEN "event_status" = 'booked' THEN "created_at" + interval '1 day' END
 WHERE "id"::text LIKE 'a7000000-0000-4000-8000-0000000000%';
 
+-- Repro for the 2026-10-11 "Bullhead rally" incident, and the check for its fix. Two bleacher lines
+-- on a Corporate, one-day quote (matrix: 10-Row $1,800, 15-Row $3,500):
+--   * 10-Row × 2 at $5,400 — typed by hand (is_price_overridden = true). Shows a reset arrow.
+--     Before the fix, changing the event type or dates silently rewrote it to the matrix
+--     price; saving then stored it and the contract fell from $11,620.80 to $3,873.60.
+--   * 15-Row × 1 at $3,500 — taken from the matrix (is_price_overridden = false). Locked, with a
+--     pencil to type your own price; it always follows the matrix.
+-- Open /quotes-bookings/b2000000-0000-4000-8000-000000000001/edit and change the Event Type (or
+-- dates): the 10-Row stays $5,400, the 15-Row moves to the new matrix price, and Save lists that
+-- change in a "Prices have changed" dialog before storing it. Click the 10-Row's reset arrow to see
+-- an explicit reset do the same.
+-- Own id range (b2…) so the AR scenarios above and their closing UPDATE never touch it. 'quoted'
+-- keeps it off the Accounts Receivable pages.
+INSERT INTO "public"."Events" (
+  "id", "event_name", "event_status", "deleted", "created_at",
+  "setup_start", "event_start", "event_end", "teardown_end", "quote_valid_till",
+  "lenient", "total_seats", "hsl_hue", "event_type_uuid", "sales_office_uuid", "created_by_user_uuid",
+  "contact_uuid", "finance_contact_uuid", "venue_uuid", "address_uuid", "terms_and_conditions_uuid",
+  "invoice_number", "po_number", "tax_percent", "tax_amount_cents", "contract_revenue_cents",
+  "goodshuffle_url", "is_qbo", "lost_reason", "internal_notes"
+) VALUES (
+  'b2000000-0000-4000-8000-000000000001',
+  'Price Repro: Bullhead rally',
+  'quoted',
+  false,
+  (current_date - 1) + time '09:30',
+  current_date + 2, current_date + 3, current_date + 3, current_date + 4,
+  current_date + 14,
+  false, 600, 75,
+  '3ea1a08f-5ba3-4210-af80-9373d03bcbd0',  -- Corporate
+  '5cfc2897-3990-41cd-b29d-06f5ad8809cc',  -- Bleacher Rentals Florida LLC (USD)
+  '9bddb34c-d84e-4d11-852a-27f16de08379',  -- josh
+  '7d000000-0000-4000-8000-000000000003',
+  NULL,
+  '7e000000-0000-4000-8000-000000000002',
+  '7a000000-0000-4000-8000-000000000015',
+  '805f9267-38ab-4442-84b9-7c9ba3f5f36e',
+  777000132, NULL, 7.6, 108680, 1538680,
+  NULL, false, NULL,
+  'Price repro — 10-Row 2 × $5,400 typed by hand (matrix is $1,800), 15-Row 1 × $3,500 from the matrix. Changing the event type must not change either price.'
+)
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "public"."EventLineItems" ("id", "event_uuid", "header", "description", "currency", "value_cents", "quantity", "bleacher_type_uuid", "is_price_overridden", "is_template", "deleted", "created_at")
+VALUES
+  ('b2100000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001',
+   '10-Row, 300 Seat - Includes Delivery & Setup / Teardown', NULL, 'USD', 540000, 2,
+   '2a0bed57-7f07-4563-b8ac-2e77c11ad022', true, false, false, now()),
+  ('b2100000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001',
+   '15-Row, 450 Seat - Includes Delivery & Setup / Teardown', NULL, 'USD', 350000, 1,
+   '8d3f0d79-ebf9-4073-b438-51c8ea2ab060', false, false, false, now() + interval '1 second')
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "public"."PaymentInstallments" ("id", "event_uuid", "due_date", "percentage_bps", "currency")
+VALUES
+  ('b2200000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', current_date + 1, 5000, 'USD'),
+  ('b2200000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', current_date + 3, 5000, 'USD')
+ON CONFLICT ("id") DO NOTHING;
+
 -- Development email allowlist. In the development environment the server only sends email to the
 -- addresses listed here; maintain the list at /dev-tools/allowed-emails (developers only).
 INSERT INTO "public"."DevAllowedEmails" ("email") VALUES

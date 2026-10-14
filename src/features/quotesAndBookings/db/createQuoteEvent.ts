@@ -125,6 +125,7 @@ export async function createQuoteEvent(
           .values({
             id: crypto.randomUUID(),
             ...toEventLineItemValues(li, eventUuid, state.currency),
+            is_price_overridden: li.overridePrice !== false ? 1 : 0,
             is_template: 0,
             deleted: 0,
           } as any)
