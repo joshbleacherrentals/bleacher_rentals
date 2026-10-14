@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { X, Lock, Unlock, CheckCircle, TriangleAlert } from "lucide-react";
+import { X, Pencil, RotateCcw, CheckCircle, TriangleAlert } from "lucide-react";
 import { formatMoney } from "../../../utils/formatMoney";
 import { useCreateQuoteStore } from "../../../state/useCreateQuoteStore";
 import { usePriceLookup } from "../../../hooks/usePriceLookup";
+import {
+  matrixPriceUpdates,
+  priceControl,
+  withManualPrice,
+  withMatrixPrice,
+} from "../../../utils/linePrice";
 import { Dropdown } from "@/components/DropDown";
 import { LineItem, DiscountType } from "../../../types/quoteTypes";
 import { db } from "@/components/providers/SystemProvider";
@@ -73,32 +79,27 @@ export function LineItemsSection() {
     return counts;
   }, [assignedRows, editingEventId]);
 
-  const { lookupPrice } = usePriceLookup();
+  const { lookupPrice, isLoading: pricingLoading } = usePriceLookup();
 
-  // Auto-recalc bleacher prices when event type, dates, or currency change
+  const matrixPriceFor = (item: LineItem): number | null =>
+    item.bleacherTypeUuid && eventTypeId && eventStart && eventEnd
+      ? lookupPrice(item.bleacherTypeUuid, eventTypeId, eventStart, eventEnd, currency)
+      : null;
+
+  // A matrix-following line (`overridePrice` false) always has the matrix price: it follows the
+  // event type, dates and currency. A hand-priced line is never touched here. Waiting for the
+  // pricing data is what makes this the same every time — it used to run once on mount, whether or
+  // not the prices had loaded yet. Whatever it changes is shown to the person before a saved quote
+  // is overwritten (see PriceChangeDialog and findPriceChanges).
   useEffect(() => {
-    if (!eventTypeId || !eventStart || !eventEnd) return;
-
-    for (const item of lineItems) {
-      if (item.category !== "bleachers" || !item.bleacherTypeUuid || item.overridePrice) continue;
-
-      const priceCents = lookupPrice(
-        item.bleacherTypeUuid,
-        eventTypeId,
-        eventStart,
-        eventEnd,
-        currency,
-      );
-      if (priceCents !== null && priceCents !== item.unitPriceCents) {
-        const updated = {
-          ...item,
-          unitPriceCents: priceCents,
-          lineTotalCents: priceCents * item.qty,
-        };
-        updateLineItem(item.id, updated);
-      }
+    if (pricingLoading) return;
+    for (const u of matrixPriceUpdates(lineItems, matrixPriceFor)) {
+      updateLineItem(u.id, {
+        unitPriceCents: u.unitPriceCents,
+        lineTotalCents: u.lineTotalCents,
+      });
     }
-  }, [eventTypeId, eventStart, eventEnd, currency]);
+  }, [pricingLoading, eventTypeId, eventStart, eventEnd, currency, lineItems]);
 
   const subtotalCents = lineItems
     .filter((i) => i.category !== "discounts")
@@ -113,32 +114,16 @@ export function LineItemsSection() {
     updateLineItem(id, updated);
   };
 
-  const togglePriceOverride = (item: LineItem) => {
-    if (item.overridePrice) {
-      // Unlocking — try to restore price from matrix
-      if (item.bleacherTypeUuid && eventTypeId && eventStart && eventEnd) {
-        const priceCents = lookupPrice(
-          item.bleacherTypeUuid,
-          eventTypeId,
-          eventStart,
-          eventEnd,
-          currency,
-        );
-        if (priceCents !== null) {
-          const updated = {
-            ...item,
-            overridePrice: false,
-            unitPriceCents: priceCents,
-            lineTotalCents: priceCents * item.qty,
-          };
-          updateLineItem(item.id, updated);
-          return;
-        }
-      }
-      handleUpdate(item.id, { overridePrice: false });
-    } else {
-      handleUpdate(item.id, { overridePrice: true });
+  // Pencil: type your own price. Reset arrow: take the matrix price again. Never both at once, and
+  // neither runs unless the person clicks it.
+  const onPriceButton = (item: LineItem) => {
+    if (!item.overridePrice) {
+      updateLineItem(item.id, withManualPrice(item));
+      return;
     }
+    const matrixCents = matrixPriceFor(item);
+    if (matrixCents === null) return;
+    updateLineItem(item.id, withMatrixPrice(item, matrixCents));
   };
 
   const grouped = lineItems.reduce(
@@ -263,42 +248,64 @@ export function LineItemsSection() {
                                   </td>
                                 );
                               })()}
-                            <td className="py-2 px-1">
-                              <input
-                                type="number"
-                                min={0}
-                                step={1}
-                                value={item.unitPriceCents / 100}
-                                disabled={!item.overridePrice}
-                                onChange={(e) =>
-                                  handleUpdate(item.id, {
-                                    unitPriceCents: Math.round(
-                                      (parseFloat(e.target.value) || 0) * 100,
-                                    ),
-                                  })
-                                }
-                                className={`w-full h-8 px-2 border rounded text-sm text-right ${
-                                  !item.overridePrice ? "bg-gray-50 text-gray-500" : ""
-                                }`}
-                              />
-                            </td>
-                            <td className="py-2 px-1">
-                              <button
-                                onClick={() => togglePriceOverride(item)}
-                                className="text-gray-400 hover:text-gray-600 transition cursor-pointer"
-                                title={
-                                  item.overridePrice
-                                    ? "Unlock: restore price from matrix"
-                                    : "Lock: manually override price"
-                                }
-                              >
-                                {item.overridePrice ? (
-                                  <Lock className="w-4 h-4 text-amber-500" />
-                                ) : (
-                                  <Unlock className="w-4 h-4" />
-                                )}
-                              </button>
-                            </td>
+                            {(() => {
+                              const matrixCents = matrixPriceFor(item);
+                              const control = priceControl(item, matrixCents);
+                              return (
+                                <>
+                                  <td className="py-2 px-1">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={1}
+                                      value={item.unitPriceCents / 100}
+                                      disabled={!control.editable}
+                                      onChange={(e) =>
+                                        handleUpdate(item.id, {
+                                          unitPriceCents: Math.round(
+                                            (parseFloat(e.target.value) || 0) * 100,
+                                          ),
+                                        })
+                                      }
+                                      className={`w-full h-8 px-2 border rounded text-sm text-right ${
+                                        !control.editable ? "bg-gray-50 text-gray-500" : ""
+                                      }`}
+                                    />
+                                    {/* {item.overridePrice && (
+                                      <div className="mt-0.5 text-right text-[11px] text-amber-600">
+                                        Custom price
+                                      </div>
+                                    )} */}
+                                  </td>
+                                  <td className="py-2 px-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => onPriceButton(item)}
+                                      disabled={control.action === "reset" && !control.canReset}
+                                      className="text-gray-400 hover:text-gray-600 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                                      aria-label={
+                                        control.action === "edit"
+                                          ? "Set a custom price"
+                                          : "Reset to the pricing-matrix price"
+                                      }
+                                      title={
+                                        control.action === "edit"
+                                          ? "Set a custom price for this quote"
+                                          : control.canReset
+                                            ? `Reset to the pricing-matrix price (${formatMoney(matrixCents!, currency)})`
+                                            : "No pricing-matrix price for this event type and dates"
+                                      }
+                                    >
+                                      {control.action === "edit" ? (
+                                        <Pencil className="w-4 h-4" />
+                                      ) : (
+                                        <RotateCcw className="w-4 h-4 text-amber-500" />
+                                      )}
+                                    </button>
+                                  </td>
+                                </>
+                              );
+                            })()}
                           </>
                         )}
 
