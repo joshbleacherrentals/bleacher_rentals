@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { QuoteDetail, fetchQuoteDetail } from "../../db/fetchQuoteDetail";
 import { softDeleteEvent } from "../../db/softDeleteEvent";
 import { useEventLineItems } from "../../hooks/useEventLineItems";
+import { useQuoteDetail } from "../../hooks/useQuoteDetail";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
@@ -46,8 +46,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const supabase = useClerkSupabaseClient();
-  const [quote, setQuote] = useState<QuoteDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  // The quote, read reactively: it follows an edit made in another tab (docs/specs/quote-detail-01).
+  const { quote, isLoading: loading } = useQuoteDetail(eventId);
   const [deleting, setDeleting] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
@@ -187,13 +187,6 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   //     createErrorToast(["Failed to request review:", String(error)]);
   //   }
   // };
-
-  useEffect(() => {
-    setLoading(true);
-    fetchQuoteDetail(eventId)
-      .then(setQuote)
-      .finally(() => setLoading(false));
-  }, [eventId]);
 
   if (loading) {
     return (
