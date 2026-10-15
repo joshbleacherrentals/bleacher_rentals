@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { DateTime } from "luxon";
 import { X } from "lucide-react";
 import {
@@ -85,42 +84,27 @@ function EventList({ events, emptyLabel }: { events: HistoryEvent[]; emptyLabel:
   );
 }
 
+/**
+ * The side panel itself: a title and two lists. It holds no data of its own; the Contact and Venue
+ * panels that wrap it watch their events while they are open and hand the lists down
+ * (docs/specs/quote-detail-03-history-panels.md).
+ */
 export function EventHistorySheet({
   title,
   subtitle,
   open,
   onOpenChange,
-  fetchEvents,
+  buckets,
+  isLoading,
 }: {
   title: string;
   subtitle: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  fetchEvents: () => Promise<HistoryEventBuckets>;
+  /** Null until the events have been read. */
+  buckets: HistoryEventBuckets | null;
+  isLoading: boolean;
 }) {
-  const [buckets, setBuckets] = useState<HistoryEventBuckets | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setIsLoading(true);
-    fetchEvents()
-      .then((result) => {
-        if (!cancelled) setBuckets(result);
-      })
-      .catch(() => {
-        if (!cancelled) setBuckets({ past: [], future: [] });
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
   if (!open) return null;
 
   const close = () => onOpenChange(false);

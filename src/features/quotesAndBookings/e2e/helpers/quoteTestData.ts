@@ -85,6 +85,13 @@ export async function assignContact(
   return contact.id as string;
 }
 
+/** Rename an event, as an edit made elsewhere would: the change reaches open pages by sync. */
+export async function renameEvent(eventId: string, eventName: string): Promise<void> {
+  const db = admin();
+  const { error } = await db.from("Events").update({ event_name: eventName }).eq("id", eventId);
+  if (error) throw new Error(`renameEvent: update failed: ${error.message}`);
+}
+
 /** Simulate a manager editing the price — bumps both content_hash and contract_hash. */
 export async function bumpLineItemPrice(eventId: string, delta = 12_345): Promise<void> {
   const db = admin();
