@@ -4,21 +4,17 @@ import { QuoteDetail } from "../../../db/fetchQuoteDetail";
 import { useEventLineItems, EventLineItemRow } from "../../../hooks/useEventLineItems";
 import { useEventCurrency } from "../../../hooks/useEventCurrency";
 import { useEventTypeName } from "../../../hooks/useEventTypeName";
+import { useContractSignature } from "../../../hooks/useContractSignature";
 import { eventTypeDisplay } from "../../../utils/eventTypeDisplay";
 import { formatMoney } from "../../../utils/formatMoney";
 import { formatLostReason } from "../../../utils/lostReason";
 import { DateTime } from "luxon";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { ExternalLink, FileText } from "lucide-react";
 import { ContactHistorySheet } from "./ContactHistorySheet";
 import { VenueHistorySheet } from "./VenueHistorySheet";
 import { VenueCard } from "@/components/VenueCard";
 import { LineItemDescription } from "../../LineItemDescription";
-
-type SignatureInfo = {
-  signerName: string;
-  signedAt: string;
-} | null;
 
 function formatDate(d: string | null): string {
   if (!d) return "N/A";
@@ -208,23 +204,11 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
     name: eventType.name,
     isLoading: eventType.isLoading,
   });
-  const [signature, setSignature] = useState<SignatureInfo>(null);
+  // The Signed banner follows the local ContractSignatures table. A quote without a contract
+  // template has no signature, as the old HTTP route answered (docs/specs/quote-detail-02).
+  const { signature } = useContractSignature(quote.id, quote.termsAndConditionsUuid !== null);
   const [contactSheetOpen, setContactSheetOpen] = useState(false);
   const [venueSheetOpen, setVenueSheetOpen] = useState(false);
-
-  useEffect(() => {
-    fetch(`/api/contracts/${quote.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.signature) {
-          setSignature({
-            signerName: data.signature.signerName,
-            signedAt: data.signature.signedAt,
-          });
-        }
-      })
-      .catch(() => {});
-  }, [quote.id]);
 
   return (
     <div className="space-y-6">

@@ -123,6 +123,26 @@ export async function assignTerms(eventId: string): Promise<string> {
   return terms.id as string;
 }
 
+/**
+ * Record an active signature the way the signing page does, against the contract as it is now, so
+ * the quote shows as signed until its terms change.
+ */
+export async function recordSignature(
+  eventId: string,
+  termsId: string,
+  signerName = "E2E Signer",
+): Promise<void> {
+  const db = admin();
+  const { error } = await db.from("ContractSignatures").insert({
+    event_uuid: eventId,
+    terms_and_conditions_uuid: termsId,
+    signer_name: signerName,
+    status: "active",
+    signed_contract_hash: await getContractHash(eventId),
+  });
+  if (error) throw new Error(`recordSignature: insert failed: ${error.message}`);
+}
+
 /** Give the quote a two-part payment schedule, so the Pay tab has one to render. */
 export async function addPaymentSchedule(eventId: string): Promise<void> {
   const db = admin();
