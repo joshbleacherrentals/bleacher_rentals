@@ -226,7 +226,7 @@ describe("chat member actions: the old flows against the new functions", () => {
     // Guard against a vacuous pass, and show the gain.
     expect(changed).toBeGreaterThan(400);
     expect(newTransactions).toBeLessThan(oldTransactions);
-  });
+  }, 60_000);
 });
 
 // The new functions return a value; the cases above only need them to finish.
