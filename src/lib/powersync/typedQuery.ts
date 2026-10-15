@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import type { CompiledQuery } from "kysely";
 import { useQuery } from "@powersync/react";
+import type { Transaction } from "@powersync/web";
 import { db, powerSyncDb } from "@/components/providers/SystemProvider";
 import {
   countDbBatch,
@@ -110,6 +111,55 @@ export function typedExecute(compiled: CompiledQuery<any>) {
  * failure part-way through can no longer leave half the cascade's alerts
  * written.
  */
+const TRACKED_TRANSACTION_METHODS = new Set([
+  "execute",
+  "executeRaw",
+  "getAll",
+  "get",
+  "getOptional",
+]);
+
+/** The transaction, with the SQL of each statement it runs added to `statements`. */
+function trackStatements(transaction: Transaction, statements: string[]): Transaction {
+  return new Proxy(transaction, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target);
+      if (typeof value !== "function") return value;
+      if (!TRACKED_TRANSACTION_METHODS.has(property as string)) return value.bind(target);
+      return (sql: string, ...rest: unknown[]) => {
+        statements.push(sql);
+        return value.call(target, sql, ...rest);
+      };
+    },
+  });
+}
+
+/**
+ * Runs `work` in a single write transaction, for an action that reads and writes: its reads and
+ * its writes share one transaction, one commit, and one wake-up of the watchers.
+ *
+ * `typedExecuteBatch` takes statements known in advance; this takes a function, because a later
+ * statement often depends on what an earlier read returned. Like the batch it is atomic: if
+ * `work` throws, everything it wrote is rolled back and the same error reaches the caller.
+ *
+ * It is timed as `sqlite.batch` and counted as one write transaction with the number of
+ * statements that ran in it. Use the `tx` it passes, not `powerSyncDb`, inside `work`.
+ */
+export function typedWriteTransaction<T>(work: (tx: Transaction) => Promise<T>): Promise<T> {
+  // Filled while `work` runs and read when the call settles (see `timed`).
+  const statements: string[] = [];
+
+  return timed("sqlite.batch", statements, () =>
+    powerSyncDb.writeTransaction(async (tx) => {
+      try {
+        return await work(trackStatements(tx, statements));
+      } finally {
+        countDbBatch(statements.length);
+      }
+    }),
+  );
+}
+
 export function typedExecuteBatch(statements: CompiledQuery<any>[]): Promise<void> {
   if (statements.length === 0) return Promise.resolve();
 

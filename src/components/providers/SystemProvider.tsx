@@ -49,6 +49,14 @@ export function chooseVfs() {
   return WASQLiteVFS.IDBBatchAtomicVFS;
 }
 
+// The SQLite page cache of the one database connection, in KB (`PRAGMA cache_size`). PowerSync's
+// own value is 50 MB, but the local database is 183-242 MB, so most reads went back to IndexedDB
+// and every page read there is one request. The cache is a ceiling, not a reservation: it fills
+// only as pages are read, once for all tabs (the database worker is shared). The setting belongs
+// to the connection, not to the database file: it takes effect on the next page load and
+// reverting this value restores the old behaviour. docs/specs/slow-local-db-plan.md, step 4.
+export const PAGE_CACHE_SIZE_KB = 300 * 1024;
+
 function createPowerSyncDb() {
   const vfs = chooseVfs();
 
@@ -57,6 +65,7 @@ function createPowerSyncDb() {
     database: new WASQLiteOpenFactory({
       dbFilename: "bleacherrentalsVFS.db",
       vfs,
+      cacheSizeKb: PAGE_CACHE_SIZE_KB,
       flags: {
         enableMultiTabs: typeof SharedWorker !== "undefined",
         ssrMode: false,

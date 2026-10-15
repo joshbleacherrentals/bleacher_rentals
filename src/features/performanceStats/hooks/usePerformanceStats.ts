@@ -31,7 +31,9 @@ export function usePerformanceStats(
   const supabase = useClerkSupabaseClient();
   const since = useMemo(() => periodToSince(filters.period, anchor), [filters.period, anchor]);
 
-  const args = { p_since: since, p_env: filters.env, p_version: filters.version };
+  // The generated type says `string`: it cannot say that these functions take NULL for "every
+  // version" (`p_version IS NULL OR ...` in the migration), so null is cast through.
+  const args = { p_since: since, p_env: filters.env, p_version: filters.version as string };
   const scope = [since, filters.env, filters.version] as const;
 
   const options = {

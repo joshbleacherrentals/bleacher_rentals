@@ -10,8 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
-import { subscribeToEvent, unsubscribeFromEvent } from "../db/subscriptions";
-import { sendEventMessage } from "../db/messages";
+import { addEventChatMember, removeEventChatMember } from "../db/conversationActions";
 import {
   chatUserDisplayName,
   chatUserInitials,
@@ -20,10 +19,7 @@ import {
 } from "../hooks/useChatEligibleUsers";
 import { useEventSubscriptions } from "../hooks/useEventSubscriptions";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
-import {
-  displayName,
-  useRoadmapUsers,
-} from "@/app/roadmap/_lib/hooks/useRoadmapUsers";
+import { displayName, useRoadmapUsers } from "@/app/roadmap/_lib/hooks/useRoadmapUsers";
 
 type Props = {
   eventUuid: string;
@@ -73,23 +69,20 @@ export function EventChatMembersModal({ eventUuid, open, onOpenChange }: Props) 
     pendingScrollTopRef.current = null;
   }, [sortedUsers]);
 
-  const postSystemMessage = async (text: string) => {
-    if (!currentUserUuid) return;
-    await sendEventMessage({
-      eventUuid,
-      userUuid: currentUserUuid,
-      body: text,
-      isSystem: true,
-    });
-  };
+  // The system message is posted as the signed-in user; without one there is none to post.
+  const systemMessage = (text: string) =>
+    currentUserUuid ? { userUuid: currentUserUuid, body: text } : null;
 
   const handleAdd = async (target: ChatEligibleUser) => {
     saveListScroll();
     setBusyUserId(target.userUuid);
     try {
-      await subscribeToEvent(eventUuid, target.userUuid);
       const actor = displayName(userMap.get(currentUserUuid ?? ""));
-      await postSystemMessage(`${actor} added ${chatUserDisplayName(target)} to the conversation.`);
+      await addEventChatMember(
+        eventUuid,
+        target.userUuid,
+        systemMessage(`${actor} added ${chatUserDisplayName(target)} to the conversation.`),
+      );
       createSuccessToast([`${chatUserDisplayName(target)} added to the chat.`]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -103,9 +96,12 @@ export function EventChatMembersModal({ eventUuid, open, onOpenChange }: Props) 
     saveListScroll();
     setBusyUserId(target.userUuid);
     try {
-      await unsubscribeFromEvent(eventUuid, target.userUuid);
       const actor = displayName(userMap.get(currentUserUuid ?? ""));
-      await postSystemMessage(`${actor} removed ${chatUserDisplayName(target)} from the chat.`);
+      await removeEventChatMember(
+        eventUuid,
+        target.userUuid,
+        systemMessage(`${actor} removed ${chatUserDisplayName(target)} from the chat.`),
+      );
       createSuccessToast([`${chatUserDisplayName(target)} removed from the chat.`]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -127,7 +123,9 @@ export function EventChatMembersModal({ eventUuid, open, onOpenChange }: Props) 
 
         <ul ref={listRef} className="max-h-80 overflow-y-auto divide-y border rounded-md">
           {sortedUsers.length === 0 ? (
-            <li className="px-4 py-6 text-sm text-gray-400 text-center">No eligible users found.</li>
+            <li className="px-4 py-6 text-sm text-gray-400 text-center">
+              No eligible users found.
+            </li>
           ) : (
             sortedUsers.map((user) => {
               const isMember = subscribedUserIds.has(user.userUuid);
@@ -151,9 +149,7 @@ export function EventChatMembersModal({ eventUuid, open, onOpenChange }: Props) 
                           </span>
                         )}
                       </p>
-                      {user.email && (
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                      )}
+                      {user.email && <p className="text-xs text-gray-500 truncate">{user.email}</p>}
                     </div>
                   </div>
 

@@ -1,6 +1,6 @@
 {
   "name": "bleacher_rentals",
-  "version": "1.18.2",
+  "version": "1.18.3",
   "private": true,
   "scripts": {
     "generate-types-staging": "supabase gen types typescript --project-id \"sycrvbdpdbaczyfdwcnc\" --schema public > database.types.ts",
@@ -156,7 +156,7 @@
     "postcss": "^8.5.3",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
-    "supabase": "^2.116.0",
+    "supabase": "^2.120.0",
     "tailwindcss": "^4.1.1",
     "tsx": "^4.21.0",
     "typescript": "^5",
