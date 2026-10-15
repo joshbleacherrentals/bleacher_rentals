@@ -473,6 +473,8 @@ const WorkTrackersCols = {
   status_changed_at: column.text,
   dropoff_event_uuid: column.text,
   pickup_event_uuid: column.text,
+  build_work_tracker_history: column.text,
+  is_work_tracker_finished: column.integer,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
 const WorkTrackers = new Table(WorkTrackersCols, {
   indexes: {

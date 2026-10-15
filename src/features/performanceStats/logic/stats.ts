@@ -180,11 +180,19 @@ export function describeLoadError(error: unknown): string {
 // ---------------------------------------------------------------------------
 
 type Functions = Database["public"]["Functions"];
+
+// The generated types call every column of these functions non-null; the SQL returns NULL for the
+// ones widened here (`20261009120000_perf_dashboard.sql`).
+type Nullable<T, K extends keyof T> = Omit<T, K> & { [P in K]: T[P] | null };
+
 type RawMetric = Functions["perf_percentiles"]["Returns"][number];
 type RawSqlite = Functions["perf_sqlite"]["Returns"][number];
-type RawError = Functions["perf_errors"]["Returns"][number];
-type RawHealth = Functions["perf_health"]["Returns"][number];
-type RawBreakdown = Functions["perf_breakdown"]["Returns"][number];
+type RawError = Nullable<Functions["perf_errors"]["Returns"][number], "median_ms" | "max_ms">;
+type RawHealth = Nullable<Functions["perf_health"]["Returns"][number], "oldest" | "newest">;
+type RawBreakdown = Nullable<
+  Functions["perf_breakdown"]["Returns"][number],
+  "p50" | "p95" | "p99" | "calls" | "slow_calls" | "max_ms"
+>;
 type RawVersion = Functions["perf_versions"]["Returns"][number];
 
 // PostgREST can hand a bigint back as a string; every count goes through this.
