@@ -5,6 +5,15 @@ import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery, typedExecute } from "@/lib/powersync/typedQuery";
 import { businessToday, hidePastAlerts } from "../util/pastAlerts";
 import { hideOutOfWindowTransportationAlerts } from "../util/transportationWindow";
+import {
+  buildUserAlertsQueries,
+  mergeUserAlerts,
+  type AlertPart,
+  type BleacherEventPart,
+  type EventDatesPart,
+  type UserAlertPart,
+  type WorkTrackerPart,
+} from "../util/userAlertsData";
 
 export type UserAlertRow = {
   userAlertId: string;
@@ -27,6 +36,8 @@ export type UserAlertRow = {
 
 type UserRow = { userUuid: string };
 
+const NO_ALERTS: UserAlertRow[] = [];
+
 export function useUserAlerts() {
   const { user } = useUser();
   const clerkUserId = user?.id ?? "__no_clerk_user__";
@@ -47,48 +58,43 @@ export function useUserAlerts() {
   const { data: userData } = useTypedQuery(userQuery, expect<UserRow>());
   const userUuid = userData?.[0]?.userUuid ?? "__no_user__";
 
-  // 2. All UserAlerts + joined Alert for this user, ordered by reminder then created
-  const alertsQuery = useMemo(
-    () =>
-      db
-        .selectFrom("UserAlerts as ua")
-        .innerJoin("Alerts as a", "a.id", "ua.alert_uuid")
-        // The entity's date, per entity type: an event's end, a bleacher event's event end, or a
-        // work tracker's date. Used to hide alerts whose entity is past.
-        .leftJoin("Events as ev", (join) =>
-          join.onRef("ev.id", "=", "a.entity_uuid").on("a.entity_type", "=", "event"),
-        )
-        .leftJoin("BleacherEvents as be", (join) =>
-          join.onRef("be.id", "=", "a.entity_uuid").on("a.entity_type", "=", "bleacher_event"),
-        )
-        .leftJoin("Events as bev", "bev.id", "be.event_uuid")
-        .leftJoin("WorkTrackers as wt", (join) =>
-          join.onRef("wt.id", "=", "a.entity_uuid").on("a.entity_type", "=", "work_tracker"),
-        )
-        .select((eb) => [
-          eb.fn.coalesce("ev.event_end", "bev.event_end", "wt.date").as("entityDate"),
-          eb.fn.coalesce("ev.event_start", "bev.event_start", "wt.date").as("entityStartDate"),
-        ])
-        .select([
-          "ua.id as userAlertId",
-          "a.id as alertId",
-          "a.entity_uuid as entityUuid",
-          "a.entity_type as entityType",
-          "a.entity_description as entityDescription",
-          "a.title as title",
-          "a.message as message",
-          "ua.dismissed as dismissed",
-          "ua.dismissed_until as dismissedUntil",
-          "ua.created_at as createdAt",
-        ])
-        .where("ua.user_uuid", "=", userUuid)
-        .orderBy("ua.dismissed_until", "asc")
-        .orderBy("ua.created_at", "desc")
-        .compile(),
-    [userUuid],
-  );
+  // 2. The user's UserAlerts with their Alert and the entity's dates, ordered by reminder then
+  //    created. Five small queries, one per table, joined in JS: one JOIN query returned thousands
+  //    of wide rows and re-ran on every commit to any of its five tables. The merge returns the
+  //    rows the JOIN returned, in the same order (docs/specs/slow-local-db-step1-split-watchers.md).
+  const queries = useMemo(() => buildUserAlertsQueries(db, userUuid), [userUuid]);
 
-  const { data: rawAlerts = [] } = useTypedQuery(alertsQuery, expect<UserAlertRow>());
+  const userAlertsPart = useTypedQuery(queries.userAlerts, expect<UserAlertPart>());
+  const alertsPart = useTypedQuery(queries.alerts, expect<AlertPart>());
+  const bleacherEventsPart = useTypedQuery(queries.bleacherEvents, expect<BleacherEventPart>());
+  const eventsPart = useTypedQuery(queries.events, expect<EventDatesPart>());
+  const workTrackersPart = useTypedQuery(queries.workTrackers, expect<WorkTrackerPart>());
+
+  // The list is empty until every part has loaded, and when any part fails, as it was while the
+  // one query loaded or failed. A half-loaded set is never merged: an alert without its entity
+  // date would show for a moment even when its event is already over.
+  const parts = [userAlertsPart, alertsPart, bleacherEventsPart, eventsPart, workTrackersPart];
+  const ready = parts.every((part) => !part.isLoading && !part.error);
+  const rawAlerts = useMemo(
+    () =>
+      ready
+        ? mergeUserAlerts({
+            userAlerts: userAlertsPart.data ?? [],
+            alerts: alertsPart.data ?? [],
+            bleacherEvents: bleacherEventsPart.data ?? [],
+            events: eventsPart.data ?? [],
+            workTrackers: workTrackersPart.data ?? [],
+          })
+        : NO_ALERTS,
+    [
+      ready,
+      userAlertsPart.data,
+      alertsPart.data,
+      bleacherEventsPart.data,
+      eventsPart.data,
+      workTrackersPart.data,
+    ],
+  );
   // Alerts about something already over are never shown, even before the daily cleanup runs.
   // "No Transportation" is narrower still: only events starting inside the booking window.
   const allAlerts = hideOutOfWindowTransportationAlerts(hidePastAlerts(rawAlerts, today));

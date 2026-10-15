@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { LogLevel, WASQLiteVFS } from "@powersync/web";
-import { chooseLogLevel, chooseVfs } from "./SystemProvider";
+import { PAGE_CACHE_SIZE_KB, chooseLogLevel, chooseVfs } from "./SystemProvider";
+
+describe("PAGE_CACHE_SIZE_KB", () => {
+  // The SQLite page cache of the one database connection, in KB. PowerSync's own value is 50 MB;
+  // the local database is 183-242 MB, so most pages were read back from IndexedDB.
+  // docs/specs/slow-local-db-plan.md, step 4.
+  it("is 300 MB", () => {
+    expect(PAGE_CACHE_SIZE_KB).toBe(300 * 1024);
+  });
+});
 
 describe("chooseVfs", () => {
   // OPFSCoopSyncVFS is disabled in favor of IDBBatchAtomicVFS: its
