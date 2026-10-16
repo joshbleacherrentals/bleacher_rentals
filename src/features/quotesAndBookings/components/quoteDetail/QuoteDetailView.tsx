@@ -16,6 +16,8 @@ import { FilesTab } from "./tabs/FilesTab";
 import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
 import { QuoteActionBar } from "./QuoteActionBar";
+import { ContractTabV2 } from "./ContractTabV2";
+import { QuoteVersionToggle, type QuotePageVersion } from "./QuoteVersionToggle";
 import { useQuotesBookingsCapabilities } from "../../hooks/useQuotesBookingsCapabilities";
 import { useGoBackOrTo } from "../../hooks/useGoBackOrTo";
 import { useEventCurrency } from "../../hooks/useEventCurrency";
@@ -50,6 +52,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   const { quote, isLoading: loading } = useQuoteDetail(eventId);
   const [deleting, setDeleting] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  // 1 = the page as it is today; 2 = the new layout, built block by block.
+  const [pageVersion, setPageVersion] = useState<QuotePageVersion>(1);
 
   const perms = usePermissionsStore();
   // What this user may do on this quote. Worked out once here and handed down: no component below
@@ -229,26 +233,31 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
       )}
 
       {/* Header */}
-      <div className={`bg-darkBlue text-white px-6 py-4 ${isDeleted ? "" : "rounded-t-lg"}`}>
-        <div className="flex items-center gap-2 text-xs text-white/60 mb-1">
-          <button onClick={goBack} className="hover:text-white transition cursor-pointer">
-            Quotes & Bookings
-          </button>
-          <span>/</span>
-          {quote.contact && (
-            <>
-              <span>
-                {quote.contact.firstName} {quote.contact.lastName ?? ""}
-              </span>
-              <span>/</span>
-            </>
-          )}
-          <span className="text-white/80">{quote.eventName}</span>
+      <div
+        className={`bg-darkBlue text-white px-6 py-4 flex items-start justify-between gap-4 ${isDeleted ? "" : "rounded-t-lg"}`}
+      >
+        <div>
+          <div className="flex items-center gap-2 text-xs text-white/60 mb-1">
+            <button onClick={goBack} className="hover:text-white transition cursor-pointer">
+              Quotes & Bookings
+            </button>
+            <span>/</span>
+            {quote.contact && (
+              <>
+                <span>
+                  {quote.contact.firstName} {quote.contact.lastName ?? ""}
+                </span>
+                <span>/</span>
+              </>
+            )}
+            <span className="text-white/80">{quote.eventName}</span>
+          </div>
+          <h1 className="text-xl font-bold">
+            {quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName ?? ""} — ` : ""}
+            {quote.eventName}
+          </h1>
         </div>
-        <h1 className="text-xl font-bold">
-          {quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName ?? ""} — ` : ""}
-          {quote.eventName}
-        </h1>
+        <QuoteVersionToggle value={pageVersion} onChange={setPageVersion} />
       </div>
 
       {/* Tab bar + actions */}
@@ -314,10 +323,16 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
 
         <div className="bg-white px-6 py-6 rounded-b-lg border border-t-0">
           <TabsContent value="contract">
-            <ContractTab quote={quote} />
+            {pageVersion === 1 ? (
+              <ContractTab quote={quote} />
+            ) : (
+              <ContractTabV2 quote={quote} canEdit={can.manageQuote && !isDeleted} />
+            )}
           </TabsContent>
           <TabsContent value="billing">
-            <BillingTab quote={quote} contractTotalCents={contractTotalCents} can={can} />
+            {pageVersion === 1 && (
+              <BillingTab quote={quote} contractTotalCents={contractTotalCents} can={can} />
+            )}
           </TabsContent>
           <TabsContent value="files">
             <FilesTab quoteId={quote.id} />
