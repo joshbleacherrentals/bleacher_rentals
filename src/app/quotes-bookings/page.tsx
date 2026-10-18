@@ -247,7 +247,7 @@ export default function QuotesBookingsPage() {
   // -m-4 cancels the quotes-bookings layout's p-4 so the filter sidebar sits flush against the app
   // sidebar, header and window edge; the content column puts its own padding back.
   return (
-    <div className="-m-4 flex items-start">
+    <div className="p-4 -m-4 flex items-start">
       <FilterSidebar
         filters={filters}
         isOpen={filters.isOpen}

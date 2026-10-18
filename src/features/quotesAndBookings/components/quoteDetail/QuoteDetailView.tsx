@@ -218,7 +218,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   return (
     <div>
       {isDeleted && (
-        <div className="bg-red-50 border border-red-200 rounded-t-lg px-6 py-3 text-sm text-red-800 flex items-center gap-2">
+        <div className="bg-red-50 border border-red-200 px-6 py-3 text-sm text-red-800 flex items-center gap-2">
           <Trash2 className="w-4 h-4 shrink-0" />
           <span>
             This quote was deleted
@@ -229,7 +229,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
       )}
 
       {/* Header */}
-      <div className={`bg-darkBlue text-white px-6 py-4 ${isDeleted ? "" : "rounded-t-lg"}`}>
+      <div className={`bg-darkBlue text-white px-6 py-4 ${isDeleted ? "" : ""}`}>
         <div className="flex items-center gap-2 text-xs text-white/60 mb-1">
           <button onClick={goBack} className="hover:text-white transition cursor-pointer">
             Quotes & Bookings
