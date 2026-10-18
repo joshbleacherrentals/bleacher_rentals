@@ -1,12 +1,12 @@
 import { Currency, LineItem } from "../types/quoteTypes";
 
 /**
- * The columns an `EventLineItems` row gets from a quote line item. Shared by the
- * create (local PowerSync) and update (Supabase) writers, which each add their
- * own `id`, `is_template` and `deleted` in the shape their client expects.
+ * The columns an `EventLineItems` row gets from a quote line item. Shared by the create writer
+ * (`createQuoteEvent`) and the update writer (`syncEventLineItems`), which both write through the
+ * local PowerSync database and add their own `id`, `is_template`, `deleted` and `created_at`.
  *
- * `is_price_overridden` is a boolean here (the Supabase writer's shape); the local PowerSync writer
- * stores booleans as 0/1 and converts it.
+ * `is_price_overridden` is a boolean here; the local table stores booleans as 0/1, so the writers
+ * convert it.
  */
 export function toEventLineItemValues(li: LineItem, eventUuid: string, currency: Currency) {
   return {
