@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { softDeleteEvent } from "../../db/softDeleteEvent";
 import { useEventLineItems } from "../../hooks/useEventLineItems";
 import { useQuoteDetail } from "../../hooks/useQuoteDetail";
@@ -18,9 +18,11 @@ import { MessagesTab } from "./tabs/MessagesTab";
 import { QuoteActionBar } from "./QuoteActionBar";
 import { ContractTabV2 } from "./ContractTabV2";
 import { QuoteVersionToggle, type QuotePageVersion } from "./QuoteVersionToggle";
+import { QuoteTabBar } from "./QuoteTabBar";
 import { useQuotesBookingsCapabilities } from "../../hooks/useQuotesBookingsCapabilities";
 import { useGoBackOrTo } from "../../hooks/useGoBackOrTo";
 import { useEventCurrency } from "../../hooks/useEventCurrency";
+import { quoteSubtitle } from "../../utils/quoteSubtitle";
 import { formatMoney } from "../../utils/formatMoney";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { loadEventForModal } from "@/features/eventConfiguration/functions/loadEventForModal";
@@ -212,6 +214,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   }
 
   const isDeleted = quote.deleted;
+  const subtitle = quoteSubtitle(quote);
   const deleteLog = deleteLogRows?.[0] ?? null;
   const deletedAtFormatted = deleteLog?.changed_at
     ? DateTime.fromISO(deleteLog.changed_at).toFormat("MMM d, yyyy 'at' h:mm a")
@@ -222,7 +225,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   return (
     <div>
       {isDeleted && (
-        <div className="bg-red-50 border border-red-200 rounded-t-lg px-6 py-3 text-sm text-red-800 flex items-center gap-2">
+        <div className="bg-red-50 border border-red-200 px-6 py-3 text-sm text-red-800 flex items-center gap-2">
           <Trash2 className="w-4 h-4 shrink-0" />
           <span>
             This quote was deleted
@@ -233,96 +236,47 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
       )}
 
       {/* Header */}
-      <div
-        className={`bg-darkBlue text-white px-6 py-4 flex items-start justify-between gap-4 ${isDeleted ? "" : "rounded-t-lg"}`}
-      >
+      <div className="bg-linear-to-r from-gray-800 to-gray-600 text-white px-6 py-4 flex items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-white/60 mb-1">
-            <button onClick={goBack} className="hover:text-white transition cursor-pointer">
-              Quotes & Bookings
-            </button>
-            <span>/</span>
-            {quote.contact && (
-              <>
-                <span>
-                  {quote.contact.firstName} {quote.contact.lastName ?? ""}
-                </span>
-                <span>/</span>
-              </>
-            )}
-            <span className="text-white/80">{quote.eventName}</span>
-          </div>
           <h1 className="text-xl font-bold">
-            {quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName ?? ""} — ` : ""}
-            {quote.eventName}
+            {quote.invoiceNumber != null
+              ? `${quote.eventName} (#${quote.invoiceNumber})`
+              : quote.eventName}
           </h1>
+          {subtitle && <p className="text-sm text-white/70 mt-0 mb-4">{subtitle}</p>}
         </div>
         <QuoteVersionToggle value={pageVersion} onChange={setPageVersion} />
       </div>
 
-      {/* Tab bar + actions */}
+      {/* Tab bar */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-0">
-        <div className="border-b bg-white px-6 flex items-center justify-between">
-          <TabsList className="bg-transparent h-auto p-0 gap-0 rounded-none">
-            <TabsTrigger
-              value="contract"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Contract
-            </TabsTrigger>
-            <TabsTrigger
-              value="billing"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Billing
-            </TabsTrigger>
-            <TabsTrigger
-              value="files"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Files
-            </TabsTrigger>
-            <TabsTrigger
-              value="log"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Log
-            </TabsTrigger>
-            <TabsTrigger
-              value="messages"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Messages
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex items-center gap-3 py-2">
-            <span className="text-sm font-bold">{formatMoney(contractTotalCents, currency)}</span>
-            <span className="text-xs text-gray-500">Contract Total</span>
-            <QuoteActionBar
-              can={can}
-              isDeleted={isDeleted}
-              deleting={deleting}
-              onOpenInDashboard={handleOpenInDashboard}
-              onEdit={() => router.push(`/quotes-bookings/${quote.id}/edit`)}
-              onDelete={handleDelete}
-              onSendToClient={handleSendToClient}
-            />
-            {/* Review-request button disabled per boss feedback — kept for future use
-            {!canSend && perms.isAccountManager && (
-              <button
-                onClick={handleRequestQuoteReview}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-sm hover:bg-amber-100 transition cursor-pointer"
-              >
-                <ClipboardCheck className="w-3.5 h-3.5" />
-                Request Review
-              </button>
-            )} */}
-          </div>
-        </div>
+        <QuoteTabBar />
 
         <div className="bg-white px-6 py-6 rounded-b-lg border border-t-0">
           <TabsContent value="contract">
+            <div className="flex items-center justify-end gap-3 mb-6">
+              <span className="text-sm font-bold">{formatMoney(contractTotalCents, currency)}</span>
+              <span className="text-xs text-gray-500">Contract Total</span>
+              <QuoteActionBar
+                can={can}
+                isDeleted={isDeleted}
+                deleting={deleting}
+                onOpenInDashboard={handleOpenInDashboard}
+                onEdit={() => router.push(`/quotes-bookings/${quote.id}/edit`)}
+                onDelete={handleDelete}
+                onSendToClient={handleSendToClient}
+              />
+              {/* Review-request button disabled per boss feedback — kept for future use
+              {!canSend && perms.isAccountManager && (
+                <button
+                  onClick={handleRequestQuoteReview}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-sm hover:bg-amber-100 transition cursor-pointer"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  Request Review
+                </button>
+              )} */}
+            </div>
             {pageVersion === 1 ? (
               <ContractTab quote={quote} />
             ) : (

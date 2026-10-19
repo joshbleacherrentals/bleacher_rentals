@@ -110,12 +110,17 @@ describe("QuoteDetailView", () => {
     expect(render()).toContain("Quote not found");
   });
 
-  it("draws the contact and event name as the heading, and the Contract tab", () => {
-    mocks.state = { quote: quote(), isLoading: false, error: null };
+  it("draws the event name and quote number as the heading, and the Contract tab", () => {
+    mocks.state = { quote: quote({ invoiceNumber: 1042 }), isLoading: false, error: null };
     const html = render();
-    expect(html).toMatch(/<h1[^>]*>[\s\S]*Dana Whitfield — [\s\S]*Spring Gala[\s\S]*<\/h1>/);
+    expect(html).toMatch(/<h1[^>]*>Spring Gala \(#1042\)<\/h1>/);
     expect(html).toContain('data-tab="contract"');
     expect(html).not.toContain("Loading quote...");
+  });
+
+  it("draws the event name alone when the quote has no number yet", () => {
+    mocks.state = { quote: quote({ invoiceNumber: null }), isLoading: false, error: null };
+    expect(render()).toMatch(/<h1[^>]*>Spring Gala<\/h1>/);
   });
 
   it("draws whatever title the hook holds: a renamed quote shows its new name", () => {
