@@ -46,21 +46,22 @@ function logBlocked(addresses: string[]) {
 export type GuardedEmailRecipients = {
   to: string | null;
   cc: string | null;
+  bcc: string | null;
   /** Addresses dropped because they are not on the list. */
   blocked: string[];
 };
 
 /**
- * For one email with a To and an optional Cc. A blocked address is dropped on its own; `to` is
+ * For one email with a To and an optional Cc and Bcc. A blocked address is dropped on its own; `to` is
  * null when nothing is left to send to. A list that cannot be read blocks everything — a broken
  * allowlist must never fall back to sending to anyone.
  */
 export async function guardEmailRecipients(
   supabaseAdmin: SupabaseClient<any>,
-  input: { to: string; cc?: string | null },
+  input: { to: string; cc?: string | null; bcc?: string | null },
 ): Promise<GuardedEmailRecipients> {
   if (!isDevEmailRestricted()) {
-    return { to: input.to, cc: input.cc ?? null, blocked: [] };
+    return { to: input.to, cc: input.cc ?? null, bcc: input.bcc ?? null, blocked: [] };
   }
 
   const allowed = (await loadAllowedEmails(supabaseAdmin)) ?? new Set<string>();
@@ -68,12 +69,16 @@ export async function guardEmailRecipients(
     { to: splitRecipients(input.to), cc: splitRecipients(input.cc) },
     allowed,
   );
-  logBlocked(result.blocked);
+  // A Bcc is filtered on its own like the others, so it cannot bypass the list.
+  const bcc = splitByAllowlist(splitRecipients(input.bcc), allowed);
+  const blocked = [...result.blocked, ...bcc.blocked];
+  logBlocked(blocked);
 
   return {
     to: result.to.length ? result.to.join(", ") : null,
     cc: result.cc.length ? result.cc.join(", ") : null,
-    blocked: result.blocked,
+    bcc: bcc.allowed.length ? bcc.allowed.join(", ") : null,
+    blocked,
   };
 }
 

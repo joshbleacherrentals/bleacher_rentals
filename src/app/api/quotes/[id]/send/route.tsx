@@ -4,7 +4,11 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@supabase/supabase-js";
 import { buildQuoteDocumentData } from "@/features/quotesAndBookings/pdf/quoteDocumentData";
 import { QuotePdfDocument } from "@/features/quotesAndBookings/pdf/QuotePdfDocument";
-import { sendTriggerEmail } from "@/features/automaticEmails/server/sendTriggerEmail";
+import {
+  sendTriggerEmail,
+  type EmailAttachment,
+} from "@/features/automaticEmails/server/sendTriggerEmail";
+import { parseSendBody } from "./parseSendBody";
 import { QUOTE_SENT_CLIENT } from "@/features/automaticEmails/triggers";
 
 function getSupabaseAdmin() {
@@ -22,16 +26,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const body = await req.json();
-  const recipientEmails: string[] =
-    body.recipientEmails ?? (body.recipientEmail ? [body.recipientEmail] : []);
-
-  if (recipientEmails.length === 0) {
-    return NextResponse.json(
-      { error: "At least one recipient email is required" },
-      { status: 400 },
-    );
+  const body = await req.json().catch(() => null);
+  const parsed = parseSendBody(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+  const input = parsed.input;
 
   const origin = req.nextUrl.origin;
 
@@ -46,7 +46,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Send via the automatic-email template system.
   const supabaseAdmin = getSupabaseAdmin();
-  const toLine = [...new Set(recipientEmails)].join(",");
+
+  // Files the browser added for this send are already in the event-files bucket with an EventFiles
+  // row (the browser uploads them first: a file cannot travel in this request, the host limits its
+  // size). They must belong to this event. Anything unreadable stops the send before any email.
+  const addedAttachments: EmailAttachment[] = [];
+  if (input.addedFileIds.length > 0) {
+    const { data: rows } = await supabaseAdmin
+      .from("EventFiles")
+      .select("id, file_name, storage_path, mime_type")
+      .eq("event_uuid", id)
+      .in("id", input.addedFileIds);
+    const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
+    for (const fileId of input.addedFileIds) {
+      const row = byId.get(fileId);
+      const { data: blob } = row
+        ? await supabaseAdmin.storage.from("event-files").download(row.storage_path)
+        : { data: null };
+      if (!row || !blob) {
+        return NextResponse.json(
+          { error: "An attached file could not be read. Remove it and add it again." },
+          { status: 400 },
+        );
+      }
+      addedAttachments.push({
+        name: row.file_name,
+        content: Buffer.from(await blob.arrayBuffer()),
+        contentType: row.mime_type ?? "application/octet-stream",
+      });
+    }
+  }
 
   const result = await sendTriggerEmail({
     supabaseAdmin,
@@ -54,13 +83,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     eventId: id,
     docData: data,
     origin,
-    recipientOverride: toLine,
+    recipientOverride: input.to.join(","),
+    cc: input.cc,
+    bcc: input.bcc,
+    subject: input.subject,
+    omitAttachmentKeys: input.removedAttachmentKeys,
     attachments: [
       {
         name: `${data.quoteNumber}.pdf`,
         content: Buffer.from(pdfBuffer),
         contentType: "application/pdf",
       },
+      ...addedAttachments,
     ],
   });
 
@@ -108,5 +142,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     console.error("Failed to store sent quote PDF (email still sent):", e);
   }
 
-  return NextResponse.json({ success: true, sentTo: toLine });
+  return NextResponse.json({ success: true, sentTo: input.to.join(",") });
 }

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolveTriggerEmail } from "@/features/automaticEmails/server/sendTriggerEmail";
+import {
+  QUOTE_PDF_KEY,
+  type PreviewAttachment,
+} from "@/features/quotesAndBookings/utils/sendQuote";
 import { QUOTE_SENT_CLIENT } from "@/features/automaticEmails/triggers";
 
 // What the send route would email, without sending. Uses the same resolver as sending.
@@ -42,7 +46,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const { data } = await supabaseAdmin.storage
         .from("email-attachments")
         .createSignedUrl(row.storage_path, 60 * 60);
-      return data?.signedUrl ? { name: row.file_name, url: data.signedUrl } : null;
+      return data?.signedUrl
+        ? {
+            key: row.id,
+            name: row.file_name,
+            url: data.signedUrl,
+            sizeBytes: row.file_size_bytes ?? null,
+          }
+        : null;
     }),
   );
 
@@ -53,8 +64,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     subject: email.subject,
     htmlBody: email.htmlBody,
     attachments: [
-      { name: `${email.docData.quoteNumber}.pdf`, url: `/api/quotes/${id}/pdf` },
-      ...templateFiles.filter((f): f is { name: string; url: string } => f !== null),
+      {
+        key: QUOTE_PDF_KEY,
+        name: `${email.docData.quoteNumber}.pdf`,
+        url: `/api/quotes/${id}/pdf`,
+        sizeBytes: null,
+      },
+      ...templateFiles.filter((f): f is NonNullable<typeof f> => f !== null),
     ],
   });
 }

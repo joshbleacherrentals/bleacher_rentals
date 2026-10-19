@@ -291,10 +291,10 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
         onOpenChange={setSendDialogOpen}
         eventId={eventId}
         recipientEmails={sendRecipients}
-        onSent={() =>
+        onSent={(sent) =>
           logQuoteSentLocal({
             eventId,
-            recipientLine: sendRecipients.join(","),
+            recipients: { to: sent.to, cc: sent.cc, bcc: sent.bcc },
             currentUserUuid: perms.userId,
           })
         }

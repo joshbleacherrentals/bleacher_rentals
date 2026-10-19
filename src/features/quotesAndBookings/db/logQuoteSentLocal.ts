@@ -1,5 +1,6 @@
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute } from "@/lib/powersync/typedQuery";
+import { formatRecipientsLine } from "../utils/sendQuote";
 
 /**
  * Logs a "quote sent to client" event to the EventChangeLog via PowerSync
@@ -15,7 +16,7 @@ import { typedExecute } from "@/lib/powersync/typedQuery";
  */
 export async function logQuoteSentLocal(params: {
   eventId: string;
-  recipientLine: string;
+  recipients: { to: string[]; cc: string[]; bcc: string[] };
   currentUserUuid: string | null;
 }): Promise<void> {
   await typedExecute(
@@ -27,7 +28,7 @@ export async function logQuoteSentLocal(params: {
         changed_by_user_uuid: params.currentUserUuid,
         field_name: "email_sent",
         prev_value: null,
-        next_value: params.recipientLine,
+        next_value: formatRecipientsLine(params.recipients), // D10: "To: a; Cc: b; Bcc: c"
         action_type: "send",
         changed_at: new Date().toISOString(),
       } as any)

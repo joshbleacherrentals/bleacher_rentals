@@ -973,14 +973,14 @@ isOneToOne: false
                   ]
                 },"EventEmailLog": {
                   Row: {
-                    "event_uuid": string,"fired_at": string,"id": string,"reason": string | null,"status": Database["public"]['Enums']["email_send_status"],"template_id": string | null,"to_email": string | null,"trigger": string
+                    "attachment_names": string | null,"bcc_emails": string | null,"cc_emails": string | null,"event_uuid": string,"fired_at": string,"id": string,"reason": string | null,"status": Database["public"]['Enums']["email_send_status"],"subject": string | null,"template_id": string | null,"to_email": string | null,"trigger": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "event_uuid": string,"fired_at"?: string,"id"?: string,"reason"?: string | null,"status": Database["public"]['Enums']["email_send_status"],"template_id"?: string | null,"to_email"?: string | null,"trigger": string
+                    "attachment_names"?: string | null,"bcc_emails"?: string | null,"cc_emails"?: string | null,"event_uuid": string,"fired_at"?: string,"id"?: string,"reason"?: string | null,"status": Database["public"]['Enums']["email_send_status"],"subject"?: string | null,"template_id"?: string | null,"to_email"?: string | null,"trigger": string
                   }
                   Update: {
-                    "event_uuid"?: string,"fired_at"?: string,"id"?: string,"reason"?: string | null,"status"?: Database["public"]['Enums']["email_send_status"],"template_id"?: string | null,"to_email"?: string | null,"trigger"?: string
+                    "attachment_names"?: string | null,"bcc_emails"?: string | null,"cc_emails"?: string | null,"event_uuid"?: string,"fired_at"?: string,"id"?: string,"reason"?: string | null,"status"?: Database["public"]['Enums']["email_send_status"],"subject"?: string | null,"template_id"?: string | null,"to_email"?: string | null,"trigger"?: string
                   }
                   Relationships: [
                     {

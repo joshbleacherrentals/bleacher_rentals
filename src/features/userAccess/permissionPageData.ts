@@ -236,6 +236,29 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Send To Client",
+    description:
+      "The Send button on a quote: it shows the email that goes to the customer and sends it with the quote PDF attached.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Can send a quote to the customer and, for that send, change the To, Cc and Bcc addresses, the subject and the attachments (the quote PDF always stays attached). The change applies to that send only; the office's email template is not changed.",
+      ),
+      account_manager: full(
+        "Can send a quote to the customer and, for that send, change the To, Cc and Bcc addresses, the subject and the attachments (the quote PDF always stays attached). The change applies to that send only; the office's email template is not changed.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Can read a quote but cannot send it to the customer."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(
+        "Can read a quote but cannot send it to the customer. Sending is for administrators and account managers.",
+      ),
+    },
+  },
+  {
     label: "Dashboard Cells",
     description: "This applies to the Dashboard page.",
     category: "Day to Day Operations",

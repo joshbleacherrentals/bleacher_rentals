@@ -16,6 +16,10 @@ type EmailLogRow = {
   status: string | null;
   reason: string | null;
   to_email: string | null;
+  cc_emails: string | null;
+  bcc_emails: string | null;
+  subject: string | null;
+  attachment_names: string | null;
   template_id: string | null;
   fired_at: string | null;
 };
@@ -369,7 +373,19 @@ export function LogTab({ quoteId }: { quoteId: string }) {
     () =>
       db
         .selectFrom("EventEmailLog")
-        .select(["id", "trigger", "status", "reason", "to_email", "template_id", "fired_at"])
+        .select([
+          "id",
+          "trigger",
+          "status",
+          "reason",
+          "to_email",
+          "cc_emails",
+          "bcc_emails",
+          "subject",
+          "attachment_names",
+          "template_id",
+          "fired_at",
+        ])
         .where("event_uuid", "=", quoteId)
         .orderBy("fired_at", "desc")
         .compile(),
@@ -565,6 +581,14 @@ export function LogTab({ quoteId }: { quoteId: string }) {
                         <Mail className="w-3 h-3" />
                         {row.to_email}
                       </p>
+                    )}
+                    {row.cc_emails && <p className="text-xs text-gray-500">Cc: {row.cc_emails}</p>}
+                    {row.bcc_emails && (
+                      <p className="text-xs text-gray-500">Bcc: {row.bcc_emails}</p>
+                    )}
+                    {row.subject && <p className="text-xs text-gray-500">Subject: {row.subject}</p>}
+                    {row.attachment_names && (
+                      <p className="text-xs text-gray-500">Attachments: {row.attachment_names}</p>
                     )}
                     {!sent && row.reason && <p className="text-xs text-red-500">{row.reason}</p>}
                     {row.template_id && (

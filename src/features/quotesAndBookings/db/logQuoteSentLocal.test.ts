@@ -42,7 +42,7 @@ describe("logQuoteSentLocal", () => {
   it("inserts a 'send' EventChangeLog row for the current user", async () => {
     await logQuoteSentLocal({
       eventId: "event-1",
-      recipientLine: "a@x.com,b@x.com",
+      recipients: { to: ["a@x.com", "b@x.com"], cc: ["c@x.com"], bcc: [] },
       currentUserUuid: "user-9",
     });
 
@@ -53,13 +53,13 @@ describe("logQuoteSentLocal", () => {
     expect(parameters).toContain("user-9"); // changed_by_user_uuid = sender
     expect(parameters).toContain("email_sent"); // field_name
     expect(parameters).toContain("send"); // action_type
-    expect(parameters).toContain("a@x.com,b@x.com"); // next_value
+    expect(parameters).toContain("To: a@x.com, b@x.com; Cc: c@x.com"); // next_value
   });
 
   it("allows a null current user uuid", async () => {
     await logQuoteSentLocal({
       eventId: "event-2",
-      recipientLine: "c@x.com",
+      recipients: { to: ["c@x.com"], cc: [], bcc: [] },
       currentUserUuid: null,
     });
     expect(executed).toHaveLength(1);

@@ -12,10 +12,19 @@ import {
 } from "@/features/automaticEmails/variables";
 import { logEmailSend } from "./logEmailSend";
 import { PAYMENT_MADE_AM, QUOTE_SIGNED_AM } from "@/features/automaticEmails/triggers";
-import { ALLOWED_EMAILS_PATH } from "@/features/devEmailAllowlist/logic/allowlist";
+import {
+  ALLOWED_EMAILS_PATH,
+  emailAddressOf,
+  splitRecipients,
+} from "@/features/devEmailAllowlist/logic/allowlist";
 import { guardEmailRecipients } from "@/features/devEmailAllowlist/server/guardRecipients";
 
-export type SendResult = { sent: true; to: string } | { sent: false; reason: string };
+// `postmarkException` is set only when Postmark threw (it refused the message or could not be
+// reached), so a caller that used to see that as a thrown error can still tell it apart from a
+// "not sent" decision such as a missing template.
+export type SendResult =
+  | { sent: true; to: string }
+  | { sent: false; reason: string; postmarkException?: true };
 
 // Finance wants a copy of every account-manager notification for these two
 // triggers. Hard-coded on purpose — this isn't a per-office setting yet.
@@ -60,6 +69,7 @@ export type ResolvedTriggerEmail = {
     file_name: string;
     storage_path: string;
     mime_type: string | null;
+    file_size_bytes?: number | null;
   }[];
   docData: QuoteDocumentData;
 };
@@ -137,7 +147,7 @@ export async function resolveTriggerEmail(opts: ResolveOpts): Promise<ResolveRes
 
   const { data: storedAttachmentRows } = await supabaseAdmin
     .from("EmailTemplateAttachments")
-    .select("id, file_name, storage_path, mime_type")
+    .select("id, file_name, storage_path, mime_type, file_size_bytes")
     .eq("template_id", template.id)
     .order("created_at", { ascending: true });
 
@@ -181,21 +191,55 @@ export async function sendTriggerEmail(opts: {
   attachments?: EmailAttachment[];
   // Override the resolved recipient (e.g. to CC a finance contact).
   recipientOverride?: string;
+  // Per-send overrides (the quote send dialog). `cc` replaces the resolved Cc, `bcc` is new, and a
+  // blank `subject` keeps the template's. All are optional.
+  cc?: string[];
+  bcc?: string[];
+  subject?: string;
+  // Template attachment rows to leave out, by row id. Caller-supplied `attachments` are never
+  // affected (the quote PDF is passed that way and cannot be removed).
+  omitAttachmentKeys?: string[];
 }): Promise<SendResult> {
   const { supabaseAdmin, trigger, eventId } = opts;
 
   // Always log the outcome before returning so every fire attempt is recorded
   // in EventEmailLog, whether it succeeded or failed.
-  const resolve = (result: SendResult, templateId: string | null): Promise<SendResult> =>
-    logEmailSend(supabaseAdmin, { eventId, trigger, result, templateId }).then(() => result);
+  const resolve = (
+    result: SendResult,
+    templateId: string | null,
+    details?: Parameters<typeof logEmailSend>[1]["details"],
+  ): Promise<SendResult> =>
+    logEmailSend(supabaseAdmin, { eventId, trigger, result, templateId, details }).then(
+      () => result,
+    );
 
   const resolved = await resolveTriggerEmail(opts);
   if (!resolved.ok) return resolve({ sent: false, reason: resolved.reason }, resolved.templateId);
   const { email } = resolved;
 
+  // The final lists. An address that appears in more than one field is sent once, in the first of
+  // To, Cc, Bcc (the dialog already refuses this; this is defensive).
+  const seen = new Set<string>();
+  const firstOnly = (list: string[]) =>
+    list.filter((a) => {
+      const key = emailAddressOf(a);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const toList = firstOnly(splitRecipients(email.to));
+  const ccList = firstOnly(opts.cc ?? splitRecipients(email.cc));
+  const bccList = firstOnly(opts.bcc ?? []);
+  const subject = opts.subject?.trim() || email.subject;
+
   // Development only: an address that is not on the allowed emails list gets nothing. The attempt
-  // is logged as failed so the quote's Automatic Emails tab says why.
-  const guarded = await guardEmailRecipients(supabaseAdmin, { to: email.to, cc: email.cc });
+  // is logged as failed so the quote's Automatic Emails tab says why. Bcc is filtered too.
+  const guarded = await guardEmailRecipients(supabaseAdmin, {
+    to: toList.join(", "),
+    cc: ccList.join(", ") || null,
+    bcc: bccList.join(", ") || null,
+  });
+  const details = { cc: guarded.cc, bcc: guarded.bcc, subject };
   if (!guarded.to) {
     return resolve(
       {
@@ -203,11 +247,14 @@ export async function sendTriggerEmail(opts: {
         reason: `Blocked in development — not on the allowed emails list (${ALLOWED_EMAILS_PATH}): ${guarded.blocked.join(", ")}`,
       },
       email.templateId,
+      details,
     );
   }
 
   const storedAttachments: EmailAttachment[] = [];
+  const omitted = new Set(opts.omitAttachmentKeys ?? []);
   for (const row of email.storedAttachmentRows) {
+    if (omitted.has(row.id)) continue;
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from("email-attachments")
       .download(row.storage_path);
@@ -228,25 +275,41 @@ export async function sendTriggerEmail(opts: {
   // Merge caller-supplied attachments (e.g. the quote PDF) with stored ones.
   const allAttachments = [...(opts.attachments ?? []), ...storedAttachments];
 
+  const attachmentNames = allAttachments.map((a) => a.name).join(", ") || null;
   const client = new postmark.ServerClient(process.env.POSTMARK_API_KEY!);
-  await client.sendEmail({
-    From: email.from,
-    To: guarded.to,
-    ...(guarded.cc ? { Cc: guarded.cc } : {}),
-    Subject: email.subject,
-    HtmlBody: email.htmlBody,
-    MessageStream: "outbound",
-    ...(allAttachments.length
-      ? {
-          Attachments: allAttachments.map((a) => ({
-            Name: a.name,
-            Content: a.content.toString("base64"),
-            ContentType: a.contentType,
-            ContentID: "",
-          })),
-        }
-      : {}),
-  });
+  try {
+    await client.sendEmail({
+      From: email.from,
+      To: guarded.to,
+      ...(guarded.cc ? { Cc: guarded.cc } : {}),
+      ...(guarded.bcc ? { Bcc: guarded.bcc } : {}),
+      Subject: subject,
+      HtmlBody: email.htmlBody,
+      MessageStream: "outbound",
+      ...(allAttachments.length
+        ? {
+            Attachments: allAttachments.map((a) => ({
+              Name: a.name,
+              Content: a.content.toString("base64"),
+              ContentType: a.contentType,
+              ContentID: "",
+            })),
+          }
+        : {}),
+    });
+  } catch (e) {
+    // Postmark refused the message (bad address, over the size limit, inactive recipient...) or
+    // could not be reached. Record why instead of throwing, so the sender sees the reason.
+    const reason = `Postmark could not send the email: ${e instanceof Error ? e.message : String(e)}`;
+    console.error("[automatic-emails] Postmark send failed:", e);
+    return resolve({ sent: false, reason, postmarkException: true }, email.templateId, {
+      ...details,
+      attachmentNames,
+    });
+  }
 
-  return resolve({ sent: true, to: guarded.to }, email.templateId);
+  return resolve({ sent: true, to: guarded.to }, email.templateId, {
+    ...details,
+    attachmentNames,
+  });
 }

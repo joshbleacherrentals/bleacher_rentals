@@ -1226,6 +1226,10 @@ const EventEmailLogCols = {
   status: column.text,
   reason: column.text,
   to_email: column.text,
+  cc_emails: column.text,
+  bcc_emails: column.text,
+  subject: column.text,
+  attachment_names: column.text,
   template_id: column.text,
   fired_at: column.text,
 } satisfies PowerSyncColsFor<"EventEmailLog">;

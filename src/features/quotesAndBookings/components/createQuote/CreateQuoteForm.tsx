@@ -36,7 +36,7 @@ import { PriceChangeDialog } from "./modals/PriceChangeDialog";
 import { summarizePriceReview, type PriceReview } from "../../utils/linePrice";
 import { draftSaveDefaults, validateQuoteForSend } from "../../utils/quoteValidation";
 import { validateLostReason } from "../../utils/lostReason";
-import { cleanRecipients } from "../../utils/sendQuote";
+import { cleanRecipients, type SendQuoteInput } from "../../utils/sendQuote";
 import { SendQuoteDialog } from "../sendQuote/SendQuoteDialog";
 
 export function CreateQuoteForm() {
@@ -251,10 +251,10 @@ export function CreateQuoteForm() {
     void triage("Events", { id: sendTarget.eventId }, supabase);
   };
 
-  const handleSent = () =>
+  const handleSent = (sent: SendQuoteInput) =>
     logQuoteSentLocal({
       eventId: sendTarget!.eventId,
-      recipientLine: sendTarget!.recipients.join(","),
+      recipients: { to: sent.to, cc: sent.cc, bcc: sent.bcc },
       currentUserUuid: currentUserUuid ?? perms.userId,
     });
 
