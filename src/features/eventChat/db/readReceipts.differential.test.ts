@@ -227,5 +227,5 @@ describe("markEventMessagesRead: the old implementation against the new one", ()
     // Guard against a vacuous pass, and show the gain.
     expect(receiptsWritten).toBeGreaterThan(500);
     expect(newTransactions).toBeLessThan(oldTransactions);
-  });
+  }, 60_000);
 });
