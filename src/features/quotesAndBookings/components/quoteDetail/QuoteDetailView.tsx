@@ -16,6 +16,7 @@ import { FilesTab } from "./tabs/FilesTab";
 import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
 import { QuoteActionBar } from "./QuoteActionBar";
+import { QuoteStatusButton } from "./QuoteStatusButton";
 import { QuoteTabBar } from "./QuoteTabBar";
 import { useQuotesBookingsCapabilities } from "../../hooks/useQuotesBookingsCapabilities";
 import { useGoBackOrTo } from "../../hooks/useGoBackOrTo";
@@ -248,6 +249,13 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
         <div className="bg-white px-6 py-6 rounded-b-lg border border-t-0">
           <TabsContent value="contract">
             <div className="flex items-center justify-end gap-3 mb-6">
+              <QuoteStatusButton
+                eventId={eventId}
+                status={quote.eventStatus}
+                canChange={can.manageQuote && !isDeleted}
+                supabase={supabase}
+                userId={perms.userId}
+              />
               <span className="text-sm font-bold">{formatMoney(contractTotalCents, currency)}</span>
               <span className="text-xs text-gray-500">Contract Total</span>
               <QuoteActionBar
