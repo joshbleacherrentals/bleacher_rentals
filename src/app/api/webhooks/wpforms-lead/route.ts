@@ -20,6 +20,15 @@ const sameSecret = (given: string | null, expected: string) => {
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
+/** The body as received, for the quote's Submission tab; not kept when it is not an object or is huge. */
+const MAX_SUBMISSION_CHARS = 100_000;
+function rawSubmission(body: unknown): Record<string, unknown> | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  return JSON.stringify(body).length <= MAX_SUBMISSION_CHARS
+    ? (body as Record<string, unknown>)
+    : null;
+}
+
 export async function POST(req: NextRequest) {
   const secret = process.env.WPFORMS_LEAD_SECRET;
   if (!secret) {
@@ -46,6 +55,7 @@ export async function POST(req: NextRequest) {
       supabase,
       parseWpformsLead(body),
       process.env.WPFORMS_LEAD_OWNER_USER_UUID || null,
+      rawSubmission(body),
     );
     return NextResponse.json({ eventId, path: `/quotes-bookings/${eventId}` }, { status: 201 });
   } catch (error) {

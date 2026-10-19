@@ -15,6 +15,8 @@ import { BillingTab } from "./tabs/BillingTab";
 import { FilesTab } from "./tabs/FilesTab";
 import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
+import { SubmissionTab } from "./tabs/SubmissionTab";
+import { useLeadSubmission } from "../../hooks/useLeadSubmission";
 import { QuoteActionBar } from "./QuoteActionBar";
 import { QuoteStatusButton } from "./QuoteStatusButton";
 import { QuoteTabBar } from "./QuoteTabBar";
@@ -37,7 +39,7 @@ import { cleanRecipients } from "../../utils/sendQuote";
 // import { ClipboardCheck } from "lucide-react";
 import { DateTime } from "luxon";
 
-const QUOTE_TABS = ["contract", "billing", "files", "log", "messages"] as const;
+const QUOTE_TABS = ["contract", "billing", "files", "log", "messages", "submission"] as const;
 type QuoteTab = (typeof QUOTE_TABS)[number];
 
 function isQuoteTab(tab: string | null): tab is QuoteTab {
@@ -129,6 +131,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   // Line items from PowerSync (reactive)
   const { lineItems } = useEventLineItems(eventId);
   const currency = useEventCurrency(eventId);
+  // The website form submission, for quotes created from it (docs: Events.lead_submission).
+  const { sections: submissionSections } = useLeadSubmission(eventId);
 
   const contractTotalCents = useMemo(() => {
     const lineTotal = lineItems.reduce((sum, li) => sum + li.valueCents * li.quantity, 0);
@@ -244,9 +248,9 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
 
       {/* Tab bar */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-0">
-        <QuoteTabBar />
+        <QuoteTabBar showSubmission={submissionSections !== null} />
 
-        <div className="bg-white px-6 py-6 rounded-b-lg border border-t-0">
+        <div className="bg-white px-6 py-6 rounded-b-lg">
           <TabsContent value="contract">
             <div className="flex items-center justify-end gap-3 mb-6">
               <QuoteStatusButton
@@ -291,6 +295,9 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
           </TabsContent>
           <TabsContent value="messages">
             <MessagesTab quoteId={quote.id} can={can} />
+          </TabsContent>
+          <TabsContent value="submission">
+            <SubmissionTab sections={submissionSections} />
           </TabsContent>
         </div>
       </Tabs>

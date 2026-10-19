@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../../../../database.types";
+import type { Database, Json } from "../../../../database.types";
 import type { ParsedLead } from "../logic/parseWpformsLead";
 import { findOrCreateVenue } from "./findOrCreateVenue";
 
@@ -65,13 +65,15 @@ async function createAddress(supabase: AdminClient, lead: ParsedLead): Promise<s
  * a quote: the name falls back to "Website Lead" and a missing date to today, for the account
  * manager to fix. The contact is reused when the email is already known, and so is the venue when
  * its address is. The owner is `ownerUserUuid`
- * (the quote is unassigned when it is null). The invoice number comes from the same database
+ * (the quote is unassigned when it is null). The submission is kept as received, for the quote's
+ * Submission tab. The invoice number comes from the same database
  * function the app's own create flow uses.
  */
 export async function createLeadQuote(
   supabase: AdminClient,
   lead: ParsedLead,
   ownerUserUuid: string | null,
+  submission: Record<string, unknown> | null = null,
 ): Promise<string> {
   const contactId = await findOrCreateContact(supabase, lead);
   // A lead with a street belongs to the venue at that address. The database then copies the
@@ -99,6 +101,7 @@ export async function createLeadQuote(
       contact_uuid: contactId,
       created_by_user_uuid: ownerUserUuid,
       internal_notes: lead.internalNotes,
+      lead_submission: (submission as Json | null) ?? null,
     })
     .select("id")
     .single();

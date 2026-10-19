@@ -50,9 +50,17 @@ describe("POST /api/webhooks/wpforms-lead", () => {
     const res = await call({ body: JSON.stringify({ name: "Ada Lovelace", event_name: "Gala" }) });
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ eventId: "ev-1", path: "/quotes-bookings/ev-1" });
-    const [, lead, owner] = mocks.createLeadQuote.mock.calls[0];
+    const [, lead, owner, submission] = mocks.createLeadQuote.mock.calls[0];
+    expect(submission).toEqual({ name: "Ada Lovelace", event_name: "Gala" });
     expect(lead).toMatchObject({ firstName: "Ada", lastName: "Lovelace", eventName: "Gala" });
     expect(owner).toBeNull();
+  });
+
+  it("keeps no submission when the body is not an object or is huge", async () => {
+    await call({ body: JSON.stringify(["a"]) });
+    expect(mocks.createLeadQuote.mock.calls[0][3]).toBeNull();
+    await call({ body: JSON.stringify({ comment: "x".repeat(100_001) }) });
+    expect(mocks.createLeadQuote.mock.calls[1][3]).toBeNull();
   });
 
   it("assigns the owner from the environment", async () => {

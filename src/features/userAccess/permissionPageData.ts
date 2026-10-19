@@ -97,7 +97,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
       accountant: read(
-        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments (see those rows).",
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments (see those rows).",
       ),
     },
   },
