@@ -21,6 +21,8 @@ const filters: Omit<QuotesBookingsFilters, "isOpen"> = {
   accountManagerUserUuid: null,
   inGoodShuffle: null,
   inQuickBooks: null,
+  inbound: null,
+  zoneUuids: [],
   salesOfficeUuid: null,
 };
 

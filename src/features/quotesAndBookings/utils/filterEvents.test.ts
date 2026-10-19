@@ -14,6 +14,8 @@ const noFilters: QuotesBookingsFilters = {
   accountManagerUserUuid: null,
   inGoodShuffle: null,
   inQuickBooks: null,
+  inbound: null,
+  zoneUuids: [],
   salesOfficeUuid: null,
 };
 
@@ -144,5 +146,68 @@ describe("In QuickBooks filter", () => {
       inQuickBooks: true,
     });
     expect(result.map((e) => e.id)).toEqual(["quoted"]);
+  });
+});
+
+describe("Inbound filter", () => {
+  const web = {
+    ...event("web", null),
+    lead_submission: '{"name":"Ada"}',
+  } as QuotesBookingsEvent & { lead_submission: string };
+  const app = event("app", null);
+  const emptyText = { ...event("empty", null), lead_submission: "  " } as QuotesBookingsEvent;
+  const all = [web, app, emptyText];
+  const run = (inbound: boolean | null) =>
+    filterQuotesBookingsEvents(all, { ...noFilters, inbound }).map((e) => e.id);
+
+  it("shows everything when it is off", () => {
+    expect(run(null)).toEqual(["web", "app", "empty"]);
+  });
+
+  it("shows only quotes made from the website form", () => {
+    expect(run(true)).toEqual(["web"]);
+  });
+
+  it("shows only the others, a blank submission counting as none", () => {
+    expect(run(false)).toEqual(["app", "empty"]);
+  });
+});
+
+describe("Zones filter", () => {
+  const inZone = (id: string, zone_uuid: string | null) =>
+    ({ ...event(id, null), zone_uuid }) as QuotesBookingsEvent;
+  const rows = [
+    inZone("a", "zone-1"),
+    inZone("b", "zone-2"),
+    inZone("c", null),
+    inZone("d", "zone-1"),
+  ];
+  const run = (zoneUuids: string[]) =>
+    filterQuotesBookingsEvents(rows, { ...noFilters, zoneUuids }).map((e) => e.id);
+
+  it("shows every zone when none is chosen", () => {
+    expect(run([])).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("shows the events of the chosen zones, any number of them", () => {
+    expect(run(["zone-1"])).toEqual(["a", "d"]);
+    expect(run(["zone-1", "zone-2"])).toEqual(["a", "b", "d"]);
+  });
+
+  it("treats an event with no zone as Zone Unknown", () => {
+    expect(run(["unknown"])).toEqual(["c"]);
+    expect(run(["zone-2", "unknown"])).toEqual(["b", "c"]);
+  });
+
+  it("combines with the other filters", () => {
+    const booked = { ...inZone("e", "zone-1"), event_status: "booked" } as QuotesBookingsEvent;
+    const quoted = { ...inZone("f", "zone-1"), event_status: "quoted" } as QuotesBookingsEvent;
+    expect(
+      filterQuotesBookingsEvents([booked, quoted], {
+        ...noFilters,
+        zoneUuids: ["zone-1"],
+        statuses: ["booked"],
+      }).map((e) => e.id),
+    ).toEqual(["e"]);
   });
 });

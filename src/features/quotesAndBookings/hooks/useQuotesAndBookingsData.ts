@@ -5,10 +5,17 @@ import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { filterQuotesBookingsEvents } from "../utils/filterEvents";
 import { QuotesBookingsEvent, QuotesBookingsFilters } from "../types";
+
+/** What the list query returns: an event plus the website form submission, as one flat type. */
+type Flat<T> = { [K in keyof T]: T[K] };
+type ListRow = Flat<QuotesBookingsEvent & { lead_submission: string | null }>;
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
+import { zoneOfEvent } from "../utils/zoneOfEvent";
+import { useZoneByState } from "./useZoneLookup";
 
 export function useQuotesAndBookingsData(filters: QuotesBookingsFilters, showDeleted = false) {
   const timezone = useTimezoneStore((s) => s.timezone);
+  const zoneByState = useZoneByState();
 
   const compiled = useMemo(() => {
     let query = db
@@ -34,6 +41,7 @@ export function useQuotesAndBookingsData(filters: QuotesBookingsFilters, showDel
         "e.sales_office_uuid as sales_office_uuid",
         "e.deleted as deleted",
         "e.invoice_number as invoice_number",
+        "e.lead_submission as lead_submission",
         "u.first_name as account_manager_first_name",
         "u.last_name as account_manager_last_name",
         "u.email as account_manager_email",
@@ -55,12 +63,17 @@ export function useQuotesAndBookingsData(filters: QuotesBookingsFilters, showDel
     return query.orderBy("e.created_at", "desc").compile();
   }, [showDeleted]);
 
-  const { data, isLoading, error } = useTypedQuery(compiled, expect<QuotesBookingsEvent>());
+  const { data, isLoading, error } = useTypedQuery(compiled, expect<ListRow>());
 
   const filtered = useMemo(() => {
     if (!data) return data;
-    return filterQuotesBookingsEvents(data, filters, timezone);
-  }, [data, filters, timezone]);
+    // The zone is worked out here, once per row, so the filter stays a plain comparison.
+    const withZone = data.map((event) => ({
+      ...event,
+      zone_uuid: zoneOfEvent(event, zoneByState),
+    }));
+    return filterQuotesBookingsEvents(withZone, filters, timezone);
+  }, [data, filters, timezone, zoneByState]);
 
   return { data: filtered, isLoading, error };
 }

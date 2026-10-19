@@ -6,6 +6,9 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
 import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
 import { StatusQuickToggle } from "@/features/quotesAndBookings/components/StatusQuickToggle";
+import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import { inboundLeadsZones, sameZones } from "@/features/quotesAndBookings/utils/inboundLeadsZones";
+import { InboundLeadsButton } from "@/features/quotesAndBookings/components/InboundLeadsButton";
 import {
   FilterSidebar,
   countActiveFilters,
@@ -100,6 +103,9 @@ export default function QuotesBookingsPage() {
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    setInbound,
+    setZoneUuids,
+    showInboundLeads,
     clearFilters,
     showDeleted,
     setShowDeleted,
@@ -127,6 +133,25 @@ export default function QuotesBookingsPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [scrollRef]);
+
+  // The Inbound Leads template narrows to the zones this person works: an account manager's own
+  // plus Zone Unknown, every zone for an admin.
+  const isAdmin = usePermissionsStore((s) => s.isAdmin);
+  const isAccountManager = usePermissionsStore((s) => s.isAccountManager);
+  const accountManagerZoneIds = usePermissionsStore((s) => s.accountManagerZoneIds);
+  const inboundZones = useMemo(
+    () => inboundLeadsZones({ isAdmin, isAccountManager, accountManagerZoneIds }),
+    [isAdmin, isAccountManager, accountManagerZoneIds],
+  );
+
+  // The Inbound Leads template is showing: unsent website quotes in those zones, oldest first.
+  const inboundLeadsActive =
+    filters.inbound === true &&
+    sameZones(filters.zoneUuids, inboundZones) &&
+    filters.statuses.length === 1 &&
+    filters.statuses[0] === "draft" &&
+    sort.key === "created_at" &&
+    sort.direction === "asc";
 
   const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
 
@@ -261,6 +286,8 @@ export default function QuotesBookingsPage() {
         onInGoodShuffleChange={setInGoodShuffle}
         onInQuickBooksChange={setInQuickBooks}
         onSalesOfficeChange={setSalesOfficeUuid}
+        onInboundChange={setInbound}
+        onZonesChange={setZoneUuids}
         onAccountManagerChange={setAccountManagerUserUuid}
         onClear={clearFilters}
       />
@@ -272,6 +299,10 @@ export default function QuotesBookingsPage() {
           subtitle="View all events — click a column header to sort"
           action={
             <div className="flex items-center gap-2">
+              <InboundLeadsButton
+                active={inboundLeadsActive}
+                onClick={() => showInboundLeads(inboundZones)}
+              />
               <StatusQuickToggle statuses={filters.statuses} onStatusesChange={setStatuses} />
               <button
                 type="button"

@@ -17,6 +17,8 @@ const emptyFilters: QuotesBookingsFilters = {
   inGoodShuffle: null,
   inQuickBooks: null,
   salesOfficeUuid: null,
+  inbound: null,
+  zoneUuids: [],
 };
 
 export function useQuotesAndBookingsFilters(
@@ -68,6 +70,28 @@ export function useQuotesAndBookingsFilters(
     setFilters((prev) => ({ ...prev, salesOfficeUuid: uuid }));
   }, []);
 
+  const setInbound = useCallback((value: boolean | null) => {
+    setFilters((prev) => ({ ...prev, inbound: value }));
+  }, []);
+
+  const setZoneUuids = useCallback((zoneUuids: string[]) => {
+    setFilters((prev) => ({ ...prev, zoneUuids }));
+  }, []);
+
+  /**
+   * The "Inbound Leads" template: website quotes not sent yet (still `draft`) in the given zones
+   * (none = every zone), every other filter cleared. The page sets the order (oldest first).
+   */
+  const applyInboundLeadsTemplate = useCallback((zoneUuids: string[]) => {
+    setFilters((prev) => ({
+      ...emptyFilters,
+      isOpen: prev.isOpen,
+      statuses: ["draft"],
+      inbound: true,
+      zoneUuids,
+    }));
+  }, []);
+
   /** Clears the one filter behind an applied-filter chip. */
   const clearFilter = useCallback((key: ActiveFilterKey) => {
     setFilters((prev) => withoutFilter(prev, key));
@@ -87,6 +111,8 @@ export function useQuotesAndBookingsFilters(
       inGoodShuffle: null,
       inQuickBooks: null,
       salesOfficeUuid: null,
+      inbound: null,
+      zoneUuids: [],
     }));
   }, []);
 
@@ -101,6 +127,9 @@ export function useQuotesAndBookingsFilters(
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    setInbound,
+    setZoneUuids,
+    applyInboundLeadsTemplate,
     clearFilter,
     clearFilters,
   };

@@ -48,6 +48,9 @@ export function useListPageState(
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    setInbound,
+    setZoneUuids,
+    applyInboundLeadsTemplate,
     clearFilter,
     clearFilters,
   } = useQuotesAndBookingsFilters(initialOverrides, hasUrlFilters ? urlState.filters : undefined);
@@ -76,6 +79,13 @@ export function useListPageState(
     if (key === "search") setSearchQuery("");
     else if (key === "showDeleted") setShowDeleted(false);
     else clearFilter(key);
+  };
+  // One click: unsent website quotes in the given zones, oldest first, nothing else narrowing.
+  const showInboundLeads = (zoneUuids: string[]) => {
+    applyInboundLeadsTemplate(zoneUuids);
+    setSort({ key: "created_at", direction: "asc" });
+    setSearchQuery("");
+    setShowDeleted(false);
   };
   const clearAllFilters = () => {
     clearFilters();
@@ -127,6 +137,9 @@ export function useListPageState(
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    setInbound,
+    setZoneUuids,
+    showInboundLeads,
     clearFilter,
     clearFilters,
     showDeleted,

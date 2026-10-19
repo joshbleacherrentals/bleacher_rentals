@@ -27,6 +27,8 @@ const PARAM = {
   inGoodShuffle: "goodShuffle",
   inQuickBooks: "quickBooks",
   salesOfficeUuid: "office",
+  inbound: "inbound",
+  zoneUuids: "zones",
   search: "q",
   showDeleted: "showDeleted",
   page: "page",
@@ -96,6 +98,8 @@ export function filtersToSearchParams(
   setOrDelete(PARAM.inGoodShuffle, boolToParam(filters.inGoodShuffle));
   setOrDelete(PARAM.inQuickBooks, boolToParam(filters.inQuickBooks));
   setOrDelete(PARAM.salesOfficeUuid, filters.salesOfficeUuid);
+  setOrDelete(PARAM.inbound, boolToParam(filters.inbound));
+  setOrDelete(PARAM.zoneUuids, filters.zoneUuids.length > 0 ? filters.zoneUuids.join(",") : null);
   setOrDelete(PARAM.search, searchQuery || null);
   setOrDelete(PARAM.showDeleted, showDeleted ? "1" : null);
   setOrDelete(PARAM.page, page > 1 ? String(page) : null);
@@ -133,6 +137,8 @@ export function searchParamsToFilters(
       inGoodShuffle: paramToBool(searchParams.get(PARAM.inGoodShuffle)),
       inQuickBooks: paramToBool(searchParams.get(PARAM.inQuickBooks)),
       salesOfficeUuid: searchParams.get(PARAM.salesOfficeUuid),
+      inbound: paramToBool(searchParams.get(PARAM.inbound)),
+      zoneUuids: (searchParams.get(PARAM.zoneUuids) ?? "").split(",").filter(Boolean),
     },
     searchQuery: searchParams.get(PARAM.search) ?? "",
     showDeleted: paramToBool(searchParams.get(PARAM.showDeleted)) ?? false,
@@ -174,6 +180,8 @@ export function hasActiveFilterValues(filters: Omit<QuotesBookingsFilters, "isOp
     filters.accountManagerUserUuid !== null ||
     filters.inGoodShuffle !== null ||
     filters.inQuickBooks !== null ||
-    filters.salesOfficeUuid !== null
+    filters.salesOfficeUuid !== null ||
+    filters.inbound !== null ||
+    filters.zoneUuids.length > 0
   );
 }

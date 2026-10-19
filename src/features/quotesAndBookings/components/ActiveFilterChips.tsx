@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { useUserNames } from "../hooks/useUserNames";
 import { useSalesOfficeNames } from "../hooks/useSalesOfficeNames";
+import { useZoneNames } from "../hooks/useZoneLookup";
 import {
   describeActiveFilters,
   type ActiveFilter,
@@ -29,10 +30,12 @@ export function ActiveFilterChips({
 }: ActiveFilterState & ChipActions) {
   const userNames = useUserNames();
   const officeNames = useSalesOfficeNames();
+  const zoneNames = useZoneNames();
 
   const active = describeActiveFilters(state, {
     userName: (id) => userNames.get(id),
     officeName: (id) => officeNames.get(id),
+    zoneName: (id) => zoneNames.get(id),
   });
 
   return <FilterChipRow filters={active} onRemove={onRemove} onClearAll={onClearAll} />;

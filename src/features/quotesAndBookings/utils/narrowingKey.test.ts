@@ -16,6 +16,8 @@ const filters: QuotesBookingsFilters = {
   accountManagerUserUuid: null,
   inGoodShuffle: null,
   inQuickBooks: null,
+  inbound: null,
+  zoneUuids: [],
   salesOfficeUuid: null,
 };
 

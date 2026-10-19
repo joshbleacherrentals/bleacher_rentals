@@ -22,6 +22,8 @@ const emptyState: UrlSyncedListState = {
     accountManagerUserUuid: null,
     inGoodShuffle: null,
     inQuickBooks: null,
+    inbound: null,
+    zoneUuids: [],
     salesOfficeUuid: null,
   },
   searchQuery: "",
@@ -31,6 +33,36 @@ const emptyState: UrlSyncedListState = {
   sort: { key: "created_at", direction: "desc" },
   tab: "all",
 };
+
+describe("inbound and zones in the URL", () => {
+  it("writes them only when set, and reads them back", () => {
+    const base = filtersToSearchParams(emptyState, QB);
+    expect(base.get("inbound")).toBeNull();
+    expect(base.get("zones")).toBeNull();
+
+    const params = filtersToSearchParams(
+      {
+        ...emptyState,
+        filters: { ...emptyState.filters, inbound: true, zoneUuids: ["z1", "unknown"] },
+      },
+      QB,
+    );
+    expect(params.get("inbound")).toBe("1");
+    expect(params.get("zones")).toBe("z1,unknown");
+    const parsed = searchParamsToFilters(params, QB).filters;
+    expect(parsed.inbound).toBe(true);
+    expect(parsed.zoneUuids).toEqual(["z1", "unknown"]);
+  });
+
+  it("keeps Inbound: No apart from no filter", () => {
+    const params = filtersToSearchParams(
+      { ...emptyState, filters: { ...emptyState.filters, inbound: false } },
+      QB,
+    );
+    expect(params.get("inbound")).toBe("0");
+    expect(searchParamsToFilters(params, QB).filters.inbound).toBe(false);
+  });
+});
 
 describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
   it("round-trips a fully populated filter state", () => {
@@ -47,6 +79,8 @@ describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
         inGoodShuffle: true,
         inQuickBooks: false,
         salesOfficeUuid: "office-uuid-1",
+        inbound: true,
+        zoneUuids: ["zone-uuid-1", "unknown"],
       },
       searchQuery: "acme corp",
       showDeleted: true,

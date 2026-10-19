@@ -18,12 +18,15 @@ const noFilters: Omit<QuotesBookingsFilters, "isOpen"> = {
   accountManagerUserUuid: null,
   inGoodShuffle: null,
   inQuickBooks: null,
+  inbound: null,
+  zoneUuids: [],
   salesOfficeUuid: null,
 };
 
 const names: ActiveFilterNames = {
   userName: (id) => (id === "am-1" ? "Dana Whitfield" : undefined),
   officeName: (id) => (id === "office-1" ? "Bleacher Rentals Florida LLC" : undefined),
+  zoneName: (id) => (id === "zone-1" ? "Zone 1" : undefined),
 };
 
 function state(overrides: Partial<ActiveFilterState> = {}): ActiveFilterState {
@@ -59,6 +62,8 @@ describe("describeActiveFilters", () => {
         inGoodShuffle: true,
         inQuickBooks: false,
         salesOfficeUuid: "office-1",
+        inbound: true,
+        zoneUuids: ["zone-1", "unknown"],
       },
     });
     expect(describeActiveFilters(all, names)).toEqual([
@@ -71,6 +76,8 @@ describe("describeActiveFilters", () => {
       { key: "salesOffice", label: "Sales Office: Bleacher Rentals Florida LLC" },
       { key: "goodShuffle", label: "In GoodShuffle: Yes" },
       { key: "quickBooks", label: "In QuickBooks: No" },
+      { key: "inbound", label: "Inbound: Yes" },
+      { key: "zones", label: "Zones: Zone 1, Zone Unknown" },
       { key: "showDeleted", label: "Deleted only" },
     ]);
   });
@@ -79,6 +86,11 @@ describe("describeActiveFilters", () => {
     const withStatus = { ...noFilters, statuses: ["booked"] };
     expect(labels(state({ showStatus: false, filters: withStatus }))).toEqual([]);
     expect(labels(state({ showStatus: true, filters: withStatus }))).toEqual(["Status: Booked"]);
+  });
+
+  it("names a zone that has not loaded as Unknown, and the no-zone choice as Zone Unknown", () => {
+    const filters = { ...noFilters, zoneUuids: ["gone", "unknown"] };
+    expect(labels(state({ filters }))).toEqual(["Zones: Unknown, Zone Unknown"]);
   });
 
   it("still says what is filtered when a name has not loaded", () => {
@@ -104,6 +116,8 @@ describe("withoutFilter", () => {
     inGoodShuffle: false,
     inQuickBooks: true,
     salesOfficeUuid: "office-1",
+    inbound: false,
+    zoneUuids: ["zone-1"],
   };
 
   it("clears one filter and leaves the others alone", () => {
@@ -122,6 +136,8 @@ describe("withoutFilter", () => {
     expect(withoutFilter(full, "salesOffice")).toEqual({ ...full, salesOfficeUuid: null });
     expect(withoutFilter(full, "goodShuffle")).toEqual({ ...full, inGoodShuffle: null });
     expect(withoutFilter(full, "quickBooks")).toEqual({ ...full, inQuickBooks: null });
+    expect(withoutFilter(full, "inbound")).toEqual({ ...full, inbound: null });
+    expect(withoutFilter(full, "zones")).toEqual({ ...full, zoneUuids: [] });
   });
 
   it("does not touch the panel for filters that live outside it", () => {

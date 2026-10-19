@@ -157,6 +157,15 @@ const ZonesCols = {
 } satisfies PowerSyncColsFor<"Zones">;
 const Zones = new Table(ZonesCols);
 
+const ZoneStateProvincesCols = {
+  created_at: column.text,
+  state_province: column.text,
+  zone_uuid: column.text,
+} satisfies PowerSyncColsFor<"ZoneStateProvinces">;
+const ZoneStateProvinces = new Table(ZoneStateProvincesCols, {
+  indexes: { zone_uuid: ["zone_uuid"] },
+});
+
 const AccountManagerZonesCols = {
   created_at: column.text,
   account_manager_uuid: column.text,
@@ -1330,6 +1339,7 @@ export const AppSchema = new Schema({
   AccountManagerZones,
   ChangeLog,
   Zones,
+  ZoneStateProvinces,
   Developers,
   DashboardFilterSettings,
   DriverUnavailability,
