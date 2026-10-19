@@ -59,6 +59,20 @@ Decisions taken 2026-10-19 (these replace the former open section 8):
 - **D12, the same address in two fields (was the open point in section 9):** the interface
   refuses it. See section 4.
 
+- **D13, a "file added" line per added file (2026-10-19):** for each file the person added in
+  the dialog and that went out with the email (an `EventFiles` row with source
+  `email_attachment` in the final `addedFileIds`), the browser writes one `EventChangeLog` row
+  after the successful send, in the same place and the same best-effort way as the "email sent"
+  line (written before it, see below): `action_type` `file_add`, `field_name` `file`, `next_value` the file name. The file lines are written first, in
+  dialog order, and the "email sent" line last, each with a strictly increasing `changed_at`
+  (base time plus its index in ms), so the Log tab, newest first, shows "Quote Sent to ..." on
+  top with the file lines beneath it in the order the files were added. The Log tab's
+  Internal Activity list shows it as "File added: <name>" with the second line "Attached to the
+  email and saved to Files". The quote PDF and template files are never logged; a file removed
+  before Send is never uploaded, so never logged; a file uploaded in a send that failed is
+  logged only when a later retry succeeds with it still in the list. The Files tab does not log
+  uploads (F7), so this is a new entry type.
+
 ## 3. What the code does today (read 2026-10-16)
 
 - **F1, one dialog, two callers:** `SendQuoteDialog` is opened from the quote page
@@ -122,8 +136,9 @@ On Send, in this order:
    removed and the ids of the added files.
 3. The server sends, then writes the log (section 6) and saves the quote PDF to Files as
    `sent_quote`, as today (D11).
-4. After a successful send the browser writes the "email sent" line to `EventChangeLog` in the
-   form of D10.
+4. After a successful send the browser writes one "file added" line for each added file (D13),
+   then the "email sent" line to `EventChangeLog` in the form of D10, so the Log tab, newest
+   first, shows the email on top.
 
 The preview on the right does not change when the left side is edited: the body does not
 depend on any of these fields.
@@ -256,6 +271,10 @@ open in this spec.
   the subject is empty, the limit check (recipient count of 50 across the three fields,
   attachment total of about 10 MB including the quote PDF and the template's files), the
   "email sent" change-log line format ("To: a; Cc: b; Bcc: c", empty Cc/Bcc left out).
+- **Vitest, "file added" lines (D13):** which files are logged (only the uploaded added files in
+  the final `addedFileIds`; none when nothing was added; names kept; nothing before a
+  successful send); one `file_add` row per file written before the email line, in dialog order, with strictly increasing `changed_at`; a failing file row does not stop the others or the email row; the Log tab's title and
+  second line.
 - **Vitest, component:** the dialog shows the placeholder "Leave empty to send the template's
   subject" when the subject is cleared and Send stays enabled; the quote PDF has no remove
   button while template files do; Send is disabled with the message naming the limit when one

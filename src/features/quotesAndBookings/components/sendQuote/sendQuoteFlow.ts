@@ -39,6 +39,28 @@ export function ignoreDialogEscape(
 /** A file the person picked in the dialog. It is uploaded only when Send is pressed (D4). */
 export type PendingFile = { id: string; file: File };
 
+/** A file the person added in the dialog and that went out with the email (D13). */
+export type AddedFile = { fileId: string; name: string };
+
+/**
+ * The files to write a "file added" log line for (D13): the pending files that were uploaded and
+ * are in the final `addedFileIds` of the request, in the order the person added them. A file the
+ * person removed before Send is not in `pending`; the quote PDF and template files never are.
+ */
+export function selectAddedFilesToLog(
+  pending: readonly PendingFile[],
+  uploadedIds: ReadonlyMap<string, string>,
+  addedFileIds: readonly string[],
+): AddedFile[] {
+  const sent = new Set(addedFileIds);
+  const out: AddedFile[] = [];
+  for (const p of pending) {
+    const fileId = uploadedIds.get(p.id);
+    if (fileId && sent.has(fileId)) out.push({ fileId, name: p.file.name });
+  }
+  return out;
+}
+
 /**
  * The whole send, in order: upload the added files, the optional pre-step, the email, then the
  * local log.
@@ -58,7 +80,7 @@ export async function runSend(params: {
   upload?: (file: File) => Promise<string>;
   onBeforeSend?: () => Promise<void>;
   post?: (eventId: string, input: SendQuoteInput) => Promise<SendOutcome>;
-  onSent: (input: SendQuoteInput) => Promise<void> | void;
+  onSent: (input: SendQuoteInput, addedFiles: AddedFile[]) => Promise<void> | void;
 }): Promise<SendOutcome> {
   const post = params.post ?? postSendQuote;
   const uploadedIds = params.uploadedIds ?? new Map<string, string>();
@@ -95,7 +117,10 @@ export async function runSend(params: {
   }
 
   try {
-    await params.onSent(input);
+    await params.onSent(
+      input,
+      selectAddedFilesToLog(params.pendingFiles ?? [], uploadedIds, input.addedFileIds),
+    );
   } catch (e) {
     console.error("Quote sent, but logging it locally failed:", e);
   }

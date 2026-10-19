@@ -346,4 +346,16 @@ describe("payment rows — getDetail", () => {
   it("has nothing to add for the rows it does not draw itself", () => {
     expect(logDetail({ ...paymentRow({}), action_type: "sign" }, [])).toBeNull();
   });
+
+  it("D13: a file_add row reads 'File added: <name>' with the attached-and-saved note", () => {
+    const row = {
+      ...paymentRow({}),
+      action_type: "file_add",
+      field_name: "file",
+      prev_value: null,
+      next_value: "site plan.pdf",
+    };
+    expect(logTitle(row, [])).toBe("File added: site plan.pdf");
+    expect(logDetail(row, [])).toBe("Attached to the email and saved to Files");
+  });
 });

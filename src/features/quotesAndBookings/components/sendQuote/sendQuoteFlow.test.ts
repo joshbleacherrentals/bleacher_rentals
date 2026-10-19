@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { runSend, canDismiss, canSend, ignoreDialogEscape } from "./sendQuoteFlow";
+import {
+  runSend,
+  selectAddedFilesToLog,
+  canDismiss,
+  canSend,
+  ignoreDialogEscape,
+} from "./sendQuoteFlow";
 import type { SendQuoteInput } from "../../utils/sendQuote";
 
 const ok = { ok: true } as const;
@@ -137,7 +143,7 @@ describe("runSend with added files", () => {
     expect(order).toEqual(["up:one.pdf", "up:two.pdf", "post", "sent"]);
     const posted = (post.mock.calls[0] as unknown[])[1] as SendQuoteInput;
     expect(posted.addedFileIds).toEqual(["id-one.pdf", "id-two.pdf"]);
-    expect(onSent).toHaveBeenCalledWith(posted);
+    expect(onSent).toHaveBeenCalledWith(posted, expect.any(Array));
   });
 
   it("uploads nothing when there are no pending files", async () => {
@@ -258,5 +264,67 @@ describe("ignoreDialogEscape", () => {
     expect(ignoreDialogEscape("review", el(null, null))).toBe(false);
     expect(ignoreDialogEscape("review", null)).toBe(false);
     expect(ignoreDialogEscape("error", null)).toBe(false);
+  });
+});
+
+describe("selectAddedFilesToLog", () => {
+  const f = (id: string, name: string) => ({ id, file: new File(["x"], name) });
+  it("returns the uploaded added files that are in the final input, with their names", () => {
+    const pending = [f("p1", "a.pdf"), f("p2", "b.png")];
+    const ids = new Map([
+      ["p1", "db1"],
+      ["p2", "db2"],
+    ]);
+    expect(selectAddedFilesToLog(pending, ids, ["db1", "db2"])).toEqual([
+      { fileId: "db1", name: "a.pdf" },
+      { fileId: "db2", name: "b.png" },
+    ]);
+  });
+  it("skips a file that is not in the final addedFileIds, and one never uploaded", () => {
+    const pending = [f("p1", "a.pdf"), f("p2", "b.png")];
+    expect(selectAddedFilesToLog(pending, new Map([["p1", "db1"]]), ["db1"])).toEqual([
+      { fileId: "db1", name: "a.pdf" },
+    ]);
+    expect(selectAddedFilesToLog(pending, new Map([["p2", "db2"]]), [])).toEqual([]);
+  });
+  it("returns nothing when no file was added", () => {
+    expect(selectAddedFilesToLog([], new Map(), [])).toEqual([]);
+  });
+});
+
+describe("runSend, added files in the log", () => {
+  it("hands the uploaded files' names to onSent only after a successful send", async () => {
+    const onSent = vi.fn();
+    const pendingFiles = [{ id: "p1", file: new File(["x"], "a.pdf") }];
+    const upload = vi.fn(async () => "db1");
+    const uploadedIds = new Map<string, string>();
+    await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles,
+      uploadedIds,
+      upload,
+      post: async () => ({ ok: false, message: "x" }),
+      onSent,
+    });
+    expect(onSent).not.toHaveBeenCalled();
+    await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles,
+      uploadedIds,
+      upload,
+      post: async () => ok,
+      onSent,
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(onSent).toHaveBeenCalledWith(expect.objectContaining({ addedFileIds: ["db1"] }), [
+      { fileId: "db1", name: "a.pdf" },
+    ]);
+  });
+  it("passes an empty list when nothing was added", async () => {
+    const onSent = vi.fn();
+    await runSend({ eventId: "e1", buildInput, post: async () => ok, onSent });
+    expect(onSent).toHaveBeenCalledWith(expect.anything(), []);
   });
 });

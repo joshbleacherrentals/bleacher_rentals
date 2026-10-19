@@ -21,6 +21,7 @@ import { AddLineItemModal } from "./modals/AddLineItemModal";
 import { EditPaymentScheduleModal } from "./modals/EditPaymentScheduleModal";
 import { createQuoteEvent } from "../../db/createQuoteEvent";
 import { updateQuoteEvent } from "../../db/updateQuoteEvent";
+import type { AddedFile } from "../sendQuote/sendQuoteFlow";
 import { logQuoteSentLocal } from "../../db/logQuoteSentLocal";
 import { fetchLineItemsForEvent } from "../../db/fetchLineItems";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
@@ -251,11 +252,12 @@ export function CreateQuoteForm() {
     void triage("Events", { id: sendTarget.eventId }, supabase);
   };
 
-  const handleSent = (sent: SendQuoteInput) =>
+  const handleSent = (sent: SendQuoteInput, addedFiles: AddedFile[]) =>
     logQuoteSentLocal({
       eventId: sendTarget!.eventId,
       recipients: { to: sent.to, cc: sent.cc, bcc: sent.bcc },
       currentUserUuid: currentUserUuid ?? perms.userId,
+      addedFiles,
     });
 
   const handleSendDone = () => {

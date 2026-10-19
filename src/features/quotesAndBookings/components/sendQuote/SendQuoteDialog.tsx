@@ -30,6 +30,7 @@ import {
   canSend,
   ignoreDialogEscape,
   runSend,
+  type AddedFile,
   type PendingFile,
   type SendPhase,
 } from "./sendQuoteFlow";
@@ -47,7 +48,7 @@ export type SendQuoteDialogProps = {
   onBeforeSend?: () => Promise<void>;
   /** Runs after the email is confirmed sent, with the final To, Cc and Bcc — logs it and does any
    *  page cleanup. */
-  onSent: (sent: SendQuoteInput) => Promise<void> | void;
+  onSent: (sent: SendQuoteInput, addedFiles: AddedFile[]) => Promise<void> | void;
   /** Runs when the person closes the dialog after a confirmed send. */
   onDone?: () => void;
 };
@@ -205,9 +206,9 @@ export function SendQuoteDialog({
           uploadedBy: userId,
         }),
       onBeforeSend,
-      onSent: (input) => {
+      onSent: (input, addedFiles) => {
         setSentInput(input);
-        return onSent(input);
+        return onSent(input, addedFiles);
       },
     });
     if (result.ok) {
