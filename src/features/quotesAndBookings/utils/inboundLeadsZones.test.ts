@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inboundLeadsZones, sameZones } from "./inboundLeadsZones";
+import { inboundLeadsFilters, inboundLeadsZones, sameZones } from "./inboundLeadsZones";
 
 describe("inboundLeadsZones", () => {
   it("gives an account manager their zones and Zone Unknown", () => {
@@ -47,5 +47,23 @@ describe("sameZones", () => {
     expect(sameZones([], [])).toBe(true);
     expect(sameZones(["a"], ["a", "b"])).toBe(false);
     expect(sameZones(["a", "c"], ["a", "b"])).toBe(false);
+  });
+});
+
+describe("inboundLeadsFilters", () => {
+  it("is unsent website quotes in the given zones and nothing else", () => {
+    const filters = inboundLeadsFilters(["zone-1", "unknown"]);
+    expect(filters).toMatchObject({
+      statuses: ["draft"],
+      inbound: true,
+      zoneUuids: ["zone-1", "unknown"],
+      accountManagerUserUuid: null,
+      salesOfficeUuid: null,
+      createdFrom: null,
+      eventFrom: null,
+      bookedFrom: null,
+      inGoodShuffle: null,
+      inQuickBooks: null,
+    });
   });
 });

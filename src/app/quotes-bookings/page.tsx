@@ -8,6 +8,7 @@ import { StatusQuickToggle } from "@/features/quotesAndBookings/components/Statu
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { inboundLeadsZones, sameZones } from "@/features/quotesAndBookings/utils/inboundLeadsZones";
 import { ListOptionsMenu } from "@/features/quotesAndBookings/components/ListOptionsMenu";
+import { useInboundLeadsCount } from "@/features/quotesAndBookings/hooks/useInboundLeadsCount";
 import { TemplatePill } from "@/features/quotesAndBookings/components/TemplatePill";
 import {
   FilterSidebar,
@@ -148,6 +149,8 @@ export default function QuotesBookingsPage() {
     () => inboundLeadsZones({ isAdmin, isAccountManager, accountManagerZoneIds }),
     [isAdmin, isAccountManager, accountManagerZoneIds],
   );
+
+  const inboundLeadsCount = useInboundLeadsCount(inboundZones);
 
   // The Inbound Leads template is showing: unsent website quotes in those zones, oldest first.
   const inboundLeadsActive =
@@ -369,6 +372,7 @@ export default function QuotesBookingsPage() {
               label="Inbound Leads"
               icon={<Inbox className="h-3.5 w-3.5" />}
               active={inboundLeadsActive}
+              count={inboundLeadsCount}
               onClick={() => {
                 // A second click on the template that is showing puts the list back to normal.
                 if (inboundLeadsActive) {
