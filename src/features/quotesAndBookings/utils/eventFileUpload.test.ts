@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { errorMessage, fileRefusal, uploadEventFile, EVENT_FILES_BUCKET } from "./eventFileUpload";
+import {
+  errorMessage,
+  fileRefusal,
+  uploadEventFile,
+  uploadEventFileObject,
+  removeUnrecordedEventFileObjects,
+  isOwnEventFilePath,
+  EVENT_FILES_BUCKET,
+} from "./eventFileUpload";
 
 describe("fileRefusal", () => {
   it("accepts a PDF under the limit", () => {
@@ -97,5 +105,89 @@ describe("errorMessage", () => {
     expect(errorMessage({ message: "c", code: "1" })).toBe("c");
     expect(errorMessage({ code: "1" })).toBe("unknown error");
     expect(errorMessage(null, "x")).toBe("x");
+  });
+});
+
+describe("isOwnEventFilePath", () => {
+  const U = "11111111-1111-4111-8111-111111111111";
+  it("accepts <event>/<uuid>.<ext> only", () => {
+    expect(isOwnEventFilePath("ev1", `ev1/${U}.pdf`)).toBe(true);
+    expect(isOwnEventFilePath("ev1", `ev1/${U}.bin`)).toBe(true);
+  });
+  it("rejects other events, traversal, nesting and other names", () => {
+    for (const p of [
+      `ev2/${U}.pdf`,
+      `ev1/../ev2/${U}.pdf`,
+      `ev1/..%2Fx.pdf`,
+      `ev1/a/${U}.pdf`,
+      `ev1/sent-quote-1.pdf`,
+      `ev1/${U}`,
+      `ev1/${U}.pdf/`,
+      `ev1x/${U}.pdf`,
+      `/ev1/${U}.pdf`,
+      "",
+    ]) {
+      expect(isOwnEventFilePath("ev1", p)).toBe(false);
+    }
+    expect(isOwnEventFilePath("", `/${U}.pdf`)).toBe(false);
+  });
+});
+
+describe("uploadEventFileObject", () => {
+  const file = new File(["x"], "My Doc.PDF", { type: "application/pdf" });
+  it("uploads under the event's folder, inserts no EventFiles row, returns the future row's data", async () => {
+    const upload = vi.fn(async () => ({ error: null }));
+    const from = vi.fn();
+    const supabase = { storage: { from: vi.fn(() => ({ upload })) }, from } as any;
+    const r = await uploadEventFileObject({ supabase, eventId: "ev1", file });
+    expect(from).not.toHaveBeenCalled();
+    expect(supabase.storage.from).toHaveBeenCalledWith(EVENT_FILES_BUCKET);
+    expect(isOwnEventFilePath("ev1", r.storagePath)).toBe(true);
+    expect(r.storagePath.endsWith(".pdf")).toBe(true);
+    expect(r).toMatchObject({ name: "My Doc.PDF", mimeType: "application/pdf", sizeBytes: 1 });
+    expect(r.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+  it("falls back to .bin for an odd extension, and throws on a storage error", async () => {
+    const ok = { storage: { from: () => ({ upload: async () => ({ error: null }) }) } } as any;
+    const r = await uploadEventFileObject({
+      supabase: ok,
+      eventId: "ev1",
+      file: new File(["x"], "weird.p/d f", { type: "application/pdf" }),
+    });
+    expect(r.storagePath.endsWith(".bin")).toBe(true);
+    const bad = {
+      storage: { from: () => ({ upload: async () => ({ error: { message: "full" } }) }) },
+    } as any;
+    await expect(uploadEventFileObject({ supabase: bad, eventId: "ev1", file })).rejects.toThrow(
+      "full",
+    );
+  });
+});
+
+describe("removeUnrecordedEventFileObjects", () => {
+  function fake(rows: { id: string }[], selectError: unknown = null) {
+    const remove = vi.fn(async () => ({ error: null }));
+    const supabase = {
+      from: () => ({ select: () => ({ in: async () => ({ data: rows, error: selectError }) }) }),
+      storage: { from: vi.fn(() => ({ remove })) },
+    } as any;
+    return { supabase, remove };
+  }
+  const files = [
+    { id: "a", storagePath: "ev1/a.pdf" },
+    { id: "b", storagePath: "ev1/b.pdf" },
+  ];
+  it("deletes the objects that have no EventFiles row and keeps recorded ones", async () => {
+    const { supabase, remove } = fake([{ id: "b" }]);
+    await removeUnrecordedEventFileObjects(supabase, files);
+    expect(supabase.storage.from).toHaveBeenCalledWith(EVENT_FILES_BUCKET);
+    expect(remove).toHaveBeenCalledWith(["ev1/a.pdf"]);
+  });
+  it("does nothing for an empty list and deletes nothing when the check fails", async () => {
+    const { supabase, remove } = fake([], { message: "offline" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await removeUnrecordedEventFileObjects(supabase, []);
+    await removeUnrecordedEventFileObjects(supabase, files);
+    expect(remove).not.toHaveBeenCalled();
   });
 });

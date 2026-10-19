@@ -8,6 +8,12 @@ import {
   sendTriggerEmail,
   type EmailAttachment,
 } from "@/features/automaticEmails/server/sendTriggerEmail";
+import {
+  ACCEPTED_TYPES,
+  EVENT_FILES_BUCKET,
+  MAX_SIZE_MB,
+  isOwnEventFilePath,
+} from "@/features/quotesAndBookings/utils/eventFileUpload";
 import { parseSendBody } from "./parseSendBody";
 import { QUOTE_SENT_CLIENT } from "@/features/automaticEmails/triggers";
 
@@ -47,34 +53,58 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Send via the automatic-email template system.
   const supabaseAdmin = getSupabaseAdmin();
 
-  // Files the browser added for this send are already in the event-files bucket with an EventFiles
-  // row (the browser uploads them first: a file cannot travel in this request, the host limits its
-  // size). They must belong to this event. Anything unreadable stops the send before any email.
+  // Files the browser added for this send are already in the event-files bucket (a file cannot
+  // travel in this request, the host limits its size) but have NO EventFiles row yet: the rows are
+  // inserted below, only after the email went out (spec D4, D14). Each file must live directly in
+  // this event's folder and be readable. Anything else stops the send before any email.
   const addedAttachments: EmailAttachment[] = [];
-  if (input.addedFileIds.length > 0) {
-    const { data: rows } = await supabaseAdmin
-      .from("EventFiles")
-      .select("id, file_name, storage_path, mime_type")
-      .eq("event_uuid", id)
-      .in("id", input.addedFileIds);
-    const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
-    for (const fileId of input.addedFileIds) {
-      const row = byId.get(fileId);
-      const { data: blob } = row
-        ? await supabaseAdmin.storage.from("event-files").download(row.storage_path)
-        : { data: null };
-      if (!row || !blob) {
-        return NextResponse.json(
-          { error: "An attached file could not be read. Remove it and add it again." },
-          { status: 400 },
-        );
-      }
-      addedAttachments.push({
-        name: row.file_name,
-        content: Buffer.from(await blob.arrayBuffer()),
-        contentType: row.mime_type ?? "application/octet-stream",
-      });
+  const addedBytes = new Map<string, number>();
+  const refusal = (error: string) => NextResponse.json({ error }, { status: 400 });
+  for (const file of input.addedFiles) {
+    if (!isOwnEventFilePath(id, file.storagePath)) {
+      return refusal("An attached file is not stored for this quote. Remove it and add it again.");
     }
+    if (!ACCEPTED_TYPES.includes(file.mimeType)) {
+      return refusal(`${file.name}: this file type cannot be attached.`);
+    }
+  }
+
+  // A file that already has an EventFiles row (e.g. uploaded from the Files tab) must not get a
+  // second row here: deleting either row would break the other. Refuse before anything is sent.
+  if (input.addedFiles.length > 0) {
+    const paths = input.addedFiles.map((f) => f.storagePath);
+    const ids = input.addedFiles.map((f) => f.id);
+    const [byPath, byId] = await Promise.all([
+      supabaseAdmin.from("EventFiles").select("id").in("storage_path", paths),
+      supabaseAdmin.from("EventFiles").select("id").in("id", ids),
+    ]);
+    if (byPath.error || byId.error) {
+      console.error("Could not check the added files against Files:", byPath.error ?? byId.error);
+      return NextResponse.json(
+        { error: "The attached files could not be checked. Try again." },
+        { status: 500 },
+      );
+    }
+    if ((byPath.data?.length ?? 0) > 0 || (byId.data?.length ?? 0) > 0) {
+      return refusal(
+        "An attached file is already saved in Files. Remove it and add it again from your computer.",
+      );
+    }
+  }
+
+  for (const file of input.addedFiles) {
+    const { data: blob } = await supabaseAdmin.storage
+      .from(EVENT_FILES_BUCKET)
+      .download(file.storagePath);
+    if (!blob) {
+      return refusal("An attached file could not be read. Remove it and add it again.");
+    }
+    const content = Buffer.from(await blob.arrayBuffer());
+    if (content.byteLength > MAX_SIZE_MB * 1024 * 1024) {
+      return refusal(`${file.name}: the file is larger than ${MAX_SIZE_MB} MB.`);
+    }
+    addedBytes.set(file.id, content.byteLength);
+    addedAttachments.push({ name: file.name, content, contentType: file.mimeType });
   }
 
   const result = await sendTriggerEmail({
@@ -112,6 +142,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq("clerk_user_id", userId)
     .maybeSingle();
   const senderUserUuid = senderUser?.id ?? null;
+
+  // Record the added files in Files now that the email is out. A failure here cannot undo the
+  // send: log it (path included, so the object can be found) and carry on.
+  for (const file of input.addedFiles) {
+    try {
+      // The browser may have timed out and deleted the object while this request was still
+      // running; do not record a row that points at nothing.
+      const slash = file.storagePath.lastIndexOf("/");
+      const { data: found, error: listError } = await supabaseAdmin.storage
+        .from(EVENT_FILES_BUCKET)
+        .list(file.storagePath.slice(0, slash), {
+          limit: 1,
+          search: file.storagePath.slice(slash + 1),
+        });
+      if (!listError && !found?.some((o) => o.name === file.storagePath.slice(slash + 1))) {
+        console.error(
+          "Quote sent, but an added file is gone from storage, not recorded:",
+          file.storagePath,
+        );
+        continue;
+      }
+      const { error } = await supabaseAdmin.from("EventFiles").insert({
+        id: file.id,
+        event_uuid: id,
+        file_name: file.name,
+        storage_path: file.storagePath,
+        mime_type: file.mimeType,
+        file_size_bytes: addedBytes.get(file.id) ?? file.sizeBytes,
+        source: "email_attachment",
+        uploaded_by: senderUserUuid,
+      });
+      if (error) {
+        console.error("Quote sent, but recording an added file failed:", file.storagePath, error);
+      }
+    } catch (e) {
+      console.error("Quote sent, but recording an added file failed:", file.storagePath, e);
+    }
+  }
 
   // Save sent quote PDF to event-files bucket
   try {

@@ -33,6 +33,19 @@ export function cleanRecipients(candidates: (string | null | undefined)[]): stri
   return out;
 }
 
+/**
+ * A file the person added in the dialog. The browser has already put it in the `event-files`
+ * bucket (under `<eventId>/<uuid>.<ext>`) but has NOT created its EventFiles row: the server does
+ * that, with this `id`, only after the email went out (D4, D14).
+ */
+export type AddedFileInput = {
+  id: string; // the id the future EventFiles row will have (a uuid made by the browser)
+  storagePath: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 export type SendQuoteInput = {
   to: string[];
   cc: string[];
@@ -42,8 +55,8 @@ export type SendQuoteInput = {
   // The server ignores "quote_pdf" here (D11).
   // An empty `subject` means "use the template's subject" (D8).
   removedAttachmentKeys: string[];
-  // EventFiles rows the browser added for this send.
-  addedFileIds: string[];
+  // Files the browser uploaded for this send; recorded in Files only after a successful send.
+  addedFiles: AddedFileInput[];
 };
 
 export async function postSendQuote(
@@ -270,7 +283,7 @@ export type SendDialogState = {
   attachments: { key: string }[];
   // Keys of every attachment the preview originally had.
   previewAttachmentKeys: string[];
-  addedFileIds: string[];
+  addedFiles: AddedFileInput[];
 };
 
 /**
@@ -302,7 +315,7 @@ export function buildSendQuoteInput(state: SendDialogState): SendQuoteInput {
     bcc,
     subject: state.subject.trim(),
     removedAttachmentKeys,
-    addedFileIds: [...new Set(state.addedFileIds)],
+    addedFiles: state.addedFiles.filter((f, i, all) => all.findIndex((o) => o.id === f.id) === i),
   };
 }
 

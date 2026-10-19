@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Lottie from "lottie-react";
-import { useAuth } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -20,14 +19,20 @@ import {
   checkSendLimits,
   fetchSendPreview,
   formatRecipientsLine,
+  type AddedFileInput,
   type RecipientFields,
   type SendPreview,
   type SendQuoteInput,
 } from "../../utils/sendQuote";
-import { fileRefusal, uploadEventFile } from "../../utils/eventFileUpload";
+import {
+  fileRefusal,
+  removeUnrecordedEventFileObjects,
+  uploadEventFileObject,
+} from "../../utils/eventFileUpload";
 import {
   canDismiss,
   canSend,
+  discardUploads,
   ignoreDialogEscape,
   runSend,
   type AddedFile,
@@ -79,13 +84,20 @@ export function SendQuoteDialog({
   const [added, setAdded] = useState<PendingFile[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [sentInput, setSentInput] = useState<SendQuoteInput | null>(null);
-  // pending-file id -> EventFiles id. Kept across attempts so "Try again" never uploads twice.
-  const uploadedIds = useRef(new Map<string, string>());
+  // pending-file id -> what was uploaded to storage (no EventFiles row yet, D14). Kept across
+  // attempts so "Try again" never uploads twice; emptied after a successful send (the server has
+  // recorded the files) and deleted from storage when the send did not go out.
+  const uploaded = useRef(new Map<string, AddedFileInput>());
+  const phaseRef = useRef<SendPhase>("review");
+  phaseRef.current = phase;
   const subjectInitialised = useRef(false);
   const recipientKey = recipients.join(",");
 
   const supabase = useClerkSupabaseClient();
-  const { userId } = useAuth();
+  const supabaseRef = useRef(supabase);
+  supabaseRef.current = supabase;
+  const removeObjects = (files: { id: string; storagePath: string }[]) =>
+    removeUnrecordedEventFileObjects(supabaseRef.current, files);
   const { contacts } = useContacts();
   const suggestions = useMemo<ContactSuggestion[]>(
     () =>
@@ -128,7 +140,14 @@ export function SendQuoteDialog({
   useEffect(() => {
     if (!open) return;
     subjectInitialised.current = false;
-    uploadedIds.current = new Map();
+    const mine = new Map<string, AddedFileInput>();
+    uploaded.current = mine;
+    // Closing, switching quote or unmounting without a successful send: the files uploaded for it
+    // must not stay in storage. Not mid-send: the request may be about to record them.
+    return () => {
+      if (phaseRef.current !== "sending") void discardUploads(mine, removeObjects);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, eventId]);
 
   useEffect(() => {
@@ -170,8 +189,11 @@ export function SendQuoteDialog({
   };
 
   const removeAttachment = (key: string) => {
-    if (added.some((p) => p.id === key)) setAdded((prev) => prev.filter((p) => p.id !== key));
-    else setRemovedKeys((prev) => new Set(prev).add(key));
+    if (added.some((p) => p.id === key)) {
+      setAdded((prev) => prev.filter((p) => p.id !== key));
+      // Already uploaded by a failed attempt: it is not going to be sent, so delete it.
+      void discardUploads(uploaded.current, removeObjects, [key]);
+    } else setRemovedKeys((prev) => new Set(prev).add(key));
     setFileError(null);
   };
 
@@ -179,6 +201,7 @@ export function SendQuoteDialog({
     if (!canDismiss(phase)) return;
     // onDone first: the parent may still need what it clears when it handles onOpenChange.
     if (phase === "sent") onDone?.();
+    else void discardUploads(uploaded.current, removeObjects);
     onOpenChange(false);
   };
 
@@ -187,24 +210,17 @@ export function SendQuoteDialog({
     setPhase("sending");
     const result = await runSend({
       eventId,
-      buildInput: (addedFileIds) =>
+      buildInput: (addedFiles) =>
         buildSendQuoteInput({
           ...fields,
           subject,
           attachments: rows.filter((r) => !r.pending),
           previewAttachmentKeys: preview.attachments.map((a) => a.key),
-          addedFileIds,
+          addedFiles,
         }),
       pendingFiles: added,
-      uploadedIds: uploadedIds.current,
-      upload: (file) =>
-        uploadEventFile({
-          supabase,
-          eventId,
-          file,
-          source: "email_attachment",
-          uploadedBy: userId,
-        }),
+      uploaded: uploaded.current,
+      upload: (file) => uploadEventFileObject({ supabase, eventId, file }),
       onBeforeSend,
       onSent: (input, addedFiles) => {
         setSentInput(input);
@@ -212,6 +228,7 @@ export function SendQuoteDialog({
       },
     });
     if (result.ok) {
+      uploaded.current.clear(); // recorded in Files by the server: nothing to clean up
       setPhase("sent");
     } else if (result.stage === "upload") {
       // Nothing was sent: back to the form with everything as it was, so the person can remove the
@@ -346,6 +363,7 @@ export function SendQuoteDialog({
             <DialogFooter>
               <button
                 type="button"
+                data-testid="send-error-close"
                 onClick={close}
                 className="cursor-pointer rounded-sm border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
               >

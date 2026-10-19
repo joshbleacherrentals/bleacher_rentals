@@ -91,7 +91,7 @@ test.describe("Send To Client options (account manager)", () => {
     await expect(page.getByText(BCC).first()).toBeVisible();
     await expect(page.getByText(fileName).first()).toBeVisible();
 
-    // Files tab: the added file, with its source.
+    // Files tab: the added file, with its source (recorded by the server only after the send, D14).
     await page.goto(`${CARD}?tab=files`);
     await expect(page.getByText(fileName).first()).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText("Email Attachment").first()).toBeVisible();
@@ -133,6 +133,28 @@ test.describe("Send To Client options (account manager)", () => {
     await dialog.getByTestId("send-add-file-input").setInputFiles(filePath);
     await expect(dialog.getByText(fileName)).toBeVisible({ timeout: 60_000 });
     await dialog.getByRole("button", { name: "Cancel" }).click();
+
+    await page.goto(`${CARD}?tab=files`);
+    await expect(page.getByText("Project Files")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(fileName)).toHaveCount(0);
+  });
+
+  test("a failed send saves the added file nowhere in Files (D14)", async ({ page }, testInfo) => {
+    const filePath = path.join(os.tmpdir(), `e2e-failed-${testInfo.workerIndex}.pdf`);
+    fs.writeFileSync(filePath, "%PDF-1.4\n% e2e failed send\n");
+    const fileName = path.basename(filePath);
+
+    await page.route("**/api/quotes/*/send", (route) =>
+      route.fulfill({ status: 500, json: { error: "Postmark is down (e2e)" } }),
+    );
+    await page.goto(CARD);
+    await page.getByRole("button", { name: "Send To Client" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByTestId("send-add-file-input").setInputFiles(filePath);
+    await expect(dialog.getByText(fileName)).toBeVisible({ timeout: 60_000 });
+    await dialog.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(dialog.getByText("The quote was not sent")).toBeVisible({ timeout: 60_000 });
+    await dialog.getByTestId("send-error-close").click();
 
     await page.goto(`${CARD}?tab=files`);
     await expect(page.getByText("Project Files")).toBeVisible({ timeout: 60_000 });

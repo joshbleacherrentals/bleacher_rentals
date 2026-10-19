@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AddedFileInput } from "./sendQuote";
 
 /** Shared by the Files tab and the send-quote dialog: same bucket, same limits. */
 export const EVENT_FILES_BUCKET = "event-files";
@@ -90,4 +91,72 @@ export async function uploadEventFile(params: {
     throw new Error(errorMessage(insertError, "could not save the file record"));
   }
   return id;
+}
+
+const STORED_NAME_RE = /^[0-9a-f-]{36}\.[a-z0-9]{1,10}$/i;
+
+/**
+ * Whether `path` is a path the send dialog could have uploaded for this event:
+ * `<eventId>/<uuid>.<ext>`, one level under the event's folder. Rejects `..`, other events'
+ * folders and anything nested. The server relies on this to read only this event's own objects.
+ */
+export function isOwnEventFilePath(eventId: string, path: string): boolean {
+  if (!eventId || !path.startsWith(`${eventId}/`)) return false;
+  return STORED_NAME_RE.test(path.slice(eventId.length + 1));
+}
+
+/**
+ * Uploads one file to `event-files` and creates NO EventFiles row (the send route does, after the
+ * email went out). The returned `id` is the one that row will use. Throws on a storage error.
+ */
+export async function uploadEventFileObject(params: {
+  supabase: SupabaseClient<any>;
+  eventId: string;
+  file: File;
+}): Promise<AddedFileInput> {
+  const { supabase, eventId, file } = params;
+  const dot = file.name.lastIndexOf(".");
+  const rawExt = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : "";
+  const ext = /^[a-z0-9]{1,10}$/.test(rawExt) ? rawExt : "bin";
+  const storagePath = `${eventId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from(EVENT_FILES_BUCKET)
+    .upload(storagePath, file, { upsert: false });
+  if (error) throw new Error(errorMessage(error, "storage upload failed"));
+  return {
+    id: crypto.randomUUID(),
+    storagePath,
+    name: file.name,
+    mimeType: file.type,
+    sizeBytes: file.size,
+  };
+}
+
+/**
+ * Best effort: deletes uploaded send-dialog objects that have no EventFiles row. A file whose row
+ * exists (a send that reached the server despite an error on our side) is kept. If the check
+ * itself fails nothing is deleted. Never throws.
+ */
+export async function removeUnrecordedEventFileObjects(
+  supabase: SupabaseClient<any>,
+  files: { id: string; storagePath: string }[],
+): Promise<void> {
+  if (files.length === 0) return;
+  try {
+    const { data, error } = await supabase
+      .from("EventFiles")
+      .select("id")
+      .in(
+        "id",
+        files.map((f) => f.id),
+      );
+    if (error) throw error;
+    const recorded = new Set((data ?? []).map((r: { id: string }) => r.id));
+    const paths = files.filter((f) => !recorded.has(f.id)).map((f) => f.storagePath);
+    if (paths.length === 0) return;
+    const { error: removeError } = await supabase.storage.from(EVENT_FILES_BUCKET).remove(paths);
+    if (removeError) throw removeError;
+  } catch (e) {
+    console.error("Could not remove the uploaded files of a send that did not go out:", e);
+  }
 }

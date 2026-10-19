@@ -1,4 +1,4 @@
-import { postSendQuote, type SendQuoteInput } from "../../utils/sendQuote";
+import { postSendQuote, type AddedFileInput, type SendQuoteInput } from "../../utils/sendQuote";
 import { errorMessage } from "../../utils/eventFileUpload";
 
 export type SendPhase = "review" | "sending" | "sent" | "error";
@@ -44,28 +44,52 @@ export type AddedFile = { fileId: string; name: string };
 
 /**
  * The files to write a "file added" log line for (D13): the pending files that were uploaded and
- * are in the final `addedFileIds` of the request, in the order the person added them. A file the
+ * are in the final `addedFiles` of the request, in the order the person added them. A file the
  * person removed before Send is not in `pending`; the quote PDF and template files never are.
  */
 export function selectAddedFilesToLog(
   pending: readonly PendingFile[],
-  uploadedIds: ReadonlyMap<string, string>,
-  addedFileIds: readonly string[],
+  uploaded: ReadonlyMap<string, AddedFileInput>,
+  addedFiles: readonly AddedFileInput[],
 ): AddedFile[] {
-  const sent = new Set(addedFileIds);
+  const sent = new Set(addedFiles.map((f) => f.id));
   const out: AddedFile[] = [];
   for (const p of pending) {
-    const fileId = uploadedIds.get(p.id);
-    if (fileId && sent.has(fileId)) out.push({ fileId, name: p.file.name });
+    const file = uploaded.get(p.id);
+    if (file && sent.has(file.id)) out.push({ fileId: file.id, name: p.file.name });
   }
   return out;
 }
 
 /**
- * The whole send, in order: upload the added files, the optional pre-step, the email, then the
+ * Deletes the storage objects uploaded for `pendingIds` (all of them when omitted) and forgets them.
+ * Used when the person removes an uploaded file, and when the dialog closes without a successful
+ * send (D14). `remove` is best effort and must not throw.
+ */
+export async function discardUploads(
+  uploaded: Map<string, AddedFileInput>,
+  remove: (files: { id: string; storagePath: string }[]) => Promise<void>,
+  pendingIds?: readonly string[],
+): Promise<void> {
+  const ids = pendingIds ?? [...uploaded.keys()];
+  const files = ids.flatMap((id) => {
+    const f = uploaded.get(id);
+    return f ? [{ id: f.id, storagePath: f.storagePath }] : [];
+  });
+  for (const id of ids) uploaded.delete(id);
+  try {
+    await remove(files);
+  } catch (e) {
+    console.error("Could not remove uploaded files:", e);
+  }
+}
+
+/**
+ * The whole send, in order: upload the added files to storage (no EventFiles row: the server
+ * records them only after the email went out, D14), the optional pre-step, the email, then the
  * local log.
  *
- * `uploadedIds` maps a pending file's id to its EventFiles id. The caller keeps the same map
+ * `uploaded` maps a pending file's id to what was uploaded for it. The caller keeps the same map
  * across attempts, so after a failed send "Try again" does not upload the files a second time.
  *
  * A failed local log never turns into an error: by then the email has gone out, and telling the
@@ -74,22 +98,22 @@ export function selectAddedFilesToLog(
 export async function runSend(params: {
   eventId: string;
   /** Builds the request body once the ids of the uploaded files are known. */
-  buildInput: (addedFileIds: string[]) => SendQuoteInput;
+  buildInput: (addedFiles: AddedFileInput[]) => SendQuoteInput;
   pendingFiles?: PendingFile[];
-  uploadedIds?: Map<string, string>;
-  upload?: (file: File) => Promise<string>;
+  uploaded?: Map<string, AddedFileInput>;
+  upload?: (file: File) => Promise<AddedFileInput>;
   onBeforeSend?: () => Promise<void>;
   post?: (eventId: string, input: SendQuoteInput) => Promise<SendOutcome>;
   onSent: (input: SendQuoteInput, addedFiles: AddedFile[]) => Promise<void> | void;
 }): Promise<SendOutcome> {
   const post = params.post ?? postSendQuote;
-  const uploadedIds = params.uploadedIds ?? new Map<string, string>();
+  const uploaded = params.uploaded ?? new Map<string, AddedFileInput>();
 
   for (const pending of params.pendingFiles ?? []) {
-    if (uploadedIds.has(pending.id)) continue;
+    if (uploaded.has(pending.id)) continue;
     try {
       if (!params.upload) throw new Error("uploading is not available");
-      uploadedIds.set(pending.id, await params.upload(pending.file));
+      uploaded.set(pending.id, await params.upload(pending.file));
     } catch (e) {
       return {
         ok: false,
@@ -98,8 +122,8 @@ export async function runSend(params: {
       };
     }
   }
-  const addedFileIds = (params.pendingFiles ?? []).map((p) => uploadedIds.get(p.id)!);
-  const input = params.buildInput(addedFileIds);
+  const addedFiles = (params.pendingFiles ?? []).map((p) => uploaded.get(p.id)!);
+  const input = params.buildInput(addedFiles);
 
   if (params.onBeforeSend) {
     try {
@@ -119,7 +143,7 @@ export async function runSend(params: {
   try {
     await params.onSent(
       input,
-      selectAddedFilesToLog(params.pendingFiles ?? [], uploadedIds, input.addedFileIds),
+      selectAddedFilesToLog(params.pendingFiles ?? [], uploaded, input.addedFiles),
     );
   } catch (e) {
     console.error("Quote sent, but logging it locally failed:", e);

@@ -29,9 +29,11 @@ The change applies to this send only. The office's template is not changed.
   dropped.
 - **D3, attachments:** the person can remove the attachments that are there and add files
   from their computer. Picking a file already in the quote's Files tab was not chosen.
-- **D4, a file added from the computer:** it goes into the quote's Files tab and stays there.
-  It is uploaded only when Send is pressed, not when the file is picked. Cancelling the dialog
-  uploads nothing.
+- **D4, a file added from the computer (changed by D14, 2026-10-19):** it is uploaded to
+  storage when Send is pressed, not when the file is picked, and it is recorded in the quote's
+  Files tab only after the email was sent successfully. A failed send saves nothing in Files.
+  Cancelling the dialog uploads nothing. (The first version of D4 recorded the file in Files
+  before the send and kept it there after a failure.)
 - **D5, what is recorded about the send:** the addresses (To, Cc, Bcc), the subject and the
   list of attachments, in the quote's email log (`EventEmailLog`). The body is not stored.
 - **D6, who:** whoever may send the quote may also change these. Today that is an admin or any
@@ -61,7 +63,7 @@ Decisions taken 2026-10-19 (these replace the former open section 8):
 
 - **D13, a "file added" line per added file (2026-10-19):** for each file the person added in
   the dialog and that went out with the email (an `EventFiles` row with source
-  `email_attachment` in the final `addedFileIds`), the browser writes one `EventChangeLog` row
+  `email_attachment` in the final `addedFiles`), the browser writes one `EventChangeLog` row
   after the successful send, in the same place and the same best-effort way as the "email sent"
   line (written before it, see below): `action_type` `file_add`, `field_name` `file`, `next_value` the file name. The file lines are written first, in
   dialog order, and the "email sent" line last, each with a strictly increasing `changed_at`
@@ -72,6 +74,14 @@ Decisions taken 2026-10-19 (these replace the former open section 8):
   before Send is never uploaded, so never logged; a file uploaded in a send that failed is
   logged only when a later retry succeeds with it still in the list. The Files tab does not log
   uploads (F7), so this is a new entry type.
+
+- **D14, record only after success (user, 2026-10-19):** if the email fails, the file the person
+  attached in the dialog must not end up saved in the quote's Files tab. The browser uploads
+  the file to the `event-files` bucket (same `<eventId>/<uuid>.<ext>` convention as the Files
+  tab) but creates no `EventFiles` row; the send route inserts the row (id made by the browser,
+  source `email_attachment`) only after the email was sent. The browser deletes the uploaded
+  objects when the send did not go out and the dialog is closed or the file removed. This
+  replaces the earlier behaviour (row inserted before the send, file kept after a failure).
 
 ## 3. What the code does today (read 2026-10-16)
 
@@ -130,13 +140,25 @@ things become editable:
 
 On Send, in this order:
 
-1. The browser uploads each added file still in the list to `event-files` and inserts its
-   `EventFiles` row with source `email_attachment` (D4, D7).
+1. The browser uploads each added file still in the list to `event-files` under
+   `<eventId>/<uuid>.<ext>` and generates the id the future `EventFiles` row will have. It
+   inserts no row (D4, D14). A file already uploaded by an earlier attempt is not uploaded again.
 2. The browser posts the send with the final To, Cc, Bcc, subject, the template attachments
-   removed and the ids of the added files.
-3. The server sends, then writes the log (section 6) and saves the quote PDF to Files as
-   `sent_quote`, as today (D11).
-4. After a successful send the browser writes one "file added" line for each added file (D13),
+   removed and `addedFiles` (id, storage path, name, type, size of each).
+3. The server validates every added file (its path is directly under this event's folder, the
+   type is an accepted one, the object exists in storage and is at most 20 MB, the name is
+   sane; otherwise 400 before anything is sent), reads it from storage, and sends. Only after a
+   successful send it inserts one `EventFiles` row per added file (the browser's id, source
+   `email_attachment`, `uploaded_by` the app user id, the real stored size), then writes the log
+   (section 6) and saves the quote PDF to Files as `sent_quote`, as today (D11). A failed send
+   inserts no row. If an `EventFiles` insert fails after the email went out, the error is
+   logged and the send still answers ok: the `EventEmailLog` row and its attachment names are
+   unchanged, and the file stays in storage.
+4. If the send failed, the browser keeps the uploaded objects for "Try again". When the person
+   closes the dialog, removes such a file, or the dialog unmounts, the browser deletes the
+   objects that have no `EventFiles` row (best effort, see section 9). After a successful send
+   nothing is deleted.
+5. After a successful send the browser writes one "file added" line for each added file (D13),
    then the "email sent" line to `EventChangeLog` in the form of D10, so the Log tab, newest
    first, shows the email on top.
 
@@ -156,8 +178,17 @@ export type SendQuoteInput = {
   // The server ignores "quote_pdf" here (D11).
   // An empty `subject` means "use the template's subject" (D8).
   removedAttachmentKeys: string[];
-  // EventFiles rows the browser added for this send.
-  addedFileIds: string[];
+  // Files the browser uploaded for this send. The server records them in Files (EventFiles rows)
+  // only after a successful send (D4, D14).
+  addedFiles: AddedFileInput[];
+};
+
+export type AddedFileInput = {
+  id: string; // uuid made by the browser; becomes EventFiles.id
+  storagePath: string; // `${eventId}/${uuid}.${ext}` in the `event-files` bucket
+  name: string; // EventFiles.file_name
+  mimeType: string; // EventFiles.mime_type; one of the Files tab's accepted types
+  sizeBytes: number; // EventFiles.file_size_bytes (the server stores the real stored size)
 };
 
 export async function postSendQuote(
@@ -243,18 +274,42 @@ open in this spec.
 
 ## 9. Edge cases
 
-- **Uploads succeed, the send fails (D4):** the added files are already in Files. The dialog
-  keeps its state, so Try again does not upload them a second time. A file uploaded during an
-  attempt whose send then failed stays in Files as an `email_attachment` row even if the
-  person removes it from the dialog before retrying; removing and re-adding the same file then
-  uploads it again (accepted, per D4 "stays there").
-- **Cancel or close before Send:** nothing is uploaded (D4).
+- **Uploads succeed, the send fails (D4, D14):** the added files are in storage only; nothing is
+  in Files. The dialog keeps its state, so Try again does not upload them a second time.
+- **Failed send, then the dialog is closed (D14):** the browser deletes the uploaded objects
+  from storage (best effort; if the delete fails the object stays unreferenced in the bucket).
+  Likewise when the person removes a file that a failed attempt already uploaded, and when the
+  dialog unmounts. Before deleting, the browser checks that no `EventFiles` row has the file's
+  id; if one exists (the request reached the server although the browser saw an error) the
+  object is kept. If that check fails nothing is deleted.
+- **The send succeeded but recording a file failed (D14):** the email is out, so the result is
+  still ok; the error is logged on the server with the storage path, the object stays in the
+  bucket without a Files row, and the log row's attachment names still list the file.
+- **A path outside this event (D14):** a `storagePath` in another event's folder, containing
+  `..`, nested, or not of the form `<uuid>.<ext>`, an object that does not exist, a type the
+  Files tab does not accept or a file over 20 MB is refused with 400 and nothing is sent.
+- **A file that already has a Files row (D14):** if a requested `storagePath` or id is already in
+  `EventFiles` (for example a Files-tab upload), the route refuses with 400 and sends nothing,
+  so no second row points at the same object.
+- **An old browser tab (D14):** a body with a non-empty `addedFileIds` (the previous shape) is
+  refused with 400 asking the person to reload, instead of sending without the attachment.
+- **Limit on added files:** at most `MAX_ADDED_FILES` = 20 per send, enforced by the route
+  (400 above it).
+- **The dialog closed while the request still ran (D14):** just before inserting the rows the
+  route checks each object still exists; a missing one is skipped and logged, and the result stays ok.
+- **Accepted risks:** unmounting the dialog mid-send with a failing send leaves an orphan
+  storage object (no sweeper); `uploaded_by` of `email_attachment` rows is the app `Users.id`
+  (like `sent_quote` rows) while Files-tab rows carry the Clerk id (nothing reads it); the server
+  trusts the browser's `mimeType` as the attachment content-type, within `ACCEPTED_TYPES`.
+- **Cancel or close before Send:** nothing is uploaded (D4). Closing after an upload that was
+  followed by a failed send deletes it (see above).
 - **Offline:** the send needs the server, as before; the dialog shows its error phase.
   Uploading the added files needs it as well.
 - **The same address in two fields (D12):** the interface refuses it. On the server, an
   address that still appears in more than one field is sent once, as the first of To, Cc,
   Bcc; this is a defensive de-duplication only.
-- **An added file removed before Send (D11):** it is never uploaded and never saved.
+- **An added file removed before Send (D11):** it is never uploaded and never saved; if a
+  failed attempt had uploaded it, it is deleted from storage.
 - **The quote PDF (D11):** it cannot be removed; a `quote_pdf` key in
   `removedAttachmentKeys` is ignored by the server.
 - **Development environment:** an address that is not on the allowed list is dropped from
@@ -272,7 +327,7 @@ open in this spec.
   attachment total of about 10 MB including the quote PDF and the template's files), the
   "email sent" change-log line format ("To: a; Cc: b; Bcc: c", empty Cc/Bcc left out).
 - **Vitest, "file added" lines (D13):** which files are logged (only the uploaded added files in
-  the final `addedFileIds`; none when nothing was added; names kept; nothing before a
+  the final `addedFiles`; none when nothing was added; names kept; nothing before a
   successful send); one `file_add` row per file written before the email line, in dialog order, with strictly increasing `changed_at`; a failing file row does not stop the others or the email row; the Log tab's title and
   second line.
 - **Vitest, component:** the dialog shows the placeholder "Leave empty to send the template's
@@ -283,11 +338,22 @@ open in this spec.
   (the existing `sendTriggerEmail.test.ts` is extended); the allowlist applied to Bcc; `quote_pdf` in the
   removed keys is ignored (the PDF is still attached and saved as `sent_quote`); an empty
   subject sends the template's subject.
-- **Vitest, route:** the send route with the new body; a body with no To is refused.
+- **Vitest, route:** the send route with the new body; a body with no To is refused; no
+  `EventFiles` insert when the send fails (Postmark failure) or when a 400 stops the request;
+  the insert happens only after the send, with the client's id and source `email_attachment`;
+  a failing post-send insert still answers ok and the sent-quote row is saved; path validation
+  (another event's folder, `..`, nested path, missing object, malformed entries, unaccepted
+  type).
+- **Vitest, browser flow (D14):** `uploadEventFileObject` creates no row and returns the
+  future row's data; `isOwnEventFilePath`; `removeUnrecordedEventFileObjects` keeps files that
+  have a row and deletes nothing when its check fails; `discardUploads` (deletes all on close,
+  only the removed file on removal, survives a failing delete); `runSend` does not upload
+  again on a retry and posts `addedFiles`; the "file added" selection works on the new shape.
 - **Playwright (written, not run locally, as agreed):** a manager opens Send To Client,
   adds a Cc and a Bcc, changes the subject, removes a template file, adds a file, presses Send; the
-  Log tab shows the addresses, the subject and the attachment names; the Files tab shows the
-  added file.
+  Log tab shows the addresses, the subject and the attachment names; after the successful send
+  the Files tab shows the added file. A second test makes the send fail (route mocked to 500),
+  closes the dialog and checks the Files tab does not show the added file.
 
 ## 11. Not in scope
 

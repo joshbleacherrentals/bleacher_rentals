@@ -23,7 +23,15 @@ const INPUT: SendQuoteInput = {
   bcc: [],
   subject: "S",
   removedAttachmentKeys: ["k1"],
-  addedFileIds: ["f1"],
+  addedFiles: [
+    {
+      id: "f1",
+      storagePath: "e/f1.pdf",
+      name: "f1.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1,
+    },
+  ],
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -257,7 +265,22 @@ describe("buildSendQuoteInput", () => {
     subject: "  Hello ",
     attachments: [{ key: "quote_pdf" }, { key: "k2" }],
     previewAttachmentKeys: ["quote_pdf", "k1", "k2"],
-    addedFileIds: ["f1", "f1"],
+    addedFiles: [
+      {
+        id: "f1",
+        storagePath: "e/f1.pdf",
+        name: "f1.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1,
+      },
+      {
+        id: "f1",
+        storagePath: "e/f1.pdf",
+        name: "f1.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1,
+      },
+    ],
   };
 
   it("lists the template attachments no longer in the dialog as removed, never the quote PDF", () => {
@@ -271,8 +294,8 @@ describe("buildSendQuoteInput", () => {
     expect(buildSendQuoteInput({ ...base, subject: "   " }).subject).toBe("");
   });
 
-  it("de-duplicates the added file ids", () => {
-    expect(buildSendQuoteInput(base).addedFileIds).toEqual(["f1"]);
+  it("de-duplicates the added files by id", () => {
+    expect(buildSendQuoteInput(base).addedFiles.map((f) => f.id)).toEqual(["f1"]);
   });
 
   it("keeps an address only in the first of To, Cc, Bcc and de-duplicates within fields", () => {
