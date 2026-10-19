@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     isLoading: boolean;
     error: Error | null;
   },
+  submission: null as unknown,
 }));
 
 vi.mock("../../hooks/useQuoteDetail", () => ({ useQuoteDetail: () => mocks.state }));
@@ -44,6 +45,9 @@ vi.mock("@/lib/powersync/typedQuery", () => ({
   useTypedQuery: () => ({ data: [], isLoading: false, isFetching: false }),
 }));
 vi.mock("../../hooks/useEventLineItems", () => ({ useEventLineItems: () => ({ lineItems: [] }) }));
+vi.mock("../../hooks/useLeadSubmission", () => ({
+  useLeadSubmission: () => ({ sections: mocks.submission, isLoading: false }),
+}));
 vi.mock("../../hooks/useEventCurrency", () => ({ useEventCurrency: () => "USD" }));
 vi.mock("../../hooks/useGoBackOrTo", () => ({ useGoBackOrTo: () => vi.fn() }));
 vi.mock("../../hooks/useQuotesBookingsCapabilities", () => ({
@@ -89,6 +93,7 @@ function quote(over: Record<string, unknown> = {}) {
 const render = () => renderToStaticMarkup(<QuoteDetailView eventId="ev-1" />);
 
 beforeEach(() => {
+  mocks.submission = null;
   mocks.state = { quote: null, isLoading: true, error: null };
 });
 
@@ -116,6 +121,14 @@ describe("QuoteDetailView", () => {
     expect(html).toMatch(/<h1[^>]*>Spring Gala \(#1042\)<\/h1>/);
     expect(html).toContain('data-tab="contract"');
     expect(html).not.toContain("Loading quote...");
+  });
+
+  it("has a Submission tab only for a quote made from the website form", () => {
+    mocks.state = { quote: quote(), isLoading: false, error: null };
+    expect(render()).not.toContain("Submission");
+
+    mocks.submission = [{ title: "Contact", rows: [] }];
+    expect(render()).toContain("Submission");
   });
 
   it("draws the event name alone when the quote has no number yet", () => {

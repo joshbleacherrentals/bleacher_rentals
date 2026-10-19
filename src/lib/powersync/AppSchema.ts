@@ -233,6 +233,8 @@ const EventsCols = {
   event_type_uuid: column.text,
   contact_uuid: column.text,
   internal_notes: column.text,
+  // The website form submission the quote was created from (jsonb on the server, JSON text here).
+  lead_submission: column.text,
   external_notes: column.text,
   sales_office_uuid: column.text,
   deleted: column.integer,

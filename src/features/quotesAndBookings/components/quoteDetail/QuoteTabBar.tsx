@@ -10,12 +10,18 @@ const TABS = [
   { value: "messages", label: "Messages" },
 ] as const;
 
-/** The tab list of the quote page: the tabs centered on a strip in the header colour. Must be rendered inside the page's `Tabs`. */
-export function QuoteTabBar() {
+const SUBMISSION_TAB = { value: "submission", label: "Submission" } as const;
+
+/**
+ * The tab list of the quote page: the tabs centered on a strip in the header colour. Must be
+ * rendered inside the page's `Tabs`. The Submission tab is only for quotes made from the website form.
+ */
+export function QuoteTabBar({ showSubmission = false }: { showSubmission?: boolean }) {
+  const tabs = showSubmission ? [...TABS, SUBMISSION_TAB] : TABS;
   return (
     <div className="bg-linear-to-r from-gray-800 to-gray-600 px-6 flex justify-center">
       <TabsList className="bg-transparent h-auto p-0 gap-1 rounded-none">
-        {TABS.map(({ value, label }) => (
+        {tabs.map(({ value, label }) => (
           <TabsTrigger
             key={value}
             value={value}
