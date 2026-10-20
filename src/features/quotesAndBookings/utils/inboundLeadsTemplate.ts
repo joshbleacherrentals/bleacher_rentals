@@ -10,8 +10,8 @@ import { isInbound } from "./filterEvents";
  *
  * - An admin sees a lead in Zone Unknown or in a zone nobody works, as long as it is unassigned or
  *   assigned to themselves. Once it is assigned to someone else it leaves their list.
- * - An account manager sees a lead assigned to them, or in a zone they are assigned to (whoever
- *   owns it).
+ * - An account manager sees a lead assigned to them, or an unassigned one in a zone they are
+ *   assigned to. A lead assigned to another account manager is theirs alone, even in a zone you share.
  * - Someone who is both sees both.
  * - Anyone else (read-only roles) sees every lead.
  */
@@ -53,7 +53,8 @@ export function matchesInboundLeads(event: InboundLeadsEvent, user: InboundLeads
     (owner === null || mine);
 
   const asAccountManager =
-    user.isAccountManager && (mine || (zone !== null && user.accountManagerZoneIds.includes(zone)));
+    user.isAccountManager &&
+    (mine || (owner === null && zone !== null && user.accountManagerZoneIds.includes(zone)));
 
   return asAdmin || asAccountManager;
 }

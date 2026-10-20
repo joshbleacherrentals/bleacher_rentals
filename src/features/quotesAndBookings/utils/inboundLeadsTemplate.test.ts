@@ -81,11 +81,18 @@ describe("an admin", () => {
 });
 
 describe("an account manager", () => {
-  it("sees leads in their zones, unassigned or assigned to anyone", () => {
+  it("sees an unassigned lead in their zones", () => {
     expect(matchesInboundLeads(lead({ zone_uuid: "zone-1" }), am)).toBe(true);
+    expect(matchesInboundLeads(lead({ zone_uuid: "zone-3" }), am)).toBe(true);
+  });
+
+  it("does not see a lead assigned to another account manager, even in their own zone", () => {
+    expect(
+      matchesInboundLeads(lead({ zone_uuid: "zone-1", created_by_user_uuid: OTHER }), am),
+    ).toBe(false);
     expect(
       matchesInboundLeads(lead({ zone_uuid: "zone-3", created_by_user_uuid: OTHER }), am),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("sees a lead assigned to them wherever it is", () => {
@@ -120,16 +127,17 @@ describe("someone who is both admin and account manager", () => {
   it("sees the admin list and the account manager list together", () => {
     expect(matchesInboundLeads(lead({ zone_uuid: null }), both)).toBe(true);
     expect(matchesInboundLeads(lead({ zone_uuid: "zone-6" }), both)).toBe(true);
-    expect(
-      matchesInboundLeads(lead({ zone_uuid: "zone-1", created_by_user_uuid: OTHER }), both),
-    ).toBe(true);
+    expect(matchesInboundLeads(lead({ zone_uuid: "zone-1" }), both)).toBe(true);
     expect(matchesInboundLeads(lead({ zone_uuid: "zone-2", created_by_user_uuid: ME }), both)).toBe(
       true,
     );
   });
 
-  it("does not see another zone's lead, or an unstaffed zone's lead given to someone else", () => {
+  it("does not see another zone's lead, or a lead in any zone given to someone else", () => {
     expect(matchesInboundLeads(lead({ zone_uuid: "zone-2" }), both)).toBe(false);
+    expect(
+      matchesInboundLeads(lead({ zone_uuid: "zone-1", created_by_user_uuid: OTHER }), both),
+    ).toBe(false);
     expect(
       matchesInboundLeads(lead({ zone_uuid: "zone-6", created_by_user_uuid: OTHER }), both),
     ).toBe(false);
