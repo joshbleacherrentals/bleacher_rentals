@@ -8,6 +8,8 @@ import { Color } from "@/types/Color";
 import { useState } from "react";
 import { FileText } from "lucide-react";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
+import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
+import { canDeleteDocuments } from "@/features/userAccess/logic/canEditDocuments";
 
 // ─── Region badge ─────────────────────────────────────────────────────────────
 
@@ -285,6 +287,8 @@ export default function BlueBookPage() {
   const [editTarget, setEditTarget] = useState<BlueBookData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BlueBookData | null>(null);
   const supabase = useClerkSupabaseClient();
+  const { isAdmin, isAccountManager } = useTeamPermissions();
+  const canDelete = canDeleteDocuments({ isAdmin, isAccountManager });
 
   return (
     <div>
@@ -404,12 +408,14 @@ export default function BlueBookPage() {
                         >
                           Edit
                         </button>
-                        <button
-                          onClick={() => setDeleteTarget(entry)}
-                          className="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded hover:bg-red-50"
-                        >
-                          Delete
-                        </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => setDeleteTarget(entry)}
+                            className="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

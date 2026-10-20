@@ -34,7 +34,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
     "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
@@ -528,7 +528,26 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: full(
-        "Can add a bleacher, edit any of its details, and delete or restore it, on the Bleachers tab of the Assets page. Sees no add button or editable form on the Documents and Other Assets tabs — those stay Administrator-only.",
+        "Can add a bleacher, edit any of its details, and delete or restore it, on the Bleachers tab of the Assets page. Sees no add button or editable form on the Other Assets tab — that stays Administrator-only. The Documents tab has its own entry below.",
+      ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Driver App Documents",
+    description:
+      "This applies to the Documents tab of the Assets page — the documents drivers read in the mobile app.",
+    category: "Configuration",
+    roles: {
+      admin: full("Can see, add, edit and delete documents, and upload the PDF."),
+      account_manager: custom(
+        "Can see, edit and delete existing documents, but has no Add Document button.",
+      ),
+      developer: none("Unable to even access the Assets page."),
+      viewer: none("The documents are not shown to viewers."),
+      driver: none("Drivers read these documents in the Driver Mobile App, not on the web."),
+      maintainer: custom(
+        "Can see every document, edit any of them (name, PDF, description, region, order, active) and add new ones. Cannot delete: a deleted document disappears from the driver app for good, so that stays with administrators and account managers.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
