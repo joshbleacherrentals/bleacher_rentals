@@ -5,11 +5,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
 import { StatusQuickToggle } from "@/features/quotesAndBookings/components/StatusQuickToggle";
-import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
-import { inboundLeadsZones, sameZones } from "@/features/quotesAndBookings/utils/inboundLeadsZones";
+import { sameZones } from "@/features/quotesAndBookings/utils/inboundLeadsZones";
+import { SHOW_INBOUND_LEADS_EVENT } from "@/features/quotesAndBookings/utils/inboundLeadsHref";
 import { ListOptionsMenu } from "@/features/quotesAndBookings/components/ListOptionsMenu";
-import { useUnstaffedZoneIds } from "@/features/quotesAndBookings/hooks/useZoneLookup";
-import { useInboundLeadsCount } from "@/features/quotesAndBookings/hooks/useInboundLeadsCount";
+import { useInboundLeadsZones } from "@/features/quotesAndBookings/hooks/useInboundLeadsZones";
+import { useInboundLeads } from "@/features/quotesAndBookings/hooks/useInboundLeads";
 import { TemplatePill } from "@/features/quotesAndBookings/components/TemplatePill";
 import {
   FilterSidebar,
@@ -141,24 +141,9 @@ export default function QuotesBookingsPage() {
     return () => observer.disconnect();
   }, [scrollRef]);
 
-  // The Inbound Leads template narrows to the zones this person handles: an account manager's own,
-  // and for an admin Zone Unknown plus the zones nobody works (both lists for someone who is both).
-  const isAdmin = usePermissionsStore((s) => s.isAdmin);
-  const isAccountManager = usePermissionsStore((s) => s.isAccountManager);
-  const accountManagerZoneIds = usePermissionsStore((s) => s.accountManagerZoneIds);
-  const unstaffedZones = useUnstaffedZoneIds();
-  const inboundZones = useMemo(
-    () =>
-      inboundLeadsZones({
-        isAdmin,
-        isAccountManager,
-        accountManagerZoneIds,
-        unstaffedZoneIds: unstaffedZones,
-      }),
-    [isAdmin, isAccountManager, accountManagerZoneIds, unstaffedZones],
-  );
-
-  const inboundLeadsCount = useInboundLeadsCount(inboundZones);
+  // The Inbound Leads template narrows to the zones this person handles (see inboundLeadsZones).
+  const { zones: inboundZones } = useInboundLeadsZones();
+  const { count: inboundLeadsCount } = useInboundLeads(inboundZones);
 
   // The Inbound Leads template is showing: unsent website quotes in those zones, oldest first.
   const inboundLeadsActive =
@@ -168,6 +153,15 @@ export default function QuotesBookingsPage() {
     filters.statuses[0] === "draft" &&
     sort.key === "created_at" &&
     sort.direction === "asc";
+
+  // The header's "New Leads" reminder asks an open list to show the template (a closed one is opened
+  // with the template in its URL).
+  useEffect(() => {
+    const show = () => showInboundLeads(inboundZones);
+    window.addEventListener(SHOW_INBOUND_LEADS_EVENT, show);
+    return () => window.removeEventListener(SHOW_INBOUND_LEADS_EVENT, show);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inboundZones]);
 
   const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
 
