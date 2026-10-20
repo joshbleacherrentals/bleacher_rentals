@@ -29,6 +29,13 @@ describe("mergeRoleConfigs — the maintainer role", () => {
     expect(config.allowedPaths).toContain("/repairs");
   });
 
+  it("lets a maintainer open the roadmap backlog — and only that part of the roadmap", () => {
+    const config = mergeRoleConfigs(["maintainer"]);
+    expect(canAccessPath(["maintainer"], "/roadmap/backlog")).toBe(true);
+    expect(canAccessPath(["maintainer"], "/roadmap")).toBe(false);
+    expect(config.allowedPaths).not.toContain("/roadmap");
+  });
+
   it("gives a maintainer nothing else — not the inspections list, work trackers or quotes", () => {
     const config = mergeRoleConfigs(["maintainer"]);
     expect(config.allowedPaths).not.toContain("/inspections");

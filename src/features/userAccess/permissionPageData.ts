@@ -884,7 +884,9 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can view all tickets in the backlog and sprints but cannot create, edit, or move them.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      maintainer: full(
+        "Can view, submit and edit tickets on the Backlog page (Request a Feature in the header menu). Cannot delete tickets, move them into a sprint, or open the sprint boards.",
+      ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
