@@ -56,6 +56,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       origin: _req.nextUrl.origin,
       recipientOverride: FINANCE_EMAIL,
     });
+    // Postmark throwing used to surface here as an exception: keep answering it with a 500.
+    if (!result.sent && result.postmarkException) {
+      console.error("Booked notice to finance failed:", result.reason);
+      return NextResponse.json({ error: "Send failed" }, { status: 500 });
+    }
     return NextResponse.json(result, { status: result.sent ? 200 : 422 });
   } catch (e) {
     console.error("Booked notice to finance failed:", e);

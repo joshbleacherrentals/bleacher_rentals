@@ -1,5 +1,4 @@
 import { db } from "@/components/providers/SystemProvider";
-import { typedGetAll, expect } from "@/lib/powersync/typedQuery";
 
 export type ContactEventRelation = "primary" | "finance";
 
@@ -75,11 +74,13 @@ export function bucketAndSortContactEvents(
   return { past, future };
 }
 
-export async function fetchContactEvents(
-  contactId: string,
-  nowIso?: string,
-): Promise<ContactEventBuckets> {
-  const compiled = db
+/**
+ * The query behind the Contact history panel: every event that is not deleted and names this
+ * contact as its contact or its finance contact. The panel watches it (`useContactEvents`) while
+ * it is open; this used to be run once, by an async `fetchContactEvents`, when the panel opened.
+ */
+export function contactEventsQuery(contactId: string) {
+  return db
     .selectFrom("Events")
     .select([
       "id",
@@ -96,8 +97,4 @@ export async function fetchContactEvents(
       eb.or([eb("contact_uuid", "=", contactId), eb("finance_contact_uuid", "=", contactId)]),
     )
     .compile();
-
-  const rows = await typedGetAll(compiled, expect<ContactEventRow>());
-
-  return bucketAndSortContactEvents(rows, contactId, nowIso);
 }

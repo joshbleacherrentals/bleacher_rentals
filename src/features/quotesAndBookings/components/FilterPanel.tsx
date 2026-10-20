@@ -9,6 +9,8 @@ import { TimezoneSelect } from "./filters/TimezoneSelect";
 import { InGoodShuffleSelect } from "./filters/InGoodShuffleSelect";
 import { InQuickBooksSelect } from "./filters/InQuickBooksSelect";
 import { SalesOfficeSelect } from "./filters/SalesOfficeSelect";
+import { InboundSelect } from "./filters/InboundSelect";
+import { ZoneMultiSelect } from "./filters/ZoneMultiSelect";
 
 type FilterPanelProps = {
   filters: QuotesBookingsFilters;
@@ -22,6 +24,9 @@ type FilterPanelProps = {
   onInGoodShuffleChange: (value: boolean | null) => void;
   onInQuickBooksChange: (value: boolean | null) => void;
   onSalesOfficeChange: (uuid: string | null) => void;
+  /** The Inbound and Zones filters are offered where both handlers are given. */
+  onInboundChange?: (value: boolean | null) => void;
+  onZonesChange?: (zoneUuids: string[]) => void;
 };
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -45,6 +50,8 @@ export function FilterPanel({
   onInGoodShuffleChange,
   onInQuickBooksChange,
   onSalesOfficeChange,
+  onInboundChange,
+  onZonesChange,
 }: FilterPanelProps) {
   return (
     <div className="space-y-3">
@@ -60,6 +67,18 @@ export function FilterPanel({
           onChange={onAccountManagerChange}
         />
       </Field>
+
+      {onInboundChange && (
+        <Field label="Inbound (website form)">
+          <InboundSelect value={filters.inbound} onChange={onInboundChange} />
+        </Field>
+      )}
+
+      {onZonesChange && (
+        <Field label="Zones">
+          <ZoneMultiSelect values={filters.zoneUuids} onChange={onZonesChange} />
+        </Field>
+      )}
 
       <Field label="Sales Office">
         <SalesOfficeSelect value={filters.salesOfficeUuid} onChange={onSalesOfficeChange} />

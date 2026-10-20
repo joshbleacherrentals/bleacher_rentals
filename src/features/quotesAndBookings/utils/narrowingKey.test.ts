@@ -16,6 +16,8 @@ const filters: QuotesBookingsFilters = {
   accountManagerUserUuid: null,
   inGoodShuffle: null,
   inQuickBooks: null,
+  inbound: null,
+  zoneUuids: [],
   salesOfficeUuid: null,
 };
 
@@ -44,5 +46,13 @@ describe("narrowingKey", () => {
 
   it("tells the two AR tabs of /accountant apart, so switching one goes back to page 1", () => {
     expect(keyFor(filters, "", false, "ar")).not.toBe(keyFor(filters, "", false, "ar_deposits"));
+  });
+});
+
+describe("narrowingKey and the My Inbound Leads template", () => {
+  it("changes when the template is turned on, so the list returns to page 1", () => {
+    const off = narrowingKey(filters, "", false, DEFAULT_SORT, "all", false);
+    const on = narrowingKey(filters, "", false, DEFAULT_SORT, "all", true);
+    expect(on).not.toBe(off);
   });
 });

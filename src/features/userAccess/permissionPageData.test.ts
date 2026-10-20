@@ -101,6 +101,28 @@ describe("permission matrix", () => {
       });
     });
 
+    it("has a Send To Client row: full for an admin and an account manager, none for everyone else", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Send To Client");
+      expect(row?.category).toBe("Day to Day Operations");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "full",
+        accountant: "none",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+      expect(row?.roles.admin.note).toMatch(
+        /To, Cc and Bcc addresses, the subject and the attachments/i,
+      );
+      expect(row?.roles.account_manager.note).toMatch(/quote PDF always stays attached/i);
+    });
+
     it("can neither create, edit, delete nor release a work tracker — and the matrix says so", () => {
       const note = accountant("Work Trackers")?.note ?? "";
       expect(accountant("Work Trackers")?.level).toBe("custom");

@@ -15,7 +15,8 @@ export function narrowingKey(
   showDeleted: boolean,
   sort: EventSort,
   activeTab: ListTab,
+  leadsTemplate = false,
 ): string {
   const { isOpen: _isOpen, ...appliedFilters } = filters;
-  return JSON.stringify([appliedFilters, searchQuery, showDeleted, sort, activeTab]);
+  return JSON.stringify([appliedFilters, searchQuery, showDeleted, sort, activeTab, leadsTemplate]);
 }

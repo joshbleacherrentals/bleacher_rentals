@@ -23,7 +23,12 @@ type FakeConfig = {
   event?: { sales_office_uuid: string | null } | null;
   binding?: { id: string } | null;
   template?: { id: string; subject: string; html_body: string } | null;
-  attachments?: Array<{ file_name: string; storage_path: string; mime_type: string | null }>;
+  attachments?: Array<{
+    id?: string;
+    file_name: string;
+    storage_path: string;
+    mime_type: string | null;
+  }>;
   download?: { ok: boolean };
   // Rows of DevAllowedEmails, or an error reading them.
   allowedEmails?: string[];
@@ -460,5 +465,174 @@ describe("development email allowlist", () => {
       docData: doc(),
     });
     expect(r.ok).toBe(true);
+  });
+});
+
+describe("quote send options: cc, bcc, subject, omitted attachments", () => {
+  const base = { trigger: QUOTE_SIGNED_CLIENT, eventId: "e1" };
+
+  it("sends Cc, Bcc and a custom subject, and logs them", async () => {
+    const { supabase, inserted } = makeSupabase(READY);
+    const r = await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      ...base,
+      docData: doc(),
+      recipientOverride: "a@x.com",
+      cc: ["c1@x.com", "c2@x.com"],
+      bcc: ["b@x.com"],
+      subject: "  Custom  ",
+    });
+    expect(r).toEqual({ sent: true, to: "a@x.com" });
+    const sent = mockSendEmail.mock.calls[0][0];
+    expect(sent).toMatchObject({
+      To: "a@x.com",
+      Cc: "c1@x.com, c2@x.com",
+      Bcc: "b@x.com",
+      Subject: "Custom",
+    });
+    expect(lastEmailLog(inserted)).toMatchObject({
+      status: "sent",
+      to_email: "a@x.com",
+      cc_emails: "c1@x.com, c2@x.com",
+      bcc_emails: "b@x.com",
+      subject: "Custom",
+    });
+  });
+
+  it("an empty subject sends the template's subject", async () => {
+    const { supabase, inserted } = makeSupabase(READY);
+    await sendTriggerEmail({ supabaseAdmin: supabase, ...base, docData: doc(), subject: "   " });
+    expect(mockSendEmail.mock.calls[0][0].Subject).toBe("Hi Jordan");
+    expect(lastEmailLog(inserted)?.subject).toBe("Hi Jordan");
+  });
+
+  it("an empty subject and an empty template subject fall back to the trigger name and quote number", async () => {
+    const { supabase } = makeSupabase({
+      ...READY,
+      template: { id: "t-1", subject: "", html_body: "<p>x</p>" },
+    });
+    await sendTriggerEmail({ supabaseAdmin: supabase, ...base, docData: doc(), subject: "" });
+    expect(mockSendEmail.mock.calls[0][0].Subject).toMatch(/Q-1$/);
+  });
+
+  it("sends an address that is in several fields once, as the first of To, Cc, Bcc", async () => {
+    const { supabase } = makeSupabase(READY);
+    await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      ...base,
+      docData: doc(),
+      recipientOverride: "a@x.com",
+      cc: ["A@x.com", "c@x.com"],
+      bcc: ["C@x.com", "b@x.com", "a@x.com"],
+    });
+    const sent = mockSendEmail.mock.calls[0][0];
+    expect(sent).toMatchObject({ To: "a@x.com", Cc: "c@x.com", Bcc: "b@x.com" });
+  });
+
+  it("leaves out the omitted template attachments but keeps caller ones, and logs the names", async () => {
+    const { supabase, inserted } = makeSupabase({
+      ...READY,
+      attachments: [
+        { id: "r1", file_name: "faq.pdf", storage_path: "p/faq.pdf", mime_type: null },
+        { id: "r2", file_name: "coi.pdf", storage_path: "p/coi.pdf", mime_type: null },
+      ],
+      download: { ok: true },
+    });
+    await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      ...base,
+      docData: doc(),
+      attachments: [{ name: "Q-1.pdf", content: Buffer.from("x"), contentType: "application/pdf" }],
+      omitAttachmentKeys: ["r1", "quote_pdf"],
+    });
+    const names = mockSendEmail.mock.calls[0][0].Attachments.map((a: any) => a.Name);
+    expect(names).toEqual(["Q-1.pdf", "coi.pdf"]);
+    expect(lastEmailLog(inserted)?.attachment_names).toBe("Q-1.pdf, coi.pdf");
+  });
+
+  it("when Postmark rejects the message, returns a failed result and logs it with the details", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSendEmail.mockRejectedValue(new Error("Invalid 'To' address: 'x@y'"));
+    const { supabase, inserted } = makeSupabase({
+      ...READY,
+      attachments: [{ id: "r1", file_name: "terms.pdf", storage_path: "p", mime_type: null }],
+      download: { ok: true },
+    });
+    const r = await sendTriggerEmail({
+      supabaseAdmin: supabase,
+      ...base,
+      docData: doc(),
+      recipientOverride: "a@x.com",
+      cc: ["c@x.com"],
+      bcc: ["b@x.com"],
+      subject: "Hello",
+      attachments: [{ name: "Q-1.pdf", content: Buffer.from("x"), contentType: "application/pdf" }],
+    });
+    expect(r).toMatchObject({ sent: false, postmarkException: true });
+    expect((r as { reason: string }).reason).toMatch(/Invalid 'To' address/);
+    expect(lastEmailLog(inserted)).toMatchObject({
+      status: "failed",
+      cc_emails: "c@x.com",
+      bcc_emails: "b@x.com",
+      subject: "Hello",
+      attachment_names: "Q-1.pdf, terms.pdf",
+    });
+    expect(lastEmailLog(inserted).reason).toMatch(/Invalid 'To' address/);
+    errorSpy.mockRestore();
+  });
+
+  describe("development allowlist", () => {
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      vi.stubEnv("NEXT_PUBLIC_ENVIRONMENT", "development");
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      errorSpy.mockRestore();
+    });
+
+    it("drops a Bcc that is not on the list, keeps an allowed one", async () => {
+      const { supabase, inserted } = makeSupabase({
+        ...READY,
+        allowedEmails: ["a@x.com", "okbcc@x.com"],
+      });
+      await sendTriggerEmail({
+        supabaseAdmin: supabase,
+        ...base,
+        docData: doc(),
+        recipientOverride: "a@x.com",
+        bcc: ["okbcc@x.com", "secret@x.com"],
+      });
+      const sent = mockSendEmail.mock.calls[0][0];
+      expect(sent.Bcc).toBe("okbcc@x.com");
+      expect(lastEmailLog(inserted)?.bcc_emails).toBe("okbcc@x.com");
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("secret@x.com"));
+    });
+
+    it("sends no Bcc at all when none of them is allowed", async () => {
+      const { supabase } = makeSupabase({ ...READY, allowedEmails: ["a@x.com"] });
+      await sendTriggerEmail({
+        supabaseAdmin: supabase,
+        ...base,
+        docData: doc(),
+        recipientOverride: "a@x.com",
+        bcc: ["secret@x.com"],
+      });
+      expect(mockSendEmail.mock.calls[0][0]).not.toHaveProperty("Bcc");
+    });
+
+    it("refuses the send when To ends empty, even if the Bcc is allowed", async () => {
+      const { supabase } = makeSupabase({ ...READY, allowedEmails: ["okbcc@x.com"] });
+      const r = await sendTriggerEmail({
+        supabaseAdmin: supabase,
+        ...base,
+        docData: doc(),
+        recipientOverride: "a@x.com",
+        bcc: ["okbcc@x.com"],
+      });
+      expect(r.sent).toBe(false);
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
   });
 });

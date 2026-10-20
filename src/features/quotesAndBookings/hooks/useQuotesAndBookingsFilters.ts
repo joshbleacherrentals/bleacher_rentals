@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import { QuotesBookingsFilters } from "../types";
 import { withoutFilter, type ActiveFilterKey } from "../utils/activeFilters";
 
-const emptyFilters: QuotesBookingsFilters = {
+/** No filter at all (the sidebar open state aside). */
+export const emptyFilters: QuotesBookingsFilters = {
   isOpen: true, // the filter sidebar starts expanded
   statuses: [],
   createdFrom: null,
@@ -17,6 +18,8 @@ const emptyFilters: QuotesBookingsFilters = {
   inGoodShuffle: null,
   inQuickBooks: null,
   salesOfficeUuid: null,
+  inbound: null,
+  zoneUuids: [],
 };
 
 export function useQuotesAndBookingsFilters(
@@ -68,6 +71,14 @@ export function useQuotesAndBookingsFilters(
     setFilters((prev) => ({ ...prev, salesOfficeUuid: uuid }));
   }, []);
 
+  const setInbound = useCallback((value: boolean | null) => {
+    setFilters((prev) => ({ ...prev, inbound: value }));
+  }, []);
+
+  const setZoneUuids = useCallback((zoneUuids: string[]) => {
+    setFilters((prev) => ({ ...prev, zoneUuids }));
+  }, []);
+
   /** Clears the one filter behind an applied-filter chip. */
   const clearFilter = useCallback((key: ActiveFilterKey) => {
     setFilters((prev) => withoutFilter(prev, key));
@@ -87,6 +98,8 @@ export function useQuotesAndBookingsFilters(
       inGoodShuffle: null,
       inQuickBooks: null,
       salesOfficeUuid: null,
+      inbound: null,
+      zoneUuids: [],
     }));
   }, []);
 
@@ -101,6 +114,8 @@ export function useQuotesAndBookingsFilters(
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    setInbound,
+    setZoneUuids,
     clearFilter,
     clearFilters,
   };

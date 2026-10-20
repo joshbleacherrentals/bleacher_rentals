@@ -46,8 +46,8 @@ export default function BacklogPage() {
   const { userUuid } = useRoadmapCurrentUserUuid();
   const myTaskIds = useMySubscribedTaskIds(userUuid);
   const { isDeveloper } = useRoadmapAccessLevel();
-  const { isAccountManager } = useTeamPermissions();
-  const canEditTasks = canEditRoadmapTasks(isDeveloper, isAccountManager);
+  const { isAccountManager, isMaintainer } = useTeamPermissions();
+  const canEditTasks = canEditRoadmapTasks(isDeveloper, isAccountManager, isMaintainer);
   const subscriptionsMap = useAllTaskSubscriptionsMap();
   const { userMap } = useRoadmapUsers();
 

@@ -66,4 +66,23 @@ describe("POST /api/quotes/[id]/booked-notice", () => {
     expect(res.status).toBe(409);
     expect(sendTriggerEmail).not.toHaveBeenCalled();
   });
+
+  it("answers a Postmark exception with 500 Send failed", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    sendTriggerEmail.mockResolvedValue({
+      sent: false,
+      reason: "Postmark could not send the email: boom",
+      postmarkException: true,
+    });
+    const res = await call();
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Send failed" });
+  });
+
+  it("still answers a decision not to send (no template) with 422 and the reason", async () => {
+    sendTriggerEmail.mockResolvedValue({ sent: false, reason: "No template" });
+    const res = await call();
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ sent: false, reason: "No template" });
+  });
 });

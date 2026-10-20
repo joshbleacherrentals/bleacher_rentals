@@ -157,6 +157,15 @@ const ZonesCols = {
 } satisfies PowerSyncColsFor<"Zones">;
 const Zones = new Table(ZonesCols);
 
+const ZoneStateProvincesCols = {
+  created_at: column.text,
+  state_province: column.text,
+  zone_uuid: column.text,
+} satisfies PowerSyncColsFor<"ZoneStateProvinces">;
+const ZoneStateProvinces = new Table(ZoneStateProvincesCols, {
+  indexes: { zone_uuid: ["zone_uuid"] },
+});
+
 const AccountManagerZonesCols = {
   created_at: column.text,
   account_manager_uuid: column.text,
@@ -233,6 +242,8 @@ const EventsCols = {
   event_type_uuid: column.text,
   contact_uuid: column.text,
   internal_notes: column.text,
+  // The website form submission the quote was created from (jsonb on the server, JSON text here).
+  lead_submission: column.text,
   external_notes: column.text,
   sales_office_uuid: column.text,
   deleted: column.integer,
@@ -1226,6 +1237,10 @@ const EventEmailLogCols = {
   status: column.text,
   reason: column.text,
   to_email: column.text,
+  cc_emails: column.text,
+  bcc_emails: column.text,
+  subject: column.text,
+  attachment_names: column.text,
   template_id: column.text,
   fired_at: column.text,
 } satisfies PowerSyncColsFor<"EventEmailLog">;
@@ -1324,6 +1339,7 @@ export const AppSchema = new Schema({
   AccountManagerZones,
   ChangeLog,
   Zones,
+  ZoneStateProvinces,
   Developers,
   DashboardFilterSettings,
   DriverUnavailability,

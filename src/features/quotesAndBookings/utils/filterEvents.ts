@@ -1,5 +1,6 @@
-import { QuotesBookingsEvent, QuotesBookingsFilters } from "../types";
+import type { InboundFields, QuotesBookingsEvent, QuotesBookingsFilters } from "../types";
 import { isWithinRange } from "./dateRange";
+import { UNKNOWN_ZONE } from "./zoneOfEvent";
 
 /**
  * An event is in GoodShuffle when it carries a real URL. A blank string is a
@@ -21,11 +22,19 @@ export function isInQuickBooks(event: QuotesBookingsEvent): boolean {
   return event.is_qbo === 1;
 }
 
-export function filterQuotesBookingsEvents(
-  events: QuotesBookingsEvent[],
+/**
+ * An event is inbound when it was created from the website form, which is the only thing that
+ * stores a submission. Exported so a badge and the filter cannot disagree.
+ */
+export function isInbound(event: InboundFields): boolean {
+  return (event.lead_submission ?? "").trim() !== "";
+}
+
+export function filterQuotesBookingsEvents<E extends QuotesBookingsEvent & InboundFields>(
+  events: E[],
   filters: QuotesBookingsFilters,
   timezone?: string,
-): QuotesBookingsEvent[] {
+): E[] {
   return events.filter((event) => {
     if (filters.statuses.length > 0) {
       const status = event.event_status?.toLowerCase() ?? "";
@@ -50,6 +59,15 @@ export function filterQuotesBookingsEvents(
 
     if (filters.inQuickBooks !== null && isInQuickBooks(event) !== filters.inQuickBooks) {
       return false;
+    }
+
+    if (filters.inbound !== null && isInbound(event) !== filters.inbound) {
+      return false;
+    }
+
+    if (filters.zoneUuids.length > 0) {
+      // An event whose state is missing or in no zone is "Zone Unknown", which is its own choice.
+      if (!filters.zoneUuids.includes(event.zone_uuid ?? UNKNOWN_ZONE)) return false;
     }
 
     if (filters.salesOfficeUuid && event.sales_office_uuid !== filters.salesOfficeUuid) {

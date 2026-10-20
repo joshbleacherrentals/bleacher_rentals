@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Lottie from "lottie-react";
-import { ExternalLink, Loader2, Monitor, Paperclip, Smartphone } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,8 +11,36 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { fetchSendPreview, type SendPreview } from "../../utils/sendQuote";
-import { canDismiss, canSend, runSend, type SendPhase } from "./sendQuoteFlow";
+import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
+import { useContacts } from "@/features/companiesContacts/hooks/useContacts";
+import type { ContactSuggestion } from "@/components/EmailChipInput";
+import {
+  buildSendQuoteInput,
+  checkSendLimits,
+  fetchSendPreview,
+  formatRecipientsLine,
+  type AddedFileInput,
+  type RecipientFields,
+  type SendPreview,
+  type SendQuoteInput,
+} from "../../utils/sendQuote";
+import {
+  fileRefusal,
+  removeUnrecordedEventFileObjects,
+  uploadEventFileObject,
+} from "../../utils/eventFileUpload";
+import {
+  canDismiss,
+  canSend,
+  discardUploads,
+  ignoreDialogEscape,
+  runSend,
+  type AddedFile,
+  type PendingFile,
+  type SendPhase,
+} from "./sendQuoteFlow";
+import { attachmentRows, attachmentSizes, openingRecipients } from "./sendDialogModel";
+import { SendQuoteReviewForm } from "./SendQuoteReviewForm";
 import successAnimation from "../../../../../public/animations/Success.json";
 
 export type SendQuoteDialogProps = {
@@ -23,8 +51,9 @@ export type SendQuoteDialogProps = {
   recipientEmails: string[];
   /** Create flow: runs just before the email, e.g. to mark the quote Quoted. */
   onBeforeSend?: () => Promise<void>;
-  /** Runs after the email is confirmed sent — logs it and does any page cleanup. */
-  onSent: () => Promise<void> | void;
+  /** Runs after the email is confirmed sent, with the final To, Cc and Bcc — logs it and does any
+   *  page cleanup. */
+  onSent: (sent: SendQuoteInput, addedFiles: AddedFile[]) => Promise<void> | void;
   /** Runs when the person closes the dialog after a confirmed send. */
   onDone?: () => void;
 };
@@ -42,17 +71,89 @@ export function SendQuoteDialog({
   const [preview, setPreview] = useState<SendPreview | null>(null);
   const [error, setError] = useState("");
   const [mobileView, setMobileView] = useState(false);
-  const recipientKey = recipientEmails.join(",");
+  // The recipients of this opening. Taken from the live `recipientEmails` when the dialog opens and
+  // then frozen (see openingRecipients), so a contact sync cannot reset a send in flight.
+  const [recipients, setRecipients] = useState<string[]>(recipientEmails);
+  const [fields, setFields] = useState<RecipientFields>({
+    to: recipientEmails,
+    cc: [],
+    bcc: [],
+  });
+  const [subject, setSubject] = useState("");
+  const [removedKeys, setRemovedKeys] = useState<ReadonlySet<string>>(new Set());
+  const [added, setAdded] = useState<PendingFile[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [sentInput, setSentInput] = useState<SendQuoteInput | null>(null);
+  // pending-file id -> what was uploaded to storage (no EventFiles row yet, D14). Kept across
+  // attempts so "Try again" never uploads twice; emptied after a successful send (the server has
+  // recorded the files) and deleted from storage when the send did not go out.
+  const uploaded = useRef(new Map<string, AddedFileInput>());
+  const phaseRef = useRef<SendPhase>("review");
+  phaseRef.current = phase;
+  const subjectInitialised = useRef(false);
+  const recipientKey = recipients.join(",");
+
+  const supabase = useClerkSupabaseClient();
+  const supabaseRef = useRef(supabase);
+  supabaseRef.current = supabase;
+  const removeObjects = (files: { id: string; storagePath: string }[]) =>
+    removeUnrecordedEventFileObjects(supabaseRef.current, files);
+  const { contacts } = useContacts();
+  const suggestions = useMemo<ContactSuggestion[]>(
+    () =>
+      contacts
+        .filter((c) => !!c.email)
+        .map((c) => ({
+          id: c.id,
+          name: [c.firstName, c.lastName].filter(Boolean).join(" "),
+          email: c.email as string,
+        })),
+    [contacts],
+  );
+
+  // Reset for a new opening while rendering, not in an effect: an effect would let the first frame
+  // of a reopen show the previous "sent" state.
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setPhase("review");
+      setError("");
+      setPreview(null);
+      setMobileView(false);
+      setRecipients(recipientEmails);
+      setFields({ to: recipientEmails, cc: [], bcc: [] });
+      setSubject("");
+      setRemovedKeys(new Set());
+      setAdded([]);
+      setFileError(null);
+      setSentInput(null);
+    }
+  }
+  // An opening that started with no contacts yet picks them up once, before anything is done.
+  const adopted = open ? openingRecipients(recipients, recipientEmails, phase) : recipients;
+  if (adopted !== recipients) {
+    setRecipients(adopted);
+    setFields((f) => (f.to.length ? f : { ...f, to: adopted }));
+  }
 
   useEffect(() => {
     if (!open) return;
-    setPhase("review");
-    setError("");
-    setPreview(null);
-    setMobileView(false);
-    if (recipientEmails.length === 0) return;
+    subjectInitialised.current = false;
+    const mine = new Map<string, AddedFileInput>();
+    uploaded.current = mine;
+    // Closing, switching quote or unmounting without a successful send: the files uploaded for it
+    // must not stay in storage. Not mid-send: the request may be about to record them.
+    return () => {
+      if (phaseRef.current !== "sending") void discardUploads(mine, removeObjects);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, eventId]);
+
+  useEffect(() => {
+    if (!open || recipients.length === 0) return;
     let cancelled = false;
-    void fetchSendPreview(eventId, recipientEmails).then((p) => {
+    void fetchSendPreview(eventId, recipients).then((p) => {
       if (!cancelled) setPreview(p);
     });
     return () => {
@@ -61,132 +162,147 @@ export function SendQuoteDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, eventId, recipientKey]);
 
+  // The subject starts as the template's. Set once per opening, so clearing it stays cleared (D8).
+  useEffect(() => {
+    if (preview?.ok && !subjectInitialised.current) {
+      subjectInitialised.current = true;
+      setSubject(preview.subject);
+    }
+  }, [preview]);
+
+  const rows = useMemo(
+    () => (preview?.ok ? attachmentRows(preview.attachments, removedKeys, added) : []),
+    [preview, removedKeys, added],
+  );
+  const limits = checkSendLimits({ ...fields, attachmentSizes: attachmentSizes(rows) });
+
+  const addFiles = (files: File[]) => {
+    const accepted: PendingFile[] = [];
+    let refusal: string | null = null;
+    for (const file of files) {
+      const why = fileRefusal(file);
+      if (why) refusal = `${file.name}: ${why.title}. ${why.detail}.`;
+      else accepted.push({ id: crypto.randomUUID(), file });
+    }
+    setFileError(refusal);
+    if (accepted.length) setAdded((prev) => [...prev, ...accepted]);
+  };
+
+  const removeAttachment = (key: string) => {
+    if (added.some((p) => p.id === key)) {
+      setAdded((prev) => prev.filter((p) => p.id !== key));
+      // Already uploaded by a failed attempt: it is not going to be sent, so delete it.
+      void discardUploads(uploaded.current, removeObjects, [key]);
+    } else setRemovedKeys((prev) => new Set(prev).add(key));
+    setFileError(null);
+  };
+
   const close = () => {
     if (!canDismiss(phase)) return;
     // onDone first: the parent may still need what it clears when it handles onOpenChange.
     if (phase === "sent") onDone?.();
+    else void discardUploads(uploaded.current, removeObjects);
     onOpenChange(false);
   };
 
   const send = async () => {
+    if (!preview?.ok) return;
     setPhase("sending");
-    const result = await runSend({ eventId, recipients: recipientEmails, onBeforeSend, onSent });
+    const result = await runSend({
+      eventId,
+      buildInput: (addedFiles) =>
+        buildSendQuoteInput({
+          ...fields,
+          subject,
+          attachments: rows.filter((r) => !r.pending),
+          previewAttachmentKeys: preview.attachments.map((a) => a.key),
+          addedFiles,
+        }),
+      pendingFiles: added,
+      uploaded: uploaded.current,
+      upload: (file) => uploadEventFileObject({ supabase, eventId, file }),
+      onBeforeSend,
+      onSent: (input, addedFiles) => {
+        setSentInput(input);
+        return onSent(input, addedFiles);
+      },
+    });
     if (result.ok) {
+      uploaded.current.clear(); // recorded in Files by the server: nothing to clean up
       setPhase("sent");
+    } else if (result.stage === "upload") {
+      // Nothing was sent: back to the form with everything as it was, so the person can remove the
+      // failing file or press Send again. Files already uploaded are not uploaded twice.
+      setFileError(result.message);
+      setPhase("review");
     } else {
       setError(result.message);
       setPhase("error");
     }
   };
 
-  const sendable = canSend({ recipients: recipientEmails, preview });
+  const sendable = canSend({
+    recipients: fields.to,
+    preview,
+    withinLimits: limits.ok,
+  });
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && close()}>
       <DialogContent
         className="top-0 left-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-4 rounded-none border-0 sm:max-w-none"
-        onEscapeKeyDown={(e) => !canDismiss(phase) && e.preventDefault()}
+        onEscapeKeyDown={(e) =>
+          ignoreDialogEscape(phase, document.activeElement) && e.preventDefault()
+        }
       >
         {phase === "review" && (
           <div className="grid min-h-0 flex-1 gap-6 md:grid-cols-[25%_1fr]">
-            <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Review before sending</DialogTitle>
-                <DialogDescription>
-                  This is exactly what your customer will receive. Nothing is sent until you press
-                  Send.
-                </DialogDescription>
-              </DialogHeader>
-
-              {preview?.ok && (
-                <>
-                  <dl className="space-y-2 text-sm">
-                    <div>
-                      <dt className="text-xs font-semibold text-gray-500">From</dt>
-                      <dd className="break-all">{preview.from}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold text-gray-500">To</dt>
-                      <dd className="break-all">{preview.to.split(",").join(", ")}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold text-gray-500">Subject</dt>
-                      <dd className="font-medium">{preview.subject}</dd>
-                    </div>
-                  </dl>
-
-                  <div className="flex gap-1">
-                    {(
-                      [
-                        { mobile: false, label: "Desktop", Icon: Monitor },
-                        { mobile: true, label: "Mobile", Icon: Smartphone },
-                      ] as const
-                    ).map(({ mobile, label, Icon }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        aria-pressed={mobileView === mobile}
-                        onClick={() => setMobileView(mobile)}
-                        className={`inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded border px-3 py-1.5 text-xs font-medium transition ${
-                          mobileView === mobile
-                            ? "border-darkBlue bg-darkBlue text-white"
-                            : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <section aria-labelledby="send-attachments-heading">
-                    <h3
-                      id="send-attachments-heading"
-                      className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500"
-                    >
-                      Attachments ({preview.attachments.length})
-                    </h3>
-                    <ul className="flex flex-col gap-2">
-                      {preview.attachments.map((file) => (
-                        <li key={file.url}>
-                          <a
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-darkBlue transition hover:border-lightBlue hover:bg-gray-50 hover:underline"
-                          >
-                            <Paperclip className="h-4 w-4 shrink-0" />
-                            <span className="min-w-0 flex-1 break-all">{file.name}</span>
-                            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                </>
-              )}
-
-              <div className="mt-auto flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={close}
-                  className="flex-1 cursor-pointer rounded-sm border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={send}
-                  disabled={!sendable}
-                  className="flex-1 cursor-pointer rounded-sm bg-darkBlue px-4 py-2 text-sm font-semibold text-white hover:bg-lightBlue disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Send
-                </button>
+            {preview?.ok ? (
+              <SendQuoteReviewForm
+                from={preview.from}
+                fields={fields}
+                onFieldsChange={setFields}
+                suggestions={suggestions}
+                subject={subject}
+                onSubjectChange={setSubject}
+                attachments={rows}
+                onRemoveAttachment={removeAttachment}
+                onAddFiles={addFiles}
+                fileError={fileError}
+                limitMessage={limits.ok ? null : limits.message}
+                mobileView={mobileView}
+                onMobileViewChange={setMobileView}
+                sendable={sendable}
+                onSend={send}
+                onCancel={close}
+              />
+            ) : (
+              <div className="flex min-h-0 min-w-0 flex-col gap-4">
+                <DialogHeader>
+                  <DialogTitle>Review before sending</DialogTitle>
+                  <DialogDescription>Nothing is sent until you press Send.</DialogDescription>
+                </DialogHeader>
+                <div className="mt-auto flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="flex-1 cursor-pointer rounded-sm border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    className="flex-1 cursor-not-allowed rounded-sm bg-darkBlue px-4 py-2 text-sm font-semibold text-white opacity-50"
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex min-h-[24rem] min-w-0 flex-col">
-              {recipientEmails.length === 0 ? (
+              {recipients.length === 0 ? (
                 <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">
                   No contact email found. Add a contact with an email address before sending.
                 </p>
@@ -227,7 +343,7 @@ export function SendQuoteDialog({
               style={{ width: 220, height: 220 }}
             />
             <DialogTitle className="text-base font-semibold">Quote sent!</DialogTitle>
-            <DialogDescription>Sent to {recipientEmails.join(", ")}</DialogDescription>
+            <DialogDescription>Sent. {formatRecipientsLine(sentInput ?? fields)}</DialogDescription>
             <button
               type="button"
               onClick={close}
@@ -247,6 +363,7 @@ export function SendQuoteDialog({
             <DialogFooter>
               <button
                 type="button"
+                data-testid="send-error-close"
                 onClick={close}
                 className="cursor-pointer rounded-sm border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
               >

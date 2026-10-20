@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import type { QuotesBookingsFilters } from "../types";
+import { UNKNOWN_ZONE } from "./zoneOfEvent";
 
 /**
  * The chips above a quotes list table: one per filter that is narrowing
@@ -10,6 +11,7 @@ import type { QuotesBookingsFilters } from "../types";
  */
 
 export type ActiveFilterKey =
+  | "leadsTemplate"
   | "search"
   | "statuses"
   | "created"
@@ -19,6 +21,8 @@ export type ActiveFilterKey =
   | "salesOffice"
   | "goodShuffle"
   | "quickBooks"
+  | "inbound"
+  | "zones"
   | "showDeleted";
 
 export type ActiveFilter = { key: ActiveFilterKey; label: string };
@@ -27,6 +31,8 @@ export type ActiveFilterState = {
   filters: Omit<QuotesBookingsFilters, "isOpen">;
   searchQuery: string;
   showDeleted: boolean;
+  /** The My Inbound Leads template is on; it is a rule, so it is a chip of its own. */
+  leadsTemplate?: boolean;
   /** Whether the page offers the Status filter; where it does not, a status is not a chip. */
   showStatus: boolean;
 };
@@ -35,6 +41,7 @@ export type ActiveFilterState = {
 export type ActiveFilterNames = {
   userName: (id: string) => string | undefined;
   officeName: (id: string) => string | undefined;
+  zoneName: (id: string) => string | undefined;
 };
 
 function formatDay(iso: string): string {
@@ -53,11 +60,13 @@ const yesNo = (value: boolean) => (value ? "Yes" : "No");
 
 /** In the order the Filter Panel lists them, with the search box first. */
 export function describeActiveFilters(
-  { filters, searchQuery, showDeleted, showStatus }: ActiveFilterState,
+  { filters, searchQuery, showDeleted, showStatus, leadsTemplate = false }: ActiveFilterState,
   names: ActiveFilterNames,
 ): ActiveFilter[] {
   const active: ActiveFilter[] = [];
   const add = (key: ActiveFilterKey, label: string) => active.push({ key, label });
+
+  if (leadsTemplate) add("leadsTemplate", "Template: My Inbound Leads");
 
   const search = searchQuery.trim();
   if (search) add("search", `Search: “${search}”`);
@@ -84,6 +93,13 @@ export function describeActiveFilters(
     add("goodShuffle", `In GoodShuffle: ${yesNo(filters.inGoodShuffle)}`);
   if (filters.inQuickBooks !== null)
     add("quickBooks", `In QuickBooks: ${yesNo(filters.inQuickBooks)}`);
+  if (filters.inbound !== null) add("inbound", `Inbound: ${yesNo(filters.inbound)}`);
+  if (filters.zoneUuids.length > 0) {
+    const zoneNames = filters.zoneUuids.map((id) =>
+      id === UNKNOWN_ZONE ? "Zone Unknown" : (names.zoneName(id) ?? "Unknown"),
+    );
+    add("zones", `Zones: ${zoneNames.join(", ")}`);
+  }
   if (showDeleted) add("showDeleted", "Deleted only");
 
   return active;
@@ -115,6 +131,11 @@ export function withoutFilter<F extends Omit<QuotesBookingsFilters, "isOpen">>(
       return { ...filters, inGoodShuffle: null };
     case "quickBooks":
       return { ...filters, inQuickBooks: null };
+    case "inbound":
+      return { ...filters, inbound: null };
+    case "zones":
+      return { ...filters, zoneUuids: [] };
+    case "leadsTemplate":
     case "search":
     case "showDeleted":
       return filters;

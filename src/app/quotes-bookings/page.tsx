@@ -1,11 +1,15 @@
 "use client";
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Search, ArrowLeft } from "lucide-react";
+import { Search, ArrowLeft, Inbox } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
-import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
 import { StatusQuickToggle } from "@/features/quotesAndBookings/components/StatusQuickToggle";
+import { SHOW_INBOUND_LEADS_EVENT } from "@/features/quotesAndBookings/utils/inboundLeadsHref";
+import { ListOptionsMenu } from "@/features/quotesAndBookings/components/ListOptionsMenu";
+import { useInboundLeadsRule } from "@/features/quotesAndBookings/hooks/useInboundLeadsRule";
+import { useInboundLeads } from "@/features/quotesAndBookings/hooks/useInboundLeads";
+import { TemplatePill } from "@/features/quotesAndBookings/components/TemplatePill";
 import {
   FilterSidebar,
   countActiveFilters,
@@ -100,6 +104,8 @@ export default function QuotesBookingsPage() {
     setInGoodShuffle,
     setInQuickBooks,
     setSalesOfficeUuid,
+    setInbound,
+    setZoneUuids,
     clearFilters,
     showDeleted,
     setShowDeleted,
@@ -113,6 +119,9 @@ export default function QuotesBookingsPage() {
     setSort,
     removeFilter,
     clearAllFilters,
+    leadsTemplate,
+    showInboundLeads,
+    hideInboundLeads,
   } = useListPageState(QUOTES_BOOKINGS_TABS, initialOverrides);
 
   // The sidebar is pinned inside the scrolling layout and fills the visible height, so its
@@ -128,7 +137,30 @@ export default function QuotesBookingsPage() {
     return () => observer.disconnect();
   }, [scrollRef]);
 
-  const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
+  // The My Inbound Leads template is a live rule (utils/inboundLeadsTemplate.ts) for this person.
+  const { user: leadsUser, ready: leadsReady } = useInboundLeadsRule();
+  const { count: inboundLeadsCount } = useInboundLeads();
+
+  // The header's "New Leads" reminder asks an open list to show the template (a closed one is opened
+  // with the template in its URL).
+  useEffect(() => {
+    window.addEventListener(SHOW_INBOUND_LEADS_EVENT, showInboundLeads);
+    return () => window.removeEventListener(SHOW_INBOUND_LEADS_EVENT, showInboundLeads);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The rule is applied once the zones it needs are known; until then the list is loading.
+  const waitingForRule = leadsTemplate && !leadsReady;
+  const {
+    data,
+    isLoading: dataLoading,
+    error,
+  } = useQuotesAndBookingsData(
+    filters,
+    showDeleted,
+    leadsTemplate && leadsReady ? leadsUser : null,
+  );
+  const isLoading = dataLoading || waitingForRule;
 
   const searchedData = useMemo(() => {
     if (!data) return undefined;
@@ -244,10 +276,12 @@ export default function QuotesBookingsPage() {
     );
   }
 
-  // -m-4 cancels the quotes-bookings layout's p-4 so the filter sidebar sits flush against the app
-  // sidebar, header and window edge; the content column puts its own padding back.
+  // The quotes-bookings layout has no padding, so the filter sidebar already sits flush against the
+  // app sidebar, header and window edge; the content column puts its own padding back. (This used
+  // to be `p-4 -m-4` to cancel a layout padding that is gone, which made the page 32px wider than
+  // its container and let it scroll sideways.)
   return (
-    <div className="-m-4 flex items-start">
+    <div className="flex items-start">
       <FilterSidebar
         filters={filters}
         isOpen={filters.isOpen}
@@ -261,6 +295,8 @@ export default function QuotesBookingsPage() {
         onInGoodShuffleChange={setInGoodShuffle}
         onInQuickBooksChange={setInQuickBooks}
         onSalesOfficeChange={setSalesOfficeUuid}
+        onInboundChange={setInbound}
+        onZonesChange={setZoneUuids}
         onAccountManagerChange={setAccountManagerUserUuid}
         onClear={clearFilters}
       />
@@ -273,33 +309,6 @@ export default function QuotesBookingsPage() {
           action={
             <div className="flex items-center gap-2">
               <StatusQuickToggle statuses={filters.statuses} onStatusesChange={setStatuses} />
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showDeleted}
-                onClick={() => setShowDeleted((v) => !v)}
-                className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none"
-              >
-                <span>Show Deleted</span>
-                <span
-                  className={`relative inline-flex h-[22px] w-[40px] shrink-0 rounded-full transition-colors duration-200 ${
-                    showDeleted ? "bg-darkBlue" : "bg-gray-300"
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-[18px] w-[18px] rounded-full bg-white shadow-sm transform transition-transform duration-200 mt-[2px] ${
-                      showDeleted ? "translate-x-[20px]" : "translate-x-[2px]"
-                    }`}
-                  />
-                </span>
-              </button>
-              {!filters.isOpen && (
-                <FilterButton
-                  isOpen={false}
-                  onClick={toggleOpen}
-                  activeCount={countActiveFilters(filters)}
-                />
-              )}
               {can.createQuote && (
                 <PrimaryButton
                   // Prefilling lives on /quotes-bookings/new itself, so typing the URL or refreshing
@@ -309,6 +318,13 @@ export default function QuotesBookingsPage() {
                   + Create Quote
                 </PrimaryButton>
               )}
+              <ListOptionsMenu
+                showDeleted={showDeleted}
+                onShowDeletedChange={setShowDeleted}
+                filtersOpen={filters.isOpen}
+                activeFilterCount={countActiveFilters(filters)}
+                onToggleFilters={toggleOpen}
+              />
             </div>
           }
         />
@@ -338,15 +354,27 @@ export default function QuotesBookingsPage() {
           </div>
         )}
 
-        <div className="relative mt-4 mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, invoice #, manager, date, amount, address, contact, company..."
-            className="w-full h-[40px] pl-10 pr-4 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-darkBlue"
-          />
+        {/* The search box, with the saved views (templates) to its right. */}
+        <div className="mt-4 mb-4 flex items-center gap-3">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, invoice #, manager, date, amount, address, contact, company..."
+              className="w-full h-[40px] pl-10 pr-4 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-darkBlue"
+            />
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <TemplatePill
+              label="Inbound Leads"
+              icon={<Inbox className="h-3.5 w-3.5" />}
+              active={leadsTemplate}
+              count={inboundLeadsCount}
+              onClick={leadsTemplate ? hideInboundLeads : showInboundLeads}
+            />
+          </div>
         </div>
 
         {/* The applied filters. The chips scroll sideways rather than wrap; the row is empty (and
@@ -356,6 +384,7 @@ export default function QuotesBookingsPage() {
             filters={filters}
             searchQuery={searchQuery}
             showDeleted={showDeleted}
+            leadsTemplate={leadsTemplate}
             showStatus
             onRemove={removeFilter}
             onClearAll={clearAllFilters}
