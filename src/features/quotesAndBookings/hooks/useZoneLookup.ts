@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
+import { unstaffedZoneIds } from "../utils/inboundLeadsZones";
+import { STATUSES } from "@/features/manageTeam/constants";
 import { buildZoneByState } from "../utils/zoneOfEvent";
 
 type ZoneRow = { id: string; display_name: string | null };
@@ -35,4 +37,34 @@ export function useZoneByState(): Map<string, string> {
   );
   const { data } = useTypedQuery(compiled, expect<ZoneStateRow>());
   return useMemo(() => buildZoneByState(data ?? []), [data]);
+}
+
+/**
+ * The zones nobody works: no active account manager (active account manager row and an active
+ * user) is assigned to them. Admins see their requests
+ * in the Inbound Leads template. Local, from `Zones` and `AccountManagerZones`.
+ */
+export function useUnstaffedZoneIds(): string[] {
+  const zones = useZones();
+  const compiled = useMemo(
+    () =>
+      db
+        .selectFrom("AccountManagerZones as amz")
+        .innerJoin("AccountManagers as am", "am.id", "amz.account_manager_uuid")
+        .innerJoin("Users as u", "u.id", "am.user_uuid")
+        .select(["amz.zone_uuid as zone_uuid"])
+        .where("am.is_active", "=", 1)
+        .where("u.status_uuid", "=", STATUSES.active)
+        .compile(),
+    [],
+  );
+  const { data } = useTypedQuery(compiled, expect<{ zone_uuid: string | null }>());
+  return useMemo(
+    () =>
+      unstaffedZoneIds(
+        zones.map((z) => z.id),
+        (data ?? []).map((r) => r.zone_uuid).filter((id): id is string => id !== null),
+      ),
+    [zones, data],
+  );
 }

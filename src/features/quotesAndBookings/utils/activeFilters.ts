@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import type { QuotesBookingsFilters } from "../types";
-import { UNKNOWN_ZONE } from "./zoneOfEvent";
+import { NO_ZONES, UNKNOWN_ZONE } from "./zoneOfEvent";
 
 /**
  * The chips above a quotes list table: one per filter that is narrowing
@@ -91,7 +91,11 @@ export function describeActiveFilters(
   if (filters.inbound !== null) add("inbound", `Inbound: ${yesNo(filters.inbound)}`);
   if (filters.zoneUuids.length > 0) {
     const zoneNames = filters.zoneUuids.map((id) =>
-      id === UNKNOWN_ZONE ? "Zone Unknown" : (names.zoneName(id) ?? "Unknown"),
+      id === UNKNOWN_ZONE
+        ? "Zone Unknown"
+        : id === NO_ZONES
+          ? "No zones"
+          : (names.zoneName(id) ?? "Unknown"),
     );
     add("zones", `Zones: ${zoneNames.join(", ")}`);
   }

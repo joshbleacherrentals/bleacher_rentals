@@ -93,6 +93,11 @@ describe("describeActiveFilters", () => {
     expect(labels(state({ filters }))).toEqual(["Zones: Unknown, Zone Unknown"]);
   });
 
+  it("labels the matches-nothing zone choice as No zones", () => {
+    const filters = { ...noFilters, zoneUuids: ["no-zones"] };
+    expect(labels(state({ filters }))).toEqual(["Zones: No zones"]);
+  });
+
   it("still says what is filtered when a name has not loaded", () => {
     const filters = { ...noFilters, accountManagerUserUuid: "gone", salesOfficeUuid: "gone" };
     expect(labels(state({ filters }))).toEqual([

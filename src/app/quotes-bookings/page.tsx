@@ -8,6 +8,7 @@ import { StatusQuickToggle } from "@/features/quotesAndBookings/components/Statu
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { inboundLeadsZones, sameZones } from "@/features/quotesAndBookings/utils/inboundLeadsZones";
 import { ListOptionsMenu } from "@/features/quotesAndBookings/components/ListOptionsMenu";
+import { useUnstaffedZoneIds } from "@/features/quotesAndBookings/hooks/useZoneLookup";
 import { useInboundLeadsCount } from "@/features/quotesAndBookings/hooks/useInboundLeadsCount";
 import { TemplatePill } from "@/features/quotesAndBookings/components/TemplatePill";
 import {
@@ -140,14 +141,21 @@ export default function QuotesBookingsPage() {
     return () => observer.disconnect();
   }, [scrollRef]);
 
-  // The Inbound Leads template narrows to the zones this person works: an account manager's own
-  // plus Zone Unknown, every zone for an admin.
+  // The Inbound Leads template narrows to the zones this person handles: an account manager's own,
+  // and for an admin Zone Unknown plus the zones nobody works (both lists for someone who is both).
   const isAdmin = usePermissionsStore((s) => s.isAdmin);
   const isAccountManager = usePermissionsStore((s) => s.isAccountManager);
   const accountManagerZoneIds = usePermissionsStore((s) => s.accountManagerZoneIds);
+  const unstaffedZones = useUnstaffedZoneIds();
   const inboundZones = useMemo(
-    () => inboundLeadsZones({ isAdmin, isAccountManager, accountManagerZoneIds }),
-    [isAdmin, isAccountManager, accountManagerZoneIds],
+    () =>
+      inboundLeadsZones({
+        isAdmin,
+        isAccountManager,
+        accountManagerZoneIds,
+        unstaffedZoneIds: unstaffedZones,
+      }),
+    [isAdmin, isAccountManager, accountManagerZoneIds, unstaffedZones],
   );
 
   const inboundLeadsCount = useInboundLeadsCount(inboundZones);

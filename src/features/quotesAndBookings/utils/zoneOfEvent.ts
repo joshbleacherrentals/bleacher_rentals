@@ -15,6 +15,12 @@ type EventLocation = { address_state: string | null; lead_submission?: string | 
 
 export const UNKNOWN_ZONE = "unknown";
 
+/**
+ * A zone filter value that no event has: "I work no zone". It lets a filter say "nothing" where an
+ * empty list would mean "every zone".
+ */
+export const NO_ZONES = "no-zones";
+
 const DISTRICT_OF_COLUMBIA = new Set([
   "dc",
   "d.c.",

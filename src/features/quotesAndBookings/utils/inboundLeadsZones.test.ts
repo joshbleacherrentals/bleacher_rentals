@@ -1,43 +1,73 @@
 import { describe, expect, it } from "vitest";
-import { inboundLeadsFilters, inboundLeadsZones, sameZones } from "./inboundLeadsZones";
+import {
+  inboundLeadsFilters,
+  inboundLeadsZones,
+  sameZones,
+  unstaffedZoneIds,
+} from "./inboundLeadsZones";
+
+const user = (over: Partial<Parameters<typeof inboundLeadsZones>[0]>) => ({
+  isAdmin: false,
+  isAccountManager: false,
+  accountManagerZoneIds: [],
+  unstaffedZoneIds: [],
+  ...over,
+});
 
 describe("inboundLeadsZones", () => {
-  it("gives an account manager their zones and Zone Unknown", () => {
+  it("gives an account manager only the zones they are assigned to", () => {
     expect(
-      inboundLeadsZones({
-        isAdmin: false,
-        isAccountManager: true,
-        accountManagerZoneIds: ["zone-1", "zone-3"],
-      }),
-    ).toEqual(["zone-1", "zone-3", "unknown"]);
+      inboundLeadsZones(
+        user({
+          isAccountManager: true,
+          accountManagerZoneIds: ["zone-1", "zone-3"],
+          unstaffedZoneIds: ["zone-6"],
+        }),
+      ),
+    ).toEqual(["zone-1", "zone-3"]);
   });
 
   it("lists a zone once, however many times the manager holds it", () => {
     expect(
-      inboundLeadsZones({
-        isAdmin: false,
-        isAccountManager: true,
-        accountManagerZoneIds: ["zone-1", "zone-1"],
-      }),
-    ).toEqual(["zone-1", "unknown"]);
+      inboundLeadsZones(user({ isAccountManager: true, accountManagerZoneIds: ["z", "z"] })),
+    ).toEqual(["z"]);
   });
 
-  it("gives a manager with no zones only Zone Unknown", () => {
-    expect(
-      inboundLeadsZones({ isAdmin: false, isAccountManager: true, accountManagerZoneIds: [] }),
-    ).toEqual(["unknown"]);
+  it("gives an admin Zone Unknown and the unstaffed zones, and no staffed zone", () => {
+    expect(inboundLeadsZones(user({ isAdmin: true, unstaffedZoneIds: ["zone-6"] }))).toEqual([
+      "unknown",
+      "zone-6",
+    ]);
+    expect(inboundLeadsZones(user({ isAdmin: true }))).toEqual(["unknown"]);
   });
 
-  it("filters no zone for an admin, even one who is also an account manager", () => {
+  it("gives someone who is both admin and account manager both lists, once each", () => {
     expect(
-      inboundLeadsZones({ isAdmin: true, isAccountManager: true, accountManagerZoneIds: ["z"] }),
-    ).toEqual([]);
+      inboundLeadsZones(
+        user({
+          isAdmin: true,
+          isAccountManager: true,
+          accountManagerZoneIds: ["zone-1", "zone-6"],
+          unstaffedZoneIds: ["zone-6"],
+        }),
+      ),
+    ).toEqual(["zone-1", "zone-6", "unknown"]);
   });
 
-  it("filters no zone for someone who is not an account manager", () => {
-    expect(
-      inboundLeadsZones({ isAdmin: false, isAccountManager: false, accountManagerZoneIds: [] }),
-    ).toEqual([]);
+  it("gives an account manager with no zones a filter that matches nothing, not every zone", () => {
+    expect(inboundLeadsZones(user({ isAccountManager: true }))).toEqual(["no-zones"]);
+  });
+
+  it("gives someone who is neither no zone filter", () => {
+    expect(inboundLeadsZones(user({}))).toEqual([]);
+  });
+});
+
+describe("unstaffedZoneIds", () => {
+  it("is every zone nobody works", () => {
+    expect(unstaffedZoneIds(["z1", "z2", "z6"], ["z1", "z2", "z1"])).toEqual(["z6"]);
+    expect(unstaffedZoneIds(["z1"], ["z1"])).toEqual([]);
+    expect(unstaffedZoneIds(["z1", "z2"], [])).toEqual(["z1", "z2"]);
   });
 });
 
