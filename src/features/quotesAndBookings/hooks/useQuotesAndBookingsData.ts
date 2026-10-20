@@ -10,10 +10,19 @@ import { QuotesBookingsEvent, QuotesBookingsFilters } from "../types";
 type Flat<T> = { [K in keyof T]: T[K] };
 type ListRow = Flat<QuotesBookingsEvent & { lead_submission: string | null }>;
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
+import { matchesInboundLeads, type InboundLeadsUser } from "../utils/inboundLeadsTemplate";
 import { zoneOfEvent } from "../utils/zoneOfEvent";
 import { useZoneByState } from "./useZoneLookup";
 
-export function useQuotesAndBookingsData(filters: QuotesBookingsFilters, showDeleted = false) {
+/**
+ * `leadsRule` turns the My Inbound Leads template on for this person (null or left out: off). It
+ * keeps only the rows the rule accepts, before the other filters.
+ */
+export function useQuotesAndBookingsData(
+  filters: QuotesBookingsFilters,
+  showDeleted = false,
+  leadsRule: InboundLeadsUser | null = null,
+) {
   const timezone = useTimezoneStore((s) => s.timezone);
   const zoneByState = useZoneByState();
 
@@ -72,8 +81,11 @@ export function useQuotesAndBookingsData(filters: QuotesBookingsFilters, showDel
       ...event,
       zone_uuid: zoneOfEvent(event, zoneByState),
     }));
-    return filterQuotesBookingsEvents(withZone, filters, timezone);
-  }, [data, filters, timezone, zoneByState]);
+    const inTemplate = leadsRule
+      ? withZone.filter((event) => matchesInboundLeads(event, leadsRule))
+      : withZone;
+    return filterQuotesBookingsEvents(inTemplate, filters, timezone);
+  }, [data, filters, timezone, zoneByState, leadsRule]);
 
   return { data: filtered, isLoading, error };
 }

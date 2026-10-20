@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import { QuotesBookingsFilters } from "../types";
 import { withoutFilter, type ActiveFilterKey } from "../utils/activeFilters";
 
-const emptyFilters: QuotesBookingsFilters = {
+/** No filter at all (the sidebar open state aside). */
+export const emptyFilters: QuotesBookingsFilters = {
   isOpen: true, // the filter sidebar starts expanded
   statuses: [],
   createdFrom: null,
@@ -78,20 +79,6 @@ export function useQuotesAndBookingsFilters(
     setFilters((prev) => ({ ...prev, zoneUuids }));
   }, []);
 
-  /**
-   * The "Inbound Leads" template: website quotes not sent yet (still `draft`) in the given zones
-   * (none = every zone), every other filter cleared. The page sets the order (oldest first).
-   */
-  const applyInboundLeadsTemplate = useCallback((zoneUuids: string[]) => {
-    setFilters((prev) => ({
-      ...emptyFilters,
-      isOpen: prev.isOpen,
-      statuses: ["draft"],
-      inbound: true,
-      zoneUuids,
-    }));
-  }, []);
-
   /** Clears the one filter behind an applied-filter chip. */
   const clearFilter = useCallback((key: ActiveFilterKey) => {
     setFilters((prev) => withoutFilter(prev, key));
@@ -129,7 +116,6 @@ export function useQuotesAndBookingsFilters(
     setSalesOfficeUuid,
     setInbound,
     setZoneUuids,
-    applyInboundLeadsTemplate,
     clearFilter,
     clearFilters,
   };

@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useInboundLeads } from "../hooks/useInboundLeads";
-import { useInboundLeadsZones } from "../hooks/useInboundLeadsZones";
 import { useNow } from "../hooks/useNow";
 import { formatWait } from "../utils/formatWait";
 import { inboundLeadsHref, SHOW_INBOUND_LEADS_EVENT } from "../utils/inboundLeadsHref";
@@ -16,8 +15,7 @@ import { inboundLeadsHref, SHOW_INBOUND_LEADS_EVENT } from "../utils/inboundLead
 export function InboundLeadsWait() {
   const router = useRouter();
   const pathname = usePathname();
-  const { zones, handlesLeads } = useInboundLeadsZones();
-  const { count, oldestCreatedAtMs } = useInboundLeads(zones);
+  const { count, oldestCreatedAtMs, handlesLeads } = useInboundLeads();
   const now = useNow();
 
   if (!handlesLeads || count === 0) return null;
@@ -28,7 +26,7 @@ export function InboundLeadsWait() {
     if (pathname === "/quotes-bookings") {
       window.dispatchEvent(new Event(SHOW_INBOUND_LEADS_EVENT));
     } else {
-      router.push(inboundLeadsHref(zones));
+      router.push(inboundLeadsHref());
     }
   };
 

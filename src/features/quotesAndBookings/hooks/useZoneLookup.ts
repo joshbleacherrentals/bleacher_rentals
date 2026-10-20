@@ -10,13 +10,17 @@ import { buildZoneByState } from "../utils/zoneOfEvent";
 type ZoneRow = { id: string; display_name: string | null };
 type ZoneStateRow = { state_province: string | null; zone_uuid: string | null };
 
-/** The zones, in name order, for the zone filter and its chip. Local, like everything else. */
-export function useZones(): { id: string; name: string }[] {
+function useZonesQuery() {
   const compiled = useMemo(
     () => db.selectFrom("Zones").select(["id", "display_name"]).orderBy("display_name").compile(),
     [],
   );
-  const { data } = useTypedQuery(compiled, expect<ZoneRow>());
+  return useTypedQuery(compiled, expect<ZoneRow>());
+}
+
+/** The zones, in name order, for the zone filter and its chip. Local, like everything else. */
+export function useZones(): { id: string; name: string }[] {
+  const { data } = useZonesQuery();
   return useMemo(
     () => (data ?? []).map((z) => ({ id: z.id, name: z.display_name ?? "Unnamed zone" })),
     [data],
@@ -40,12 +44,13 @@ export function useZoneByState(): Map<string, string> {
 }
 
 /**
- * The zones nobody works: no active account manager (active account manager row and an active
- * user) is assigned to them. Admins see their requests
- * in the Inbound Leads template. Local, from `Zones` and `AccountManagerZones`.
+ * The zones nobody works: no active account manager (an active account manager row and an active
+ * user) is assigned to them. Admins see their requests in the My Inbound Leads template. Local,
+ * from `Zones` and `AccountManagerZones`. `isLoading` is true until both have answered: before
+ * that every zone would look unstaffed.
  */
-export function useUnstaffedZoneIds(): string[] {
-  const zones = useZones();
+export function useUnstaffedZoneIds(): { zoneIds: string[]; isLoading: boolean } {
+  const { data: zones, isLoading: zonesLoading } = useZonesQuery();
   const compiled = useMemo(
     () =>
       db
@@ -58,13 +63,17 @@ export function useUnstaffedZoneIds(): string[] {
         .compile(),
     [],
   );
-  const { data } = useTypedQuery(compiled, expect<{ zone_uuid: string | null }>());
-  return useMemo(
+  const { data, isLoading: staffedLoading } = useTypedQuery(
+    compiled,
+    expect<{ zone_uuid: string | null }>(),
+  );
+  const zoneIds = useMemo(
     () =>
       unstaffedZoneIds(
-        zones.map((z) => z.id),
+        (zones ?? []).map((z) => z.id),
         (data ?? []).map((r) => r.zone_uuid).filter((id): id is string => id !== null),
       ),
     [zones, data],
   );
+  return { zoneIds, isLoading: zonesLoading || staffedLoading };
 }

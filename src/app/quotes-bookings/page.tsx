@@ -5,10 +5,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { DataTable, Column, CellText, CellSecondary, CellBadge } from "@/components/DataTable";
 import { StatusQuickToggle } from "@/features/quotesAndBookings/components/StatusQuickToggle";
-import { sameZones } from "@/features/quotesAndBookings/utils/inboundLeadsZones";
 import { SHOW_INBOUND_LEADS_EVENT } from "@/features/quotesAndBookings/utils/inboundLeadsHref";
 import { ListOptionsMenu } from "@/features/quotesAndBookings/components/ListOptionsMenu";
-import { useInboundLeadsZones } from "@/features/quotesAndBookings/hooks/useInboundLeadsZones";
+import { useInboundLeadsRule } from "@/features/quotesAndBookings/hooks/useInboundLeadsRule";
 import { useInboundLeads } from "@/features/quotesAndBookings/hooks/useInboundLeads";
 import { TemplatePill } from "@/features/quotesAndBookings/components/TemplatePill";
 import {
@@ -21,12 +20,7 @@ import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/use
 
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
 import { searchEvents } from "@/features/quotesAndBookings/utils/searchEvents";
-import {
-  sortEvents,
-  nextSort,
-  DEFAULT_SORT,
-  type SortKey,
-} from "@/features/quotesAndBookings/utils/sortEvents";
+import { sortEvents, nextSort, type SortKey } from "@/features/quotesAndBookings/utils/sortEvents";
 import { eventSubtotalCents, eventTaxCents } from "@/features/quotesAndBookings/utils/eventAmounts";
 import {
   pickEventCurrency,
@@ -112,7 +106,6 @@ export default function QuotesBookingsPage() {
     setSalesOfficeUuid,
     setInbound,
     setZoneUuids,
-    showInboundLeads,
     clearFilters,
     showDeleted,
     setShowDeleted,
@@ -126,6 +119,9 @@ export default function QuotesBookingsPage() {
     setSort,
     removeFilter,
     clearAllFilters,
+    leadsTemplate,
+    showInboundLeads,
+    hideInboundLeads,
   } = useListPageState(QUOTES_BOOKINGS_TABS, initialOverrides);
 
   // The sidebar is pinned inside the scrolling layout and fills the visible height, so its
@@ -141,29 +137,30 @@ export default function QuotesBookingsPage() {
     return () => observer.disconnect();
   }, [scrollRef]);
 
-  // The Inbound Leads template narrows to the zones this person handles (see inboundLeadsZones).
-  const { zones: inboundZones } = useInboundLeadsZones();
-  const { count: inboundLeadsCount } = useInboundLeads(inboundZones);
-
-  // The Inbound Leads template is showing: unsent website quotes in those zones, oldest first.
-  const inboundLeadsActive =
-    filters.inbound === true &&
-    sameZones(filters.zoneUuids, inboundZones) &&
-    filters.statuses.length === 1 &&
-    filters.statuses[0] === "draft" &&
-    sort.key === "created_at" &&
-    sort.direction === "asc";
+  // The My Inbound Leads template is a live rule (utils/inboundLeadsTemplate.ts) for this person.
+  const { user: leadsUser, ready: leadsReady } = useInboundLeadsRule();
+  const { count: inboundLeadsCount } = useInboundLeads();
 
   // The header's "New Leads" reminder asks an open list to show the template (a closed one is opened
   // with the template in its URL).
   useEffect(() => {
-    const show = () => showInboundLeads(inboundZones);
-    window.addEventListener(SHOW_INBOUND_LEADS_EVENT, show);
-    return () => window.removeEventListener(SHOW_INBOUND_LEADS_EVENT, show);
+    window.addEventListener(SHOW_INBOUND_LEADS_EVENT, showInboundLeads);
+    return () => window.removeEventListener(SHOW_INBOUND_LEADS_EVENT, showInboundLeads);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inboundZones]);
+  }, []);
 
-  const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
+  // The rule is applied once the zones it needs are known; until then the list is loading.
+  const waitingForRule = leadsTemplate && !leadsReady;
+  const {
+    data,
+    isLoading: dataLoading,
+    error,
+  } = useQuotesAndBookingsData(
+    filters,
+    showDeleted,
+    leadsTemplate && leadsReady ? leadsUser : null,
+  );
+  const isLoading = dataLoading || waitingForRule;
 
   const searchedData = useMemo(() => {
     if (!data) return undefined;
@@ -373,17 +370,9 @@ export default function QuotesBookingsPage() {
             <TemplatePill
               label="Inbound Leads"
               icon={<Inbox className="h-3.5 w-3.5" />}
-              active={inboundLeadsActive}
+              active={leadsTemplate}
               count={inboundLeadsCount}
-              onClick={() => {
-                // A second click on the template that is showing puts the list back to normal.
-                if (inboundLeadsActive) {
-                  clearAllFilters();
-                  setSort(DEFAULT_SORT);
-                } else {
-                  showInboundLeads(inboundZones);
-                }
-              }}
+              onClick={leadsTemplate ? hideInboundLeads : showInboundLeads}
             />
           </div>
         </div>
@@ -395,6 +384,7 @@ export default function QuotesBookingsPage() {
             filters={filters}
             searchQuery={searchQuery}
             showDeleted={showDeleted}
+            leadsTemplate={leadsTemplate}
             showStatus
             onRemove={removeFilter}
             onClearAll={clearAllFilters}

@@ -34,6 +34,7 @@ const state: UrlSyncedListState = {
   pageSize: 25,
   sort: DEFAULT_SORT,
   tab: "all",
+  leadsTemplate: false,
 };
 
 const QB = QUOTES_BOOKINGS_TABS;

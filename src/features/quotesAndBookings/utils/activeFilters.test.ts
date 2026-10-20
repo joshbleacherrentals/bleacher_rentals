@@ -82,6 +82,15 @@ describe("describeActiveFilters", () => {
     ]);
   });
 
+  it("lists the My Inbound Leads template first, as its own chip", () => {
+    const active = describeActiveFilters(
+      state({ leadsTemplate: true, searchQuery: "acme" }),
+      names,
+    );
+    expect(active[0]).toEqual({ key: "leadsTemplate", label: "Template: My Inbound Leads" });
+    expect(active[1].key).toBe("search");
+  });
+
   it("leaves Status out where the page does not offer it (the AR tabs)", () => {
     const withStatus = { ...noFilters, statuses: ["booked"] };
     expect(labels(state({ showStatus: false, filters: withStatus }))).toEqual([]);
@@ -91,11 +100,6 @@ describe("describeActiveFilters", () => {
   it("names a zone that has not loaded as Unknown, and the no-zone choice as Zone Unknown", () => {
     const filters = { ...noFilters, zoneUuids: ["gone", "unknown"] };
     expect(labels(state({ filters }))).toEqual(["Zones: Unknown, Zone Unknown"]);
-  });
-
-  it("labels the matches-nothing zone choice as No zones", () => {
-    const filters = { ...noFilters, zoneUuids: ["no-zones"] };
-    expect(labels(state({ filters }))).toEqual(["Zones: No zones"]);
   });
 
   it("still says what is filtered when a name has not loaded", () => {
@@ -142,6 +146,7 @@ describe("withoutFilter", () => {
     expect(withoutFilter(full, "goodShuffle")).toEqual({ ...full, inGoodShuffle: null });
     expect(withoutFilter(full, "quickBooks")).toEqual({ ...full, inQuickBooks: null });
     expect(withoutFilter(full, "inbound")).toEqual({ ...full, inbound: null });
+    expect(withoutFilter(full, "leadsTemplate")).toBe(full);
     expect(withoutFilter(full, "zones")).toEqual({ ...full, zoneUuids: [] });
   });
 

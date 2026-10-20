@@ -48,3 +48,11 @@ describe("narrowingKey", () => {
     expect(keyFor(filters, "", false, "ar")).not.toBe(keyFor(filters, "", false, "ar_deposits"));
   });
 });
+
+describe("narrowingKey and the My Inbound Leads template", () => {
+  it("changes when the template is turned on, so the list returns to page 1", () => {
+    const off = narrowingKey(filters, "", false, DEFAULT_SORT, "all", false);
+    const on = narrowingKey(filters, "", false, DEFAULT_SORT, "all", true);
+    expect(on).not.toBe(off);
+  });
+});
