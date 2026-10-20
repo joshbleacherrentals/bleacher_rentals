@@ -8,14 +8,17 @@ import { SheetAddOtherAsset } from "./other-assets/_lib/components/sheets/SheetA
 import { usePathname } from "next/navigation";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { canEditBleachers } from "@/features/userAccess/logic/canEditBleachers";
+import { canAddDocuments } from "@/features/userAccess/logic/canEditDocuments";
 
 export default function AssetsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAdmin, isMaintainer } = useTeamPermissions();
 
-  // Documents and other assets stay admin-only; a maintainer is only let into the bleachers table.
+  // Other assets stay admin-only. A maintainer adds bleachers and documents
+  // (docs/specs/maintainer-asset-documents.md).
   const getSheetButton = () => {
-    if (pathname.includes("/assets/documents")) return isAdmin ? <SheetAddDocumentEntry /> : null;
+    if (pathname.includes("/assets/documents"))
+      return canAddDocuments({ isAdmin, isMaintainer }) ? <SheetAddDocumentEntry /> : null;
     if (pathname.includes("/assets/other-assets")) return isAdmin ? <SheetAddOtherAsset /> : null;
     return canEditBleachers({ isAdmin, isMaintainer }) ? <SheetAddBleacher /> : null;
   };

@@ -5,6 +5,7 @@ import { AlertsDropDown } from "@/features/alerts/components/AlertsDropDown";
 import { CurrentSprintHeaderLink } from "@/app/roadmap/_lib/components/CurrentSprintHeaderLink";
 import { ProductDropDown } from "@/features/changelog/components/ProductDropDown";
 import { EventChatNotificationsDropDown } from "@/features/eventChat/components/EventChatNotificationsDropDown";
+import { InboundLeadsWait } from "@/features/quotesAndBookings/components/InboundLeadsWait";
 import { useInternalChatCapabilities } from "@/features/eventChat/hooks/useInternalChatCapabilities";
 
 const Header = () => {
@@ -52,6 +53,7 @@ const Header = () => {
             priority
           />
           <div className="flex items-center mr-2 relative">
+            <InboundLeadsWait />
             <div className="flex items-center  mr-4">
               <CurrentSprintHeaderLink />
               <ProductDropDown />

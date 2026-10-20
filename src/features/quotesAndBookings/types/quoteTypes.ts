@@ -1,6 +1,6 @@
 export type PaymentMethod = "credit_card" | "physical_check" | "wire_ach" | "cash" | null;
 
-export type QuoteStatus = "draft" | "quoted" | "booked" | "lost";
+export type QuoteStatus = "draft" | "quoted" | "booked" | "unsigned_changes" | "lost";
 
 export type LineItemCategory = "bleachers" | "discounts" | "logistics" | "custom_service";
 

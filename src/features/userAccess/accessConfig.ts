@@ -116,6 +116,8 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     // what they are allowed to do, and /changelog so a release note is not invisible to them.
     // /dashboard so they can write notes in cells (docs/specs/maintainer-dashboard-cells.md);
     // with it, defaultRedirect lands them there, the same as every other role that has one.
+    // /roadmap/backlog (not all of /roadmap): they file and edit backlog tickets, reached from the
+    // header's "Request a Feature". The sprint boards stay out of reach — nothing of them syncs.
     allowedPaths: [
       "/dashboard",
       "/annual-inspections",
@@ -124,6 +126,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/permissions",
       "/changelog",
       "/assets",
+      "/roadmap/backlog",
     ],
     showSidebar: true,
   },

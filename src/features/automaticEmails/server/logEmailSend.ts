@@ -12,6 +12,13 @@ export async function logEmailSend(
     trigger: string;
     result: SendResult;
     templateId?: string | null;
+    // What the message contained, when known. Null columns on rows that never got that far.
+    details?: {
+      cc?: string | null;
+      bcc?: string | null;
+      subject?: string | null;
+      attachmentNames?: string | null;
+    };
   },
 ): Promise<void> {
   try {
@@ -21,6 +28,10 @@ export async function logEmailSend(
       status: opts.result.sent ? "sent" : "failed",
       reason: opts.result.sent ? null : opts.result.reason,
       to_email: opts.result.sent ? opts.result.to : null,
+      cc_emails: opts.details?.cc ?? null,
+      bcc_emails: opts.details?.bcc ?? null,
+      subject: opts.details?.subject ?? null,
+      attachment_names: opts.details?.attachmentNames ?? null,
       template_id: opts.templateId ?? null,
     });
   } catch (e) {

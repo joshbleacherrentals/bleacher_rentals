@@ -1,14 +1,37 @@
 import { describe, it, expect, vi } from "vitest";
-import { runSend, canDismiss, canSend } from "./sendQuoteFlow";
+import {
+  runSend,
+  selectAddedFilesToLog,
+  discardUploads,
+  canDismiss,
+  canSend,
+  ignoreDialogEscape,
+} from "./sendQuoteFlow";
+import type { AddedFileInput, SendQuoteInput } from "../../utils/sendQuote";
 
 const ok = { ok: true } as const;
+const af = (id: string, name = `${id}.pdf`): AddedFileInput => ({
+  id,
+  storagePath: `e1/${id}.pdf`,
+  name,
+  mimeType: "application/pdf",
+  sizeBytes: 1,
+});
+const buildInput = (addedFiles: AddedFileInput[] = []): SendQuoteInput => ({
+  to: ["a@x.com"],
+  cc: [],
+  bcc: [],
+  subject: "",
+  removedAttachmentKeys: [],
+  addedFiles,
+});
 
 describe("runSend", () => {
   it("runs onBeforeSend, then sends, then reports sent", async () => {
     const order: string[] = [];
     const result = await runSend({
       eventId: "e1",
-      recipients: ["a@x.com"],
+      buildInput,
       onBeforeSend: async () => void order.push("before"),
       post: async () => (order.push("post"), ok),
       onSent: async () => void order.push("sent"),
@@ -21,7 +44,7 @@ describe("runSend", () => {
     const post = vi.fn();
     const result = await runSend({
       eventId: "e1",
-      recipients: ["a@x.com"],
+      buildInput,
       onBeforeSend: async () => {
         throw new Error("write failed");
       },
@@ -35,7 +58,7 @@ describe("runSend", () => {
   it("names the Quoted status when the email fails after onBeforeSend", async () => {
     const result = await runSend({
       eventId: "e1",
-      recipients: ["a@x.com"],
+      buildInput,
       onBeforeSend: async () => {},
       post: async () => ({ ok: false, message: "No template" }),
       onSent: vi.fn(),
@@ -49,7 +72,7 @@ describe("runSend", () => {
   it("passes the plain server message through when there was no onBeforeSend", async () => {
     const result = await runSend({
       eventId: "e1",
-      recipients: ["a@x.com"],
+      buildInput,
       post: async () => ({ ok: false, message: "No template" }),
       onSent: vi.fn(),
     });
@@ -60,7 +83,7 @@ describe("runSend", () => {
     const onSent = vi.fn();
     await runSend({
       eventId: "e1",
-      recipients: ["a@x.com"],
+      buildInput,
       post: async () => ({ ok: false, message: "x" }),
       onSent,
     });
@@ -70,7 +93,7 @@ describe("runSend", () => {
   it("still reports sent when the local change log write fails — the email already went out", async () => {
     const result = await runSend({
       eventId: "e1",
-      recipients: ["a@x.com"],
+      buildInput,
       post: async () => ok,
       onSent: async () => {
         throw new Error("log failed");
@@ -96,5 +119,284 @@ describe("canSend", () => {
     expect(canSend({ recipients: [], preview })).toBe(false);
     expect(canSend({ recipients: ["a@x.com"], preview: null })).toBe(false);
     expect(canSend({ recipients: ["a@x.com"], preview: { ok: false } })).toBe(false);
+  });
+
+  it("is off while a limit is exceeded, and does not depend on the subject", () => {
+    expect(canSend({ recipients: ["a@x.com"], preview, withinLimits: false })).toBe(false);
+    expect(canSend({ recipients: ["a@x.com"], preview, withinLimits: true })).toBe(true);
+  });
+});
+
+describe("runSend with added files", () => {
+  const file = (name: string) => new File(["x"], name, { type: "application/pdf" });
+  const pending = [
+    { id: "p1", file: file("one.pdf") },
+    { id: "p2", file: file("two.pdf") },
+  ];
+
+  it("uploads every pending file first, then posts them, then logs the final input", async () => {
+    const order: string[] = [];
+    const upload = vi.fn(async (f: File) => (order.push(`up:${f.name}`), af(`id-${f.name}`)));
+    const post = vi.fn(async () => (order.push("post"), ok));
+    const onSent = vi.fn(async () => void order.push("sent"));
+    const result = await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles: pending,
+      upload,
+      post,
+      onSent,
+    });
+    expect(result).toEqual(ok);
+    expect(order).toEqual(["up:one.pdf", "up:two.pdf", "post", "sent"]);
+    const posted = (post.mock.calls[0] as unknown[])[1] as SendQuoteInput;
+    expect(posted.addedFiles.map((f) => f.id)).toEqual(["id-one.pdf", "id-two.pdf"]);
+    expect(posted.addedFiles[0]).toMatchObject({ storagePath: "e1/id-one.pdf.pdf" });
+    expect(onSent).toHaveBeenCalledWith(posted, expect.any(Array));
+  });
+
+  it("uploads nothing when there are no pending files", async () => {
+    const upload = vi.fn();
+    await runSend({ eventId: "e1", buildInput, upload, post: async () => ok, onSent: vi.fn() });
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("does not upload again on a retry after the send failed", async () => {
+    const upload = vi.fn(async (f: File) => af(`id-${f.name}`));
+    const uploadedIds = new Map<string, AddedFileInput>();
+    const post = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, message: "Postmark down" })
+      .mockResolvedValueOnce(ok);
+    const run = () =>
+      runSend({
+        eventId: "e1",
+        buildInput,
+        pendingFiles: pending,
+        uploaded: uploadedIds,
+        upload,
+        post,
+        onSent: vi.fn(),
+      });
+    expect(await run()).toEqual({ ok: false, message: "Postmark down" });
+    expect(await run()).toEqual(ok);
+    expect(upload).toHaveBeenCalledTimes(2); // once per file, not once per attempt
+    expect(post.mock.calls[1][1].addedFiles.map((f: AddedFileInput) => f.id)).toEqual([
+      "id-one.pdf",
+      "id-two.pdf",
+    ]);
+  });
+
+  it("on a failed upload does not send, and a retry uploads only the file that is missing", async () => {
+    const upload = vi
+      .fn()
+      .mockResolvedValueOnce(af("id-1"))
+      .mockRejectedValueOnce(new Error("storage full"))
+      .mockResolvedValueOnce(af("id-2"));
+    const post = vi.fn(async (..._a: unknown[]) => ok);
+    const uploadedIds = new Map<string, AddedFileInput>();
+    const run = () =>
+      runSend({
+        eventId: "e1",
+        buildInput,
+        pendingFiles: pending,
+        uploaded: uploadedIds,
+        upload,
+        post,
+        onSent: vi.fn(),
+      });
+    expect(await run()).toEqual({
+      ok: false,
+      message: "Could not upload two.pdf: storage full",
+      stage: "upload",
+    });
+    expect(post).not.toHaveBeenCalled();
+    expect(await run()).toEqual(ok);
+    expect(upload).toHaveBeenCalledTimes(3);
+    expect((post.mock.calls[0] as any[])[1].addedFiles.map((f: AddedFileInput) => f.id)).toEqual([
+      "id-1",
+      "id-2",
+    ]);
+  });
+
+  it("does not run onBeforeSend (mark Quoted) when an upload fails", async () => {
+    const onBeforeSend = vi.fn();
+    await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles: pending,
+      upload: async () => {
+        throw new Error("nope");
+      },
+      onBeforeSend,
+      post: async () => ok,
+      onSent: vi.fn(),
+    });
+    expect(onBeforeSend).not.toHaveBeenCalled();
+  });
+
+  it("keeps the message of a thrown PostgrestError-like object instead of 'unknown error'", async () => {
+    const result = await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles: pending,
+      upload: async () => {
+        throw { message: "new row violates row-level security policy", code: "42501" };
+      },
+      post: async () => ok,
+      onSent: vi.fn(),
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      stage: "upload",
+      message: "Could not upload one.pdf: new row violates row-level security policy",
+    });
+  });
+
+  it("does not mark a send failure as an upload failure", async () => {
+    const result = await runSend({
+      eventId: "e1",
+      buildInput,
+      post: async () => ({ ok: false, message: "nope" }),
+      onSent: vi.fn(),
+    });
+    expect(result).toEqual({ ok: false, message: "nope" });
+  });
+});
+
+describe("ignoreDialogEscape", () => {
+  const el = (role: string | null, expanded: string | null) => ({
+    getAttribute: (n: string) => (n === "role" ? role : n === "aria-expanded" ? expanded : null),
+  });
+  it("ignores Escape while sending", () => {
+    expect(ignoreDialogEscape("sending", null)).toBe(true);
+  });
+  it("ignores Escape when the focused combobox has its list open (only the list closes)", () => {
+    expect(ignoreDialogEscape("review", el("combobox", "true"))).toBe(true);
+  });
+  it("lets Escape close the dialog otherwise", () => {
+    expect(ignoreDialogEscape("review", el("combobox", "false"))).toBe(false);
+    expect(ignoreDialogEscape("review", el(null, null))).toBe(false);
+    expect(ignoreDialogEscape("review", null)).toBe(false);
+    expect(ignoreDialogEscape("error", null)).toBe(false);
+  });
+});
+
+describe("selectAddedFilesToLog", () => {
+  const f = (id: string, name: string) => ({ id, file: new File(["x"], name) });
+  it("returns the uploaded added files that are in the final input, with their names", () => {
+    const pending = [f("p1", "a.pdf"), f("p2", "b.png")];
+    const up = new Map([
+      ["p1", af("db1")],
+      ["p2", af("db2")],
+    ]);
+    expect(selectAddedFilesToLog(pending, up, [af("db1"), af("db2")])).toEqual([
+      { fileId: "db1", name: "a.pdf" },
+      { fileId: "db2", name: "b.png" },
+    ]);
+  });
+  it("skips a file that is not in the final addedFiles, and one never uploaded", () => {
+    const pending = [f("p1", "a.pdf"), f("p2", "b.png")];
+    expect(selectAddedFilesToLog(pending, new Map([["p1", af("db1")]]), [af("db1")])).toEqual([
+      { fileId: "db1", name: "a.pdf" },
+    ]);
+    expect(selectAddedFilesToLog(pending, new Map([["p2", af("db2")]]), [])).toEqual([]);
+  });
+  it("returns nothing when no file was added", () => {
+    expect(selectAddedFilesToLog([], new Map(), [])).toEqual([]);
+  });
+});
+
+describe("runSend, added files in the log", () => {
+  it("hands the uploaded files' names to onSent only after a successful send", async () => {
+    const onSent = vi.fn();
+    const pendingFiles = [{ id: "p1", file: new File(["x"], "a.pdf") }];
+    const upload = vi.fn(async () => af("db1"));
+    const uploaded = new Map<string, AddedFileInput>();
+    await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles,
+      uploaded,
+      upload,
+      post: async () => ({ ok: false, message: "x" }),
+      onSent,
+    });
+    expect(onSent).not.toHaveBeenCalled();
+    await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles,
+      uploaded,
+      upload,
+      post: async () => ok,
+      onSent,
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(onSent).toHaveBeenCalledWith(expect.objectContaining({ addedFiles: [af("db1")] }), [
+      { fileId: "db1", name: "a.pdf" },
+    ]);
+  });
+  it("passes an empty list when nothing was added", async () => {
+    const onSent = vi.fn();
+    await runSend({ eventId: "e1", buildInput, post: async () => ok, onSent });
+    expect(onSent).toHaveBeenCalledWith(expect.anything(), []);
+  });
+});
+
+describe("discardUploads (cleanup of files from a send that did not go out)", () => {
+  const make = () =>
+    new Map<string, AddedFileInput>([
+      ["p1", af("a")],
+      ["p2", af("b")],
+    ]);
+
+  it("removes every uploaded object and forgets them", async () => {
+    const uploaded = make();
+    const remove = vi.fn(async () => {});
+    await discardUploads(uploaded, remove);
+    expect(remove).toHaveBeenCalledWith([
+      { id: "a", storagePath: "e1/a.pdf" },
+      { id: "b", storagePath: "e1/b.pdf" },
+    ]);
+    expect(uploaded.size).toBe(0);
+  });
+
+  it("removes only the file the person removed from the dialog", async () => {
+    const uploaded = make();
+    const remove = vi.fn(async () => {});
+    await discardUploads(uploaded, remove, ["p2"]);
+    expect(remove).toHaveBeenCalledWith([{ id: "b", storagePath: "e1/b.pdf" }]);
+    expect([...uploaded.keys()]).toEqual(["p1"]);
+  });
+
+  it("ignores a file that was never uploaded, and survives a failing remove", async () => {
+    const remove = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(discardUploads(new Map(), remove, ["nope"])).resolves.toBeUndefined();
+    await expect(discardUploads(make(), remove)).resolves.toBeUndefined();
+  });
+
+  it("after a failed send and a close, a reopened dialog has nothing left to delete or reuse", async () => {
+    const uploaded = new Map<string, AddedFileInput>();
+    const upload = vi.fn(async () => af("a"));
+    const pendingFiles = [{ id: "p1", file: new File(["x"], "a.pdf") }];
+    const remove = vi.fn(async () => {});
+    const failed = await runSend({
+      eventId: "e1",
+      buildInput,
+      pendingFiles,
+      uploaded,
+      upload,
+      post: async () => ({ ok: false, message: "Postmark down" }),
+      onSent: vi.fn(),
+    });
+    expect(failed.ok).toBe(false);
+    expect(uploaded.size).toBe(1); // kept for "Try again" (no second upload)
+    await discardUploads(uploaded, remove); // the person closes the dialog
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(uploaded.size).toBe(0);
   });
 });

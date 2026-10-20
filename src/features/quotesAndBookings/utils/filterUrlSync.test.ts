@@ -22,6 +22,8 @@ const emptyState: UrlSyncedListState = {
     accountManagerUserUuid: null,
     inGoodShuffle: null,
     inQuickBooks: null,
+    inbound: null,
+    zoneUuids: [],
     salesOfficeUuid: null,
   },
   searchQuery: "",
@@ -30,7 +32,38 @@ const emptyState: UrlSyncedListState = {
   pageSize: 25,
   sort: { key: "created_at", direction: "desc" },
   tab: "all",
+  leadsTemplate: false,
 };
+
+describe("inbound and zones in the URL", () => {
+  it("writes them only when set, and reads them back", () => {
+    const base = filtersToSearchParams(emptyState, QB);
+    expect(base.get("inbound")).toBeNull();
+    expect(base.get("zones")).toBeNull();
+
+    const params = filtersToSearchParams(
+      {
+        ...emptyState,
+        filters: { ...emptyState.filters, inbound: true, zoneUuids: ["z1", "unknown"] },
+      },
+      QB,
+    );
+    expect(params.get("inbound")).toBe("1");
+    expect(params.get("zones")).toBe("z1,unknown");
+    const parsed = searchParamsToFilters(params, QB).filters;
+    expect(parsed.inbound).toBe(true);
+    expect(parsed.zoneUuids).toEqual(["z1", "unknown"]);
+  });
+
+  it("keeps Inbound: No apart from no filter", () => {
+    const params = filtersToSearchParams(
+      { ...emptyState, filters: { ...emptyState.filters, inbound: false } },
+      QB,
+    );
+    expect(params.get("inbound")).toBe("0");
+    expect(searchParamsToFilters(params, QB).filters.inbound).toBe(false);
+  });
+});
 
 describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
   it("round-trips a fully populated filter state", () => {
@@ -47,6 +80,8 @@ describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
         inGoodShuffle: true,
         inQuickBooks: false,
         salesOfficeUuid: "office-uuid-1",
+        inbound: true,
+        zoneUuids: ["zone-uuid-1", "unknown"],
       },
       searchQuery: "acme corp",
       showDeleted: true,
@@ -54,6 +89,7 @@ describe("filtersToSearchParams / searchParamsToFilters round-trip", () => {
       pageSize: 50,
       sort: { key: "subtotal", direction: "asc" },
       tab: "all",
+      leadsTemplate: false,
     };
 
     const params = filtersToSearchParams(state, QB);
@@ -263,5 +299,48 @@ describe("tab in the URL — /accountant (AR and AR Deposits, always written)", 
     expect(hasUrlSyncedFilterParams(new URLSearchParams({ template: "revenue" }), ACCT)).toBe(
       false,
     );
+  });
+});
+
+describe("the My Inbound Leads template in the URL", () => {
+  it("writes only its name, and reads it back", () => {
+    const params = filtersToSearchParams({ ...emptyState, leadsTemplate: true }, QB);
+    expect(params.get("template")).toBe("my_inbound_leads");
+    expect(params.toString()).toBe("template=my_inbound_leads");
+    expect(searchParamsToFilters(params, QB).leadsTemplate).toBe(true);
+  });
+
+  it("takes its name out when the template is turned off", () => {
+    const params = filtersToSearchParams(
+      emptyState,
+      QB,
+      new URLSearchParams({ template: "my_inbound_leads" }),
+    );
+    expect(params.get("template")).toBeNull();
+  });
+
+  it("leaves a scorecard template alone, on or off", () => {
+    const existing = new URLSearchParams({ template: "revenue", timeRange: "weekly" });
+    expect(filtersToSearchParams(emptyState, QB, existing).get("template")).toBe("revenue");
+    expect(searchParamsToFilters(existing, QB).leadsTemplate).toBe(false);
+  });
+
+  it("is not a filter param: on its own it does not stand in for the scorecard's starting filters", () => {
+    expect(
+      hasUrlSyncedFilterParams(new URLSearchParams({ template: "my_inbound_leads" }), QB),
+    ).toBe(false);
+  });
+
+  it("keeps filters added on top of it", () => {
+    const params = filtersToSearchParams(
+      {
+        ...emptyState,
+        leadsTemplate: true,
+        filters: { ...emptyState.filters, salesOfficeUuid: "office-1" },
+      },
+      QB,
+    );
+    expect(params.get("template")).toBe("my_inbound_leads");
+    expect(params.get("office")).toBe("office-1");
   });
 });

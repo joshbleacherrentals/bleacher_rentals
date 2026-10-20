@@ -28,6 +28,16 @@ export type QuotesBookingsEvent = {
 };
 
 /**
+ * What the Quotes & Bookings list adds to its rows, for the Inbound and Zone filters: the raw
+ * website form submission (JSON text, null for a quote made in the app) and the zone the event's
+ * state belongs to (see utils/zoneOfEvent).
+ */
+export type InboundFields = {
+  lead_submission?: string | null;
+  zone_uuid?: string | null;
+};
+
+/**
  * The two balances the AR tabs show, per event. Both come from
  * `computeAmountDue`, so they read the same as the event's Billing tab.
  */
@@ -56,4 +66,8 @@ export type QuotesBookingsFilters = {
   inQuickBooks: boolean | null;
   /** null = every office; otherwise only events belonging to that one office. */
   salesOfficeUuid: string | null;
+  /** null = no filter, true = only quotes made from the website form, false = only the others. */
+  inbound: boolean | null;
+  /** Empty = every zone; otherwise only events in these zones (`UNKNOWN_ZONE` = no zone found). */
+  zoneUuids: string[];
 };

@@ -94,7 +94,7 @@ export function FileUploadInput({
   };
 
   return (
-    <div>
+    <div className="min-w-0">
       <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
       <div className="flex items-center gap-2">
         {!value ? (
@@ -121,19 +121,19 @@ export function FileUploadInput({
             />
           </label>
         ) : (
-          <div className="flex flex-1 items-center justify-between rounded border border-green-300 bg-green-50 px-3 py-2 text-sm">
+          <div className="flex min-w-0 flex-1 items-center justify-between rounded border border-green-300 bg-green-50 px-3 py-2 text-sm">
             <a
               href={getPublicUrl(value)}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate text-green-700 hover:text-green-900 hover:underline cursor-pointer"
+              className="min-w-0 truncate text-green-700 hover:text-green-900 hover:underline cursor-pointer"
             >
               {value.split("/").pop()}
             </a>
             <button
               type="button"
               onClick={handleRemove}
-              className="ml-2 text-red-500 hover:text-red-700"
+              className="ml-2 shrink-0 text-red-500 hover:text-red-700"
             >
               <X className="h-4 w-4" />
             </button>

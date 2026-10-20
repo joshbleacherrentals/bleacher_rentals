@@ -1,3 +1,7 @@
-export function canEditRoadmapTasks(isDeveloper: boolean, isAccountManager: boolean): boolean {
-  return isDeveloper || isAccountManager;
+export function canEditRoadmapTasks(
+  isDeveloper: boolean,
+  isAccountManager: boolean,
+  isMaintainer: boolean,
+): boolean {
+  return isDeveloper || isAccountManager || isMaintainer;
 }

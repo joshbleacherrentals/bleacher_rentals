@@ -28,7 +28,9 @@ export function countActiveFilters(filters: QuotesBookingsFilters): number {
     (filters.accountManagerUserUuid ? 1 : 0) +
     (filters.salesOfficeUuid ? 1 : 0) +
     (filters.inGoodShuffle !== null ? 1 : 0) +
-    (filters.inQuickBooks !== null ? 1 : 0)
+    (filters.inQuickBooks !== null ? 1 : 0) +
+    (filters.inbound !== null ? 1 : 0) +
+    (filters.zoneUuids.length > 0 ? 1 : 0)
   );
 }
 
