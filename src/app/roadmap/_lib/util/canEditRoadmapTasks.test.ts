@@ -3,22 +3,26 @@ import { canEditRoadmapTasks } from "./canEditRoadmapTasks";
 
 describe("canEditRoadmapTasks", () => {
   it("admin (isDeveloper=true) → true", () => {
-    expect(canEditRoadmapTasks(true, false)).toBe(true);
+    expect(canEditRoadmapTasks(true, false, false)).toBe(true);
   });
 
   it("developer (isDeveloper=true) → true", () => {
-    expect(canEditRoadmapTasks(true, false)).toBe(true);
+    expect(canEditRoadmapTasks(true, false, false)).toBe(true);
   });
 
   it("account manager → true", () => {
-    expect(canEditRoadmapTasks(false, true)).toBe(true);
+    expect(canEditRoadmapTasks(false, true, false)).toBe(true);
   });
 
   it("admin + account manager → true", () => {
-    expect(canEditRoadmapTasks(true, true)).toBe(true);
+    expect(canEditRoadmapTasks(true, true, false)).toBe(true);
   });
 
-  it("viewer (neither developer nor AM) → false", () => {
-    expect(canEditRoadmapTasks(false, false)).toBe(false);
+  it("maintainer → true", () => {
+    expect(canEditRoadmapTasks(false, false, true)).toBe(true);
+  });
+
+  it("viewer (neither developer, AM nor maintainer) → false", () => {
+    expect(canEditRoadmapTasks(false, false, false)).toBe(false);
   });
 });

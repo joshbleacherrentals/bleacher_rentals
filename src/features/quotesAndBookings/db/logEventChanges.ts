@@ -7,6 +7,9 @@ export type ActionType =
   | "update"
   | "sign"
   | "send"
+  // A file the person added in the send dialog (docs/specs/quote-send-email-options.md, D13).
+  // `next_value` is the file name.
+  | "file_add"
   | "status_change"
   | "line_item_add"
   | "line_item_remove"

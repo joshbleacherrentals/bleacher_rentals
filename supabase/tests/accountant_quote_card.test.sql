@@ -235,7 +235,9 @@ SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_qc_norol
 SELECT is(public.test_card_visible(), 0, 'a user with no role still reads none of the four tables');
 
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_qc_maint')::text, true);
-SELECT is(public.test_card_visible(), 0, 'a maintainer still reads none of the four tables');
+-- A maintainer reads BleacherTypes since 20261020120000_maintainer_asset_documents.sql (saving a
+-- bleacher needs the type's SELECT policy); Venues, EventChangeLog and EventEmailLog stay closed.
+SELECT is(public.test_card_visible(), 1, 'a maintainer reads only BleacherTypes of the four tables');
 
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_qc_am')::text, true);
 SELECT is(public.test_card_visible(), 4, 'an account manager still reads all four tables');

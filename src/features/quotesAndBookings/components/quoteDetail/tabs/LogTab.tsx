@@ -16,6 +16,10 @@ type EmailLogRow = {
   status: string | null;
   reason: string | null;
   to_email: string | null;
+  cc_emails: string | null;
+  bcc_emails: string | null;
+  subject: string | null;
+  attachment_names: string | null;
   template_id: string | null;
   fired_at: string | null;
 };
@@ -37,6 +41,7 @@ const ACTION_CONFIG: Record<string, { icon: string; color: string; label: string
   update: { icon: "🔵", color: "text-blue-600", label: "Updated" },
   sign: { icon: "✍️", color: "text-purple-600", label: "Signed" },
   send: { icon: "📧", color: "text-indigo-600", label: "Sent" },
+  file_add: { icon: "📎", color: "text-indigo-600", label: "File added" },
   status_change: { icon: "🔄", color: "text-orange-600", label: "Status Changed" },
   line_item_add: { icon: "➕", color: "text-green-600", label: "Added" },
   line_item_remove: { icon: "➖", color: "text-red-600", label: "Removed" },
@@ -44,6 +49,9 @@ const ACTION_CONFIG: Record<string, { icon: string; color: string; label: string
   payment_edit: { icon: "💳", color: "text-amber-600", label: "Payment edited" },
   payment_delete: { icon: "🗑️", color: "text-red-600", label: "Payment deleted" },
 };
+
+/** The second line of a "file added" row (D13). */
+export const FILE_ADD_DETAIL = "Attached to the email and saved to Files";
 
 export function isClientEvent(row: LogRow): boolean {
   return row.action_type?.startsWith("client_") ?? false;
@@ -109,6 +117,7 @@ export function getTitle(row: LogRow, payments: readonly PaymentForEdit[] = []):
   }
   if (row.action_type === "sign") return "Contract Signed";
   if (row.action_type === "send") return `Quote Sent to ${row.next_value ?? "client"}`;
+  if (row.action_type === "file_add") return `File added: ${row.next_value ?? "file"}`;
   if (row.action_type === "line_item_add") return `Line Item Added`;
   if (row.action_type === "line_item_remove") return `Line Item Removed`;
   if (row.action_type === "line_item_change") return `Line Item Changed`;
@@ -122,6 +131,7 @@ export function getTitle(row: LogRow, payments: readonly PaymentForEdit[] = []):
  * have one (docs/specs/accountant-quotes-09, D7). Null for every other row.
  */
 export function getDetail(row: LogRow, payments: readonly PaymentForEdit[] = []): string | null {
+  if (row.action_type === "file_add") return FILE_ADD_DETAIL;
   if (row.action_type === "payment_edit") {
     return `${row.prev_value ?? "—"} → ${row.next_value ?? "—"}`;
   }
@@ -280,6 +290,16 @@ function ChangeDetailModal({
             </div>
           )}
 
+          {log.action_type === "file_add" && (
+            <div className="text-sm">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                File
+              </span>
+              <p className="font-medium text-gray-800">{log.next_value ?? "—"}</p>
+              <p className="text-xs text-gray-400 mt-1">{FILE_ADD_DETAIL}</p>
+            </div>
+          )}
+
           {log.action_type === "status_change" && (
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -369,7 +389,19 @@ export function LogTab({ quoteId }: { quoteId: string }) {
     () =>
       db
         .selectFrom("EventEmailLog")
-        .select(["id", "trigger", "status", "reason", "to_email", "template_id", "fired_at"])
+        .select([
+          "id",
+          "trigger",
+          "status",
+          "reason",
+          "to_email",
+          "cc_emails",
+          "bcc_emails",
+          "subject",
+          "attachment_names",
+          "template_id",
+          "fired_at",
+        ])
         .where("event_uuid", "=", quoteId)
         .orderBy("fired_at", "desc")
         .compile(),
@@ -565,6 +597,14 @@ export function LogTab({ quoteId }: { quoteId: string }) {
                         <Mail className="w-3 h-3" />
                         {row.to_email}
                       </p>
+                    )}
+                    {row.cc_emails && <p className="text-xs text-gray-500">Cc: {row.cc_emails}</p>}
+                    {row.bcc_emails && (
+                      <p className="text-xs text-gray-500">Bcc: {row.bcc_emails}</p>
+                    )}
+                    {row.subject && <p className="text-xs text-gray-500">Subject: {row.subject}</p>}
+                    {row.attachment_names && (
+                      <p className="text-xs text-gray-500">Attachments: {row.attachment_names}</p>
                     )}
                     {!sent && row.reason && <p className="text-xs text-red-500">{row.reason}</p>}
                     {row.template_id && (

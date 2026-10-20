@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { QuoteDetail, fetchQuoteDetail } from "../../db/fetchQuoteDetail";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { softDeleteEvent } from "../../db/softDeleteEvent";
 import { useEventLineItems } from "../../hooks/useEventLineItems";
+import { useQuoteDetail } from "../../hooks/useQuoteDetail";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
@@ -15,10 +15,15 @@ import { BillingTab } from "./tabs/BillingTab";
 import { FilesTab } from "./tabs/FilesTab";
 import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
+import { SubmissionTab } from "./tabs/SubmissionTab";
+import { useLeadSubmission } from "../../hooks/useLeadSubmission";
 import { QuoteActionBar } from "./QuoteActionBar";
+import { QuoteStatusButton } from "./QuoteStatusButton";
+import { QuoteTabBar } from "./QuoteTabBar";
 import { useQuotesBookingsCapabilities } from "../../hooks/useQuotesBookingsCapabilities";
 import { useGoBackOrTo } from "../../hooks/useGoBackOrTo";
 import { useEventCurrency } from "../../hooks/useEventCurrency";
+import { quoteSubtitle } from "../../utils/quoteSubtitle";
 import { formatMoney } from "../../utils/formatMoney";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { loadEventForModal } from "@/features/eventConfiguration/functions/loadEventForModal";
@@ -34,7 +39,7 @@ import { cleanRecipients } from "../../utils/sendQuote";
 // import { ClipboardCheck } from "lucide-react";
 import { DateTime } from "luxon";
 
-const QUOTE_TABS = ["contract", "billing", "files", "log", "messages"] as const;
+const QUOTE_TABS = ["contract", "billing", "files", "log", "messages", "submission"] as const;
 type QuoteTab = (typeof QUOTE_TABS)[number];
 
 function isQuoteTab(tab: string | null): tab is QuoteTab {
@@ -46,8 +51,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const supabase = useClerkSupabaseClient();
-  const [quote, setQuote] = useState<QuoteDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  // The quote, read reactively: it follows an edit made in another tab (docs/specs/quote-detail-01).
+  const { quote, isLoading: loading } = useQuoteDetail(eventId);
   const [deleting, setDeleting] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
@@ -126,6 +131,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   // Line items from PowerSync (reactive)
   const { lineItems } = useEventLineItems(eventId);
   const currency = useEventCurrency(eventId);
+  // The website form submission, for quotes created from it (docs: Events.lead_submission).
+  const { sections: submissionSections } = useLeadSubmission(eventId);
 
   const contractTotalCents = useMemo(() => {
     const lineTotal = lineItems.reduce((sum, li) => sum + li.valueCents * li.quantity, 0);
@@ -188,13 +195,6 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   //   }
   // };
 
-  useEffect(() => {
-    setLoading(true);
-    fetchQuoteDetail(eventId)
-      .then(setQuote)
-      .finally(() => setLoading(false));
-  }, [eventId]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -215,6 +215,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   }
 
   const isDeleted = quote.deleted;
+  const subtitle = quoteSubtitle(quote);
   const deleteLog = deleteLogRows?.[0] ?? null;
   const deletedAtFormatted = deleteLog?.changed_at
     ? DateTime.fromISO(deleteLog.changed_at).toFormat("MMM d, yyyy 'at' h:mm a")
@@ -225,7 +226,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
   return (
     <div>
       {isDeleted && (
-        <div className="bg-red-50 border border-red-200 rounded-t-lg px-6 py-3 text-sm text-red-800 flex items-center gap-2">
+        <div className="bg-red-50 border border-red-200 px-6 py-3 text-sm text-red-800 flex items-center gap-2">
           <Trash2 className="w-4 h-4 shrink-0" />
           <span>
             This quote was deleted
@@ -236,91 +237,51 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
       )}
 
       {/* Header */}
-      <div className={`bg-darkBlue text-white px-6 py-4 ${isDeleted ? "" : "rounded-t-lg"}`}>
-        <div className="flex items-center gap-2 text-xs text-white/60 mb-1">
-          <button onClick={goBack} className="hover:text-white transition cursor-pointer">
-            Quotes & Bookings
-          </button>
-          <span>/</span>
-          {quote.contact && (
-            <>
-              <span>
-                {quote.contact.firstName} {quote.contact.lastName ?? ""}
-              </span>
-              <span>/</span>
-            </>
-          )}
-          <span className="text-white/80">{quote.eventName}</span>
-        </div>
+      <div className="bg-linear-to-r from-gray-800 to-gray-600 text-white px-6 py-4">
         <h1 className="text-xl font-bold">
-          {quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName ?? ""} — ` : ""}
-          {quote.eventName}
+          {quote.invoiceNumber != null
+            ? `${quote.eventName} (#${quote.invoiceNumber})`
+            : quote.eventName}
         </h1>
+        {subtitle && <p className="text-sm text-white/70 mt-0 mb-4">{subtitle}</p>}
       </div>
 
-      {/* Tab bar + actions */}
+      {/* Tab bar */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-0">
-        <div className="border-b bg-white px-6 flex items-center justify-between">
-          <TabsList className="bg-transparent h-auto p-0 gap-0 rounded-none">
-            <TabsTrigger
-              value="contract"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Contract
-            </TabsTrigger>
-            <TabsTrigger
-              value="billing"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Billing
-            </TabsTrigger>
-            <TabsTrigger
-              value="files"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Files
-            </TabsTrigger>
-            <TabsTrigger
-              value="log"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Log
-            </TabsTrigger>
-            <TabsTrigger
-              value="messages"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-darkBlue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
-            >
-              Messages
-            </TabsTrigger>
-          </TabsList>
+        <QuoteTabBar showSubmission={submissionSections !== null} />
 
-          <div className="flex items-center gap-3 py-2">
-            <span className="text-sm font-bold">{formatMoney(contractTotalCents, currency)}</span>
-            <span className="text-xs text-gray-500">Contract Total</span>
-            <QuoteActionBar
-              can={can}
-              isDeleted={isDeleted}
-              deleting={deleting}
-              onOpenInDashboard={handleOpenInDashboard}
-              onEdit={() => router.push(`/quotes-bookings/${quote.id}/edit`)}
-              onDelete={handleDelete}
-              onSendToClient={handleSendToClient}
-            />
-            {/* Review-request button disabled per boss feedback — kept for future use
-            {!canSend && perms.isAccountManager && (
-              <button
-                onClick={handleRequestQuoteReview}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-sm hover:bg-amber-100 transition cursor-pointer"
-              >
-                <ClipboardCheck className="w-3.5 h-3.5" />
-                Request Review
-              </button>
-            )} */}
-          </div>
-        </div>
-
-        <div className="bg-white px-6 py-6 rounded-b-lg border border-t-0">
+        <div className="bg-white px-6 py-6 rounded-b-lg">
           <TabsContent value="contract">
+            <div className="flex items-center justify-end gap-3 mb-6">
+              <QuoteStatusButton
+                eventId={eventId}
+                status={quote.eventStatus}
+                canChange={can.manageQuote && !isDeleted}
+                supabase={supabase}
+                userId={perms.userId}
+              />
+              <span className="text-sm font-bold">{formatMoney(contractTotalCents, currency)}</span>
+              <span className="text-xs text-gray-500">Contract Total</span>
+              <QuoteActionBar
+                can={can}
+                isDeleted={isDeleted}
+                deleting={deleting}
+                onOpenInDashboard={handleOpenInDashboard}
+                onEdit={() => router.push(`/quotes-bookings/${quote.id}/edit`)}
+                onDelete={handleDelete}
+                onSendToClient={handleSendToClient}
+              />
+              {/* Review-request button disabled per boss feedback — kept for future use
+              {!canSend && perms.isAccountManager && (
+                <button
+                  onClick={handleRequestQuoteReview}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-sm hover:bg-amber-100 transition cursor-pointer"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  Request Review
+                </button>
+              )} */}
+            </div>
             <ContractTab quote={quote} />
           </TabsContent>
           <TabsContent value="billing">
@@ -335,6 +296,9 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
           <TabsContent value="messages">
             <MessagesTab quoteId={quote.id} can={can} />
           </TabsContent>
+          <TabsContent value="submission">
+            <SubmissionTab sections={submissionSections} />
+          </TabsContent>
         </div>
       </Tabs>
       <SendQuoteDialog
@@ -342,11 +306,12 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
         onOpenChange={setSendDialogOpen}
         eventId={eventId}
         recipientEmails={sendRecipients}
-        onSent={() =>
+        onSent={(sent, addedFiles) =>
           logQuoteSentLocal({
             eventId,
-            recipientLine: sendRecipients.join(","),
+            recipients: { to: sent.to, cc: sent.cc, bcc: sent.bcc },
             currentUserUuid: perms.userId,
+            addedFiles,
           })
         }
       />

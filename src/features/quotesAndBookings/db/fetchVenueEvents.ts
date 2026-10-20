@@ -1,5 +1,4 @@
 import { db } from "@/components/providers/SystemProvider";
-import { typedGetAll, expect } from "@/lib/powersync/typedQuery";
 
 export type VenueEventRow = {
   id: string;
@@ -63,18 +62,16 @@ export function bucketAndSortVenueEvents(
   return { past, future };
 }
 
-export async function fetchVenueEvents(
-  venueUuid: string,
-  nowIso?: string,
-): Promise<VenueEventBuckets> {
-  const compiled = db
+/**
+ * The query behind the Venue history panel: every event that is not deleted and is held at this
+ * venue. The panel watches it (`useVenueEvents`) while it is open; this used to be run once, by an
+ * async `fetchVenueEvents`, when the panel opened.
+ */
+export function venueEventsQuery(venueUuid: string) {
+  return db
     .selectFrom("Events")
     .select(["id", "event_name", "invoice_number", "event_start", "event_end", "event_status"])
     .where("deleted", "=", 0)
     .where("venue_uuid", "=", venueUuid)
     .compile();
-
-  const rows = await typedGetAll(compiled, expect<VenueEventRow>());
-
-  return bucketAndSortVenueEvents(rows, nowIso);
 }

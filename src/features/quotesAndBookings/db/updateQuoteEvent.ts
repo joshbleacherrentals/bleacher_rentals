@@ -15,7 +15,7 @@ import { normalizeLostFields } from "../utils/lostReason";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
-import { toEventLineItemValues } from "./toEventLineItemValues";
+import { syncEventLineItems } from "./eventLineItems";
 import { postFinanceBookedNotice, shouldNotifyFinanceBooked } from "../utils/notifyFinanceBooked";
 import { taxOverrideFlag } from "../utils/taxOverride";
 
@@ -272,18 +272,11 @@ export async function updateQuoteEvent(
     ]);
   }
 
-  // 5. Sync line items via Supabase (not local PowerSync) to avoid duplication across clients
-  await supabase.from("EventLineItems").delete().eq("event_uuid", eventId);
-
-  if (state.lineItems.length > 0) {
-    const rows = state.lineItems.map((li) => ({
-      id: crypto.randomUUID(),
-      ...toEventLineItemValues(li, eventId, state.currency),
-      is_template: false,
-      deleted: false,
-    }));
-    await supabase.from("EventLineItems").insert(rows);
-  }
+  // 5. Sync line items through the local database, writing only what changed, in one transaction
+  //    (docs/specs/quote-detail-04-line-items-local.md). They used to go straight to Supabase, so
+  //    another tab saw them only after a round trip, a failed call went unseen, and a Save that
+  //    changed nothing still invalidated the signature.
+  await syncEventLineItems(eventId, state.lineItems, state.currency);
 
   // Propagate errors so the editor retains the draft for retry.
   await syncPaymentInstallments(eventId, state.paymentInstallments, state.currency);

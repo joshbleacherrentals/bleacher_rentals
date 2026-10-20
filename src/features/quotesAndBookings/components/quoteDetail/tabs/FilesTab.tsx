@@ -27,26 +27,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import {
+  ACCEPTED_TYPES,
+  EVENT_FILES_BUCKET,
+  IMAGE_TYPES,
+  MAX_SIZE_MB,
+  fileRefusal,
+  uploadEventFile,
+} from "../../../utils/eventFileUpload";
 
-const BUCKET = "event-files";
-const IMAGE_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-  "image/webp",
-];
-const ACCEPTED_TYPES = [
-  ...IMAGE_TYPES,
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/csv",
-];
-const MAX_SIZE_MB = 20;
+const BUCKET = EVENT_FILES_BUCKET;
 
 const isImageType = (mime: string | null) =>
   !!mime && IMAGE_TYPES.includes(mime);
@@ -69,6 +59,8 @@ const sourceLabel = (source: string | null) => {
       return "Sent Quote PDF";
     case "signed_contract":
       return "Signed Contract";
+    case "email_attachment":
+      return "Email Attachment";
     case "upload":
     default:
       return "Upload";
@@ -143,18 +135,10 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
   };
 
   const validateFile = (file: File): boolean => {
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      createErrorToast([
-        "Invalid file type",
-        `Accepted: PDF, DOC, XLS, CSV, images`,
-      ]);
-      return false;
-    }
-    if (file.size / (1024 * 1024) > MAX_SIZE_MB) {
-      createErrorToast(["File too large", `Maximum size is ${MAX_SIZE_MB}MB`]);
-      return false;
-    }
-    return true;
+    const refusal = fileRefusal(file);
+    if (!refusal) return true;
+    createErrorToast([refusal.title, refusal.detail]);
+    return false;
   };
 
   const addToStaged = useCallback((fileList: FileList | File[]) => {
@@ -183,26 +167,13 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
     setSaving(true);
     try {
       for (const item of staged) {
-        const ext = item.file.name.split(".").pop() ?? "bin";
-        const storagePath = `${quoteId}/${crypto.randomUUID()}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from(BUCKET)
-          .upload(storagePath, item.file, { upsert: false });
-        if (uploadError) throw uploadError;
-
-        const { error: insertError } = await supabase
-          .from("EventFiles")
-          .insert({
-            event_uuid: quoteId,
-            file_name: item.file.name,
-            storage_path: storagePath,
-            mime_type: item.file.type || null,
-            file_size_bytes: item.file.size,
-            source: "upload",
-            uploaded_by: userId,
-          });
-        if (insertError) throw insertError;
+        await uploadEventFile({
+          supabase,
+          eventId: quoteId,
+          file: item.file,
+          source: "upload",
+          uploadedBy: userId,
+        });
       }
 
       staged.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));

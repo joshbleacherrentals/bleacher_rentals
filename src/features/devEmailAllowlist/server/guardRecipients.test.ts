@@ -38,6 +38,7 @@ describe("outside development", () => {
       expect(result).toEqual({
         to: "abby@bleacherrentals.com",
         cc: "finance@bleacherrentals.com",
+        bcc: null,
         blocked: [],
       });
       expect(from).not.toHaveBeenCalled();
@@ -61,7 +62,7 @@ describe("in development", () => {
       to: "JOSH@bleacherrentals.com",
       cc: null,
     });
-    expect(result).toEqual({ to: "JOSH@bleacherrentals.com", cc: null, blocked: [] });
+    expect(result).toEqual({ to: "JOSH@bleacherrentals.com", cc: null, bcc: null, blocked: [] });
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
@@ -74,6 +75,7 @@ describe("in development", () => {
     expect(result).toEqual({
       to: "josh@bleacherrentals.com",
       cc: null,
+      bcc: null,
       blocked: ["finance@bleacherrentals.com"],
     });
     expect(errorSpy).toHaveBeenCalledTimes(1);
