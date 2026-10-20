@@ -100,7 +100,7 @@ export function SheetAddDocumentEntry() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
               <div className="space-y-4">
                 {/* Name */}
                 <div className="grid grid-cols-5 items-center gap-4">
@@ -121,7 +121,7 @@ export function SheetAddDocumentEntry() {
                   <label className="text-right text-sm font-medium col-span-2 pt-2">
                     Attachment
                   </label>
-                  <div className="col-span-3">
+                  <div className="col-span-3 min-w-0">
                     <FileUploadInput
                       label=""
                       bucket="documents"
@@ -138,7 +138,7 @@ export function SheetAddDocumentEntry() {
                 <div className="grid grid-cols-5 items-start gap-4">
                   <label className="text-right text-sm font-medium col-span-2 pt-2">Link</label>
 
-                  <div className="col-span-3 space-y-2">
+                  <div className="col-span-3 min-w-0 space-y-2">
                     {/* Deprecation warning */}
                     <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md px-3 py-2 text-xs">
                       <span className="font-bold">⚠️</span>
