@@ -1,11 +1,12 @@
 # QuickBooks invoice — the create route
 
 Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions.
-Implementation order: **04 of 10**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Implementation order: **04** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (the columns), [02](qbo-invoice-02-customer.md)
-(the customer), [03](qbo-invoice-03-payload.md) (the body). Spec 03b (the Class) is not
-required to build this, but see the plan: until it is decided an invoice carries no Class.
+(the customer), [03](qbo-invoice-03-payload.md) (the body),
+[03a](qbo-invoice-03a-province-tax-codes.md) (the Canadian tax code) and
+[03b](qbo-invoice-03b-zone-class.md) (the Class).
 
 ## 0. The request, and what it is not
 
@@ -32,6 +33,10 @@ marked step); any screen.
 - **The PDF:** the quote's own PDF is attached, not to an email. If attaching fails the
   invoice stays and the user gets a warning (user's answer).
 - **The invoice is never sent to the client.**
+- **Canada is supported.** A Canadian taxed quote whose province has no tax code mapped is
+  created without tax, with a warning (user's answer, spec 03a).
+- **A quote with no Class** (its state is in no zone, or its zone has no Class for the
+  connection) is created without one, with a warning (user's answer, spec 03b).
 - **Log:** creating the invoice is written to the quote's Log.
 
 ## 2. Research findings
@@ -62,7 +67,8 @@ marked step); any screen.
 **Response, HTTP 200** — a `status` field says which:
 
 - `created` — `docNumber`, `qboInvoiceId`, `warnings` (a list; may hold `pdf_not_attached`
-  with its reason; spec 06 adds the totals result).
+  with its reason, `class_missing` with the state and reason, `tax_code_missing` with the
+  province; spec 06 adds the totals result).
 - `choose_customer` — `candidates` (spec 02's summaries). Nothing was written to QuickBooks
   or to `Events`.
 - `invoice_number_exists` — `invoice`: id, number, customer name, total in cents. Nothing
@@ -92,8 +98,11 @@ In this order; a step that fails ends the request with its error and nothing aft
    `invoice_number_exists`, stop.
 7. `resolveInvoiceCustomer` with the request's `customerChoice`. `choose` → `choose_customer`,
    stop.
-8. `buildInvoicePayload`, then create the invoice, carrying a `requestid` made from the event
-   id and the hash of step 4. QuickBooks refuses → 502.
+8. Resolve the Class (`resolveZoneClass`, spec 03b) and, for a taxed Canadian quote, the
+   province's tax code (`resolveProvinceTaxCode`, spec 03a). Then `buildInvoicePayload` with
+   those refs, and create the invoice, carrying a `requestid` made from the event id and the
+   hash of step 4. The warnings of the two resolvers and of the builder go into the response's
+   `warnings`. QuickBooks refuses → 502.
 9. Save the link in one `UPDATE Events … WHERE id = ? AND qbo_invoice_id IS NULL`:
    `qbo_invoice_id`, `qbo_invoice_connection_uuid`, `qbo_invoice_sent_hash` (step 4),
    `qbo_invoice_mismatch` false and `is_qbo` true. If no row changed because another request
@@ -163,6 +172,7 @@ reaches QuickBooks):
 - **S4** an accountant on a quote of another office: allowed.
 - **S5** a viewer and an account manager: 403.
 - **S6** a quote that already has an invoice: 409.
+- **S7** a Canadian quote and a quote with no Class: `created` with the matching warnings.
 
 ## 10. Files
 
@@ -194,6 +204,9 @@ Red first. Prettier only on touched files.
     `qbo_invoice_mismatch` false and `is_qbo` true; the update is guarded by
     `qbo_invoice_id IS NULL`;
   - the link is saved before the PDF; a PDF failure still returns `created` with the warning;
+  - a quote with no Class returns `created` with `class_missing` and a body without
+    `ClassRef`; a taxed Canadian quote with no mapped code returns `created` with
+    `tax_code_missing` and an untaxed body; both warnings can come together;
   - a QuickBooks refusal returns 502 and writes nothing to `Events`;
   - the `requestid` is the same for the same event and hash and differs for another hash;
   - an `is_qbo` that was already true gets no second Log row.
@@ -222,5 +235,5 @@ Red first. Prettier only on touched files.
 - Update, overwrite, "invoice deleted" (spec 05); the totals check (spec 06); screens.
 - Deleting or voiding an invoice in QuickBooks, including the duplicate of §8.
 - Sending the invoice to anyone.
-- The QuickBooks Class (spec 03b).
+- Choosing the Class and the Canadian tax code (specs 03a and 03b).
 - Changing `create-bill` or sharing its upload code.

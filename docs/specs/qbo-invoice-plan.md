@@ -1,8 +1,9 @@
 # QuickBooks invoice from a quote — plan and decisions
 
-Status: **DRAFT 2026-10-22 — awaiting review.** Eleven specs and one blocked stub, no code.
+Status: **DRAFT 2026-10-22 — awaiting review.** Thirteen specs (01–11, 03a, 03b), no code. None is blocked.
 Branch: `q4-sprint1-finance-role`.
-Specs: `qbo-invoice-01` … `qbo-invoice-11`, plus `qbo-invoice-03b-zone-class.md` (BLOCKED).
+Specs: `qbo-invoice-01` … `qbo-invoice-11`, plus `qbo-invoice-03a-province-tax-codes.md` and
+`qbo-invoice-03b-zone-class.md`.
 Builds on: [accountant-quotes-05-is-qbo-column.md](accountant-quotes-05-is-qbo-column.md),
 [quote-staleness-detection.md](quote-staleness-detection.md),
 [accountant-role.md](accountant-role.md).
@@ -37,7 +38,8 @@ when an invoice is outdated or its totals do not match the quote.
   It may be earlier than the invoice date.
 - **Memo on statement:** the quote's title (for example `SC - CLEMSON - RALLY`).
 - **Attachment:** the quote's own PDF, not attached to an email. A new PDF replaces the old one.
-- **Class:** the quote's zone. **Not decided** — see spec 03b.
+- **Class:** the quote's zone, through the existing `ZoneQboClasses` (spec 03b). A quote with
+  no Class is created without one, with a warning.
 
 ## 2. Decisions (all taken by the user)
 
@@ -55,7 +57,10 @@ Taken in the chat of 2026-10-20 … 2026-10-22:
   admin or account manager could PATCH them); only the accountant is fenced.
 - **`is_qbo`:** set to true automatically when an invoice is created; the checkbox stays
   editable by hand.
-- **Canada:** not supported yet. Create and Update refuse an event whose currency is CAD.
+- **Canada is supported.** The Canadian QuickBooks file applies whatever tax code it is
+  handed, so each Canadian province gets its own QuickBooks tax code, mapped per connection
+  by an admin on `/quickbooks` (spec 03a). A taxed Canadian quote whose province has no code
+  is created without tax, with a warning.
 - **Hash:** two hashes on `Events`, kept by a trigger (current) and by the server (sent). The
   current hash includes `tax_percent`, `tax_amount_cents` and `is_tax_overridden`.
 - **Customer:** the finance contact when set, otherwise the contact. The search looks at the
@@ -84,7 +89,8 @@ Each one is a separate commit with one logic. Counted files = migrations, `datab
 - **01 — link and hashes** (4 counted): the `Events` columns, the current hash, its trigger.
 - **02 — customer** (4): the contact-to-customer link table and the customer resolver.
 - **03 — payload** (4): loading the quote and building the QuickBooks invoice body.
-- **03b — zone class** (BLOCKED): the QuickBooks Class on the line. Not decided.
+- **03a — Canadian tax code** (8): the code per province, its table and its screen.
+- **03b — zone class** (1): finding the QuickBooks Class of a quote.
 - **04 — create** (7): the route, the invoice-number check, create, PDF, log.
 - **05 — update** (6): update, overwrite by number, missing invoice, wrong company.
 - **06 — totals check** (5): the comparison, the mismatch flag, the Check again route.
@@ -94,8 +100,11 @@ Each one is a separate commit with one logic. Counted files = migrations, `datab
 - **10 — Need attention tab** (6): the third tab of `/accountant` and its list.
 - **11 — counts and marks** (8): sidebar counts, tab counts, row marks.
 
-Specs 01–06 add no screen. 07 is the first place a person can use the feature, so the
-permission matrix changes in 07, 08, 09, 10 and 11.
+Specs 01–06 add no screen to the quote workflow; 03a adds a section to the admin-only
+`/quickbooks` page. 07 is the first place a person can use the feature on a quote, so the
+permission matrix changes in 03a, 07, 08, 09, 10 and 11. The order of work is 01, 02, 03, 03a,
+03b, 04 … 11; 03a and 03b only supply references (a tax code, a Class) that 03's builder is
+given.
 
 ## 4. Facts found in the code that the specs rely on
 
@@ -111,7 +120,11 @@ permission matrix changes in 07, 08, 09, 10 and 11.
 - A booked event whose signature is invalidated moves to `unsigned_changes`
   (`20261018150000_unsigned_changes_status.sql`). Booked-only Create therefore excludes it.
 - `Events.invoice_number` is nullable (old events have none), nine digits, unique.
-- QuickBooks' own rule in `tax-percent`: the line-level tax code must be `TAX` or `NON`.
+- QuickBooks' own rule in `tax-percent`: the line-level tax code must be `TAX` or `NON`; for a
+  file without Automated Sales Tax the transaction also carries `TxnTaxDetail.TxnTaxCodeRef`.
+- Zones and QuickBooks classes are already joined in `ZoneQboClasses` (zone, connection,
+  class id); the USA company has five classes, the Canadian one effectively one. The app
+  already finds an event's zone with `zoneOfEvent`.
 
 ## 5. Readings to confirm at review
 
@@ -133,6 +146,10 @@ Places where the wording of a decision left a detail, and the spec reads it one 
 - The Need attention list has the first four columns of the AR tabs plus a Reason column (10).
 - The numbers on the three tab labels count that tab's own rows after the page's filters; the
   sidebar count is global over non-deleted quotes (11).
+- The Class is found from the venue's state, and the Canadian path is chosen by the rule the
+  tax calculator uses (the venue's state is a Canadian province) (03, 03b).
+- The province tax-code section is shown under every connection on `/quickbooks`, and only an
+  admin maintains it (03a).
 - A button that is not allowed is not drawn, not disabled (07).
 - Create is refused, with a message, when the quote lacks an invoice number, an event type,
   a sales office with a connection, a contact with a name, or a venue street and state (03).
@@ -141,7 +158,8 @@ Places where the wording of a decision left a detail, and the spec reads it one 
 ## 6. Not in any of these specs
 
 - Sending the invoice to the client, or any QuickBooks email.
-- Canada, and the Sale event type (added to `EventTypes` by the user later).
+- The Sale event type (added to `EventTypes` by the user later).
+- Reading QuickBooks' tax rates to compare them with the calculator's.
 - Creating QuickBooks Items or Classes from the app.
 - Merging the contacts and companies tables.
 - Payments recorded in QuickBooks, and credit memos.
@@ -149,5 +167,5 @@ Places where the wording of a decision left a detail, and the spec reads it one 
 
 ## 7. Deploy order
 
-Migrations 01 and 02, then the app. No `sync_rules.yaml` change: `Events` already syncs whole-row
-to admin and accountant, and the new table of spec 02 is server-only.
+Migrations 01, 02 and 03a, then the app. No `sync_rules.yaml` change: `Events` already syncs whole-row
+to admin and accountant, and the new tables of specs 02 and 03a are server-only.

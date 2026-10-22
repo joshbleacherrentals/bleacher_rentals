@@ -2,7 +2,7 @@
 
 Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
 (§1, last paragraph).
-Implementation order: **07 of 10**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Implementation order: **07** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [04](qbo-invoice-04-create.md) and [05](qbo-invoice-05-update.md) (the route and its
 answers). This is the first spec a person can use.
@@ -93,7 +93,7 @@ one more field):
 - **Create** → `postInvoice({ eventId })`:
   - `created` → success toast "Invoice {number} created in QuickBooks"; each warning is its
     own toast (`pdf_not_attached`: "The PDF was not attached ({reason}). Press Update
-    invoice to try again."; `totals_check_failed`: "The totals could not be checked.").
+    invoice to try again."; `totals_check_failed`: "The totals could not be checked."; `class_missing`: "No QuickBooks Class was found for {state}. The invoice was made without one; set the Class in QuickBooks."; `tax_code_missing`: "No QuickBooks tax code is mapped for {province}. The invoice was made without tax; map the code on the QuickBooks page, then press Update invoice.").
   - `choose_customer` → the customer window; its answer is sent as `customerChoice`.
   - `invoice_number_exists` → the number window; **Overwrite** sends `overwriteInvoiceId`.
 - **Update** → the confirmation "Update the QuickBooks invoice? This replaces its content with
@@ -165,7 +165,8 @@ Playwright, written, **not run**; the route is replaced by a fake with `page.rou
   asks first; **Cancel** sends nothing.
 - **S8** the fake answers `invoice_missing`: **Yes** sends `replaceMissing`; **No** shows the
   developer message and sends nothing.
-- **S9** a `pdf_not_attached` warning shows its own toast.
+- **S9** each warning (`pdf_not_attached`, `totals_check_failed`, `class_missing`,
+  `tax_code_missing`) shows its own toast.
 - **S10** a route error shows its message.
 
 ## 7. Files

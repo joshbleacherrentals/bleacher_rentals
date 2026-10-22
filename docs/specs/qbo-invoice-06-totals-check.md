@@ -1,7 +1,7 @@
 # QuickBooks invoice — the totals check
 
 Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions.
-Implementation order: **06 of 10**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Implementation order: **06** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (`qbo_invoice_mismatch`),
 [04](qbo-invoice-04-create.md) and [05](qbo-invoice-05-update.md) (the hooks).
@@ -83,8 +83,11 @@ It reads the invoice in the connection stored on the quote, not the office's cur
   written, the check compares QuickBooks with the **current** quote, so the flag can say
   "mismatch" for an invoice that is merely outdated. The two signals are independent; spec 09
   shows both.
-- **A file that is not on Automated Sales Tax.** QuickBooks adds no tax to a line marked
+- **A US file that is not on Automated Sales Tax.** QuickBooks adds no tax to a line marked
   taxable (spec 03, §10); the check reports a tax difference.
+- **A Canadian invoice.** QuickBooks applies the province's mapped code (spec 03a); a code
+  whose rate differs from the calculator's, a province with no code (the invoice was made
+  untaxed, with a warning) and a tax typed by hand on the quote all show as a tax difference.
 - **Sub-cent rounding.** QuickBooks rounds tax per line; with one line the totals can still
   differ by a cent from the quote's. That is reported: there is no tolerance.
 - **Check again on an invoice paid or voided.** QuickBooks' totals are read as they are.
@@ -135,8 +138,9 @@ Red first. Prettier only on touched files.
 
 ## 10. Risks
 
-- **R1 — the Canadian and non-AST cases are reported, not solved.** Spec 03 refuses CAD and
-  assumes Automated Sales Tax; a US file that is not on it shows a mismatch on every invoice.
+- **R1 — the non-AST US case is reported, not solved.** Spec 03 assumes Automated Sales Tax
+  for the US file; one that is not on it shows a mismatch on every taxed invoice. Canada is
+  covered by spec 03a's mapping; where the mapping is wrong or missing, the check says so.
 - **R2 — a flag that nobody clears.** The flag is cleared only by a later check (Check again
   or Update). An accountant who fixes the invoice and does nothing else keeps the flag.
 

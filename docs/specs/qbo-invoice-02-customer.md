@@ -2,7 +2,7 @@
 
 Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
 (§1, last paragraph).
-Implementation order: **02 of 10**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Implementation order: **02** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Builds on: spec 01 is not required; this spec is independent of it.
 

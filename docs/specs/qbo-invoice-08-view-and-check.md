@@ -1,7 +1,7 @@
 # QuickBooks invoice — View in QuickBooks and Check again
 
 Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions.
-Implementation order: **08 of 11**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Implementation order: **08** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [06](qbo-invoice-06-totals-check.md) (the check route) and
 [07](qbo-invoice-07-card-buttons.md) (the buttons' place and the capability).

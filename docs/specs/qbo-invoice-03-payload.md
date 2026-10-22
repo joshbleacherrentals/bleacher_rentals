@@ -1,8 +1,10 @@
 # QuickBooks invoice — loading the quote and building the invoice body
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions in this spec (the
-QuickBooks Class is spec 03b, BLOCKED).
-Implementation order: **03 of 10**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Status: **DRAFT 2026-10-22, amended 2026-10-22 (Canada, Class) — awaiting "Approved".** 0 open
+decisions. The tax code per Canadian province ([03a](qbo-invoice-03a-province-tax-codes.md))
+and the QuickBooks Class ([03b](qbo-invoice-03b-zone-class.md)) are separate specs; the
+builder here takes both as inputs.
+Implementation order: **03** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Builds on: [qbo-invoice-01-link-and-hash.md](qbo-invoice-01-link-and-hash.md) (the hash this
 payload must stay in step with). Reads, but does not change, `buildQuoteDocumentData`.
@@ -13,8 +15,9 @@ Everything on the QuickBooks invoice comes from the quote; the user types nothin
 turns a quote into the body of a QuickBooks invoice — nothing is sent to QuickBooks except an
 Item lookup. It is a pure builder plus a loader, with no route and no screen.
 
-**Not part of this spec:** the customer (spec 02), the QuickBooks Class (spec 03b), writing
-or updating an invoice (specs 04–05), the totals comparison (spec 06).
+**Not part of this spec:** the customer (spec 02), finding the province's tax code (03a) and
+the Class (03b), writing or updating an invoice (specs 04–05), the totals comparison
+(spec 06).
 
 ## 1. Decisions (all taken by the user)
 
@@ -30,13 +33,19 @@ or updating an invoice (specs 04–05), the totals comparison (spec 06).
   is empty. It may be earlier than the invoice date.
 - **Memo on statement:** the quote's title.
 - **Tax:** calculated by QuickBooks; a state without tax has the Tax box unchecked.
-- **Canada:** not supported yet; an event whose currency is CAD is refused.
+- **Canada is supported.** A Canadian invoice carries a transaction tax code chosen per
+  province (spec 03a). A taxed quote whose province has no code mapped is created **without
+  tax, with a warning** (user's answer).
+- **Class:** the quote's zone (spec 03b). A quote with no Class is created **without one,
+  with a warning** (user's answer).
 - **Not sent:** the invoice is saved, never emailed.
 
 **Reading to confirm at review.** The amount, the dates, the venue and the client's name are
 read from `buildQuoteDocumentData` — the same figures the client's own quote page and PDF
 show, so the invoice cannot disagree with them. The amount is `subtotalCents +
-discountsCents` (discounts are negative), the tax is `taxAmountCents`.
+discountsCents` (discounts are negative), the tax is `taxAmountCents`. The Canadian path is
+chosen by the rule the quote form's tax calculator uses: the venue's state is a Canadian
+province (`normalizeCanadianProvince`).
 
 ## 2. Research findings
 
@@ -53,6 +62,9 @@ discountsCents` (discounts are negative), the tax is `taxAmountCents`.
   `UnitPrice`, `ItemRef` and a line-level `TaxCodeRef` that **must** be `TAX` or `NON`;
   `ShipAddr` with `Line1`, `City`, `CountrySubDivisionCode`, `PostalCode`. With Automated Sales
   Tax, QuickBooks finds the rate from the shipping address.
+- **Files without Automated Sales Tax** (every Canadian file): in `tax-percent` the line's
+  `TaxCodeRef` is still `TAX` or `NON`, and the **transaction** carries
+  `TxnTaxDetail.TxnTaxCodeRef`, the code that tells QuickBooks which rates to apply.
 - **Event types** are the `EventTypes` rows named `Rural`, `City`, `Corporate`.
 - **Hash parity.** Spec 01's current hash lists what the payload may read. A payload member
   with no hash member would never light "outdated".
@@ -62,11 +74,15 @@ discountsCents` (discounts are negative), the tax is `taxAmountCents`.
 - `InvoiceSource` — the quote as the invoice needs it: `eventId`, `eventStatus`,
   `invoiceNumber`, `title`, `eventTypeName`, `eventStart`, `dueDate`, `venue` (street, city,
   state, zip), `billedContact` (id, first name, last name, email, company name),
-  `billToName`, `amountCents`, `taxCents`, `currency`, `connectionId` (the sales office's
-  QuickBooks connection), plus the link columns of spec 01 (`qboInvoiceId`, …).
+  `billToName`, `amountCents`, `taxCents`, `currency`, `canadianProvince` (a province code, or
+  null for any other state), `connectionId` (the sales office's QuickBooks connection), plus
+  the link columns of spec 01 (`qboInvoiceId`, …).
 - `InvoiceIssue` — `{ code, message }`. Codes: `deleted`, `no_invoice_number`, `no_event_type`,
-  `no_sales_office`, `no_connection`, `no_contact`, `no_venue`, `currency_not_supported`.
+  `no_sales_office`, `no_connection`, `no_contact`, `no_venue`.
 - `QboItemRef` — `{ id, name, description }`.
+- `InvoiceRefs` — what the builder is given besides the quote: `item` (a `QboItemRef`),
+  `customerId`, `classId` (or null, spec 03b), `canadianTaxCodeId` (or null, spec 03a).
+- `InvoiceBuildWarning` — `{ code: "tax_code_missing", province }`.
 - `QboInvoiceBody` — the body, field for field as in §5.
 
 ## 4. The loader — `…/invoice/loadInvoiceSource.ts` (new)
@@ -84,6 +100,7 @@ when the event does not exist.
   company's name.
 - `dueDate` is the latest `paymentSchedule[].dueDate`, or `dates.eventStart` when empty.
 - `amountCents` is `subtotalCents + discountsCents`; `taxCents` is `taxAmountCents`.
+- `canadianProvince` is `normalizeCanadianProvince(venue.state)`.
 
 ## 5. The builder — `…/invoice/buildInvoicePayload.ts` (new)
 
@@ -95,12 +112,12 @@ Pure. Two functions.
 - `invoiceNumber` is null (old events have none);
 - no event type; no sales office; the sales office has no connection;
 - no billed contact, or a billed contact with no name;
-- no venue street or no venue state;
-- `currency` is CAD (Canada is not supported yet).
+- no venue street or no venue state.
 
 Each message is written for the person who pressed the button and says what to fix.
 
-**`buildInvoicePayload(source, item, customerId)`** returns the invoice body:
+**`buildInvoicePayload(source, refs)`** returns `{ body, warnings }`; `body` is the invoice
+body:
 
 - `DocNumber` — the invoice number as text.
 - `TxnDate` — the Event Start. `DueDate` — `dueDate` (§4).
@@ -112,8 +129,13 @@ Each message is written for the person who pressed the button and says what to f
 - `Line` — exactly one `SalesItemLineDetail` line: `Amount` and `UnitPrice` the amount in
   dollars, `Qty` 1, `ItemRef` the Item's id and name, `Description` the Item's own
   Description (omitted when the Item has none), `TaxCodeRef` `TAX` when `taxCents` is above 0,
-  `NON` when it is 0.
-- No `ClassRef` (spec 03b), no `BillEmail`, no email status: nothing is sent.
+  `NON` when it is 0, and `ClassRef` when `refs.classId` is set.
+- **Canada.** When `canadianProvince` is set and `taxCents` is above 0, the body also has
+  `TxnTaxDetail.TxnTaxCodeRef` set to `refs.canadianTaxCodeId`. If that is null the line is
+  `NON`, there is no `TxnTaxDetail`, and `warnings` holds `tax_code_missing` with the province.
+- **United States.** No `TxnTaxDetail`: with Automated Sales Tax QuickBooks calculates the
+  tax from the shipping address.
+- No `BillEmail`, no email status: nothing is sent.
 
 The amount in dollars is made from the cents by integer arithmetic into a two-decimal
 string, never by floating point.
@@ -152,13 +174,16 @@ Red first. Prettier only on touched files.
   - cents become dollars exactly (1 cent, 99 cents, 100,000.01) with no float error;
   - `taxCents` above 0 gives `TAX`; 0 gives `NON`;
   - the Item's Description is used; absent Description is omitted;
-  - the body has no `ClassRef`, no `BillEmail`.
+  - `ClassRef` is present only when `classId` is given; the body has no `BillEmail`;
+  - Canada, taxed, code mapped: `TxnTaxDetail.TxnTaxCodeRef` is the code; Canada, taxed, no
+    code: line `NON`, no `TxnTaxDetail`, the `tax_code_missing` warning; Canada, untaxed: no
+    `TxnTaxDetail`, no warning; United States: never a `TxnTaxDetail`.
 - **`validateInvoiceSource.test.ts`:** one case per code of §3; a complete source gives no
-  issue; CAD gives `currency_not_supported`, USD does not.
+  issue; a Canadian and a US source both pass.
 - **`loadInvoiceSource.test.ts`:** with `buildQuoteDocumentData` and the client replaced:
   the finance contact is the billed contact when set; the due date is the latest installment
-  and falls back to the Event Start; no query joins more than one table; a missing event
-  gives null.
+  and falls back to the Event Start; `canadianProvince` is set for "ON", "Ontario" and
+  "Québec" and null for "SC"; no query joins more than one table; a missing event gives null.
 - **`findQboItem.test.ts`:** found; none; two; a name with an apostrophe is escaped.
 - **Parity test (`invoiceHashParity.test.ts`):** a static list maps every `InvoiceSource`
   field the builder reads to the matching member of spec 01's hash document; the test fails
@@ -171,8 +196,10 @@ Red first. Prettier only on touched files.
 - **A quote whose total is 0.** The body is built with Amount `0.00`; QuickBooks decides.
 - **A street that already holds a whole composed address** (see `combineAddressLine`) goes in
   `Line1` as stored. Whether QuickBooks' tax engine reads it correctly: to verify in a sandbox.
-- **A company file not on Automated Sales Tax.** The body has no transaction tax code, so
+- **A US file that is not on Automated Sales Tax.** The body has no transaction tax code, so
   QuickBooks adds no tax and the totals check (spec 06) reports a mismatch. Not handled here.
+- **A Canadian quote typed with a tax by hand** (`is_tax_overridden`). QuickBooks still
+  applies the mapped code's rate to the amount, so a different typed tax shows as a mismatch.
 - **QuickBooks field names** (`PrivateNote` for "Memo on statement", `ShipAddr` for "Location of
   Sale", `BillAddr.Line1` for "Bill to"): to verify in a sandbox before the feature ships.
 - **An Item renamed in QuickBooks** is not found; the message names the wanted Item.
@@ -188,8 +215,8 @@ Red first. Prettier only on touched files.
 
 ## 12. Out of scope
 
-- The QuickBooks Class (spec 03b).
+- Finding the province's tax code (03a) and the Class (03b); this spec only places them.
 - Creating Items, or using any Item but the one named after the event type.
 - Itemising the quote's line items on the invoice.
-- Canada, and the Sale event type.
+- The Sale event type.
 - Any QuickBooks write.

@@ -2,7 +2,7 @@
 
 Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
 (§1, last paragraph).
-Implementation order: **10 of 11**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Implementation order: **10** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [09](qbo-invoice-09-banner.md) (the attention rule),
 [accountant-quotes-02-accountant-page.md](accountant-quotes-02-accountant-page.md) (the page

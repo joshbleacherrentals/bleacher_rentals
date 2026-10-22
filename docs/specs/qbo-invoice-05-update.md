@@ -2,9 +2,10 @@
 
 Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
 (§1, last paragraph).
-Implementation order: **05 of 10**. Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
+Implementation order: **05** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
-Needs: [04](qbo-invoice-04-create.md) (the route and the create flow).
+Needs: [04](qbo-invoice-04-create.md) (the route and the create flow), which in turn needs
+[03a](qbo-invoice-03a-province-tax-codes.md) and [03b](qbo-invoice-03b-zone-class.md).
 
 ## 0. The request, and what it is not
 
@@ -87,7 +88,9 @@ The route decides by the event's state:
    `invoice_missing`, stop.
 6. `resolveInvoiceCustomer` (the billed contact may have changed); `choose` →
    `choose_customer`, stop.
-7. `buildInvoicePayload`; a sparse update with the invoice's `Id` and `SyncToken`. A
+7. Resolve the Class (spec 03b) and, for a taxed Canadian quote, the province's tax code
+   (spec 03a); `buildInvoicePayload` with those refs; a sparse update with the invoice's `Id`
+   and `SyncToken`. Their warnings (`class_missing`, `tax_code_missing`) go into `warnings`. A
    QuickBooks refusal → 502.
 8. Save `qbo_invoice_sent_hash` (step 3); `UPDATE Events … WHERE id = ?`. `is_qbo` is **not**
    touched (an accountant who unticked it by hand is not overruled).
@@ -176,6 +179,8 @@ Red first. Prettier only on touched files.
   carries the `Id` and `SyncToken`; the saved sent hash is the one read first; case 2 refuses
   a wrong number and an unknown id; case 3 replaces only the old id's link; each case writes
   the right Log text; the booked rule applies to case 2 and not to cases 1 and 3.
+- **Warnings:** an update of a quote with no Class, or a taxed Canadian quote with no mapped
+  code, returns `updated` with the matching warning.
 - **`attachQuotePdf.test.ts`:** replace deletes only the app's own file name, then uploads;
   a failure throws.
 - **`createInvoice.test.ts`** (extended): the create flow is unchanged.
