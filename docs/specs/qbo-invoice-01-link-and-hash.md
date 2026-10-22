@@ -1,6 +1,6 @@
 # QuickBooks invoice — the link columns and the current hash
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions.
+Status: **Implemented 2026-10-22.** 0 open decisions.
 Implementation order: **01** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Builds on: [quote-staleness-detection.md](quote-staleness-detection.md) (the same trigger
