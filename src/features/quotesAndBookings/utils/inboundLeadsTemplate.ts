@@ -5,8 +5,9 @@ import { isInbound } from "./filterEvents";
  * live rule, not a set of filter values, because it depends on who is looking (their role, their
  * zones, the zones nobody works) and must follow assignments as they happen.
  *
- * A lead is a quote with a website form submission whose status is still `draft` (not sent yet). It
- * leaves everyone's list the moment it stops being one or the other.
+ * A lead is a quote with a website form submission whose status is still `draft` (not sent yet) and
+ * that nobody has marked Responded (`hide_lead_alert`). It leaves everyone's list the moment it
+ * stops being any of these.
  *
  * - An admin sees a lead in Zone Unknown or in a zone nobody works, as long as it is unassigned or
  *   assigned to themselves. Once it is assigned to someone else it leaves their list.
@@ -34,6 +35,8 @@ export type InboundLeadsUser = {
 /** The fields of a list row the rule reads. `zone_uuid` is null for an event in no known zone. */
 export type InboundLeadsEvent = {
   lead_submission?: string | null;
+  /** 1 once someone has answered the request (Events.hide_lead_alert). */
+  hide_lead_alert?: number | null;
   event_status: string | null;
   created_by_user_uuid: string | null;
   zone_uuid?: string | null;
@@ -41,6 +44,7 @@ export type InboundLeadsEvent = {
 
 export function matchesInboundLeads(event: InboundLeadsEvent, user: InboundLeadsUser): boolean {
   if (!isInbound(event) || (event.event_status ?? "").toLowerCase() !== "draft") return false;
+  if (event.hide_lead_alert === 1) return false;
   if (!user.isAdmin && !user.isAccountManager) return true;
 
   const owner = event.created_by_user_uuid;

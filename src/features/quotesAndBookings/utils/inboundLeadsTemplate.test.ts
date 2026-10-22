@@ -34,6 +34,15 @@ const both = user({
   unstaffedZoneIds: ["zone-6"],
 });
 
+describe("a lead marked Responded", () => {
+  it("leaves the list, and comes back when it is marked waiting again", () => {
+    const u = user({});
+    expect(matchesInboundLeads(lead({ hide_lead_alert: 1 }), u)).toBe(false);
+    expect(matchesInboundLeads(lead({ hide_lead_alert: 0 }), u)).toBe(true);
+    expect(matchesInboundLeads(lead({ hide_lead_alert: null }), u)).toBe(true);
+  });
+});
+
 describe("a lead", () => {
   it("is a website quote that is still a draft, for every role", () => {
     for (const u of [admin, am, both, user({})]) {
@@ -42,6 +51,7 @@ describe("a lead", () => {
       expect(matchesInboundLeads(lead({ event_status: "lost" }), u)).toBe(false);
       expect(matchesInboundLeads(lead({ event_status: null }), u)).toBe(false);
       expect(matchesInboundLeads(lead({ lead_submission: null }), u)).toBe(false);
+      expect(matchesInboundLeads(lead({ hide_lead_alert: 1 }), u)).toBe(false);
       expect(matchesInboundLeads(lead({ lead_submission: "  " }), u)).toBe(false);
     }
   });
