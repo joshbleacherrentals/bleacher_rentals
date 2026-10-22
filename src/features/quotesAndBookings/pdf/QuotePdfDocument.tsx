@@ -1,6 +1,7 @@
 import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
 import { QuoteDocumentData } from "./quoteDocumentData";
 import { ContractPdfPages } from "./ContractPdfPages";
+import { isInvoiceStatus } from "../utils/isInvoiceStatus";
 import { formatQuoteDate, formatQuoteMoney } from "./quoteFormat";
 import { quoteText, statusLabel } from "./quoteStrings";
 
@@ -217,7 +218,7 @@ export function QuotePdfDocument({ data }: { data: QuoteDocumentData }) {
           </View>
           <View>
             <Text style={styles.quoteTitle}>
-              {data.contractSignature ? s.pdfInvoiceTitle : s.pdfQuoteTitle}
+              {isInvoiceStatus(data.status) ? s.pdfInvoiceTitle : s.pdfQuoteTitle}
             </Text>
             <Text style={styles.quoteNumber}>{data.quoteNumber}</Text>
             <Text style={styles.quoteNumber}>{s.pdfDate(formatDate(data.quoteDate))}</Text>

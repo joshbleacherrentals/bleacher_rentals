@@ -11,7 +11,7 @@ import { quoteText } from "./quoteStrings";
 export function ChecksPayableBox({
   company,
   quoteNumber,
-  isSigned,
+  isInvoice,
   paymentInfo,
   language,
   highlight = false,
@@ -19,7 +19,7 @@ export function ChecksPayableBox({
   company: { name: string; street: string; zip: string };
   quoteNumber: string;
   /** Signed documents are invoices; unsigned ones are still quotes. */
-  isSigned: boolean;
+  isInvoice: boolean;
   paymentInfo: string | null;
   language: QuoteLanguage;
   /** Pulses a red outline round the box — used by the sales office form's live preview. */
@@ -39,7 +39,7 @@ export function ChecksPayableBox({
       <p>{company.name}</p>
       {company.street && <p className="whitespace-pre-line">{address}</p>}
       <p className="font-bold mb-2">
-        {isSigned ? s.memoInvoice(quoteNumber) : s.memoQuote(quoteNumber)}
+        {isInvoice ? s.memoInvoice(quoteNumber) : s.memoQuote(quoteNumber)}
       </p>
       {extra && <p className="font-bold mb-2 whitespace-pre-line">{extra}</p>}
     </div>

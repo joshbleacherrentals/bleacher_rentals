@@ -94,12 +94,14 @@ describe("ContractTab: the Signed banner", () => {
     expect(render(quote())).not.toContain("Signed:");
   });
 
-  it("calls a signed quote an invoice and an unsigned one a quote, as before", () => {
-    mocks.signature = { signerName: "Dana Whitfield", signedAt: "2026-05-01T14:30:00Z" };
-    expect(render(quote())).toContain("Invoice #:");
-
+  it("calls a booked event an invoice, whatever the signature, and any other a quote", () => {
     mocks.signature = null;
-    expect(render(quote())).toContain("Quote #:");
+    expect(render(quote({ eventStatus: "booked" }))).toContain("Invoice #:");
+
+    mocks.signature = { signerName: "Dana Whitfield", signedAt: "2026-05-01T14:30:00Z" };
+    expect(render(quote({ eventStatus: "quoted" }))).toContain("Quote #:");
+    expect(render(quote({ eventStatus: "unsigned_changes" }))).toContain("Quote #:");
+    expect(render(quote({ eventStatus: "draft" }))).toContain("Quote #:");
   });
 
   it("asks for the signature of its own quote", () => {
