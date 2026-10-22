@@ -20,6 +20,8 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     invoiceNumber: 1001,
     eventName: "Homecoming",
     eventStatus: "quoted",
+    hasLeadSubmission: false,
+    hideLeadAlert: false,
     lostReason: null,
     lostReasonNote: null,
     eventStart: "2026-01-01",

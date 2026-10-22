@@ -256,6 +256,9 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
               <QuoteStatusButton
                 eventId={eventId}
                 status={quote.eventStatus}
+                hasLeadSubmission={quote.hasLeadSubmission}
+                hideLeadAlert={quote.hideLeadAlert}
+                createdAt={quote.createdAt}
                 canChange={can.manageQuote && !isDeleted}
                 supabase={supabase}
                 userId={perms.userId}
