@@ -25,7 +25,7 @@ export function QuoteTabBar({ showSubmission = false }: { showSubmission?: boole
           <TabsTrigger
             key={value}
             value={value}
-            className="h-full text-base rounded-none rounded-t-xs cursor-pointer transition-colors duration-200 bg-black/20 text-white not-data-[state=active]:hover:bg-black/35 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-none px-12 py-4"
+            className="h-full text-base rounded-none rounded-t cursor-pointer transition-colors duration-200 bg-black/20 text-white not-data-[state=active]:hover:bg-black/35 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-none px-12 py-4"
           >
             {label}
           </TabsTrigger>

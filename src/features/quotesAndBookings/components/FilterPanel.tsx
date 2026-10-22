@@ -20,6 +20,7 @@ type FilterPanelProps = {
   onCreatedRangeChange: (from: string | null, to: string | null) => void;
   onEventRangeChange: (from: string | null, to: string | null) => void;
   onBookedRangeChange: (from: string | null, to: string | null) => void;
+  onQuoteSentRangeChange: (from: string | null, to: string | null) => void;
   onAccountManagerChange: (uuid: string | null) => void;
   onInGoodShuffleChange: (value: boolean | null) => void;
   onInQuickBooksChange: (value: boolean | null) => void;
@@ -46,6 +47,7 @@ export function FilterPanel({
   onCreatedRangeChange,
   onEventRangeChange,
   onBookedRangeChange,
+  onQuoteSentRangeChange,
   onAccountManagerChange,
   onInGoodShuffleChange,
   onInQuickBooksChange,
@@ -108,6 +110,15 @@ export function FilterPanel({
           from={filters.bookedFrom}
           to={filters.bookedTo}
           onChange={onBookedRangeChange}
+        />
+      </Field>
+
+      <Field label="Quote Sent">
+        <DateRangeInput
+          label="Quote Sent"
+          from={filters.quoteSentFrom}
+          to={filters.quoteSentTo}
+          onChange={onQuoteSentRangeChange}
         />
       </Field>
 

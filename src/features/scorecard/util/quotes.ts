@@ -59,7 +59,9 @@ export function getNumberForEachDay(
           ? event.created_at
           : dateField === "booked_at"
             ? event.booked_at
-            : event.event_start;
+            : dateField === "quote_sent_at"
+              ? event.quote_sent_at
+              : event.event_start;
       if (!dateValue) return;
       const eventDateKey = toLocalDateKey(dateValue);
       if (!daySet.has(eventDateKey)) return;
@@ -116,9 +118,10 @@ export function assembleChartData(
     return thisPeriodDays.map((dateKey, idx) => {
       const d = new Date(`${dateKey}T00:00:00`);
       const lastPeriodDateKey = lastPeriodDays[idx];
-      const lastPeriodValue = lastPeriodDateKey != null
-        ? (lastPeriodCumulative[lastPeriodDateKey] ?? 0)
-        : lastPeriodFinalValue;
+      const lastPeriodValue =
+        lastPeriodDateKey != null
+          ? (lastPeriodCumulative[lastPeriodDateKey] ?? 0)
+          : lastPeriodFinalValue;
       return {
         day: dateKey,
         dayTick: GetDayForXAxis(timeRange, dateKey),

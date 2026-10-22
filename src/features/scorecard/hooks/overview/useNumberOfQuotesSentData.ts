@@ -8,26 +8,45 @@ import { filterQuotesBookingsEvents } from "@/features/quotesAndBookings/utils/f
 import { filtersForTemplate } from "@/features/quotesAndBookings/utils/scorecardTemplates";
 
 export function useNumberOfQuotesSentData() {
-  const { allEvents, activeRange, periodStart, currentDay, thisPeriodDays, lastPeriodDays, lastPeriodSameElapsedDayKey, getGoal, timezone } =
-    useScorecardStatsContext();
+  const {
+    allEvents,
+    activeRange,
+    periodStart,
+    currentDay,
+    thisPeriodDays,
+    lastPeriodDays,
+    lastPeriodSameElapsedDayKey,
+    getGoal,
+    timezone,
+  } = useScorecardStatsContext();
 
   const goal = getGoal("quotes");
 
   const thisFiltered = useMemo(
-    () => filterQuotesBookingsEvents(allEvents, filtersForTemplate("quotes-sent", activeRange, "this", null, periodStart), timezone),
+    () =>
+      filterQuotesBookingsEvents(
+        allEvents,
+        filtersForTemplate("quotes-sent", activeRange, "this", null, periodStart),
+        timezone,
+      ),
     [allEvents, activeRange, periodStart, timezone],
   );
   const lastFiltered = useMemo(
-    () => filterQuotesBookingsEvents(allEvents, filtersForTemplate("quotes-sent", activeRange, "last", null, periodStart), timezone),
+    () =>
+      filterQuotesBookingsEvents(
+        allEvents,
+        filtersForTemplate("quotes-sent", activeRange, "last", null, periodStart),
+        timezone,
+      ),
     [allEvents, activeRange, periodStart, timezone],
   );
 
   const thisPeriodCumulativeByDay = useMemo(
-    () => cumulativeEventCountByDay(thisPeriodDays, thisFiltered, "created_at", timezone),
+    () => cumulativeEventCountByDay(thisPeriodDays, thisFiltered, "quote_sent_at", timezone),
     [thisPeriodDays, thisFiltered, timezone],
   );
   const lastPeriodCumulativeByDay = useMemo(
-    () => cumulativeEventCountByDay(lastPeriodDays, lastFiltered, "created_at", timezone),
+    () => cumulativeEventCountByDay(lastPeriodDays, lastFiltered, "quote_sent_at", timezone),
     [lastPeriodDays, lastFiltered, timezone],
   );
 
