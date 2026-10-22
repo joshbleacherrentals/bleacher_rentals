@@ -21,6 +21,7 @@ export function countActiveFilters(filters: QuotesBookingsFilters): number {
     [filters.createdFrom, filters.createdTo],
     [filters.eventFrom, filters.eventTo],
     [filters.bookedFrom, filters.bookedTo],
+    [filters.quoteSentFrom, filters.quoteSentTo],
   ];
   return (
     (filters.statuses.length > 0 ? 1 : 0) +

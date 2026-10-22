@@ -17,6 +17,7 @@ export type ActiveFilterKey =
   | "created"
   | "event"
   | "booked"
+  | "quoteSent"
   | "accountManager"
   | "salesOffice"
   | "goodShuffle"
@@ -82,6 +83,9 @@ export function describeActiveFilters(
   if (filters.bookedFrom || filters.bookedTo) {
     add("booked", `Booked: ${rangeLabel(filters.bookedFrom, filters.bookedTo)}`);
   }
+  if (filters.quoteSentFrom || filters.quoteSentTo) {
+    add("quoteSent", `Quote Sent: ${rangeLabel(filters.quoteSentFrom, filters.quoteSentTo)}`);
+  }
   if (filters.accountManagerUserUuid) {
     const name = names.userName(filters.accountManagerUserUuid) ?? "Unknown";
     add("accountManager", `Account Manager: ${name}`);
@@ -123,6 +127,8 @@ export function withoutFilter<F extends Omit<QuotesBookingsFilters, "isOpen">>(
       return { ...filters, eventFrom: null, eventTo: null };
     case "booked":
       return { ...filters, bookedFrom: null, bookedTo: null };
+    case "quoteSent":
+      return { ...filters, quoteSentFrom: null, quoteSentTo: null };
     case "accountManager":
       return { ...filters, accountManagerUserUuid: null };
     case "salesOffice":

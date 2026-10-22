@@ -15,7 +15,7 @@ export const SCORECARD_TEMPLATES: Record<
   "quotes-sent": {
     label: "Quotes Sent",
     description:
-      "Showing all events created within the selected period. The scorecard counts every event by its Created At date.",
+      "Showing all events with a Quote Sent date within the selected period. The scorecard counts rows where Quote Sent falls in the range.",
   },
   "quotes-signed": {
     label: "Quotes Signed",
@@ -25,7 +25,7 @@ export const SCORECARD_TEMPLATES: Record<
   "value-of-quotes-sent": {
     label: "Value of Quotes Sent",
     description:
-      "Showing all events created within the selected period. The scorecard sums the contract revenue of those events.",
+      "Showing all events with a Quote Sent date within the selected period. The scorecard sums the contract revenue of those events.",
   },
   "value-of-quotes-signed": {
     label: "Value of Quotes Signed",
@@ -66,9 +66,7 @@ function getPeriodDates(
   }
   if (timeRange === "annually") {
     const start =
-      period === "this"
-        ? valid.startOf("year")
-        : valid.startOf("year").minus({ years: 1 });
+      period === "this" ? valid.startOf("year") : valid.startOf("year").minus({ years: 1 });
     const end =
       period === "this"
         ? valid.startOf("year").plus({ years: 1 }).minus({ days: 1 })
@@ -77,9 +75,7 @@ function getPeriodDates(
   }
   // weekly
   const start =
-    period === "this"
-      ? valid.startOf("week")
-      : valid.startOf("week").minus({ weeks: 1 });
+    period === "this" ? valid.startOf("week") : valid.startOf("week").minus({ weeks: 1 });
   const end =
     period === "this"
       ? valid.startOf("week").plus({ weeks: 1 }).minus({ days: 1 })
@@ -117,6 +113,8 @@ export function filtersForTemplate(
     eventTo: null,
     bookedFrom: null,
     bookedTo: null,
+    quoteSentFrom: null,
+    quoteSentTo: null,
     inGoodShuffle: null,
     inQuickBooks: null,
     inbound: null,
@@ -128,7 +126,7 @@ export function filtersForTemplate(
   switch (template) {
     case "quotes-sent":
     case "value-of-quotes-sent":
-      return { ...base, createdFrom: from, createdTo: effectiveTo };
+      return { ...base, quoteSentFrom: from, quoteSentTo: effectiveTo };
     case "quotes-signed":
       return { ...base, bookedFrom: from, bookedTo: effectiveTo };
     case "value-of-quotes-signed":

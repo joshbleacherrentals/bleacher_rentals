@@ -239,6 +239,7 @@ const EventsCols = {
   lost_reason_note: column.text,
   contract_revenue_cents: column.integer,
   booked_at: column.text,
+  quote_sent_at: column.text,
   event_type_uuid: column.text,
   contact_uuid: column.text,
   internal_notes: column.text,

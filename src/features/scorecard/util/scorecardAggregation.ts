@@ -2,7 +2,7 @@ import { DateTime } from "luxon";
 import { QuotesBookingsEvent } from "../../quotesAndBookings/types";
 import { WorkTrackerRow } from "../../allWorkTrackers/types";
 
-type EventDateField = "created_at" | "booked_at" | "event_start";
+type EventDateField = "created_at" | "booked_at" | "quote_sent_at" | "event_start";
 
 /**
  * Convert an ISO date/timestamp string to a YYYY-MM-DD day key.
@@ -11,9 +11,7 @@ type EventDateField = "created_at" | "booked_at" | "event_start";
  */
 function toDayKey(value: string | null, timezone?: string): string | null {
   if (!value) return null;
-  const dt = timezone
-    ? DateTime.fromISO(value, { zone: timezone })
-    : DateTime.fromISO(value);
+  const dt = timezone ? DateTime.fromISO(value, { zone: timezone }) : DateTime.fromISO(value);
   if (!dt.isValid) return null;
   return dt.toFormat("yyyy-MM-dd");
 }

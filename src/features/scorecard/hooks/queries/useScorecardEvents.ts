@@ -16,6 +16,7 @@ import { TimeRange } from "./useEventsWithinTimeRange";
 export type ScorecardEvent = {
   id: string;
   created_at: string | null;
+  quote_sent_at: string | null;
   booked_at: string | null;
   event_start: string | null;
   event_status: string | null;
@@ -46,6 +47,7 @@ export function useScorecardEvents(activeRange: TimeRange) {
       .select([
         "e.id as id",
         "e.created_at as created_at",
+        "e.quote_sent_at as quote_sent_at",
         "e.booked_at as booked_at",
         "e.event_start as event_start",
         "e.event_status as event_status",
