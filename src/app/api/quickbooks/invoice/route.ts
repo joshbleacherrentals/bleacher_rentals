@@ -1,34 +1,70 @@
 import { createInvoice } from "@/features/quickbooks-integration/invoice/createInvoice";
+import {
+  overwriteInvoice,
+  readLinkedInvoiceId,
+  updateInvoice,
+} from "@/features/quickbooks-integration/invoice/updateInvoice";
 import type { CustomerChoice } from "@/features/quickbooks-integration/customers";
 import { requireAdminOrAccountant } from "@/features/userAccess/logic/requireAdminOrAccountant";
 import { resolveUserAccessForRequest } from "@/features/userAccess/logic/resolveUserAccessForRequest";
 import { NextRequest, NextResponse } from "next/server";
 
-// Creating the invoice reads the quote, a customer, the PDF and talks to QuickBooks before it
-// answers. On a plan capped at 10 s it can still time out (docs/specs/qbo-invoice-04-create.md R1);
+// Creating or updating the invoice reads the quote, a customer, the PDF and talks to QuickBooks before
+// it answers. On a plan capped at 10 s it can still time out (docs/specs/qbo-invoice-04-create.md R1);
 // this raises the real limit for this route only, as create-bill does.
 export const maxDuration = 60;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** { eventId, customerChoice? }; anything else is refused. */
-function parseBody(body: unknown): { eventId: string; customerChoice?: CustomerChoice } | null {
-  if (!body || typeof body !== "object") return null;
-  const { eventId, customerChoice } = body as Record<string, unknown>;
-  if (typeof eventId !== "string" || !UUID_RE.test(eventId)) return null;
-  if (customerChoice === undefined) return { eventId };
+type InvoiceRequest = {
+  eventId: string;
+  customerChoice?: CustomerChoice;
+  replaceMissing?: boolean;
+  overwriteInvoiceId?: string;
+};
 
-  if (!customerChoice || typeof customerChoice !== "object") return null;
-  const choice = customerChoice as Record<string, unknown>;
-  if (choice.kind === "new") return { eventId, customerChoice: { kind: "new" } };
+/** The choice of a customer, undefined when none was sent, null when it is malformed. */
+function parseCustomerChoice(raw: unknown): CustomerChoice | undefined | null {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== "object") return null;
+  const choice = raw as Record<string, unknown>;
+  if (choice.kind === "new") return { kind: "new" };
   if (choice.kind === "existing" && typeof choice.customerId === "string" && choice.customerId) {
-    return { eventId, customerChoice: { kind: "existing", customerId: choice.customerId } };
+    return { kind: "existing", customerId: choice.customerId };
   }
   return null;
 }
 
-// Creates the QuickBooks invoice of a booked quote (docs/specs/qbo-invoice-04-create.md).
-// Admin and accountant, on a quote of any office.
+/** { eventId, customerChoice?, replaceMissing?, overwriteInvoiceId? }; anything else is refused. */
+function parseBody(body: unknown): InvoiceRequest | null {
+  if (!body || typeof body !== "object") return null;
+  const { eventId, customerChoice, replaceMissing, overwriteInvoiceId } = body as Record<
+    string,
+    unknown
+  >;
+  if (typeof eventId !== "string" || !UUID_RE.test(eventId)) return null;
+
+  const choice = parseCustomerChoice(customerChoice);
+  if (choice === null) return null;
+  if (replaceMissing !== undefined && typeof replaceMissing !== "boolean") return null;
+  if (
+    overwriteInvoiceId !== undefined &&
+    (typeof overwriteInvoiceId !== "string" || !overwriteInvoiceId)
+  ) {
+    return null;
+  }
+
+  return {
+    eventId,
+    ...(choice ? { customerChoice: choice } : {}),
+    ...(replaceMissing !== undefined ? { replaceMissing } : {}),
+    ...(overwriteInvoiceId !== undefined ? { overwriteInvoiceId } : {}),
+  };
+}
+
+// Creates, updates or links the QuickBooks invoice of a quote (docs/specs/qbo-invoice-04-create.md,
+// docs/specs/qbo-invoice-05-update.md §4). Admin and accountant, on a quote of any office. The quote's
+// link to an invoice decides which flow runs.
 export async function POST(req: NextRequest) {
   try {
     const clerkUserId = await requireAdminOrAccountant();
@@ -44,11 +80,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const result = await createInvoice({
-      ...parsed,
-      userUuid: access.userId,
-      origin: req.nextUrl.origin,
-    });
+    const { eventId, customerChoice, replaceMissing, overwriteInvoiceId } = parsed;
+    const flow = { eventId, customerChoice, userUuid: access.userId, origin: req.nextUrl.origin };
+
+    const linkedInvoiceId = await readLinkedInvoiceId(eventId);
+    let result;
+    if (!linkedInvoiceId) {
+      result = overwriteInvoiceId
+        ? await overwriteInvoice({ ...flow, replaceMissing, overwriteInvoiceId })
+        : await createInvoice(flow);
+    } else if (replaceMissing && overwriteInvoiceId) {
+      // The link points at an invoice QuickBooks no longer has, and the number is taken by another.
+      result = await overwriteInvoice({ ...flow, replaceMissing, overwriteInvoiceId });
+    } else {
+      result = await updateInvoice({ ...flow, replaceMissing });
+    }
 
     if (result.status === "error") {
       return NextResponse.json({ error: result.error }, { status: result.httpStatus });

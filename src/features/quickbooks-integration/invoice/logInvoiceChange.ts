@@ -4,7 +4,7 @@ import type { Database } from "../../../../database.types";
 /**
  * Writes the invoice app's changes to the quote's Log (EventChangeLog) with the service role: the
  * route runs for an accountant, whom the Events guard and the Log's policies do not let write these.
- * Spec: docs/specs/qbo-invoice-04-create.md §6
+ * Spec: docs/specs/qbo-invoice-04-create.md §6, docs/specs/qbo-invoice-05-update.md §6
  */
 
 function getSupabaseAdmin() {
@@ -14,13 +14,18 @@ function getSupabaseAdmin() {
   );
 }
 
-const KIND_LABELS = { created: "Created" } as const;
+const NEXT_VALUES = {
+  created: (docNumber: string) => `Created (invoice ${docNumber})`,
+  updated: (docNumber: string) => `Updated (invoice ${docNumber})`,
+  linked: (docNumber: string) => `Linked and updated (invoice ${docNumber})`,
+  recreated: () => "Created again (the previous invoice was not found)",
+} as const;
 
-/** "None" → "Created (invoice {docNumber})", shown under the label of `qbo_invoice`. */
+/** "None" → "Created (invoice {docNumber})" and its kin, shown under the label of `qbo_invoice`. */
 export async function logInvoiceChange(params: {
   eventId: string;
   userUuid: string;
-  kind: keyof typeof KIND_LABELS;
+  kind: keyof typeof NEXT_VALUES;
   docNumber: string;
 }): Promise<void> {
   const { error } = await getSupabaseAdmin()
@@ -30,7 +35,7 @@ export async function logInvoiceChange(params: {
       changed_by_user_uuid: params.userUuid,
       field_name: "qbo_invoice",
       prev_value: "None",
-      next_value: `${KIND_LABELS[params.kind]} (invoice ${params.docNumber})`,
+      next_value: NEXT_VALUES[params.kind](params.docNumber),
       action_type: "update",
       changed_at: new Date().toISOString(),
     });

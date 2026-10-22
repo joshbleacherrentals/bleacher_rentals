@@ -4,6 +4,8 @@ import type { InvoiceSource } from "./invoiceTypes";
 // docs/specs/qbo-invoice-04-create.md §4 and §11: QuickBooks (a fake fetch), the loader, the other
 // QuickBooks helpers and the database are replaced by fakes that record their calls in one list, so
 // the order of the steps can be asserted. The builder itself is the real one.
+// docs/specs/qbo-invoice-05-update.md §4, case 3: createInvoiceFromSource runs steps 6–13 for a quote
+// whose linked invoice QuickBooks no longer has; the create flow itself must not change.
 
 const { calls, state, createClient } = vi.hoisted(() => {
   const calls: string[] = [];
@@ -156,8 +158,8 @@ vi.mock("./attachQuotePdf", () => ({
 }));
 
 vi.mock("./logInvoiceChange", () => ({
-  logInvoiceChange: vi.fn(async (args: unknown) => {
-    calls.push("log:created");
+  logInvoiceChange: vi.fn(async (args: { kind: string }) => {
+    calls.push(`log:${args.kind}`);
     state.logCreated.push(args);
   }),
   logIsQboSet: vi.fn(async (args: unknown) => {
@@ -166,7 +168,7 @@ vi.mock("./logInvoiceChange", () => ({
   }),
 }));
 
-import { createInvoice } from "./createInvoice";
+import { createInvoice, createInvoiceFromSource } from "./createInvoice";
 
 const EVENT_ID = "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b";
 
@@ -1008,5 +1010,169 @@ describe("createInvoice — the PDF", () => {
       "class_missing",
       "pdf_not_attached",
     ]);
+  });
+});
+
+describe("createInvoiceFromSource — case 3 of spec 05, creating again after 'not found'", () => {
+  const OLD_ID = "inv-old";
+  const ITEM = { id: "item-1", name: "Bleacher Rental - Corporate", description: "Seats" };
+
+  const again = (over: Partial<Parameters<typeof createInvoiceFromSource>[0]> = {}) =>
+    createInvoiceFromSource({
+      source: sourceOf({ qboInvoiceId: OLD_ID, qboInvoiceConnectionId: "conn-1" }),
+      item: ITEM,
+      userUuid: "user-1",
+      replacingInvoiceId: OLD_ID,
+      ...over,
+    });
+
+  it("runs steps 6–13 and does not look the Item up again", async () => {
+    const result = await again();
+
+    expect(result.status).toBe("created");
+    expect(calls).toEqual([
+      "qbo:find-invoice",
+      "customer",
+      "zone-class",
+      "qbo:create-invoice",
+      "read-is-qbo",
+      "save-link",
+      "log:recreated",
+      "log:is_qbo",
+      "pdf",
+    ]);
+  });
+
+  it("replaces only the old invoice's link: the update is guarded by the old id, not by IS NULL", async () => {
+    await again();
+
+    expect(state.updates).toHaveLength(1);
+    expect(state.updates[0].filters).toEqual([
+      ["eq", "id", EVENT_ID],
+      ["eq", "qbo_invoice_id", OLD_ID],
+    ]);
+    expect(state.updates[0].values).toEqual({
+      qbo_invoice_id: "inv-1",
+      qbo_invoice_connection_uuid: "conn-1",
+      qbo_invoice_sent_hash: "hash-A",
+      qbo_invoice_mismatch: false,
+      is_qbo: true,
+    });
+  });
+
+  it("writes the Log as 'recreated' and the is_qbo row when the box was unticked", async () => {
+    await again();
+
+    expect(state.logCreated).toEqual([
+      { eventId: EVENT_ID, userUuid: "user-1", kind: "recreated", docNumber: "100200300" },
+    ]);
+    expect(state.logIsQbo).toHaveLength(1);
+  });
+
+  it("an is_qbo that was already true gets no second Log row", async () => {
+    state.isQbo = true;
+
+    await again();
+
+    expect(state.logIsQbo).toHaveLength(0);
+  });
+
+  it("does not apply the booked rule (the caller decided; a lost quote is created again)", async () => {
+    const result = await again({
+      source: sourceOf({
+        eventStatus: "lost",
+        qboInvoiceId: OLD_ID,
+        qboInvoiceConnectionId: "conn-1",
+      }),
+    });
+
+    expect(result.status).toBe("created");
+  });
+
+  it("carries another request id than the create of the same quote and hash", async () => {
+    await createInvoice({
+      eventId: EVENT_ID,
+      userUuid: "user-1",
+      origin: "https://app.example.com",
+    });
+    const created = state.posts.at(-1)!.requestId;
+    await again();
+    const recreated = state.posts.at(-1)!.requestId;
+
+    expect(recreated).toBeTruthy();
+    expect(recreated).not.toBe(created);
+    expect(recreated!.length).toBeLessThanOrEqual(50);
+  });
+
+  it("the same old invoice, event and hash give the same request id (a double press)", async () => {
+    await again();
+    const first = state.posts.at(-1)!.requestId;
+    await again();
+
+    expect(state.posts.at(-1)!.requestId).toBe(first);
+  });
+
+  it("still stops at an invoice with this number: nothing is written", async () => {
+    state.invoicesByNumber = [
+      {
+        Id: "inv-77",
+        DocNumber: "100200300",
+        CustomerRef: { value: "9", name: "Pat" },
+        TotalAmt: 1,
+      },
+    ];
+
+    const result = await again();
+
+    expect(result.status).toBe("invoice_number_exists");
+    expectNothingWritten();
+  });
+
+  it("still returns choose_customer: nothing is written", async () => {
+    state.customer = { kind: "choose", candidates: [] };
+
+    expect((await again()).status).toBe("choose_customer");
+    expectNothingWritten();
+  });
+
+  it("another request already replaced the link with this invoice: carries on", async () => {
+    state.updateRows = [];
+    state.linkedId = "inv-1";
+
+    expect((await again()).status).toBe("created");
+  });
+
+  it("the link is now another invoice: 409 with the extra invoice named, nothing after it", async () => {
+    state.updateRows = [];
+    state.linkedId = "inv-other";
+
+    const result = await again();
+
+    expect(result).toMatchObject({ status: "error", httpStatus: 409 });
+    expect((result as { error: string }).error).toContain("100200300");
+    expect(calls).not.toContain("pdf");
+  });
+
+  it("a Canadian quote that needs the no-tax code and has none is refused with 400", async () => {
+    state.noTaxCode = null;
+
+    const result = await again({
+      source: canadian({ taxCents: 0, qboInvoiceId: OLD_ID, qboInvoiceConnectionId: "conn-1" }),
+    });
+
+    expect(result).toMatchObject({ status: "error", httpStatus: 400 });
+    expect((result as { error: string }).error).toContain("no tax");
+    expectNothingWritten();
+  });
+
+  it("a plain create is unchanged: guarded by IS NULL, logged as created", async () => {
+    await run();
+
+    expect(state.updates[0].filters).toEqual([
+      ["eq", "id", EVENT_ID],
+      ["is", "qbo_invoice_id", null],
+    ]);
+    expect(calls).toContain("log:created");
+    expect(calls).not.toContain("log:recreated");
   });
 });

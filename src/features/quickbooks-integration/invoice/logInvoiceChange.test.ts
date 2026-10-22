@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // docs/specs/qbo-invoice-04-create.md §6: creating the invoice is written to the quote's Log with
 // the service role; an `is_qbo` that flips gets the row setEventIsQbo writes.
+// docs/specs/qbo-invoice-05-update.md §6: updating, linking and creating again are written the same
+// way, under the same field.
 
 const { createClient, state } = vi.hoisted(() => {
   const state = {
@@ -51,6 +53,27 @@ describe("logInvoiceChange", () => {
       next_value: "Created (invoice 100200300)",
       action_type: "update",
     });
+  });
+
+  it.each([
+    ["updated", "Updated (invoice 100200300)"],
+    ["linked", "Linked and updated (invoice 100200300)"],
+    ["recreated", "Created again (the previous invoice was not found)"],
+  ] as const)("writes a %s row: prev None, next %s", async (kind, nextValue) => {
+    await logInvoiceChange({ eventId: "evt-1", userUuid: "user-1", kind, docNumber: "100200300" });
+
+    expect(state.inserts).toHaveLength(1);
+    const [{ table, row }] = state.inserts;
+    expect(table).toBe("EventChangeLog");
+    expect(row).toMatchObject({
+      event_uuid: "evt-1",
+      changed_by_user_uuid: "user-1",
+      field_name: "qbo_invoice",
+      prev_value: "None",
+      next_value: nextValue,
+      action_type: "update",
+    });
+    expect(typeof row.changed_at).toBe("string");
   });
 
   it("stamps the time", async () => {

@@ -5,7 +5,7 @@ import { resolveInvoiceCustomer, type CustomerChoice, type QboCustomerSummary } 
 import { attachQuotePdf } from "./attachQuotePdf";
 import { buildInvoicePayload, needsNoTaxCode, validateInvoiceSource } from "./buildInvoicePayload";
 import { findQboItem } from "./findQboItem";
-import type { InvoiceBuildWarning } from "./invoiceTypes";
+import type { InvoiceBuildWarning, InvoiceSource, QboItemRef } from "./invoiceTypes";
 import { loadInvoiceSource } from "./loadInvoiceSource";
 import { logInvoiceChange, logIsQboSet } from "./logInvoiceChange";
 import { createQboInvoice, findInvoiceByDocNumber, type ExistingInvoice } from "./qboInvoiceApi";
@@ -16,7 +16,9 @@ import { resolveZoneClass, type ClassMissingWarning } from "./resolveZoneClass";
  * Creates the QuickBooks invoice of a booked quote that has none, step by step (the numbered steps
  * are the ones of the spec). A step that fails ends the request with its error and nothing after it
  * runs. Server-only: it writes Events and the Log with the service role.
- * Spec: docs/specs/qbo-invoice-04-create.md §4
+ * Steps 6–13 are also case 3 of the update route: a quote whose linked invoice QuickBooks no longer
+ * has gets a new one (createInvoiceFromSource, `replacingInvoiceId`).
+ * Spec: docs/specs/qbo-invoice-04-create.md §4, docs/specs/qbo-invoice-05-update.md §4
  */
 
 export type PdfNotAttachedWarning = { code: "pdf_not_attached"; reason: string };
@@ -42,39 +44,44 @@ type ErrorStatus = Extract<CreateInvoiceResult, { status: "error" }>["httpStatus
 // What getQboAccessTokenAndRealmId and describeQboAuthError throw when the connection lost its token.
 const AUTH_ERROR = /re-authenticate|No tokens found/i;
 
-const NO_TAX_CODE_MISSING =
+export const NO_TAX_CODE_MISSING =
   "This QuickBooks connection has no 'no tax' code for Canadian invoices. Ask an admin to choose one on the QuickBooks page.";
 
-function getSupabaseAdmin() {
+export function getSupabaseAdmin() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 }
 
-const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
+export const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-const fail = (httpStatus: ErrorStatus, error: string): CreateInvoiceResult => ({
+export const fail = (httpStatus: ErrorStatus, error: string): CreateInvoiceResult => ({
   status: "error",
   httpStatus,
   error,
 });
 
 /** The Item or the customer step failed: a lost token is QuickBooks' side (502), the rest is 400. */
-function setupFailure(e: unknown): CreateInvoiceResult {
+export function setupFailure(e: unknown): CreateInvoiceResult {
   const message = messageOf(e);
   return fail(AUTH_ERROR.test(message) ? 502 : 400, message);
 }
 
-/** QuickBooks answers the same `requestid` with the invoice it already made; it takes 50 characters. */
-function requestIdFor(eventId: string, hash: string | null): string {
+/**
+ * QuickBooks answers the same `requestid` with the invoice it already made; it takes 50 characters.
+ * A quote made again carries the old invoice's id too: the same quote and hash made the deleted one.
+ */
+function requestIdFor(eventId: string, hash: string | null, replacingInvoiceId?: string): string {
   return createHash("sha256")
-    .update(`${eventId}:${hash ?? ""}`)
+    .update(
+      `${eventId}:${hash ?? ""}${replacingInvoiceId ? `:replaces:${replacingInvoiceId}` : ""}`,
+    )
     .digest("hex")
     .slice(0, 50);
 }
 
-async function readIsQbo(
+export async function readIsQbo(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   eventId: string,
 ): Promise<boolean> {
@@ -89,13 +96,20 @@ async function readIsQbo(
 
 /**
  * Step 9. Links the invoice unless another request linked one first; returns the invoice id the
- * quote ends up with (null when the update changed nothing and nothing is linked).
+ * quote ends up with (null when the update changed nothing and nothing is linked). A quote that had
+ * a link to a missing invoice (`replacingInvoiceId`) is guarded by that id instead of by no link.
  */
-async function saveInvoiceLink(
+export async function saveInvoiceLink(
   supabase: ReturnType<typeof getSupabaseAdmin>,
-  link: { eventId: string; invoiceId: string; connectionId: string; sentHash: string | null },
+  link: {
+    eventId: string;
+    invoiceId: string;
+    connectionId: string;
+    sentHash: string | null;
+    replacingInvoiceId?: string;
+  },
 ): Promise<string | null> {
-  const { data, error } = await supabase
+  const update = supabase
     .from("Events")
     .update({
       qbo_invoice_id: link.invoiceId,
@@ -104,9 +118,12 @@ async function saveInvoiceLink(
       qbo_invoice_mismatch: false,
       is_qbo: true,
     })
-    .eq("id", link.eventId)
-    .is("qbo_invoice_id", null)
-    .select("id");
+    .eq("id", link.eventId);
+  const { data, error } = await (
+    link.replacingInvoiceId
+      ? update.eq("qbo_invoice_id", link.replacingInvoiceId)
+      : update.is("qbo_invoice_id", null)
+  ).select("id");
   if (error) throw new Error(`Failed to save the QuickBooks invoice link: ${error.message}`);
   if (data && data.length > 0) return link.invoiceId;
 
@@ -119,6 +136,15 @@ async function saveInvoiceLink(
   return row?.qbo_invoice_id ?? null;
 }
 
+/** Step 2, also the booked rule of case 2 of spec 05: only a booked quote gets its first invoice. */
+export function bookedRuleFailure(source: InvoiceSource): CreateInvoiceResult | null {
+  if (source.eventStatus === "booked") return null;
+  return fail(
+    400,
+    `A QuickBooks invoice can only be created for a booked quote. This quote's status is "${source.eventStatus ?? "not set"}".`,
+  );
+}
+
 export async function createInvoice(params: CreateInvoiceParams): Promise<CreateInvoiceResult> {
   const { eventId, customerChoice, userUuid, origin } = params;
 
@@ -128,12 +154,8 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
   if (source.qboInvoiceId) return fail(409, "This quote already has a QuickBooks invoice.");
 
   // 2
-  if (source.eventStatus !== "booked") {
-    return fail(
-      400,
-      `A QuickBooks invoice can only be created for a booked quote. This quote's status is "${source.eventStatus ?? "not set"}".`,
-    );
-  }
+  const notBooked = bookedRuleFailure(source);
+  if (notBooked) return notBooked;
 
   // 3
   const issues = validateInvoiceSource(source);
@@ -141,12 +163,8 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
   // validateInvoiceSource has refused a quote without these.
   const connectionId = source.connectionId!;
   const eventTypeName = source.eventTypeName!;
-  const billedContact = source.billedContact!;
-  const docNumber = String(source.invoiceNumber);
 
-  // 4: the hash the invoice will be built from. The loader read it with the quote's data, so a
-  // quote edited meanwhile leaves this hash older than the data, which can only read as "outdated".
-  const sentHash = source.qboInvoiceHash;
+  // 4: the hash is remembered from `source` in createInvoiceFromSource.
 
   // 5
   let item;
@@ -155,6 +173,35 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
   } catch (e) {
     return setupFailure(e);
   }
+
+  return createInvoiceFromSource({ source, item, customerChoice, userUuid });
+}
+
+export type CreateFromSourceParams = {
+  /** A quote the caller has loaded and found valid. */
+  source: InvoiceSource;
+  item: QboItemRef;
+  customerChoice?: CustomerChoice;
+  /** `Users.id` of the person who pressed the button (the Log's author). */
+  userUuid: string;
+  /** Case 3 of spec 05: the id of the linked invoice QuickBooks no longer has; the new link replaces it. */
+  replacingInvoiceId?: string;
+};
+
+/** Steps 6–13: from the number check on, for a quote the caller has already checked (steps 1–5). */
+export async function createInvoiceFromSource(
+  params: CreateFromSourceParams,
+): Promise<CreateInvoiceResult> {
+  const { source, item, customerChoice, userUuid, replacingInvoiceId } = params;
+  const eventId = source.eventId;
+  // validateInvoiceSource has refused a quote without these.
+  const connectionId = source.connectionId!;
+  const billedContact = source.billedContact!;
+  const docNumber = String(source.invoiceNumber);
+
+  // 4: the hash the invoice will be built from. The loader read it with the quote's data, so a
+  // quote edited meanwhile leaves this hash older than the data, which can only read as "outdated".
+  const sentHash = source.qboInvoiceHash;
 
   // 6
   let existing: ExistingInvoice | null;
@@ -200,7 +247,11 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
 
   let created;
   try {
-    created = await createQboInvoice(connectionId, body, requestIdFor(eventId, sentHash));
+    created = await createQboInvoice(
+      connectionId,
+      body,
+      requestIdFor(eventId, sentHash, replacingInvoiceId),
+    );
   } catch (e) {
     return fail(502, messageOf(e));
   }
@@ -215,6 +266,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
     invoiceId: invoice.id,
     connectionId,
     sentHash,
+    replacingInvoiceId,
   });
   if (linkedId === null) {
     throw new Error("Failed to save the QuickBooks invoice link: the quote was not updated.");
@@ -227,7 +279,12 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
   }
 
   // 10
-  await logInvoiceChange({ eventId, userUuid, kind: "created", docNumber: invoice.docNumber });
+  await logInvoiceChange({
+    eventId,
+    userUuid,
+    kind: replacingInvoiceId ? "recreated" : "created",
+    docNumber: invoice.docNumber,
+  });
   if (!wasQbo) await logIsQboSet({ eventId, userUuid });
 
   // 11: spec 06 hooks in here (the totals check, which sets qbo_invoice_mismatch).

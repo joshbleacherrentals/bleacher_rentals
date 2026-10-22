@@ -1,7 +1,10 @@
 # QuickBooks invoice — the update route
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
-(§1, last paragraph).
+Status: **Implemented 2026-10-22** (approved in chat, amended the same day before
+implementing). 0 open decisions; one reading to confirm (§1, last paragraph). Three amendments, all answered by the
+user: the Canadian no-tax code of [03c](qbo-invoice-03c-no-tax-code.md) and
+[03d](qbo-invoice-03d-canadian-line-tax-code.md) (§4, case 1 step 7), the Log values (§6), and
+the fourth routing row for a link that points at a missing invoice (§4).
 Implementation order: **05** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [04](qbo-invoice-04-create.md) (the route and the create flow), which in turn needs
@@ -74,7 +77,17 @@ The route decides by the event's state:
 
 - **No link, no `overwriteInvoiceId`** → the create flow of spec 04.
 - **No link, with `overwriteInvoiceId`** → case 2.
-- **A link** → case 1, or case 3 when `replaceMissing` is true.
+- **A link, `replaceMissing` true and `overwriteInvoiceId`** → case 2, relinking (below).
+  This is the request the screen sends after case 3 answered `invoice_number_exists` (spec 07
+  re-sends the request it made, with the id added); without this row it would run case 3 again
+  and loop.
+- **A link, anything else** → case 1, or case 3 when `replaceMissing` is true.
+
+The route reads the quote's link with `readLinkedInvoiceId` (in `updateInvoice.ts`, service role)
+and calls `createInvoice`, `overwriteInvoice` (case 2, with or without relinking) or
+`updateInvoice` (cases 1 and 3). Each of them loads the quote itself, so a link that changed in
+between is caught by the flow (409). The `wrong_company` error is the 409 with the message below,
+in the `{ error }` body of every other error.
 
 **Case 1 — Update.** In this order; a failing step ends the request.
 
@@ -89,9 +102,11 @@ The route decides by the event's state:
 6. `resolveInvoiceCustomer` (the billed contact may have changed); `choose` →
    `choose_customer`, stop.
 7. Resolve the Class (spec 03b) and, for a taxed Canadian quote, the province's tax code
-   (spec 03a); `buildInvoicePayload` with those refs; a sparse update with the invoice's `Id`
-   and `SyncToken`. Their warnings (`class_missing`, `tax_code_missing`) go into `warnings`. A
-   QuickBooks refusal → 502.
+   (spec 03a); for any Canadian quote also the connection's no-tax code (spec 03c). When a
+   Canadian line needs the no-tax code and the connection has none, the request ends with the
+   same 400 as spec 04 step 8 (spec 03d). `buildInvoicePayload` with those refs; a sparse
+   update with the invoice's `Id` and `SyncToken`. Their warnings (`class_missing`,
+   `tax_code_missing`) go into `warnings`. A QuickBooks refusal → 502.
 8. Save `qbo_invoice_sent_hash` (step 3); `UPDATE Events … WHERE id = ?`. `is_qbo` is **not**
    touched (an accountant who unticked it by hand is not overruled).
 9. Write the Log (§6): "Updated".
@@ -104,13 +119,24 @@ a first link). The invoice with `overwriteInvoiceId` is read from this connectio
 file; it must exist and its `DocNumber` must equal the quote's invoice number, else 400 (the
 id may not point at any invoice). Then steps 3–12 of case 1, except: step 8 saves the id, the
 connection and `is_qbo` true as well, guarded by `qbo_invoice_id IS NULL`; the Log says
-"Linked and updated"; the result has `linkedExisting` true.
+"Linked and updated"; the result has `linkedExisting` true. The save also sets
+`qbo_invoice_mismatch` false (a first link has nothing to be compared with yet; spec 06 sets it
+right after).
+
+**Case 2, relinking.** The quote has a link to an invoice that QuickBooks no longer has, and
+the user chose to overwrite the invoice found by number. Case 1 step 1 (the company) applies
+first. The booked rule is **not** applied (the quote already had an invoice, as in case 3); the
+validation is. The rest is case 2, except the save is guarded by
+`WHERE qbo_invoice_id = {the old id}` instead of `IS NULL`. The result is `updated` with
+`linkedExisting` true.
 
 **Case 3 — Create a new one after "not found".** `replaceMissing` is true and the read of
 step 5 found nothing. The create flow of spec 04 runs from its step 5 (Item, number check,
 customer, create, save), with these differences: the booked rule is not applied; the saved
 link replaces the old one with `WHERE qbo_invoice_id = {the old id}`; the Log says "Created
-again (the previous invoice was not found)"; the result is `created`.
+again (the previous invoice was not found)"; the result is `created`. The `requestid` also
+carries the old invoice's id: the same quote and hash made the deleted invoice, and
+QuickBooks must not answer with it.
 
 ## 5. The PDF — `attachQuotePdf.tsx` (changed)
 
@@ -121,8 +147,13 @@ PDF as in spec 04. Other attachments are left alone. It throws on failure.
 ## 6. The Log — `logInvoiceChange.ts` (changed)
 
 `kind` gains `updated`, `linked` and `recreated`. All write `field_name` `qbo_invoice`,
-`action_type` `update`, `prev_value` and `next_value` as named in §4. The case-2 and case-3
-flows that set `is_qbo` write its second row as spec 04 does.
+`action_type` `update` and `prev_value` "None", as `created` does. `next_value`:
+
+- `updated` — "Updated (invoice {docNumber})"
+- `linked` — "Linked and updated (invoice {docNumber})"
+- `recreated` — "Created again (the previous invoice was not found)"
+
+The case-2 and case-3 flows that set `is_qbo` write its second row as spec 04 does.
 
 ## 7. Edge cases and error handling
 
@@ -153,6 +184,8 @@ Playwright, written, **not run** (the route is replaced by a fake):
 - **S5** an office moved to the other company: 409 with the message, nothing saved.
 - **S6** a quote that is no longer `booked` but has an invoice: Update still works.
 - **S7** a viewer and an account manager: 403.
+- **S8** a quote with a link, `replaceMissing` and an `overwriteInvoiceId` of the right number:
+  `updated` with `linkedExisting`; the link is the overwritten invoice's id.
 
 ## 9. Files
 
@@ -178,9 +211,13 @@ Red first. Prettier only on touched files.
   writes nothing; `is_qbo` is untouched by an update and set by case 2; the sparse body
   carries the `Id` and `SyncToken`; the saved sent hash is the one read first; case 2 refuses
   a wrong number and an unknown id; case 3 replaces only the old id's link; each case writes
-  the right Log text; the booked rule applies to case 2 and not to cases 1 and 3.
+  the right Log text; the booked rule applies to case 2 and not to cases 1, 3 and the
+  relinking case 2; the relinking case 2 replaces only the old id's link.
 - **Warnings:** an update of a quote with no Class, or a taxed Canadian quote with no mapped
   code, returns `updated` with the matching warning.
+- **No-tax code:** a Canadian quote that needs the connection's no-tax code and has none is
+  refused with 400 and nothing is written, in cases 1, 2 and 3; one that has it carries it on
+  the line.
 - **`attachQuotePdf.test.ts`:** replace deletes only the app's own file name, then uploads;
   a failure throws.
 - **`createInvoice.test.ts`** (extended): the create flow is unchanged.
