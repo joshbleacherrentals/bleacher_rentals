@@ -42,6 +42,8 @@ function quote(over: Partial<Quote> = {}): Quote {
     invoiceNumber: 1042,
     eventName: "Spring Gala",
     eventStatus: "booked",
+    hasLeadSubmission: false,
+    hideLeadAlert: false,
     lostReason: null,
     lostReasonNote: null,
     eventStart: "2026-05-01",

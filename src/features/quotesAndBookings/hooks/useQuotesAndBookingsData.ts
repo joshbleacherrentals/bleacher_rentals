@@ -8,7 +8,9 @@ import { QuotesBookingsEvent, QuotesBookingsFilters } from "../types";
 
 /** What the list query returns: an event plus the website form submission, as one flat type. */
 type Flat<T> = { [K in keyof T]: T[K] };
-type ListRow = Flat<QuotesBookingsEvent & { lead_submission: string | null }>;
+type ListRow = Flat<
+  QuotesBookingsEvent & { lead_submission: string | null; hide_lead_alert: number | null }
+>;
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { matchesInboundLeads, type InboundLeadsUser } from "../utils/inboundLeadsTemplate";
 import { zoneOfEvent } from "../utils/zoneOfEvent";
@@ -52,6 +54,7 @@ export function useQuotesAndBookingsData(
         "e.deleted as deleted",
         "e.invoice_number as invoice_number",
         "e.lead_submission as lead_submission",
+        "e.hide_lead_alert as hide_lead_alert",
         "u.first_name as account_manager_first_name",
         "u.last_name as account_manager_last_name",
         "u.email as account_manager_email",
