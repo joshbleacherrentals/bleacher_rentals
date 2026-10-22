@@ -1,5 +1,6 @@
 import { QuoteDocumentData } from "./quoteDocumentData";
 import { formatMoney } from "../utils/formatMoney";
+import { isInvoiceStatus } from "../utils/isInvoiceStatus";
 
 function formatDate(d: string): string {
   if (!d) return "—";
@@ -53,7 +54,7 @@ export function buildQuoteEmailHtml(data: QuoteDocumentData): string {
               You've received a quote from <strong>${data.company.name}</strong>
             </p>
             <p style="font-size:14px;color:#6b7280;margin:0 0 24px;">
-              ${data.contractSignature ? "Invoice" : "Quote"} <strong>${data.quoteNumber}</strong> &middot; ${formatDate(data.quoteDate)}
+              ${isInvoiceStatus(data.status) ? "Invoice" : "Quote"} <strong>${data.quoteNumber}</strong> &middot; ${formatDate(data.quoteDate)}
             </p>
 
             <!-- Summary -->
