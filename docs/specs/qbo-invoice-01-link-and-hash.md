@@ -74,9 +74,9 @@ client, the venue address, the invoice number, the Event Start, the due date, th
   the service role included. That is why the invoice route can write these columns.
 - **Sync.** `Events` already syncs whole-row to admin, account manager and accountant.
 
-## 3. Database — `supabase/migrations/20261022120000_qbo_invoice_link_and_hash.sql`
+## 3. Database — `supabase/migrations/20261022130000_qbo_invoice_link_and_hash.sql`
 
-(After `20261020130000`; renumber if `develop` has moved.)
+(After `20261022120000`, the latest on the branch; renumbered from `20261022120000`, which `events_quote_sent_at` already uses.)
 
 **3.1 Columns on `public."Events"`.**
 
@@ -140,7 +140,7 @@ test of §7.1.
 
 **Counted — 4 files** (limit 10):
 
-1. `supabase/migrations/20261022120000_qbo_invoice_link_and_hash.sql` — new
+1. `supabase/migrations/20261022130000_qbo_invoice_link_and_hash.sql` — new
 2. `database.types.ts` — changed: the five `Events` columns and the foreign key
 3. `src/lib/powersync/AppSchema.ts` — changed: the five columns
 4. `package.json` — changed: `test:db:qboinvoicehash`, added to `test:db:all`

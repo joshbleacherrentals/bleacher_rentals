@@ -257,6 +257,12 @@ const EventsCols = {
   tax_amount_cents: column.integer,
   is_tax_overridden: column.integer,
   finance_contact_uuid: column.text,
+  // Written by the server (service role); qbo_invoice_hash by the recompute trigger.
+  qbo_invoice_id: column.text,
+  qbo_invoice_connection_uuid: column.text,
+  qbo_invoice_hash: column.text,
+  qbo_invoice_sent_hash: column.text,
+  qbo_invoice_mismatch: column.integer,
   content_hash: column.text,
   contract_hash: column.text,
   venue_uuid: column.text,
