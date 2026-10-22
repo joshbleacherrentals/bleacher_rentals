@@ -18,6 +18,8 @@ const filters: Omit<QuotesBookingsFilters, "isOpen"> = {
   eventTo: null,
   bookedFrom: null,
   bookedTo: null,
+  quoteSentFrom: null,
+  quoteSentTo: null,
   accountManagerUserUuid: null,
   inGoodShuffle: null,
   inQuickBooks: null,

@@ -85,6 +85,7 @@ export function ScorecardStatsProvider({ children }: { children: ReactNode }) {
           "e.tax_amount_cents as tax_amount_cents",
           "e.tax_percent as tax_percent",
           "e.created_at as created_at",
+          "e.quote_sent_at as quote_sent_at",
           "e.booked_at as booked_at",
           "e.created_by_user_uuid as created_by_user_uuid",
           "e.goodshuffle_url as goodshuffle_url",
@@ -107,6 +108,7 @@ export function ScorecardStatsProvider({ children }: { children: ReactNode }) {
         .where((eb) =>
           eb.or([
             eb.and([eb("e.created_at", ">=", start), eb("e.created_at", "<", end)]),
+            eb.and([eb("e.quote_sent_at", ">=", start), eb("e.quote_sent_at", "<", end)]),
             eb.and([eb("e.booked_at", ">=", start), eb("e.booked_at", "<", end)]),
             eb.and([eb("e.event_start", ">=", start), eb("e.event_start", "<", end)]),
           ]),

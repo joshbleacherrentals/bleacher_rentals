@@ -100,6 +100,7 @@ export default function QuotesBookingsPage() {
     setCreatedRange,
     setEventRange,
     setBookedRange,
+    setQuoteSentRange,
     setAccountManagerUserUuid,
     setInGoodShuffle,
     setInQuickBooks,
@@ -292,6 +293,7 @@ export default function QuotesBookingsPage() {
         onCreatedRangeChange={setCreatedRange}
         onEventRangeChange={setEventRange}
         onBookedRangeChange={setBookedRange}
+        onQuoteSentRangeChange={setQuoteSentRange}
         onInGoodShuffleChange={setInGoodShuffle}
         onInQuickBooksChange={setInQuickBooks}
         onSalesOfficeChange={setSalesOfficeUuid}
