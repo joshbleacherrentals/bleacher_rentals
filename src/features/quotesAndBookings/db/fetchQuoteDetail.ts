@@ -6,6 +6,10 @@ export type QuoteDetail = {
   invoiceNumber: number | null;
   eventName: string;
   eventStatus: string | null;
+  /** The quote came from the website form. */
+  hasLeadSubmission: boolean;
+  /** Someone has answered the website request, so the "waiting" alert is off. */
+  hideLeadAlert: boolean;
   lostReason: string | null;
   lostReasonNote: string | null;
   eventStart: string | null;
@@ -65,6 +69,8 @@ type Row = {
   invoice_number: number | null;
   event_name: string;
   event_status: string | null;
+  lead_submission: string | null;
+  hide_lead_alert: number | null;
   lost_reason: string | null;
   lost_reason_note: string | null;
   event_start: string | null;
@@ -121,6 +127,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
       "e.invoice_number as invoice_number",
       "e.event_name as event_name",
       "e.event_status as event_status",
+      "e.lead_submission as lead_submission",
+      "e.hide_lead_alert as hide_lead_alert",
       "e.lost_reason as lost_reason",
       "e.lost_reason_note as lost_reason_note",
       "e.event_start as event_start",
@@ -178,6 +186,8 @@ export async function fetchQuoteDetail(eventId: string): Promise<QuoteDetail | n
     invoiceNumber: r.invoice_number,
     eventName: r.event_name,
     eventStatus: r.event_status,
+    hasLeadSubmission: (r.lead_submission ?? "").trim() !== "",
+    hideLeadAlert: r.hide_lead_alert === 1,
     lostReason: r.lost_reason,
     lostReasonNote: r.lost_reason_note,
     eventStart: r.event_start,

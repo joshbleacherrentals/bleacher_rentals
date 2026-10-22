@@ -18,7 +18,7 @@ import { buildQuoteDetailQueries, mergeQuoteDetail } from "./quoteDetailData";
 // including for an event that does not exist.
 
 // The old query, verbatim from `fetchQuoteDetail` (compiled by Kysely). Parameter: the event id.
-const OLD_SQL = `select "e"."id" as "id", "e"."invoice_number" as "invoice_number", "e"."event_name" as "event_name", "e"."event_status" as "event_status", "e"."lost_reason" as "lost_reason", "e"."lost_reason_note" as "lost_reason_note", "e"."event_start" as "event_start", "e"."event_end" as "event_end", "e"."setup_start" as "setup_start", "e"."teardown_end" as "teardown_end", "e"."notes" as "notes", "e"."internal_notes" as "internal_notes", "e"."external_notes" as "external_notes", "e"."pickup_instructions" as "pickup_instructions", "e"."dropoff_instructions" as "dropoff_instructions", "e"."contract_revenue_cents" as "contract_revenue_cents", "e"."event_type_uuid" as "event_type_uuid", "e"."quote_valid_till" as "quote_valid_till", "e"."sales_office_uuid" as "sales_office_uuid", "e"."terms_and_conditions_uuid" as "terms_and_conditions_uuid", "e"."tax_percent" as "tax_percent", "e"."tax_amount_cents" as "tax_amount_cents", "e"."is_tax_overridden" as "is_tax_overridden", "e"."booked_at" as "booked_at", "e"."created_at" as "created_at", "e"."created_by_user_uuid" as "created_by_user_uuid", "a"."street" as "address_street", "a"."city" as "address_city", "a"."state_province" as "address_state_province", "a"."zip_postal" as "address_zip_postal", "v"."id" as "venue_id", "v"."name" as "venue_name", "ct"."id" as "contact_id", "ct"."first_name" as "contact_first_name", "ct"."last_name" as "contact_last_name", "ct"."email" as "contact_email", "ct"."phone" as "contact_phone", "fc"."id" as "fc_id", "fc"."first_name" as "fc_first_name", "fc"."last_name" as "fc_last_name", "fc"."email" as "fc_email", "fc"."phone" as "fc_phone", "u"."first_name" as "am_first_name", "u"."last_name" as "am_last_name", "e"."deleted" as "deleted" from "Events" as "e" left join "Addresses" as "a" on "e"."address_uuid" = "a"."id" left join "Venues" as "v" on "e"."venue_uuid" = "v"."id" left join "Contacts" as "ct" on "e"."contact_uuid" = "ct"."id" left join "Contacts" as "fc" on "e"."finance_contact_uuid" = "fc"."id" left join "Users" as "u" on "e"."created_by_user_uuid" = "u"."id" where "e"."id" = ?`;
+const OLD_SQL = `select "e"."id" as "id", "e"."invoice_number" as "invoice_number", "e"."event_name" as "event_name", "e"."event_status" as "event_status", "e"."lead_submission" as "lead_submission", "e"."hide_lead_alert" as "hide_lead_alert", "e"."lost_reason" as "lost_reason", "e"."lost_reason_note" as "lost_reason_note", "e"."event_start" as "event_start", "e"."event_end" as "event_end", "e"."setup_start" as "setup_start", "e"."teardown_end" as "teardown_end", "e"."notes" as "notes", "e"."internal_notes" as "internal_notes", "e"."external_notes" as "external_notes", "e"."pickup_instructions" as "pickup_instructions", "e"."dropoff_instructions" as "dropoff_instructions", "e"."contract_revenue_cents" as "contract_revenue_cents", "e"."event_type_uuid" as "event_type_uuid", "e"."quote_valid_till" as "quote_valid_till", "e"."sales_office_uuid" as "sales_office_uuid", "e"."terms_and_conditions_uuid" as "terms_and_conditions_uuid", "e"."tax_percent" as "tax_percent", "e"."tax_amount_cents" as "tax_amount_cents", "e"."is_tax_overridden" as "is_tax_overridden", "e"."booked_at" as "booked_at", "e"."created_at" as "created_at", "e"."created_by_user_uuid" as "created_by_user_uuid", "a"."street" as "address_street", "a"."city" as "address_city", "a"."state_province" as "address_state_province", "a"."zip_postal" as "address_zip_postal", "v"."id" as "venue_id", "v"."name" as "venue_name", "ct"."id" as "contact_id", "ct"."first_name" as "contact_first_name", "ct"."last_name" as "contact_last_name", "ct"."email" as "contact_email", "ct"."phone" as "contact_phone", "fc"."id" as "fc_id", "fc"."first_name" as "fc_first_name", "fc"."last_name" as "fc_last_name", "fc"."email" as "fc_email", "fc"."phone" as "fc_phone", "u"."first_name" as "am_first_name", "u"."last_name" as "am_last_name", "e"."deleted" as "deleted" from "Events" as "e" left join "Addresses" as "a" on "e"."address_uuid" = "a"."id" left join "Venues" as "v" on "e"."venue_uuid" = "v"."id" left join "Contacts" as "ct" on "e"."contact_uuid" = "ct"."id" left join "Contacts" as "fc" on "e"."finance_contact_uuid" = "fc"."id" left join "Users" as "u" on "e"."created_by_user_uuid" = "u"."id" where "e"."id" = ?`;
 
 type Row = Record<string, string | number | null>;
 
@@ -32,6 +32,8 @@ function oldMapping(rows: Row[]): QuoteDetail | null {
     invoiceNumber: r.invoice_number,
     eventName: r.event_name,
     eventStatus: r.event_status,
+    hasLeadSubmission: (r.lead_submission ?? "").trim() !== "",
+    hideLeadAlert: r.hide_lead_alert === 1,
     lostReason: r.lost_reason,
     lostReasonNote: r.lost_reason_note,
     eventStart: r.event_start,
@@ -117,7 +119,7 @@ function seed(db: DatabaseSync, rand: () => number): void {
 
   db.exec(`
     create table "Events" (id text primary key, invoice_number integer, event_name text,
-      event_status text, lost_reason text, lost_reason_note text, event_start text, event_end text,
+      event_status text, lead_submission text, hide_lead_alert integer, lost_reason text, lost_reason_note text, event_start text, event_end text,
       setup_start text, teardown_end text, notes text, internal_notes text, external_notes text,
       pickup_instructions text, dropoff_instructions text, contract_revenue_cents integer,
       event_type_uuid text, quote_valid_till text, sales_office_uuid text,
@@ -172,11 +174,13 @@ function seed(db: DatabaseSync, rand: () => number): void {
 
   for (const id of EVENT_IDS) {
     // Foreign keys may point at a row that is not synced (the "-missing" ids), or at nothing.
-    insert(`insert into "Events" values (${Array(31).fill("?").join(", ")})`, [
+    insert(`insert into "Events" values (${Array(33).fill("?").join(", ")})`, [
       id,
       orNull(1000 + EVENT_IDS.indexOf(id)),
       orNull(`Event ${id}`),
       orNull(pick(["draft", "quoted", "booked", "lost"])),
+      orNull(pick(['{"state_prov":"ON"}', "", "  "]), 0.5),
+      pick([0, 1, null]),
       orNull(pick(["price", "date"]), 0.6),
       orNull("note", 0.6),
       orNull("2026-05-01"),
