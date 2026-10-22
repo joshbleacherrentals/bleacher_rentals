@@ -7,6 +7,7 @@ import { useEventTypeName } from "../../../hooks/useEventTypeName";
 import { useContractSignature } from "../../../hooks/useContractSignature";
 import { eventTypeDisplay } from "../../../utils/eventTypeDisplay";
 import { formatMoney } from "../../../utils/formatMoney";
+import { isInvoiceStatus } from "../../../utils/isInvoiceStatus";
 import { formatLostReason } from "../../../utils/lostReason";
 import { DateTime } from "luxon";
 import { useMemo, useState } from "react";
@@ -250,7 +251,9 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
           <div className="space-y-2 text-sm">
             {quote.invoiceNumber && (
               <div>
-                <span className="text-gray-500">{signature ? "Invoice #:" : "Quote #:"}</span>{" "}
+                <span className="text-gray-500">
+                  {isInvoiceStatus(quote.eventStatus) ? "Invoice #:" : "Quote #:"}
+                </span>{" "}
                 <span className="font-medium">{quote.invoiceNumber}</span>
               </div>
             )}

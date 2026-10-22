@@ -8,12 +8,12 @@ const company = {
   zip: "33702",
 };
 
-const render = (paymentInfo: string | null, language: "en" | "fr" = "en", isSigned = true) =>
+const render = (paymentInfo: string | null, language: "en" | "fr" = "en", isInvoice = true) =>
   renderToStaticMarkup(
     <ChecksPayableBox
       company={company}
       quoteNumber="487597792"
-      isSigned={isSigned}
+      isInvoice={isInvoice}
       paymentInfo={paymentInfo}
       language={language}
     />,
@@ -56,7 +56,7 @@ describe("ChecksPayableBox", () => {
       <ChecksPayableBox
         company={company}
         quoteNumber="1"
-        isSigned
+        isInvoice
         paymentInfo={null}
         language="en"
         highlight
