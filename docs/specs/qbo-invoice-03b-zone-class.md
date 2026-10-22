@@ -1,6 +1,6 @@
 # QuickBooks invoice — the zone as the QuickBooks Class
 
-Status: **DRAFT 2026-10-22, rewritten 2026-10-22 after the user's answers — awaiting
+Status: **Implemented 2026-10-22, rewritten 2026-10-22 after the user's answers — awaiting
 "Approved".** 0 open decisions; two readings to confirm (§1, last paragraph).
 Implementation order: **03b**, after [03a](qbo-invoice-03a-province-tax-codes.md) and before
 [04](qbo-invoice-04-create.md). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
