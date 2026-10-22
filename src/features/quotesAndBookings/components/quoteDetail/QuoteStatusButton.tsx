@@ -22,11 +22,22 @@ import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { changeQuoteStatus } from "../../db/changeQuoteStatus";
 import type { QuoteStatus } from "../../types/quoteTypes";
 import { validateLostReason, type LostReason } from "../../utils/lostReason";
-import { allowedStatuses, statusLabel } from "../../utils/statusTransitions";
+import { statusLabel } from "../../utils/statusTransitions";
+import {
+  displayState,
+  displayStateLabel,
+  displayStateOptions,
+  type DisplayState,
+} from "../../utils/leadResponseState";
+import { setLeadResponded } from "../../db/setLeadResponded";
+import { useNow } from "../../hooks/useNow";
+import { formatWait } from "../../utils/formatWait";
 import { LostReasonFields } from "../lostReason/LostReasonFields";
 
 /** The colour of each status: the button, and its entry in the list. */
-const STATUS_COLORS: Record<QuoteStatus, string> = {
+const STATUS_COLORS: Record<DisplayState, string> = {
+  awaiting_response: "bg-red-600 text-white",
+  responded: "bg-[rgb(254,218,120)] text-white",
   draft: "bg-[rgb(254,218,120)] text-white",
   quoted: "bg-[rgb(78,149,255)] text-white",
   booked: "bg-[rgb(61,196,165)] text-white",
@@ -35,7 +46,15 @@ const STATUS_COLORS: Record<QuoteStatus, string> = {
 };
 
 const colorOf = (status: string | null) =>
-  STATUS_COLORS[status as QuoteStatus] ?? STATUS_COLORS.draft;
+  STATUS_COLORS[status as DisplayState] ?? STATUS_COLORS.draft;
+
+/** How long the website request has waited, counting up; only mounted while it is waiting. */
+function WaitTimer({ since }: { since: string }) {
+  const now = useNow();
+  const ms = Date.parse(since);
+  if (Number.isNaN(ms)) return null;
+  return <span className="tabular-nums font-normal">{formatWait(now - ms)}</span>;
+}
 
 /**
  * The quote's status, drawn in its colour. Clicking it lists the statuses the quote may become
@@ -44,17 +63,27 @@ const colorOf = (status: string | null) =>
  */
 export function QuoteStatusButton({
   eventId,
-  status,
+  status: storedStatus,
+  hasLeadSubmission,
+  hideLeadAlert,
+  createdAt,
   canChange,
   supabase,
   userId,
 }: {
   eventId: string;
   status: string | null;
+  /** The quote came from the website form. */
+  hasLeadSubmission: boolean;
+  /** The website request has been answered. */
+  hideLeadAlert: boolean;
+  /** When the quote was created, which is when a website request arrived. */
+  createdAt: string;
   canChange: boolean;
   supabase: SupabaseClient<Database>;
   userId: string | null;
 }) {
+  const status = displayState({ status: storedStatus, hasLeadSubmission, hideLeadAlert });
   const [saving, setSaving] = useState(false);
   const [askLostReason, setAskLostReason] = useState(false);
   const [reason, setReason] = useState<LostReason | null>(null);
@@ -64,7 +93,7 @@ export function QuoteStatusButton({
     setSaving(true);
     try {
       await changeQuoteStatus(
-        { eventId, from: status, to, lostReason: lost?.reason, lostReasonNote: lost?.note },
+        { eventId, from: storedStatus, to, lostReason: lost?.reason, lostReasonNote: lost?.note },
         supabase,
         userId,
       );
@@ -77,8 +106,26 @@ export function QuoteStatusButton({
     }
   };
 
-  const pick = (to: QuoteStatus) => {
+  const saveLeadResponded = async (responded: boolean) => {
+    setSaving(true);
+    try {
+      await setLeadResponded(eventId, responded);
+      createSuccessToast([
+        responded ? "Marked as responded." : "Marked as waiting for a response.",
+      ]);
+    } catch (error) {
+      createErrorToastNoThrow([(error as Error).message || "Could not change the status."]);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const pick = (to: DisplayState) => {
     if (to === status) return;
+    if (to === "responded" || to === "awaiting_response") {
+      void saveLeadResponded(to === "responded");
+      return;
+    }
     if (to === "lost") {
       setReason(null);
       setNote("");
@@ -99,7 +146,14 @@ export function QuoteStatusButton({
 
   const badge = `flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-sm ${colorOf(status)}`;
 
-  if (!canChange) return <span className={badge}>{statusLabel(status)}</span>;
+  const label = (
+    <>
+      {displayStateLabel(status)}
+      {status === "awaiting_response" && <WaitTimer since={createdAt} />}
+    </>
+  );
+
+  if (!canChange) return <span className={badge}>{label}</span>;
 
   return (
     <>
@@ -108,11 +162,11 @@ export function QuoteStatusButton({
           disabled={saving}
           className={`${badge} cursor-pointer disabled:opacity-50`}
         >
-          {statusLabel(status)}
+          {label}
           <ChevronDown className="w-3.5 h-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {allowedStatuses(status).map((option) => (
+          {displayStateOptions(status).map((option) => (
             <DropdownMenuItem
               key={option}
               disabled={option === status}
@@ -120,7 +174,7 @@ export function QuoteStatusButton({
               className="cursor-pointer"
             >
               <span className={`inline-block w-2.5 h-2.5 rounded-full ${colorOf(option)}`} />
-              {statusLabel(option)}
+              {displayStateLabel(option)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
