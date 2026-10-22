@@ -53,6 +53,10 @@ export function filterQuotesBookingsEvents<E extends QuotesBookingsEvent & Inbou
       return false;
     }
 
+    if (!isWithinRange(event.quote_sent_at, filters.quoteSentFrom, filters.quoteSentTo, timezone)) {
+      return false;
+    }
+
     if (filters.inGoodShuffle !== null && isInGoodShuffle(event) !== filters.inGoodShuffle) {
       return false;
     }

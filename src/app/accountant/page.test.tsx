@@ -57,6 +57,7 @@ const listEvent: QuotesBookingsEvent = {
   tax_percent: 13,
   created_at: "2026-08-01T00:00:00Z",
   booked_at: "2026-08-02T00:00:00Z",
+  quote_sent_at: null,
   created_by_user_uuid: null,
   goodshuffle_url: null,
   is_qbo: null,

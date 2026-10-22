@@ -42,6 +42,7 @@ export default function AccountantPage() {
     setCreatedRange,
     setEventRange,
     setBookedRange,
+    setQuoteSentRange,
     setAccountManagerUserUuid,
     setInGoodShuffle,
     setInQuickBooks,
@@ -116,6 +117,7 @@ export default function AccountantPage() {
         onCreatedRangeChange={setCreatedRange}
         onEventRangeChange={setEventRange}
         onBookedRangeChange={setBookedRange}
+        onQuoteSentRangeChange={setQuoteSentRange}
         onInGoodShuffleChange={setInGoodShuffle}
         onInQuickBooksChange={setInQuickBooks}
         onSalesOfficeChange={setSalesOfficeUuid}

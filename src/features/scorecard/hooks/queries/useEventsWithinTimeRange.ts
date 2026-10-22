@@ -28,6 +28,7 @@ import { DateField } from "../overview/useEventData";
 export type EventWithDate = {
   id: string;
   created_at: string | null;
+  quote_sent_at: string | null;
   event_start: string | null;
   booked_at: string | null;
   contract_revenue_cents: number | null;
@@ -49,6 +50,7 @@ export function useEventsWithinTimeRange(
       .select([
         "e.id as id",
         "e.created_at as created_at",
+        "e.quote_sent_at as quote_sent_at",
         "e.event_start as event_start",
         "e.booked_at as booked_at",
         "e.contract_revenue_cents as contract_revenue_cents",

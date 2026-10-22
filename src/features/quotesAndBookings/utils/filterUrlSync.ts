@@ -24,6 +24,8 @@ const PARAM = {
   eventTo: "eventTo",
   bookedFrom: "bookedFrom",
   bookedTo: "bookedTo",
+  quoteSentFrom: "quoteSentFrom",
+  quoteSentTo: "quoteSentTo",
   accountManagerUserUuid: "am",
   inGoodShuffle: "goodShuffle",
   inQuickBooks: "quickBooks",
@@ -101,6 +103,8 @@ export function filtersToSearchParams(
   setOrDelete(PARAM.eventTo, filters.eventTo);
   setOrDelete(PARAM.bookedFrom, filters.bookedFrom);
   setOrDelete(PARAM.bookedTo, filters.bookedTo);
+  setOrDelete(PARAM.quoteSentFrom, filters.quoteSentFrom);
+  setOrDelete(PARAM.quoteSentTo, filters.quoteSentTo);
   setOrDelete(PARAM.accountManagerUserUuid, filters.accountManagerUserUuid);
   setOrDelete(PARAM.inGoodShuffle, boolToParam(filters.inGoodShuffle));
   setOrDelete(PARAM.inQuickBooks, boolToParam(filters.inQuickBooks));
@@ -143,6 +147,8 @@ export function searchParamsToFilters(
       eventTo: searchParams.get(PARAM.eventTo),
       bookedFrom: searchParams.get(PARAM.bookedFrom),
       bookedTo: searchParams.get(PARAM.bookedTo),
+      quoteSentFrom: searchParams.get(PARAM.quoteSentFrom),
+      quoteSentTo: searchParams.get(PARAM.quoteSentTo),
       accountManagerUserUuid: searchParams.get(PARAM.accountManagerUserUuid),
       inGoodShuffle: paramToBool(searchParams.get(PARAM.inGoodShuffle)),
       inQuickBooks: paramToBool(searchParams.get(PARAM.inQuickBooks)),
@@ -191,6 +197,8 @@ export function hasActiveFilterValues(filters: Omit<QuotesBookingsFilters, "isOp
     filters.eventTo !== null ||
     filters.bookedFrom !== null ||
     filters.bookedTo !== null ||
+    filters.quoteSentFrom !== null ||
+    filters.quoteSentTo !== null ||
     filters.accountManagerUserUuid !== null ||
     filters.inGoodShuffle !== null ||
     filters.inQuickBooks !== null ||
