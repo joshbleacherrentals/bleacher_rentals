@@ -1,6 +1,7 @@
 # QuickBooks invoice — the create route
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions.
+Status: **Implemented 2026-10-22.** 0 open decisions. Step 8 was amended the same day by
+[03d](qbo-invoice-03d-canadian-line-tax-code.md) (the Canadian line's tax code).
 Implementation order: **04** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (the columns), [02](qbo-invoice-02-customer.md)
@@ -99,8 +100,11 @@ In this order; a step that fails ends the request with its error and nothing aft
 7. `resolveInvoiceCustomer` with the request's `customerChoice`. `choose` → `choose_customer`,
    stop.
 8. Resolve the Class (`resolveZoneClass`, spec 03b) and, for a taxed Canadian quote, the
-   province's tax code (`resolveProvinceTaxCode`, spec 03a). Then `buildInvoicePayload` with
-   those refs, and create the invoice, carrying a `requestid` made from the event id and the
+   province's tax code (`resolveProvinceTaxCode`, spec 03a); for any Canadian quote also the
+   connection's no-tax code (`resolveNoTaxCode`, spec 03c). When a Canadian line needs the
+   no-tax code and the connection has none, the request ends with a 400 (spec 03d). Then
+   `buildInvoicePayload` with those refs, and create the invoice, carrying a `requestid` made
+   from the event id and the
    hash of step 4. The warnings of the two resolvers and of the builder go into the response's
    `warnings`. QuickBooks refuses → 502.
 9. Save the link in one `UPDATE Events … WHERE id = ? AND qbo_invoice_id IS NULL`:
@@ -206,7 +210,8 @@ Red first. Prettier only on touched files.
   - the link is saved before the PDF; a PDF failure still returns `created` with the warning;
   - a quote with no Class returns `created` with `class_missing` and a body without
     `ClassRef`; a taxed Canadian quote with no mapped code returns `created` with
-    `tax_code_missing` and an untaxed body; both warnings can come together;
+    `tax_code_missing` and a body whose line carries the no-tax code (spec 03d); both warnings
+    can come together;
   - a QuickBooks refusal returns 502 and writes nothing to `Events`;
   - the `requestid` is the same for the same event and hash and differs for another hash;
   - an `is_qbo` that was already true gets no second Log row.

@@ -3,7 +3,10 @@
 Status: **Implemented 2026-10-22.** 0 open
 decisions. The tax code per Canadian province ([03a](qbo-invoice-03a-province-tax-codes.md))
 and the QuickBooks Class ([03b](qbo-invoice-03b-zone-class.md)) are separate specs; the
-builder here takes both as inputs.
+builder here takes both as inputs. **The Canadian branch was amended on 2026-10-22 by
+[03c](qbo-invoice-03c-no-tax-code.md) and [03d](qbo-invoice-03d-canadian-line-tax-code.md)**
+after the first sandbox run (QuickBooks Canada refuses `TAX` and `NON` on a line): the text
+below is the amended one.
 Implementation order: **03** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Builds on: [qbo-invoice-01-link-and-hash.md](qbo-invoice-01-link-and-hash.md) (the hash this
@@ -33,9 +36,10 @@ the Class (03b), writing or updating an invoice (specs 04–05), the totals comp
   is empty. It may be earlier than the invoice date.
 - **Memo on statement:** the quote's title.
 - **Tax:** calculated by QuickBooks; a state without tax has the Tax box unchecked.
-- **Canada is supported.** A Canadian invoice carries a transaction tax code chosen per
-  province (spec 03a). A taxed quote whose province has no code mapped is created **without
-  tax, with a warning** (user's answer).
+- **Canada is supported.** A Canadian invoice line carries the tax code chosen per province
+  (spec 03a), and a line with no tax carries the connection's no-tax code (spec 03c). A taxed
+  quote whose province has no code mapped is created **without tax, with a warning** (user's
+  answer).
 - **Class:** the quote's zone (spec 03b). A quote with no Class is created **without one,
   with a warning** (user's answer).
 - **Not sent:** the invoice is saved, never emailed.
@@ -62,9 +66,11 @@ province (`normalizeCanadianProvince`).
   `UnitPrice`, `ItemRef` and a line-level `TaxCodeRef` that **must** be `TAX` or `NON`;
   `ShipAddr` with `Line1`, `City`, `CountrySubDivisionCode`, `PostalCode`. With Automated Sales
   Tax, QuickBooks finds the rate from the shipping address.
-- **Files without Automated Sales Tax** (every Canadian file): in `tax-percent` the line's
-  `TaxCodeRef` is still `TAX` or `NON`, and the **transaction** carries
-  `TxnTaxDetail.TxnTaxCodeRef`, the code that tells QuickBooks which rates to apply.
+- **The Canadian file** (sandbox run, 2026-10-22): it refuses `TAX` and `NON` on a line (error
+  `6000`, "Make sure all your transactions have a GST/HST rate before you save"). An invoice whose
+  line carried a real tax code (`5`, HST ON) and no `TxnTaxDetail` was created, and QuickBooks
+  built the tax itself (amount 100.00, tax 13.00, total 113.00). The American file takes only
+  `TAX` or `NON`.
 - **Event types** are the `EventTypes` rows named `Rural`, `City`, `Corporate`.
 - **Hash parity.** Spec 01's current hash lists what the payload may read. A payload member
   with no hash member would never light "outdated".
@@ -81,7 +87,8 @@ province (`normalizeCanadianProvince`).
   `no_sales_office`, `no_connection`, `no_contact`, `no_venue`.
 - `QboItemRef` — `{ id, name, description }`.
 - `InvoiceRefs` — what the builder is given besides the quote: `item` (a `QboItemRef`),
-  `customerId`, `classId` (or null, spec 03b), `canadianTaxCodeId` (or null, spec 03a).
+  `customerId`, `classId` (or null, spec 03b), `canadianTaxCodeId` (or null, spec 03a),
+  `noTaxCodeId` (or null, spec 03c).
 - `InvoiceBuildWarning` — `{ code: "tax_code_missing", province }`.
 - `QboInvoiceBody` — the body, field for field as in §5.
 
@@ -128,13 +135,17 @@ body:
 - `GlobalTaxCalculation` — `TaxExcluded`.
 - `Line` — exactly one `SalesItemLineDetail` line: `Amount` and `UnitPrice` the amount in
   dollars, `Qty` 1, `ItemRef` the Item's id and name, `Description` the Item's own
-  Description (omitted when the Item has none), `TaxCodeRef` `TAX` when `taxCents` is above 0,
-  `NON` when it is 0, and `ClassRef` when `refs.classId` is set.
-- **Canada.** When `canadianProvince` is set and `taxCents` is above 0, the body also has
-  `TxnTaxDetail.TxnTaxCodeRef` set to `refs.canadianTaxCodeId`. If that is null the line is
-  `NON`, there is no `TxnTaxDetail`, and `warnings` holds `tax_code_missing` with the province.
-- **United States.** No `TxnTaxDetail`: with Automated Sales Tax QuickBooks calculates the
-  tax from the shipping address.
+  Description (omitted when the Item has none), `TaxCodeRef` (below), and `ClassRef` when
+  `refs.classId` is set.
+- **United States.** `TaxCodeRef` is `TAX` when `taxCents` is above 0 and `NON` when it is 0. No
+  `TxnTaxDetail`: with Automated Sales Tax QuickBooks calculates the tax from the shipping
+  address.
+- **Canada** (when `canadianProvince` is set; amended by 03d). `TaxCodeRef` is never `TAX` or
+  `NON`: it is `refs.canadianTaxCodeId` when `taxCents` is above 0 and that code is mapped;
+  otherwise it is `refs.noTaxCodeId`, and when the quote was taxed but the province has no code
+  `warnings` holds `tax_code_missing` with the province. There is no `TxnTaxDetail`. A Canadian
+  quote that needs `noTaxCodeId` and is given null makes the builder throw (the create route has
+  refused it before). `needsNoTaxCode(source, canadianTaxCodeId)` says when that is.
 - No `BillEmail`, no email status: nothing is sent.
 
 The amount in dollars is made from the cents by integer arithmetic into a two-decimal
@@ -172,12 +183,14 @@ Red first. Prettier only on touched files.
     `DocNumber`, dates, `ShipAddr`, `PrivateNote`, one line of Qty 1 and Amount `7500.00`;
   - the amount after a discount is subtotal plus the negative discount;
   - cents become dollars exactly (1 cent, 99 cents, 100,000.01) with no float error;
-  - `taxCents` above 0 gives `TAX`; 0 gives `NON`;
+  - United States: `taxCents` above 0 gives `TAX`; 0 gives `NON`; never a `TxnTaxDetail`;
   - the Item's Description is used; absent Description is omitted;
   - `ClassRef` is present only when `classId` is given; the body has no `BillEmail`;
-  - Canada, taxed, code mapped: `TxnTaxDetail.TxnTaxCodeRef` is the code; Canada, taxed, no
-    code: line `NON`, no `TxnTaxDetail`, the `tax_code_missing` warning; Canada, untaxed: no
-    `TxnTaxDetail`, no warning; United States: never a `TxnTaxDetail`.
+  - Canada (amended by 03d), taxed, code mapped: the line's `TaxCodeRef` is the province's code;
+    taxed, no code: the line carries the no-tax code, no `TxnTaxDetail`, the `tax_code_missing`
+    warning; untaxed: the line carries the no-tax code, no warning; never `TAX` or `NON` on a
+    Canadian line; a Canadian quote that needs the no-tax code and gets null throws;
+    `needsNoTaxCode` is true for an untaxed quote and for a taxed one with no province code.
 - **`validateInvoiceSource.test.ts`:** one case per code of §3; a complete source gives no
   issue; a Canadian and a US source both pass.
 - **`loadInvoiceSource.test.ts`:** with `buildQuoteDocumentData` and the client replaced:

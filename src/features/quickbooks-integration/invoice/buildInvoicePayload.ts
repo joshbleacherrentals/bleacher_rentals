@@ -71,6 +71,15 @@ export function validateInvoiceSource(source: InvoiceSource): InvoiceIssue[] {
   return issues;
 }
 
+/**
+ * Whether a Canadian line must carry the connection's no-tax code: the quote has no tax, or it has
+ * tax but its province has no code mapped. A US quote never needs it.
+ * Spec: docs/specs/qbo-invoice-03d-canadian-line-tax-code.md
+ */
+export function needsNoTaxCode(source: InvoiceSource, canadianTaxCodeId: string | null): boolean {
+  return !!source.canadianProvince && !(source.taxCents > 0 && canadianTaxCodeId);
+}
+
 /** The invoice body and what the caller should tell the user about it. */
 export function buildInvoicePayload(
   source: InvoiceSource,
@@ -79,13 +88,21 @@ export function buildInvoicePayload(
   const warnings: InvoiceBuildWarning[] = [];
   const taxed = source.taxCents > 0;
 
-  // Canada: QuickBooks applies the code it is handed. Taxed but no code mapped → no tax, warn.
+  // The US file takes TAX or NON on the line and calculates the tax from the address. The Canadian
+  // file refuses both: the line carries a real tax code of the file, and QuickBooks builds the tax
+  // from it. Taxed but no code mapped for the province → the no-tax code, and a warning.
   const province = source.canadianProvince;
-  const canadianCode = province && taxed ? refs.canadianTaxCodeId : null;
-  if (province && taxed && !canadianCode) {
-    warnings.push({ code: "tax_code_missing", province });
+  let taxCode: string;
+  if (province) {
+    const provinceCode = taxed ? refs.canadianTaxCodeId : null;
+    if (taxed && !provinceCode) warnings.push({ code: "tax_code_missing", province });
+    const code = provinceCode ?? refs.noTaxCodeId;
+    // The create route has refused a Canadian quote that needs the no-tax code and has none.
+    if (!code) throw new Error("A Canadian invoice line needs the connection's no-tax code");
+    taxCode = code;
+  } else {
+    taxCode = taxed ? "TAX" : "NON";
   }
-  const lineTaxed = taxed && (!province || canadianCode !== null);
 
   const amount = centsToDollars(source.amountCents);
   const line: QboInvoiceLine = {
@@ -96,7 +113,7 @@ export function buildInvoicePayload(
       ItemRef: { value: refs.item.id, name: refs.item.name },
       Qty: 1,
       UnitPrice: amount,
-      TaxCodeRef: { value: lineTaxed ? "TAX" : "NON" },
+      TaxCodeRef: { value: taxCode },
       ...(refs.classId ? { ClassRef: { value: refs.classId } } : {}),
     },
   };
@@ -116,7 +133,6 @@ export function buildInvoicePayload(
     PrivateNote: source.title,
     GlobalTaxCalculation: "TaxExcluded",
     Line: [line],
-    ...(canadianCode ? { TxnTaxDetail: { TxnTaxCodeRef: { value: canadianCode } } } : {}),
   };
 
   return { body, warnings };

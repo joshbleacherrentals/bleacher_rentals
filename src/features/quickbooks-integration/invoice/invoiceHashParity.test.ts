@@ -59,6 +59,7 @@ const refs: InvoiceRefs = {
   customerId: "900",
   classId: "5",
   canadianTaxCodeId: "12",
+  noTaxCodeId: "2",
 };
 
 /** Wraps the source so every property read is recorded as a dotted path. */

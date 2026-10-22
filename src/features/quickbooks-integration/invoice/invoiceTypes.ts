@@ -59,6 +59,8 @@ export type InvoiceRefs = {
   classId: string | null;
   /** Spec 03a; null when the province has no code mapped. */
   canadianTaxCodeId: string | null;
+  /** Spec 03c: the connection's code for a Canadian line with no tax; null when none is set. */
+  noTaxCodeId: string | null;
 };
 
 export type InvoiceBuildWarning = { code: "tax_code_missing"; province: ProvinceCode };
@@ -71,7 +73,8 @@ export type QboInvoiceLine = {
     ItemRef: { value: string; name: string };
     Qty: 1;
     UnitPrice: string;
-    TaxCodeRef: { value: "TAX" | "NON" };
+    // `TAX` or `NON` in the US file; a real tax code of the file in the Canadian one (spec 03d).
+    TaxCodeRef: { value: string };
     ClassRef?: { value: string };
   };
 };
@@ -86,5 +89,4 @@ export type QboInvoiceBody = {
   PrivateNote: string;
   GlobalTaxCalculation: "TaxExcluded";
   Line: [QboInvoiceLine];
-  TxnTaxDetail?: { TxnTaxCodeRef: { value: string } };
 };

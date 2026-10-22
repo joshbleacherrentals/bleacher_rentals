@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildInvoicePayload, centsToDollars } from "./buildInvoicePayload";
+import { buildInvoicePayload, centsToDollars, needsNoTaxCode } from "./buildInvoicePayload";
 import type { InvoiceRefs, InvoiceSource } from "./invoiceTypes";
 
 const source = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
@@ -39,6 +39,7 @@ const refs = (over: Partial<InvoiceRefs> = {}): InvoiceRefs => ({
   customerId: "900",
   classId: null,
   canadianTaxCodeId: null,
+  noTaxCodeId: null,
   ...over,
 });
 
@@ -142,38 +143,87 @@ describe("buildInvoicePayload", () => {
         ...over,
       });
 
-    it("taxed with a code mapped: TxnTaxDetail carries the code", () => {
-      const { body, warnings } = buildInvoicePayload(ontario(), refs({ canadianTaxCodeId: "12" }));
-      expect(body.TxnTaxDetail).toEqual({ TxnTaxCodeRef: { value: "12" } });
-      expect(body.Line[0].SalesItemLineDetail.TaxCodeRef.value).toBe("TAX");
+    // docs/specs/qbo-invoice-03d-canadian-line-tax-code.md §2: QuickBooks Canada refuses TAX and NON
+    // on a line; the line carries a real tax code of the file, and QuickBooks builds the tax itself.
+    it("taxed with a code mapped: the line carries the province's code, no TxnTaxDetail", () => {
+      const { body, warnings } = buildInvoicePayload(
+        ontario(),
+        refs({ canadianTaxCodeId: "5", noTaxCodeId: "2" }),
+      );
+      expect(body.Line[0].SalesItemLineDetail.TaxCodeRef).toEqual({ value: "5" });
+      expect(body).not.toHaveProperty("TxnTaxDetail");
       expect(warnings).toEqual([]);
     });
 
-    it("taxed with no code: line NON, no TxnTaxDetail, a tax_code_missing warning", () => {
-      const { body, warnings } = buildInvoicePayload(ontario(), refs({ canadianTaxCodeId: null }));
-      expect(body.Line[0].SalesItemLineDetail.TaxCodeRef.value).toBe("NON");
+    it("taxed with no code: the line carries the no-tax code, no TxnTaxDetail, a tax_code_missing warning", () => {
+      const { body, warnings } = buildInvoicePayload(
+        ontario(),
+        refs({ canadianTaxCodeId: null, noTaxCodeId: "2" }),
+      );
+      expect(body.Line[0].SalesItemLineDetail.TaxCodeRef).toEqual({ value: "2" });
       expect(body).not.toHaveProperty("TxnTaxDetail");
       expect(warnings).toEqual([{ code: "tax_code_missing", province: "ON" }]);
     });
 
-    it("untaxed: no TxnTaxDetail and no warning", () => {
+    it("untaxed: the line carries the no-tax code, no TxnTaxDetail and no warning", () => {
       const { body, warnings } = buildInvoicePayload(
         ontario({ taxCents: 0 }),
-        refs({ canadianTaxCodeId: "12" }),
+        refs({ canadianTaxCodeId: "5", noTaxCodeId: "2" }),
       );
       expect(body).not.toHaveProperty("TxnTaxDetail");
-      expect(body.Line[0].SalesItemLineDetail.TaxCodeRef.value).toBe("NON");
+      expect(body.Line[0].SalesItemLineDetail.TaxCodeRef).toEqual({ value: "2" });
       expect(warnings).toEqual([]);
+    });
+
+    it("never puts TAX or NON on a Canadian line", () => {
+      const values = [
+        buildInvoicePayload(ontario(), refs({ canadianTaxCodeId: "5", noTaxCodeId: "2" })),
+        buildInvoicePayload(ontario(), refs({ noTaxCodeId: "2" })),
+        buildInvoicePayload(ontario({ taxCents: 0 }), refs({ noTaxCodeId: "2" })),
+      ].map(({ body }) => body.Line[0].SalesItemLineDetail.TaxCodeRef.value);
+      expect(values).not.toContain("TAX");
+      expect(values).not.toContain("NON");
+    });
+
+    it("needs the no-tax code when untaxed, or taxed with no province code, and throws without it", () => {
+      expect(() => buildInvoicePayload(ontario({ taxCents: 0 }), refs())).toThrow(/no-tax code/);
+      expect(() => buildInvoicePayload(ontario(), refs({ canadianTaxCodeId: null }))).toThrow(
+        /no-tax code/,
+      );
+    });
+
+    it("does not need the no-tax code when taxed with the province's code", () => {
+      expect(() =>
+        buildInvoicePayload(ontario(), refs({ canadianTaxCodeId: "5", noTaxCodeId: null })),
+      ).not.toThrow();
     });
   });
 
-  it("United States: never a TxnTaxDetail, even taxed and given a Canadian code", () => {
-    const { body, warnings } = buildInvoicePayload(
-      source({ taxCents: 50000 }),
-      refs({ canadianTaxCodeId: "12" }),
-    );
-    expect(body).not.toHaveProperty("TxnTaxDetail");
-    expect(body.Line[0].SalesItemLineDetail.TaxCodeRef.value).toBe("TAX");
-    expect(warnings).toEqual([]);
+  describe("needsNoTaxCode", () => {
+    const ontario = (over: Partial<InvoiceSource> = {}) =>
+      source({ canadianProvince: "ON", taxCents: 97500, ...over });
+
+    it("is true for an untaxed Canadian quote, and for a taxed one with no province code", () => {
+      expect(needsNoTaxCode(ontario({ taxCents: 0 }), "5")).toBe(true);
+      expect(needsNoTaxCode(ontario(), null)).toBe(true);
+    });
+
+    it("is false for a taxed Canadian quote with its province code, and for any US quote", () => {
+      expect(needsNoTaxCode(ontario(), "5")).toBe(false);
+      expect(needsNoTaxCode(source({ taxCents: 0 }), null)).toBe(false);
+      expect(needsNoTaxCode(source({ taxCents: 50000 }), null)).toBe(false);
+    });
+  });
+
+  it("United States: still TAX or NON, never a TxnTaxDetail, even given Canadian codes", () => {
+    const given = refs({ canadianTaxCodeId: "5", noTaxCodeId: "2" });
+
+    const taxed = buildInvoicePayload(source({ taxCents: 50000 }), given);
+    expect(taxed.body).not.toHaveProperty("TxnTaxDetail");
+    expect(taxed.body.Line[0].SalesItemLineDetail.TaxCodeRef).toEqual({ value: "TAX" });
+    expect(taxed.warnings).toEqual([]);
+
+    const untaxed = buildInvoicePayload(source({ taxCents: 0 }), given);
+    expect(untaxed.body.Line[0].SalesItemLineDetail.TaxCodeRef).toEqual({ value: "NON" });
   });
 });
