@@ -15,7 +15,7 @@ import {
   getPaceForEachDay,
 } from "../../util/quotes";
 
-export type DateField = "created_at" | "event_start" | "booked_at";
+export type DateField = "created_at" | "event_start" | "booked_at" | "quote_sent_at";
 
 export function useEventData(props: {
   onlyBooked: boolean;

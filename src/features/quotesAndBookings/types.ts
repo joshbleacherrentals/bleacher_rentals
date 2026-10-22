@@ -9,6 +9,7 @@ export type QuotesBookingsEvent = {
   tax_percent: number | null;
   created_at: string | null;
   booked_at: string | null;
+  quote_sent_at: string | null;
   created_by_user_uuid: string | null;
   goodshuffle_url: string | null;
   is_qbo: number | null;
@@ -59,6 +60,8 @@ export type QuotesBookingsFilters = {
   eventTo: string | null;
   bookedFrom: string | null;
   bookedTo: string | null;
+  quoteSentFrom: string | null;
+  quoteSentTo: string | null;
   accountManagerUserUuid: string | null;
   /** null = no filter, true = only events in GoodShuffle, false = only those not in it. */
   inGoodShuffle: boolean | null;

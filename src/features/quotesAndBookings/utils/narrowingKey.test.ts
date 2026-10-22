@@ -13,6 +13,8 @@ const filters: QuotesBookingsFilters = {
   eventTo: null,
   bookedFrom: null,
   bookedTo: null,
+  quoteSentFrom: null,
+  quoteSentTo: null,
   accountManagerUserUuid: null,
   inGoodShuffle: null,
   inQuickBooks: null,

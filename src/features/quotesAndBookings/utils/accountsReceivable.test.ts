@@ -25,6 +25,7 @@ function makeEvent(overrides: Partial<QuotesBookingsEvent>): QuotesBookingsEvent
     tax_percent: null,
     created_at: null,
     booked_at: null,
+    quote_sent_at: null,
     created_by_user_uuid: null,
     goodshuffle_url: null,
     is_qbo: null,

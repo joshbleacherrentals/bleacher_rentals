@@ -44,6 +44,7 @@ export function useQuotesAndBookingsData(
         "e.tax_percent as tax_percent",
         "e.created_at as created_at",
         "e.booked_at as booked_at",
+        "e.quote_sent_at as quote_sent_at",
         "e.created_by_user_uuid as created_by_user_uuid",
         "e.goodshuffle_url as goodshuffle_url",
         "e.is_qbo as is_qbo",
