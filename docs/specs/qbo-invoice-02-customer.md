@@ -66,7 +66,7 @@ read two ways. This spec reads them so:
 - **Service role.** Server code that reads and writes without the user's rights creates its
   client as `quoteDocumentData.ts` does (`SUPABASE_SERVICE_ROLE_KEY`).
 
-## 3. Database — `supabase/migrations/20261022130000_contact_qbo_customers.sql`
+## 3. Database — `supabase/migrations/20261022140000_contact_qbo_customers.sql`
 
 **`public."ContactQboCustomers"`:**
 
@@ -124,7 +124,7 @@ tests of §7 and, for the picker, by spec 07.
 
 **Counted — 4 files** (limit 10):
 
-1. `supabase/migrations/20261022130000_contact_qbo_customers.sql` — new
+1. `supabase/migrations/20261022140000_contact_qbo_customers.sql` — new
 2. `database.types.ts` — changed: the new table, by hand
 3. `src/features/quickbooks-integration/customers.ts` — new
 4. `package.json` — changed: `test:db:contactqbocustomers`, added to `test:db:all`
