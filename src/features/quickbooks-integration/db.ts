@@ -167,16 +167,24 @@ export async function updateQboConnectionDisplayName(
 }
 
 /**
- * Fetches all QBO connections (id, display_name, realm_id, qbo_tax_code_id — no tokens).
+ * Fetches all QBO connections (id, display_name, realm_id, qbo_tax_code_id, qbo_no_tax_code_id —
+ * no tokens).
  */
 export async function getAllQboConnections(): Promise<
-  { id: string; display_name: string; realm_id: string | null; qbo_tax_code_id: string | null; currency: string | null }[]
+  {
+    id: string;
+    display_name: string;
+    realm_id: string | null;
+    qbo_tax_code_id: string | null;
+    qbo_no_tax_code_id: string | null;
+    currency: string | null;
+  }[]
 > {
   const supabase = createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("QboConnections")
-    .select("id, display_name, realm_id, qbo_tax_code_id, currency")
+    .select("id, display_name, realm_id, qbo_tax_code_id, qbo_no_tax_code_id, currency")
     .order("display_name");
 
   if (error) {
@@ -224,6 +232,28 @@ export async function updateQboConnectionTaxCode(
   if (error) {
     console.error("Failed to update QBO connection tax code:", error);
     throw new Error(`Failed to update tax code: ${error.message}`);
+  }
+}
+
+/**
+ * Sets the "no tax" code of a QBO connection: the tax code a Canadian invoice line carries when it
+ * has no tax (docs/specs/qbo-invoice-03c-no-tax-code.md). Uses the signed-in user's token, so the
+ * policies of QboConnections decide who may call it.
+ */
+export async function updateQboConnectionNoTaxCode(
+  connectionId: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const supabase = createServerSupabaseClient();
+
+  const { error } = await supabase
+    .from("QboConnections")
+    .update({ qbo_no_tax_code_id: taxCodeId })
+    .eq("id", connectionId);
+
+  if (error) {
+    console.error("Failed to update QBO connection no-tax code:", error);
+    throw new Error(`Failed to update no-tax code: ${error.message}`);
   }
 }
 

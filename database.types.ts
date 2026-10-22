@@ -1597,14 +1597,14 @@ isOneToOne: false
                   ]
                 },"QboConnections": {
                   Row: {
-                    "currency": string | null,"display_name": string,"encrypted_token_value": string,"id": string,"qbo_tax_code_id": string | null,"realm_id": string | null
+                    "currency": string | null,"display_name": string,"encrypted_token_value": string,"id": string,"qbo_no_tax_code_id": string | null,"qbo_tax_code_id": string | null,"realm_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "currency"?: string | null,"display_name": string,"encrypted_token_value": string,"id"?: string,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                    "currency"?: string | null,"display_name": string,"encrypted_token_value": string,"id"?: string,"qbo_no_tax_code_id"?: string | null,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
                   }
                   Update: {
-                    "currency"?: string | null,"display_name"?: string,"encrypted_token_value"?: string,"id"?: string,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                    "currency"?: string | null,"display_name"?: string,"encrypted_token_value"?: string,"id"?: string,"qbo_no_tax_code_id"?: string | null,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
                   }
                   Relationships: [
                     

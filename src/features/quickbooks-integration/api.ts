@@ -82,6 +82,7 @@ export type QboConnection = {
   display_name: string;
   realm_id: string | null;
   qbo_tax_code_id: string | null;
+  qbo_no_tax_code_id: string | null;
 };
 
 export type QboTaxCode = {
@@ -211,6 +212,26 @@ export async function setQboConnectionTaxCodeApi(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Failed to set tax code" }));
     throw new Error(error.error || "Failed to set tax code");
+  }
+}
+
+/**
+ * Sets the "no tax" code of a QBO connection: the tax code a Canadian invoice line carries when it
+ * has no tax (docs/specs/qbo-invoice-03c-no-tax-code.md).
+ */
+export async function setQboConnectionNoTaxCodeApi(
+  connectionId: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const response = await fetch("/api/quickbooks/connections", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionId, noTaxCodeId: taxCodeId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Failed to set no-tax code" }));
+    throw new Error(error.error || "Failed to set no-tax code");
   }
 }
 

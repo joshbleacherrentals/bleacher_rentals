@@ -577,6 +577,14 @@ describe("permission matrix", () => {
       );
     });
 
+    // docs/specs/qbo-invoice-03c-no-tax-code.md §4: and the code a Canadian invoice line carries
+    // when it has no tax.
+    it("tells an administrator they also set the 'no tax' code of a Canadian invoice", () => {
+      expect(connections?.roles.admin.note).toContain(
+        "the QuickBooks tax code that means 'no tax' on a Canadian invoice",
+      );
+    });
+
     it("still keeps the page from every other role", () => {
       for (const role of ROLE_ORDER.filter((r) => r !== "admin")) {
         expect(connections?.roles[role].level, role).toBe("none");

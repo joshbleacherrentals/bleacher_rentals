@@ -11,7 +11,7 @@ const { ops, result, userClient, serviceClient } = vi.hoisted(() => {
       const builder: any = {
         then: (resolve: (value: unknown) => unknown) => resolve(result.current),
       };
-      for (const op of ["select", "eq", "order", "upsert", "delete"]) {
+      for (const op of ["select", "eq", "order", "upsert", "delete", "update"]) {
         builder[op] = (...args: unknown[]) => {
           ops.push({ table, op, args });
           return builder;
@@ -30,7 +30,12 @@ vi.mock("@/utils/supabase/server", () => ({
   createServiceRoleClient: vi.fn(async () => serviceClient),
 }));
 
-import { getProvinceTaxCodes, setProvinceTaxCode } from "./db";
+import {
+  getAllQboConnections,
+  getProvinceTaxCodes,
+  setProvinceTaxCode,
+  updateQboConnectionNoTaxCode,
+} from "./db";
 import { createServerSupabaseClient } from "@/utils/supabase/getClerkSupabaseServerClient";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 
@@ -39,6 +44,64 @@ beforeEach(() => {
   result.current = { data: null, error: null };
   vi.mocked(createServerSupabaseClient).mockClear();
   vi.mocked(createServiceRoleClient).mockClear();
+});
+
+// docs/specs/qbo-invoice-03c-no-tax-code.md §4: the connection's "no tax" code is a column of
+// QboConnections, read in the connections list and written with the signed-in user's token.
+describe("getAllQboConnections", () => {
+  it("also returns each connection's no-tax code", async () => {
+    result.current = {
+      data: [
+        {
+          id: "c1",
+          display_name: "Canada",
+          realm_id: "r1",
+          qbo_tax_code_id: null,
+          qbo_no_tax_code_id: "2",
+          currency: "CAD",
+        },
+      ],
+      error: null,
+    };
+
+    const rows = await getAllQboConnections();
+
+    expect(rows[0].qbo_no_tax_code_id).toBe("2");
+    const select = ops.find((o) => o.table === "QboConnections" && o.op === "select");
+    expect(String(select?.args[0])).toContain("qbo_no_tax_code_id");
+  });
+});
+
+describe("updateQboConnectionNoTaxCode", () => {
+  it("sets the column of the connection, with the signed-in user's token", async () => {
+    await updateQboConnectionNoTaxCode("conn-1", "2");
+
+    expect(createServerSupabaseClient).toHaveBeenCalledTimes(1);
+    expect(createServiceRoleClient).not.toHaveBeenCalled();
+    expect(ops).toEqual([
+      { table: "QboConnections", op: "update", args: [{ qbo_no_tax_code_id: "2" }] },
+      { table: "QboConnections", op: "eq", args: ["id", "conn-1"] },
+    ]);
+  });
+
+  it("clears the column on null", async () => {
+    await updateQboConnectionNoTaxCode("conn-1", null);
+
+    expect(ops[0]).toEqual({
+      table: "QboConnections",
+      op: "update",
+      args: [{ qbo_no_tax_code_id: null }],
+    });
+  });
+
+  it("throws when the write fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    result.current = { data: null, error: { message: "denied" } };
+
+    await expect(updateQboConnectionNoTaxCode("conn-1", "2")).rejects.toThrow(
+      "Failed to update no-tax code: denied",
+    );
+  });
 });
 
 describe("getProvinceTaxCodes", () => {
