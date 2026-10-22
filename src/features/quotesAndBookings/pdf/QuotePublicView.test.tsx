@@ -83,14 +83,20 @@ function quote(language: QuoteLanguage): QuoteDocumentData {
 
 const signature = { signerName: "Marie Tremblay", signedAt: "2026-01-10T15:00:00.000Z" };
 
-// Signed by default: a signed document is an invoice, an unsigned one is still a quote.
-const render = (language: QuoteLanguage, signed = true) =>
+// Invoice by default: a booked event reads as an invoice, anything else is still a quote.
+const render = (language: QuoteLanguage, invoice = true) =>
   renderToStaticMarkup(
-    <QuotePublicView data={{ ...quote(language), contractSignature: signed ? signature : null }} />,
+    <QuotePublicView
+      data={{
+        ...quote(language),
+        status: invoice ? "booked" : "quoted",
+        contractSignature: invoice ? signature : null,
+      }}
+    />,
   );
 
-describe("QuotePublicView — quote until signed", () => {
-  it("says Quote everywhere until the client signs", () => {
+describe("QuotePublicView — quote until the event is booked", () => {
+  it("says Quote everywhere until the event is booked", () => {
     const html = render("en", false);
     expect(html).toContain("QUOTE");
     expect(html).toContain("Quote #INV-1042");
@@ -99,7 +105,7 @@ describe("QuotePublicView — quote until signed", () => {
     expect(html).not.toContain("Invoice #");
   });
 
-  it("says Devis in French until the client signs", () => {
+  it("says Devis in French until the event is booked", () => {
     const html = render("fr", false);
     expect(html).toContain("DEVIS");
     expect(html).toContain("Devis nº INV-1042");

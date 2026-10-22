@@ -7,6 +7,7 @@ import { formatQuoteDate, formatQuoteDateRange, formatQuoteMoney } from "./quote
 import { quoteText } from "./quoteStrings";
 import { LineItemDescription } from "../components/LineItemDescription";
 import { ChecksPayableBox } from "./ChecksPayableBox";
+import { isInvoiceStatus } from "../utils/isInvoiceStatus";
 
 function companyFullAddress(c: QuoteDocumentData["company"]): string {
   const parts = [c.street];
@@ -32,8 +33,8 @@ export function QuotePublicView({
 }) {
   const { currency, language } = data;
   const s = quoteText(language);
-  const isSigned = !!data.contractSignature;
-  const numberLabel = isSigned
+  const isInvoice = isInvoiceStatus(data.status);
+  const numberLabel = isInvoice
     ? s.invoiceNumber(data.quoteNumber)
     : s.quoteNumber(data.quoteNumber);
   const formatMoney = (cents: number) => formatQuoteMoney(cents, currency, language);
@@ -96,7 +97,7 @@ export function QuotePublicView({
           {/* Right: INVOICE badge */}
           <div className="text-left sm:text-right">
             <p className="text-3xl font-bold text-green-700">
-              {isSigned ? s.invoiceBadge : s.quoteBadge}
+              {isInvoice ? s.invoiceBadge : s.quoteBadge}
             </p>
             <p className="text-sm mt-1">{numberLabel}</p>
             {data.poNumber && <p className="text-sm">{s.poNumberShort(data.poNumber)}</p>}
@@ -184,7 +185,7 @@ export function QuotePublicView({
             <ChecksPayableBox
               company={data.company}
               quoteNumber={data.quoteNumber}
-              isSigned={isSigned}
+              isInvoice={isInvoice}
               paymentInfo={data.company.paymentInfo}
               language={language}
               highlight={highlightPaymentBox}
