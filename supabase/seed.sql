@@ -90698,3 +90698,9 @@ INSERT INTO "public"."DevAllowedEmails" ("email") VALUES
 	('max@bleacherrentals.com'),
 	('josh@bleacherrentals.com')
 ON CONFLICT ("email") DO NOTHING;
+
+
+UPDATE public."Events"
+SET quote_sent_at = created_at
+WHERE quote_sent_at IS NULL
+  AND event_status IS DISTINCT FROM 'draft'::public.event_status;
