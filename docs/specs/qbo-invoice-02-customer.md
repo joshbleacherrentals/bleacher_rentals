@@ -1,6 +1,6 @@
 # QuickBooks invoice — finding or creating the customer
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
+Status: **Implemented 2026-10-22.** 0 open decisions; one reading to confirm
 (§1, last paragraph).
 Implementation order: **02** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.

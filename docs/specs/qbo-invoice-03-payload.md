@@ -1,6 +1,6 @@
 # QuickBooks invoice — loading the quote and building the invoice body
 
-Status: **DRAFT 2026-10-22, amended 2026-10-22 (Canada, Class) — awaiting "Approved".** 0 open
+Status: **Implemented 2026-10-22.** 0 open
 decisions. The tax code per Canadian province ([03a](qbo-invoice-03a-province-tax-codes.md))
 and the QuickBooks Class ([03b](qbo-invoice-03b-zone-class.md)) are separate specs; the
 builder here takes both as inputs.
