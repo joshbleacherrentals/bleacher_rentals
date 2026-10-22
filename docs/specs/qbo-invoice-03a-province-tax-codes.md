@@ -1,7 +1,9 @@
 # QuickBooks invoice — the tax code per Canadian province
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; three readings to
-confirm (§1, last paragraph).
+Status: **Implemented 2026-10-22.** 0 open decisions; three readings to confirm (§1, last
+paragraph). Two changes were approved while implementing: the migration is numbered
+`20261022150000` (§3), and the page reaches `db.ts` through a route plus two `api.ts` functions
+(§4, §6).
 Implementation order: **03a**, after [03](qbo-invoice-03-payload.md) and before
 [04](qbo-invoice-04-create.md). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
@@ -71,7 +73,10 @@ codes in QuickBooks; the US file (it calculates tax itself).
 - **The matrix.** The row **Quickbooks Connections** says an admin can create, update, delete
   and edit all connections on that page.
 
-## 3. Database — `supabase/migrations/20261022140000_province_qbo_tax_codes.sql`
+## 3. Database — `supabase/migrations/20261022150000_province_qbo_tax_codes.sql`
+
+(After `20261022140000`, the latest on the branch; renumbered from `20261022140000`, which
+`contact_qbo_customers` already uses.)
 
 **`public."ProvinceQboTaxCodes"`:**
 
@@ -92,6 +97,15 @@ Row level security is **enabled**, with four policies (select, insert, update, d
 - **`db.ts`** (changed): `getProvinceTaxCodes(connectionId)` returns the connection's rows;
   `setProvinceTaxCode(connectionId, province, taxCodeId | null)` upserts the row, or deletes it
   when the id is null. Both use the signed-in user's token, so the policies of §3 decide.
+- **`api.ts`** (changed): `fetchProvinceTaxCodes(connectionId)` and
+  `setProvinceTaxCodeApi(connectionId, province, taxCodeId | null)` — the page is a client
+  component, so it reaches `db.ts` through a route, as every other call on that page does.
+- **`app/api/quickbooks/province-tax-codes/route.ts`** (new): `GET ?connectionId=` answers
+  `{ provinceTaxCodes: [{ province, qbo_tax_code_id }] }`; `PUT` takes the body
+  `{ connectionId, province, taxCodeId }` and answers `{ success: true }`. Both are guarded by
+  `requireAdmin`; `PUT` answers 400 for a missing `connectionId`, a `province` outside the 13
+  codes, or a `taxCodeId` that is neither a non-empty string nor null (a body that forgot it
+  must not delete the row).
 - **`ProvinceTaxCodes.tsx`** (new, `quickbooks-integration/components/`): a collapsible section
   headed "Tax code per Canadian province". One row per province in the table's order: the
   name, the label and rate (read from `CANADIAN_PROVINCES`), and a `select` of the connection's
@@ -119,9 +133,9 @@ Playwright, written, **not run**; the QuickBooks tax-code list is replaced by a 
 
 ## 6. Files
 
-**Counted — 8 files** (limit 10):
+**Counted — 10 files** (limit 10):
 
-1. `supabase/migrations/20261022140000_province_qbo_tax_codes.sql` — new
+1. `supabase/migrations/20261022150000_province_qbo_tax_codes.sql` — new
 2. `database.types.ts` — changed: the new table, by hand
 3. `src/features/quickbooks-integration/db.ts` — changed: two functions
 4. `src/features/quickbooks-integration/components/ProvinceTaxCodes.tsx` — new
@@ -129,9 +143,12 @@ Playwright, written, **not run**; the QuickBooks tax-code list is replaced by a 
 6. `src/features/quickbooks-integration/invoice/resolveProvinceTaxCode.ts` — new
 7. `src/features/userAccess/permissionPageData.ts` — changed (§4)
 8. `package.json` — changed: `test:db:provincetaxcodes`, added to `test:db:all`
+9. `src/features/quickbooks-integration/api.ts` — changed: two client functions (§4)
+10. `src/app/api/quickbooks/province-tax-codes/route.ts` — new (§4)
 
 **Not counted:** `supabase/tests/province_qbo_tax_codes.test.sql` (new);
-`ProvinceTaxCodes.test.tsx`, `resolveProvinceTaxCode.test.ts`, `db` tests (new or edited);
+`ProvinceTaxCodes.test.tsx`, `resolveProvinceTaxCode.test.ts`, `db` tests, `api` tests and
+`province-tax-codes/route.test.ts` (new or edited);
 `permissionPageData.test.ts` (edited); the Playwright spec of §5. No `AppSchema.ts`, no
 `sync_rules.yaml`.
 
@@ -155,6 +172,11 @@ Red first. Prettier only on touched files.
   restores the value and shows the toast; the stored id is shown before the list loads.
 - **`resolveProvinceTaxCode.test.ts`:** a mapped province returns its id; an unmapped one,
   null; the service role is used.
+- **`province-tax-codes/route.test.ts`:** both verbs are `requireAdmin`-guarded (a refusal
+  reads or writes nothing); `PUT` refuses a missing connection or an unknown province; a null
+  id is passed through.
+- **`db` and `api` tests:** `setProvinceTaxCode` upserts on `(connection, province)` and
+  deletes on null; the client functions call the route with the agreed method and body.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check` on the touched files. E2E:
   SKIPPED (not run locally, by instruction).
 

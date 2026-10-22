@@ -226,3 +226,56 @@ export async function updateQboConnectionTaxCode(
     throw new Error(`Failed to update tax code: ${error.message}`);
   }
 }
+
+/**
+ * Reads the QuickBooks tax code of each Canadian province for a connection
+ * (docs/specs/qbo-invoice-03a-province-tax-codes.md). RLS lets only an admin read the table.
+ */
+export async function getProvinceTaxCodes(
+  connectionId: string,
+): Promise<{ province: string; qbo_tax_code_id: string }[]> {
+  const supabase = createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("ProvinceQboTaxCodes")
+    .select("province, qbo_tax_code_id")
+    .eq("qbo_connection_uuid", connectionId)
+    .order("province");
+
+  if (error) {
+    console.error("Failed to fetch province tax codes:", error);
+    throw new Error(`Failed to fetch province tax codes: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
+/**
+ * Sets the QuickBooks tax code of one province for a connection, or removes it when the id is null.
+ */
+export async function setProvinceTaxCode(
+  connectionId: string,
+  province: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const supabase = createServerSupabaseClient();
+
+  const { error } =
+    taxCodeId === null
+      ? await supabase
+          .from("ProvinceQboTaxCodes")
+          .delete()
+          .eq("qbo_connection_uuid", connectionId)
+          .eq("province", province)
+      : await supabase
+          .from("ProvinceQboTaxCodes")
+          .upsert(
+            { qbo_connection_uuid: connectionId, province, qbo_tax_code_id: taxCodeId },
+            { onConflict: "qbo_connection_uuid,province" },
+          );
+
+  if (error) {
+    console.error("Failed to set province tax code:", error);
+    throw new Error(`Failed to set province tax code: ${error.message}`);
+  }
+}

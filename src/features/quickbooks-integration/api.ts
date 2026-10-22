@@ -213,3 +213,47 @@ export async function setQboConnectionTaxCodeApi(
     throw new Error(error.error || "Failed to set tax code");
   }
 }
+
+export type ProvinceTaxCodeRow = {
+  province: string;
+  qbo_tax_code_id: string;
+};
+
+/**
+ * Fetches the stored QuickBooks tax code of each Canadian province for a connection.
+ */
+export async function fetchProvinceTaxCodes(connectionId: string): Promise<ProvinceTaxCodeRow[]> {
+  const response = await fetch(
+    `/api/quickbooks/province-tax-codes?connectionId=${encodeURIComponent(connectionId)}`,
+  );
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Failed to fetch province tax codes" }));
+    throw new Error(error.error || "Failed to fetch province tax codes");
+  }
+
+  const data = await response.json();
+  return data.provinceTaxCodes || [];
+}
+
+/**
+ * Sets the QuickBooks tax code of one Canadian province for a connection (null removes it).
+ */
+export async function setProvinceTaxCodeApi(
+  connectionId: string,
+  province: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const response = await fetch("/api/quickbooks/province-tax-codes", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionId, province, taxCodeId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Failed to set province tax code" }));
+    throw new Error(error.error || "Failed to set province tax code");
+  }
+}

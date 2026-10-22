@@ -1575,6 +1575,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ProvinceQboTaxCodes": {
+                  Row: {
+                    "created_at": string,"id": string,"province": string,"qbo_connection_uuid": string,"qbo_tax_code_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"province": string,"qbo_connection_uuid": string,"qbo_tax_code_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"province"?: string,"qbo_connection_uuid"?: string,"qbo_tax_code_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ProvinceQboTaxCodes_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"QboConnections": {
                   Row: {
                     "currency": string | null,"display_name": string,"encrypted_token_value": string,"id": string,"qbo_tax_code_id": string | null,"realm_id": string | null

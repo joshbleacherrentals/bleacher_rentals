@@ -564,4 +564,23 @@ describe("permission matrix", () => {
       expect(row("Work Trackers")?.level).toBe("read");
     });
   });
+
+  // docs/specs/qbo-invoice-03a-province-tax-codes.md §4: the QuickBooks page also holds the tax
+  // code of each Canadian province. Only an administrator maintains it; no role gains anything.
+  describe("Quickbooks Connections (province tax codes)", () => {
+    const connections = PERMISSIONS.find((p) => p.label === "Quickbooks Connections");
+
+    it("tells an administrator they also set the tax code of every Canadian province", () => {
+      expect(connections?.roles.admin.level).toBe("full");
+      expect(connections?.roles.admin.note).toContain(
+        "also sets, for each connection, the QuickBooks tax code to use for every Canadian province",
+      );
+    });
+
+    it("still keeps the page from every other role", () => {
+      for (const role of ROLE_ORDER.filter((r) => r !== "admin")) {
+        expect(connections?.roles[role].level, role).toBe("none");
+      }
+    });
+  });
 });

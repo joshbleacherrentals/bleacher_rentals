@@ -12,6 +12,7 @@ import {
   setQboConnectionTaxCodeApi,
   type QboTaxCode,
 } from "@/features/quickbooks-integration/api";
+import { ProvinceTaxCodes } from "@/features/quickbooks-integration/components/ProvinceTaxCodes";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -321,6 +322,7 @@ export default function QuickBooksPage() {
                   </span>
                 )}
               </div>
+              <ProvinceTaxCodes connectionId={conn.id} taxCodes={taxCodesMap[conn.id]} />
             </div>
           ))}
 
