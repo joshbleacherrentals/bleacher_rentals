@@ -4,6 +4,7 @@ import type { Database } from "../../../../database.types";
 import { resolveInvoiceCustomer, type CustomerChoice, type QboCustomerSummary } from "../customers";
 import { attachQuotePdf } from "./attachQuotePdf";
 import { buildInvoicePayload, needsNoTaxCode, validateInvoiceSource } from "./buildInvoicePayload";
+import { runTotalsCheck, type TotalsComparison } from "./checkInvoiceTotals";
 import { findQboItem } from "./findQboItem";
 import type { InvoiceBuildWarning, InvoiceSource, QboItemRef } from "./invoiceTypes";
 import { loadInvoiceSource } from "./loadInvoiceSource";
@@ -18,15 +19,29 @@ import { resolveZoneClass, type ClassMissingWarning } from "./resolveZoneClass";
  * runs. Server-only: it writes Events and the Log with the service role.
  * Steps 6–13 are also case 3 of the update route: a quote whose linked invoice QuickBooks no longer
  * has gets a new one (createInvoiceFromSource, `replacingInvoiceId`).
- * Spec: docs/specs/qbo-invoice-04-create.md §4, docs/specs/qbo-invoice-05-update.md §4
+ * Spec: docs/specs/qbo-invoice-04-create.md §4, docs/specs/qbo-invoice-05-update.md §4,
+ * docs/specs/qbo-invoice-06-totals-check.md §4
  */
 
 export type PdfNotAttachedWarning = { code: "pdf_not_attached"; reason: string };
 
-export type InvoiceWarning = ClassMissingWarning | InvoiceBuildWarning | PdfNotAttachedWarning;
+export type TotalsCheckFailedWarning = { code: "totals_check_failed"; reason: string };
+
+export type InvoiceWarning =
+  | ClassMissingWarning
+  | InvoiceBuildWarning
+  | TotalsCheckFailedWarning
+  | PdfNotAttachedWarning;
 
 export type CreateInvoiceResult =
-  | { status: "created"; docNumber: string; qboInvoiceId: string; warnings: InvoiceWarning[] }
+  | {
+      status: "created";
+      docNumber: string;
+      qboInvoiceId: string;
+      warnings: InvoiceWarning[];
+      /** Absent when the check failed itself; the warning says so. */
+      totals?: TotalsComparison;
+    }
   | { status: "choose_customer"; candidates: QboCustomerSummary[] }
   | { status: "invoice_number_exists"; invoice: ExistingInvoice }
   | { status: "error"; httpStatus: 400 | 404 | 409 | 502; error: string };
@@ -134,6 +149,36 @@ export async function saveInvoiceLink(
     .maybeSingle();
   if (readError) throw new Error(`Failed to read the event: ${readError.message}`);
   return row?.qbo_invoice_id ?? null;
+}
+
+/**
+ * Step 11 of create, step 10 of update: compares QuickBooks' totals with the quote's and stores the
+ * flag (spec 06). The invoice just linked is the one checked, in the connection it was made in. A check
+ * that fails does not fail the request: it becomes the `totals_check_failed` warning, and the flag
+ * stays as it was.
+ */
+export async function checkTotalsAfterWrite(
+  source: InvoiceSource,
+  link: { invoiceId: string; connectionId: string },
+): Promise<{ totals?: TotalsComparison; warning?: TotalsCheckFailedWarning }> {
+  try {
+    const result = await runTotalsCheck(source.eventId, {
+      ...source,
+      qboInvoiceId: link.invoiceId,
+      qboInvoiceConnectionId: link.connectionId,
+    });
+    if (result.status === "missing") {
+      return {
+        warning: {
+          code: "totals_check_failed",
+          reason: "QuickBooks did not return the invoice that was just written.",
+        },
+      };
+    }
+    return { totals: { matches: result.matches, differences: result.differences } };
+  } catch (e) {
+    return { warning: { code: "totals_check_failed", reason: messageOf(e) } };
+  }
 }
 
 /** Step 2, also the booked rule of case 2 of spec 05: only a booked quote gets its first invoice. */
@@ -287,7 +332,12 @@ export async function createInvoiceFromSource(
   });
   if (!wasQbo) await logIsQboSet({ eventId, userUuid });
 
-  // 11: spec 06 hooks in here (the totals check, which sets qbo_invoice_mismatch).
+  // 11: the totals check, which sets qbo_invoice_mismatch (spec 06).
+  const { totals, warning: totalsWarning } = await checkTotalsAfterWrite(source, {
+    invoiceId: invoice.id,
+    connectionId,
+  });
+  if (totalsWarning) warnings.push(totalsWarning);
 
   // 12: the invoice stays whatever happens to the PDF.
   try {
@@ -297,5 +347,11 @@ export async function createInvoiceFromSource(
   }
 
   // 13
-  return { status: "created", docNumber: invoice.docNumber, qboInvoiceId: invoice.id, warnings };
+  return {
+    status: "created",
+    docNumber: invoice.docNumber,
+    qboInvoiceId: invoice.id,
+    warnings,
+    ...(totals ? { totals } : {}),
+  };
 }

@@ -33,6 +33,9 @@ const { calls, state, createClient } = vi.hoisted(() => {
     posts: [] as Array<{ url: string; requestId: string | null; body: any }>,
     pdfError: null as Error | null,
     pdfArgs: [] as unknown[],
+    totals: { status: "checked", matches: true, differences: [] } as unknown,
+    totalsError: null as Error | null,
+    totalsArgs: [] as unknown[],
     logCreated: [] as unknown[],
     logIsQbo: [] as unknown[],
     isQbo: false,
@@ -157,6 +160,15 @@ vi.mock("./attachQuotePdf", () => ({
   }),
 }));
 
+vi.mock("./checkInvoiceTotals", () => ({
+  runTotalsCheck: vi.fn(async (...args: unknown[]) => {
+    calls.push("totals");
+    state.totalsArgs = args;
+    if (state.totalsError) throw state.totalsError;
+    return state.totals;
+  }),
+}));
+
 vi.mock("./logInvoiceChange", () => ({
   logInvoiceChange: vi.fn(async (args: { kind: string }) => {
     calls.push(`log:${args.kind}`);
@@ -250,6 +262,9 @@ beforeEach(() => {
     posts: [],
     pdfError: null,
     pdfArgs: [],
+    totals: { status: "checked", matches: true, differences: [] },
+    totalsError: null,
+    totalsArgs: [],
     logCreated: [],
     logIsQbo: [],
     isQbo: false,
@@ -311,6 +326,7 @@ describe("createInvoice — the order of §4", () => {
       "save-link",
       "log:created",
       "log:is_qbo",
+      "totals",
       "pdf",
     ]);
   });
@@ -625,12 +641,13 @@ describe("createInvoice — the QuickBooks invoice", () => {
     expect(state.posts[0].url).toContain("https://qbo.example.com/v3/company/123/invoice");
   });
 
-  it("returns created with the QuickBooks id and the number", async () => {
+  it("returns created with the QuickBooks id, the number and the totals check", async () => {
     expect(await run()).toEqual({
       status: "created",
       docNumber: "100200300",
       qboInvoiceId: "inv-1",
       warnings: [],
+      totals: { matches: true, differences: [] },
     });
   });
 
@@ -992,6 +1009,7 @@ describe("createInvoice — the PDF", () => {
       docNumber: "100200300",
       qboInvoiceId: "inv-1",
       warnings: [{ code: "pdf_not_attached", reason: "render blew up" }],
+      totals: { matches: true, differences: [] },
     });
     expect(calls).toContain("save-link");
     expect(calls).toContain("log:created");
@@ -1010,6 +1028,148 @@ describe("createInvoice — the PDF", () => {
       "class_missing",
       "pdf_not_attached",
     ]);
+  });
+});
+
+describe("createInvoice — the totals check (spec 06)", () => {
+  const ITEM = { id: "item-1", name: "Bleacher Rental - Corporate", description: "Seats" };
+
+  it("runs after the link and the Log, before the PDF", async () => {
+    await run();
+
+    expect(calls.indexOf("save-link")).toBeLessThan(calls.indexOf("totals"));
+    expect(calls.indexOf("log:created")).toBeLessThan(calls.indexOf("totals"));
+    expect(calls.indexOf("log:is_qbo")).toBeLessThan(calls.indexOf("totals"));
+    expect(calls.indexOf("totals")).toBeLessThan(calls.indexOf("pdf"));
+  });
+
+  it("checks the new invoice, in the connection it was made in, against the quote's figures", async () => {
+    await run();
+
+    expect(state.totalsArgs).toEqual([
+      EVENT_ID,
+      expect.objectContaining({
+        eventId: EVENT_ID,
+        qboInvoiceId: "inv-1",
+        qboInvoiceConnectionId: "conn-1",
+        amountCents: 750000,
+        taxCents: 52500,
+      }),
+    ]);
+  });
+
+  it("puts the comparison in the response as totals", async () => {
+    state.totals = { status: "checked", matches: true, differences: [] };
+
+    expect(await run()).toMatchObject({
+      status: "created",
+      totals: { matches: true, differences: [] },
+    });
+  });
+
+  it("a mismatch is a result, not a failure: created, with the differences and no warning", async () => {
+    const differences = [{ field: "tax", quoteCents: 52500, qboCents: 52501 }];
+    state.totals = { status: "checked", matches: false, differences };
+
+    const result = await run();
+
+    expect(result).toEqual({
+      status: "created",
+      docNumber: "100200300",
+      qboInvoiceId: "inv-1",
+      warnings: [],
+      totals: { matches: false, differences },
+    });
+  });
+
+  it("a check that fails still returns created, with totals_check_failed and its reason, and no totals", async () => {
+    state.totalsError = new Error("QuickBooks invoice read failed: fetch failed");
+
+    const result = await run();
+
+    expect(result).toEqual({
+      status: "created",
+      docNumber: "100200300",
+      qboInvoiceId: "inv-1",
+      warnings: [
+        { code: "totals_check_failed", reason: "QuickBooks invoice read failed: fetch failed" },
+      ],
+    });
+    expect(result).not.toHaveProperty("totals");
+  });
+
+  it("a failed check leaves the link, the Log and the PDF as they are", async () => {
+    state.totalsError = new Error("boom");
+
+    await run();
+
+    expect(calls).toContain("save-link");
+    expect(calls).toContain("log:created");
+    expect(calls).toContain("pdf");
+    expect(state.updates).toHaveLength(1);
+  });
+
+  it("an invoice QuickBooks cannot find is the same warning, and no totals", async () => {
+    state.totals = { status: "missing" };
+
+    const result = await run();
+
+    expect(result).toMatchObject({
+      status: "created",
+      warnings: [{ code: "totals_check_failed", reason: expect.stringContaining("QuickBooks") }],
+    });
+    expect(result).not.toHaveProperty("totals");
+  });
+
+  it("the warning comes after the others and before the PDF's", async () => {
+    state.totalsError = new Error("boom");
+    state.pdfError = new Error("render blew up");
+    state.zoneClass = {
+      classId: null,
+      warning: { code: "class_missing", state: "SC", reason: "no_class" },
+    };
+
+    const result = await run();
+
+    expect((result as { warnings: Array<{ code: string }> }).warnings.map((w) => w.code)).toEqual([
+      "class_missing",
+      "totals_check_failed",
+      "pdf_not_attached",
+    ]);
+  });
+
+  it("does not run when QuickBooks refused the invoice", async () => {
+    state.createResponse = json({ Fault: { Error: [{ Message: "Bad", Detail: "boom" }] } }, 400);
+
+    await run();
+
+    expect(calls).not.toContain("totals");
+  });
+
+  it("does not run when another invoice was linked first", async () => {
+    state.updateRows = [];
+    state.linkedId = "inv-other";
+
+    await run();
+
+    expect(calls).not.toContain("totals");
+  });
+
+  it("case 3 runs it too, on the new invoice and not the one it replaces", async () => {
+    const result = await createInvoiceFromSource({
+      source: sourceOf({ qboInvoiceId: "inv-old", qboInvoiceConnectionId: "conn-1" }),
+      item: ITEM,
+      userUuid: "user-1",
+      replacingInvoiceId: "inv-old",
+    });
+
+    expect(result).toMatchObject({ status: "created", totals: { matches: true } });
+    expect(calls.indexOf("log:recreated")).toBeLessThan(calls.indexOf("totals"));
+    expect(calls.indexOf("totals")).toBeLessThan(calls.indexOf("pdf"));
+    expect(state.totalsArgs[1]).toMatchObject({
+      qboInvoiceId: "inv-1",
+      qboInvoiceConnectionId: "conn-1",
+    });
   });
 });
 
@@ -1039,6 +1199,7 @@ describe("createInvoiceFromSource — case 3 of spec 05, creating again after 'n
       "save-link",
       "log:recreated",
       "log:is_qbo",
+      "totals",
       "pdf",
     ]);
   });

@@ -27,15 +27,33 @@ export type CreateQboInvoiceResult =
   | { ok: true; invoice: CreatedQboInvoice }
   | { ok: false; error: string };
 
-/** What an update must carry: the invoice's id and the SyncToken it was read with. */
-export type QboInvoiceVersion = { id: string; syncToken: string; docNumber: string };
+/**
+ * The total and the tax QuickBooks calculated, in dollars as it sent them (a number or a string); null
+ * when it sent none. An invoice with no tax has no TxnTaxDetail. Spec 06 turns them into cents.
+ */
+export type QboInvoiceTotals = {
+  totalAmt: number | string | null;
+  totalTax: number | string | null;
+};
+
+/**
+ * What an update must carry: the invoice's id and the SyncToken it was read with. The totals ride
+ * along for the totals check (docs/specs/qbo-invoice-06-totals-check.md §3).
+ */
+export type QboInvoiceVersion = {
+  id: string;
+  syncToken: string;
+  docNumber: string;
+  totals: QboInvoiceTotals;
+};
 
 type RawQboInvoice = {
   Id: string;
   SyncToken?: string;
   DocNumber?: string;
   CustomerRef?: { value?: string; name?: string };
-  TotalAmt?: number;
+  TotalAmt?: number | string;
+  TxnTaxDetail?: { TotalTax?: number | string };
 };
 
 /** The invoice in the connection's QuickBooks file with this number, or null. */
@@ -123,8 +141,9 @@ function isObjectNotFound(fault: { code?: string; Message?: string } | undefined
 }
 
 /**
- * The invoice with this id in the connection's QuickBooks file, with the SyncToken an update needs,
- * or null when QuickBooks no longer has it. Any other failure throws.
+ * The invoice with this id in the connection's QuickBooks file, with the SyncToken an update needs
+ * and the totals QuickBooks calculated, or null when QuickBooks no longer has it. Any other failure
+ * throws.
  */
 export async function readQboInvoice(
   connectionId: string,
@@ -154,7 +173,15 @@ export async function readQboInvoice(
   if (!invoice?.Id || invoice.SyncToken === undefined) {
     throw new Error("QuickBooks invoice read failed: the answer carried no invoice.");
   }
-  return { id: invoice.Id, syncToken: invoice.SyncToken, docNumber: invoice.DocNumber ?? "" };
+  return {
+    id: invoice.Id,
+    syncToken: invoice.SyncToken,
+    docNumber: invoice.DocNumber ?? "",
+    totals: {
+      totalAmt: invoice.TotalAmt ?? null,
+      totalTax: invoice.TxnTaxDetail?.TotalTax ?? null,
+    },
+  };
 }
 
 /**

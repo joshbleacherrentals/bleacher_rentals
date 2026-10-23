@@ -2,8 +2,10 @@ import type { CustomerChoice } from "../customers";
 import { resolveInvoiceCustomer } from "../customers";
 import { replaceQuotePdf } from "./attachQuotePdf";
 import { buildInvoicePayload, needsNoTaxCode, validateInvoiceSource } from "./buildInvoicePayload";
+import type { TotalsComparison } from "./checkInvoiceTotals";
 import {
   bookedRuleFailure,
+  checkTotalsAfterWrite,
   createInvoiceFromSource,
   fail,
   getSupabaseAdmin,
@@ -29,7 +31,7 @@ import { resolveZoneClass } from "./resolveZoneClass";
  * has gets a new one (case 3, createInvoiceFromSource). The numbered steps are the ones of the spec.
  * A step that fails ends the request with its error and nothing after it runs. Server-only: it
  * writes Events and the Log with the service role.
- * Spec: docs/specs/qbo-invoice-05-update.md §4
+ * Spec: docs/specs/qbo-invoice-05-update.md §4, docs/specs/qbo-invoice-06-totals-check.md §4
  */
 
 export type UpdateInvoiceResult =
@@ -40,6 +42,8 @@ export type UpdateInvoiceResult =
       /** True when the update came from an overwrite by number (case 2). */
       linkedExisting: boolean;
       warnings: InvoiceWarning[];
+      /** Absent when the check failed itself; the warning says so. */
+      totals?: TotalsComparison;
     }
   | { status: "invoice_missing" }
   | CreateInvoiceResult;
@@ -205,7 +209,12 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
   });
   if (!wasQbo) await logIsQboSet({ eventId, userUuid });
 
-  // 10: spec 06 hooks in here (the totals check, which sets qbo_invoice_mismatch).
+  // 10: the totals check, which sets qbo_invoice_mismatch (spec 06).
+  const { totals, warning: totalsWarning } = await checkTotalsAfterWrite(source, {
+    invoiceId: invoice.id,
+    connectionId,
+  });
+  if (totalsWarning) warnings.push(totalsWarning);
 
   // 11: the invoice stays whatever happens to the PDF.
   try {
@@ -221,6 +230,7 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
     qboInvoiceId: invoice.id,
     linkedExisting: mode === "link",
     warnings,
+    ...(totals ? { totals } : {}),
   };
 }
 

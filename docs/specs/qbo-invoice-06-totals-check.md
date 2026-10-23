@@ -1,6 +1,6 @@
 # QuickBooks invoice — the totals check
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions.
+Status: **Implemented 2026-10-23** (approved in chat). 0 open decisions.
 Implementation order: **06** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (`qbo_invoice_mismatch`),
