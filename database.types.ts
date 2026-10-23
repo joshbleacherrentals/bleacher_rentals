@@ -1267,6 +1267,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"GmailConnections": {
+                  Row: {
+                    "created_at": string,"encrypted_token_value": string,"id": string,"updated_at": string,"user_uuid": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"encrypted_token_value": string,"id"?: string,"updated_at"?: string,"user_uuid": string
+                  }
+                  Update: {
+                    "created_at"?: string,"encrypted_token_value"?: string,"id"?: string,"updated_at"?: string,"user_uuid"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "gmailconnections_user_uuid_fkey"
+      columns: ["user_uuid"]
+isOneToOne: true
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"HomeBases": {
                   Row: {
                     "created_at": string,"home_base_name": string,"id": string

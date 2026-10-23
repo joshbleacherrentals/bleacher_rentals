@@ -40,6 +40,11 @@ export function createGoogleOAuthClient(): OAuth2Client {
   });
 }
 
+/** Email addresses are compared ignoring case and surrounding whitespace. */
+export function isSameEmail(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export function buildGoogleAuthUrl(client: OAuth2Client, state: string): string {
   return client.generateAuthUrl({
     scope: GOOGLE_SCOPES,

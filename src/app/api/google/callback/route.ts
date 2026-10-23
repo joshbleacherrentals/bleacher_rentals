@@ -1,9 +1,10 @@
+import { GmailEmailMismatchError, saveGmailRefreshToken } from "@/features/gmail-integration/db";
 import {
   createGoogleOAuthClient,
   getAppBaseUrl,
   GOOGLE_STATE_COOKIE,
 } from "@/features/gmail-integration/util";
-import { requireAdminOrAccountManager } from "@/features/userAccess/logic/requireAdminOrAccountManager";
+import { requireActiveUser } from "@/features/userAccess/logic/requireActiveUser";
 import { NextRequest, NextResponse } from "next/server";
 
 function redirectHome(params: Record<string, string>) {
@@ -19,15 +20,12 @@ function redirectHome(params: Record<string, string>) {
 /**
  * Finishes Google OAuth for the Gmail integration.
  *
- * Verifies the CSRF `state`, trades the `code` for tokens, and reads the
- * connected address from the ID token.
- *
- * TODO: persist the tokens. Nothing is stored yet, so the refresh token is
- * dropped once this request ends. Where and how to store them is still undecided.
+ * Verifies the CSRF `state`, trades the `code` for tokens, checks the ID token,
+ * and stores the encrypted refresh token against the signed-in user.
  */
 export async function GET(req: NextRequest) {
   try {
-    await requireAdminOrAccountManager();
+    const userId = await requireActiveUser();
 
     const params = req.nextUrl.searchParams;
 
@@ -59,12 +57,18 @@ export async function GET(req: NextRequest) {
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    const email = ticket.getPayload()?.email;
-    if (!email) return redirectHome({ error: "Google did not return an email address." });
+    const payload = ticket.getPayload();
+    if (!payload?.email || !payload.email_verified) {
+      return redirectHome({ error: "Google did not return a verified email address." });
+    }
+
+    await saveGmailRefreshToken(userId, tokens.refresh_token, payload.email);
 
     return redirectHome({ gmail: "connected" });
   } catch (error: any) {
     if (error instanceof Response) return error;
+    // Expected user mistake, with a message written for them: not a server error.
+    if (error instanceof GmailEmailMismatchError) return redirectHome({ error: error.message });
     console.error("Google callback error:", error);
     return redirectHome({ error: error.message ?? "Failed to finish Google authorization" });
   }

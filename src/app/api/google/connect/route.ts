@@ -4,7 +4,7 @@ import {
   getAppBaseUrl,
   GOOGLE_STATE_COOKIE,
 } from "@/features/gmail-integration/util";
-import { requireAdminOrAccountManager } from "@/features/userAccess/logic/requireAdminOrAccountManager";
+import { requireActiveUser } from "@/features/userAccess/logic/requireActiveUser";
 import { NextResponse } from "next/server";
 
 /**
@@ -15,7 +15,7 @@ import { NextResponse } from "next/server";
  */
 export async function GET() {
   try {
-    await requireAdminOrAccountManager();
+    await requireActiveUser();
 
     const state = crypto.randomUUID();
     const url = buildGoogleAuthUrl(createGoogleOAuthClient(), state);

@@ -571,6 +571,23 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Connect Your Gmail",
+    description:
+      "Connecting your own Gmail account to the app. Everyone with access to the web app can connect their own, whatever their role. The Google account you pick must be the one you log in with, and nobody can see or use anyone else's connection.",
+    category: "Configuration",
+    roles: {
+      admin: full("Can connect their own Gmail account."),
+      account_manager: full("Can connect their own Gmail account."),
+      developer: full("Can connect their own Gmail account."),
+      viewer: full(
+        "Viewers are read-only on operational data, but can still connect their own Gmail account.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: full("Can connect their own Gmail account."),
+      accountant: full("Can connect their own Gmail account."),
+    },
+  },
+  {
     label: "Work Tracker Types",
     description:
       "This applies to the Work Tracker Types page under Configuration, where each of the 3 fixed work tracker types (Trip, Repair / Maintenance, Site Visit / Cleaning / Other) is assigned a QuickBooks account per connection. The 3 types themselves cannot be renamed, added, or removed — only their QuickBooks account assignment is editable, here and nowhere else.",

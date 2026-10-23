@@ -4,6 +4,7 @@ import {
   createGoogleOAuthClient,
   getGoogleRedirectUri,
   GOOGLE_SCOPES,
+  isSameEmail,
 } from "./util";
 
 beforeEach(() => {
@@ -51,5 +52,15 @@ describe("getGoogleRedirectUri", () => {
     vi.stubEnv("GOOGLE_REDIRECT_URI", "");
 
     expect(() => getGoogleRedirectUri()).toThrow("GOOGLE_REDIRECT_URI is not set");
+  });
+});
+
+describe("isSameEmail", () => {
+  it("ignores case and surrounding whitespace", () => {
+    expect(isSameEmail("Pat@Example.com", " pat@example.com ")).toBe(true);
+  });
+
+  it("tells different addresses apart", () => {
+    expect(isSameEmail("pat@example.com", "pat@gmail.com")).toBe(false);
   });
 });
