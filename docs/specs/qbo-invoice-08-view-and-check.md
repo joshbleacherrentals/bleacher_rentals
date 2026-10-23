@@ -42,7 +42,8 @@ re-runs the invoice comparison of spec 06.
   company it opens in when the browser is signed in to several.
 - **The check route** answers `checked` (with `matches`, `reasons` and `differences`),
   `invoice_missing`, `skipped` (with a message) or an error (spec 06).
-- **The link columns** `qbo_invoice_id` and `qbo_invoice_connection_uuid` are spec 01's.
+- **The link column** `qbo_invoice_id` is spec 01's. `Events` stores no QuickBooks connection;
+  the view route needs none (the URL of an invoice carries only its id).
 
 ## 3. The view route — `src/app/api/quickbooks/invoice/view/route.ts` (new)
 

@@ -3,9 +3,10 @@
 (The file keeps its old name, `…link-and-hash`, by the user's choice of 2026-10-23: the hash it
 once described is gone.)
 
-Status: **AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions. The earlier version
+Status: **AMENDED TWICE 2026-10-23 — approved and implemented.** 0 open decisions. The earlier version
 (five columns and a current hash kept by a trigger) was implemented on 2026-10-22; the user then
-asked to remove the hashes (§1). The migration `20261022140000_qbo_invoice_link_and_hash.sql` is
+asked to remove the hashes (§1), and then to remove `qbo_invoice_connection_uuid` (§1, "One source
+for the QuickBooks file"). The migration `20261022140000_qbo_invoice_link_and_hash.sql` is
 edited in place — the feature is not in production.
 Implementation order: **01** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
@@ -17,7 +18,8 @@ Builds on: [accountant-quotes-05-is-qbo-column.md](accountant-quotes-05-is-qbo-c
 The app keeps, on each quote, which QuickBooks invoice it made and whether that invoice still
 matches the quote. This spec is the storage for that:
 
-- the link: the invoice's id and the QuickBooks file it lives in;
+- the link: the invoice's id. The QuickBooks file it lives in is not stored: it is the file of
+  the quote's sales office, `Events.sales_office_uuid` → `SalesOffices.quickbook_uuid`;
 - the **mismatch flag** and the **reasons** behind it.
 
 The user's request of 2026-10-23: **remove the hashes from `Events`** (`qbo_invoice_hash`,
@@ -55,6 +57,14 @@ differs is found by the comparison (spec 06).
   fixed text (spec 10). So the reasons must be kept, which is why the table gains a column (§3).
 - **The card shows when the quote was last checked** (user's answer, 2026-10-23), so a check that
   did not run is not mistaken for a clean invoice. Two timestamps are kept for it (§3).
+- **One source for the QuickBooks file** (2026-10-23). `Events` had a second copy of it,
+  `qbo_invoice_connection_uuid`, beside the one the sales office already has. **Remove the column**
+  and send every QuickBooks call — create, update, check, PDF — to the connection of the quote's
+  sales office (`sales_office_uuid` → `quickbook_uuid`).
+- **The "office moved" case is not detected** (user's answer, 2026-10-23, to the question of what
+  replaces spec 05's refusal: "just remove it"). Without a stored file there is nothing to compare
+  the office's connection with, so Update no longer refuses and nothing replaces the refusal. What
+  follows from it is in §8 and R3.
 
 ## 2. Research findings
 
@@ -73,12 +83,10 @@ differs is found by the comparison (spec 06).
 
 ## 3. Database — `supabase/migrations/20261022140000_qbo_invoice_link_and_hash.sql` (edited)
 
-Six columns on `public."Events"`, each with a `COMMENT`:
+Five columns on `public."Events"`, each with a `COMMENT`:
 
-- `qbo_invoice_id` — `text`, null. QuickBooks' own id of the invoice.
-- `qbo_invoice_connection_uuid` — `uuid`, null, `references "QboConnections"(id)` with
-  `ON DELETE RESTRICT` (as `Vendors.qbo_connection_uuid`). The QuickBooks file the invoice
-  lives in.
+- `qbo_invoice_id` — `text`, null. QuickBooks' own id of the invoice, in the QuickBooks file of
+  the quote's sales office. The comment says so.
 - `qbo_invoice_mismatch` — `boolean`, not null, `false`. True while the last comparison found a
   difference between the quote and its QuickBooks invoice.
 - `qbo_invoice_mismatch_reasons` — `text`, null. **New.** A JSON array of reason codes (spec 06,
@@ -94,20 +102,23 @@ Six columns on `public."Events"`, each with a `COMMENT`:
 `CREATE OR REPLACE` of `recompute_quote_hashes`; the `CREATE OR REPLACE` of
 `trg_recompute_quote_hashes_contacts`; the backfill and its drift check. What is left is the
 `ALTER TABLE … ADD COLUMN` and the comments, and the header comment is rewritten to say so.
+The column `qbo_invoice_connection_uuid` and its foreign key to `QboConnections` are removed too
+(2026-10-23); the header comment says where the file comes from instead.
 
 **Deliberately not changed:** every RLS policy, `guard_events_accountant_columns`,
 `sync_rules.yaml`, `content_hash`, `contract_hash` and the triggers that keep them.
 
 ## 4. App changes
 
-- `src/lib/powersync/AppSchema.ts`: six columns in `EventsCols` — `qbo_invoice_id`,
-  `qbo_invoice_connection_uuid`, `qbo_invoice_mismatch_reasons`, `qbo_invoice_checked_at` and
-  `qbo_invoice_check_failed_at` as `column.text` (timestamps are text locally);
-  `qbo_invoice_mismatch` as `column.integer` (booleans are 0/1 locally). The two hash columns are
-  taken out, and the comment above them is corrected.
+- `src/lib/powersync/AppSchema.ts`: five columns in `EventsCols` — `qbo_invoice_id`,
+  `qbo_invoice_mismatch_reasons`, `qbo_invoice_checked_at` and `qbo_invoice_check_failed_at` as
+  `column.text` (timestamps are text locally); `qbo_invoice_mismatch` as `column.integer`
+  (booleans are 0/1 locally). The two hash columns and `qbo_invoice_connection_uuid` are taken
+  out, and the comment above them is corrected.
 - `database.types.ts`: by hand (`gtl` is not used: the local database lags the migrations) — the
-  two hash columns out of `Events` `Row`, `Insert` and `Update`, the three new columns in, and the
-  foreign key to `QboConnections` stays in `Relationships`.
+  two hash columns and `qbo_invoice_connection_uuid` out of `Events` `Row`, `Insert` and `Update`,
+  the three new columns in, and the foreign key `Events_qbo_invoice_connection_uuid_fkey` out of
+  `Relationships`.
 - **Every reader and writer of the two hashes is removed** — they live in specs 03, 04, 05, 09, 10
   and 11, which say how, and in the e2e specs and tests listed there. Nothing outside the
   QuickBooks invoice feature reads them.
@@ -136,11 +147,12 @@ Red first. Playwright: not applicable. Prettier only on touched files.
 
 **7.1 Database** — `qbo_invoice_hash.test.sql` keeps only what still has a meaning:
 
-- the six columns exist with the right types and defaults: a new event has `qbo_invoice_id`,
-  `qbo_invoice_connection_uuid`, `qbo_invoice_mismatch_reasons`, `qbo_invoice_checked_at` and
-  `qbo_invoice_check_failed_at` null and `qbo_invoice_mismatch` false;
-- the two hash columns **do not exist** (`information_schema.columns` has no row for them);
-- writing the six columns as the table owner raises no error and does not change
+- the five columns exist with the right types and defaults: a new event has `qbo_invoice_id`,
+  `qbo_invoice_mismatch_reasons`, `qbo_invoice_checked_at` and `qbo_invoice_check_failed_at` null
+  and `qbo_invoice_mismatch` false;
+- the two hash columns and `qbo_invoice_connection_uuid` **do not exist**
+  (`information_schema.columns` has no row for them);
+- writing the five columns as the table owner raises no error and does not change
   `content_hash` or `contract_hash` (no trigger recursion);
 - `content_hash` and `contract_hash` of a sample of events are identical before and after the
   migration;
@@ -168,7 +180,14 @@ All the "each field flips the hash" assertions of the first version are deleted 
   file does not undo them. Such a database (the user's local one, and any shared dev one) must be
   rebuilt (`npx supabase db reset`) or have the three changes reverted by hand; otherwise the old
   function keeps writing a column the app no longer reads. A database that never ran it needs
-  nothing.
+  nothing. The same holds for `qbo_invoice_connection_uuid`: a database that ran an earlier
+  version still has the column (and its foreign key to `QboConnections`), which the app no longer
+  reads or writes; the reset removes it.
+- **The office's QuickBooks file changes, or the quote moves to another office.** The invoice id is
+  then looked up in the new file (user's answer, §1). If the invoice is not there, the app reports
+  it as missing, as for any invoice deleted in QuickBooks (spec 05 case 3, spec 06 `missing`). If
+  the new file has an invoice with the same id, that one is read, compared or updated as the
+  quote's: QuickBooks ids are unique only within a company (R3).
 - **A flag with no reasons.** The flag is the truth and the reasons explain it. A browser may PATCH
   one column without the other (D2), and rows written before the reasons existed have none: a
   reader's rule in spec 09 shows a generic text for a set flag with no reasons.
@@ -182,6 +201,10 @@ All the "each field flips the hash" assertions of the first version are deleted 
   is not in production; the shared databases that ran it need the reset.
 - **R2 — columns that can disagree** (§8): the flag and its reasons are written together by the
   server and apart by a hand PATCH; the check times only by the server.
+- **R3 — the QuickBooks file is not remembered** (§1, §8). `qbo_invoice_id` is read in whatever file
+  the quote's office points at now. An office moved to another file, or a quote moved to another
+  office, can make a call land on an invoice of the same id in the wrong company — an Update then
+  rewrites it, and a check compares it. The user accepted this when asking to remove the column.
 
 ## 10. Out of scope
 

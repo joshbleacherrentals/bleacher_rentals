@@ -260,7 +260,6 @@ const EventsCols = {
   finance_contact_uuid: column.text,
   // Written by the server (service role). The two timestamps are text locally.
   qbo_invoice_id: column.text,
-  qbo_invoice_connection_uuid: column.text,
   qbo_invoice_mismatch: column.integer,
   qbo_invoice_mismatch_reasons: column.text,
   qbo_invoice_checked_at: column.text,

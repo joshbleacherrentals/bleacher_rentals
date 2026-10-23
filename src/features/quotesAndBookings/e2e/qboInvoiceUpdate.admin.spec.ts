@@ -4,13 +4,13 @@ import { cleanupQuote, createQuote, type CreatedQuote } from "./helpers/quoteTes
 
 /**
  * POST /api/quickbooks/invoice, the update flows, as an admin (docs/specs/qbo-invoice-05-update.md §8:
- * S1, S2, S3, S4, S5, S6 and S8).
+ * S1, S2, S3, S4, S6 and S8; S5, the refusal of an office that moved to another company, went
+ * with the stored connection, 2026-10-23).
  *
  * Written, not run locally (standing instruction: no Playwright runs on this machine). The real
  * route reaches QuickBooks, which a browser test cannot replace from outside the server, so:
- *  - S5 and S6 call the real route on a quote that the route refuses before it reaches QuickBooks
- *    (the office moved to another company / a quote that is not booked but has an invoice), so no
- *    QuickBooks call is made;
+ *  - S6 calls the real route on a quote that the route refuses before it reaches QuickBooks
+ *    (a quote that is not booked but has an invoice), so no QuickBooks call is made;
  *  - S1, S2, S3 and S8 replace the route with a fake that writes to Events what the real one writes,
  *    then check what the quote shows afterwards (the flag a check stores is in checkInvoice.test.ts);
  *  - S4 (a wrong number) needs a QuickBooks sandbox company and is asserted in updateInvoice.test.ts.
@@ -175,65 +175,6 @@ test.describe("Update invoice route (admin)", () => {
     // Needs a QuickBooks sandbox company holding an invoice of another number; the server's own
     // QuickBooks calls cannot be replaced from the browser. The refusal, for a wrong number and for
     // an unknown id, and that nothing is saved, are asserted in updateInvoice.test.ts.
-  });
-
-  test("S5: an office that moved to the other company is refused with 409, and nothing is saved", async ({
-    page,
-  }) => {
-    const db = serviceRole();
-    const stamp = Date.now();
-    const { data: connections, error: connError } = await db
-      .from("QboConnections")
-      .insert([
-        { display_name: `E2E Company A ${stamp}`, encrypted_token_value: "e2e", realm_id: "e2e-a" },
-        { display_name: `E2E Company B ${stamp}`, encrypted_token_value: "e2e", realm_id: "e2e-b" },
-      ])
-      .select("id, display_name");
-    if (connError || !connections) throw new Error(`connections insert: ${connError?.message}`);
-    const [a, b] = connections;
-
-    const { data: office, error: officeError } = await db
-      .from("SalesOffices")
-      .insert({ name: `E2E Office ${stamp}`, quickbook_uuid: b.id })
-      .select("id")
-      .single();
-    if (officeError || !office) throw new Error(`office insert: ${officeError?.message}`);
-
-    try {
-      await updateEvent(quote.eventId, {
-        sales_office_uuid: office.id,
-        qbo_invoice_id: "e2e-linked-invoice",
-        qbo_invoice_connection_uuid: a.id,
-        qbo_invoice_mismatch: true,
-        qbo_invoice_mismatch_reasons: '["dates"]',
-      });
-
-      const res = await page.request.post(INVOICE_ROUTE, { data: { eventId: quote.eventId } });
-
-      expect(res.status()).toBe(409);
-      const { error } = await res.json();
-      expect(error).toContain(`in the ${a.display_name} QuickBooks company`);
-      expect(error).toContain(`now uses ${b.display_name}`);
-      expect(error).toContain("Nothing was changed");
-
-      const after = await readEvent(quote.eventId);
-      expect(after.qbo_invoice_id).toBe("e2e-linked-invoice");
-      expect(after.qbo_invoice_mismatch).toBe(true);
-      expect(after.qbo_invoice_mismatch_reasons).toBe('["dates"]');
-    } finally {
-      await updateEvent(quote.eventId, {
-        sales_office_uuid: null,
-        qbo_invoice_connection_uuid: null,
-      });
-      await db.from("SalesOffices").delete().eq("id", office.id);
-      await db
-        .from("QboConnections")
-        .delete()
-        .in(
-          "id",
-          connections.map((c) => c.id),
-        );
-    }
   });
 
   test("S6: a quote that is not booked but has an invoice is not refused for its status", async ({

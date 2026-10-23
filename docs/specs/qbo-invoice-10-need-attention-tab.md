@@ -162,7 +162,8 @@ Red first. Prettier only on touched files.
   does not override the filters.
 - **A deleted quote** appears only with Show Deleted, as on the AR tabs.
 - **A quote with an invoice whose sales office was changed.** It is listed if it needs
-  attention; Update on it is refused by the route (spec 05).
+  attention, like any other. Nothing marks the change, and Update is not refused: the invoice is
+  looked up in the new office's QuickBooks file (spec 05, spec 01 §8).
 - **A very long list.** The rows are paged client-side like the AR tabs.
 - **Offline.** The tab reads the local database and works offline.
 - **Clerk.** Page access is unchanged (admin and accountant).

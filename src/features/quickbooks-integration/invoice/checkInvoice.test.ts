@@ -128,7 +128,6 @@ function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
     salesOfficeId: "office-1",
     connectionId: "conn-office",
     qboInvoiceId: "inv-1",
-    qboInvoiceConnectionId: "conn-stored",
     qboInvoiceMismatch: false,
     qboInvoiceMismatchReasons: null,
     ...over,
@@ -204,13 +203,13 @@ describe("runInvoiceCheck — the order, and where it looks", () => {
     expect(calls).toEqual(["item", "read-invoice", "customer-link", "zone-class", "write"]);
   });
 
-  it("does everything in the connection stored on the quote, and nothing in the office's", async () => {
+  it("does everything in the connection of the quote's sales office", async () => {
     await runInvoiceCheck(EVENT_ID, sourceOf());
 
-    expect(state.itemArgs).toEqual(["conn-stored", "Corporate"]);
-    expect(state.invoiceArgs).toEqual(["conn-stored", "inv-1"]);
-    expect(state.customerArgs).toEqual(["conn-stored", "contact-1"]);
-    expect(state.zoneArgs).toEqual(["conn-stored", "SC"]);
+    expect(state.itemArgs).toEqual(["conn-office", "Corporate"]);
+    expect(state.invoiceArgs).toEqual(["conn-office", "inv-1"]);
+    expect(state.customerArgs).toEqual(["conn-office", "contact-1"]);
+    expect(state.zoneArgs).toEqual(["conn-office", "SC"]);
   });
 
   it("a Canadian quote also looks up the province's tax code and the no-tax code", async () => {
@@ -251,9 +250,6 @@ describe("runInvoiceCheck — the order, and where it looks", () => {
     await expect(runInvoiceCheck(EVENT_ID, sourceOf({ qboInvoiceId: null }))).rejects.toThrow(
       /no QuickBooks invoice/,
     );
-    await expect(
-      runInvoiceCheck(EVENT_ID, sourceOf({ qboInvoiceConnectionId: null })),
-    ).rejects.toThrow(/no QuickBooks invoice/);
 
     expect(calls).toEqual([]);
   });
@@ -355,6 +351,17 @@ describe("runInvoiceCheck — a quote that cannot be compared", () => {
     expect(result).toMatchObject({
       status: "skipped",
       message: expect.stringContaining("deleted"),
+    });
+    expect(calls).toEqual(["write"]);
+    expect(state.updates.map((u) => u.values)).toEqual([failureOnly]);
+  });
+
+  it("an office with no QuickBooks connection is skipped, and QuickBooks is not asked anything", async () => {
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf({ connectionId: null }));
+
+    expect(result).toMatchObject({
+      status: "skipped",
+      message: expect.stringContaining("QuickBooks connection"),
     });
     expect(calls).toEqual(["write"]);
     expect(state.updates.map((u) => u.values)).toEqual([failureOnly]);

@@ -70,7 +70,6 @@ beforeEach(() => {
     finance_contact_uuid: null,
     deleted: false,
     qbo_invoice_id: null,
-    qbo_invoice_connection_uuid: null,
     qbo_invoice_mismatch: false,
     qbo_invoice_mismatch_reasons: null,
   };
@@ -115,7 +114,6 @@ describe("loadInvoiceSource", () => {
       salesOfficeId: "office-1",
       connectionId: "conn-1",
       qboInvoiceId: null,
-      qboInvoiceConnectionId: null,
       qboInvoiceMismatch: false,
       qboInvoiceMismatchReasons: null,
     });

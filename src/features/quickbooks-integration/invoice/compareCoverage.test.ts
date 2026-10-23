@@ -84,7 +84,6 @@ const source = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
   salesOfficeId: "office-1",
   connectionId: "conn-1",
   qboInvoiceId: "inv-1",
-  qboInvoiceConnectionId: "conn-1",
   qboInvoiceMismatch: false,
   qboInvoiceMismatchReasons: null,
   ...over,

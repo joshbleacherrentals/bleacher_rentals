@@ -445,21 +445,22 @@ describe("POST /api/quickbooks/invoice", () => {
       expect(await res.json()).toMatchObject({ status: "created", qboInvoiceId: "inv-new" });
     });
 
-    it("wrong_company: 409 with the message", async () => {
-      readLinkedInvoiceId.mockImplementation(async () => "inv-1");
-      const message =
-        "This invoice is in the BR USA QuickBooks company, but this quote's office now uses BR Canada. Nothing was changed. Fix it by hand in QuickBooks.";
-      updateInvoice.mockImplementation(async () => ({
-        status: "error",
-        httpStatus: 409,
-        error: message,
-      }));
+    it.each([400, 404, 409, 502])(
+      "an error of %i from case 1: that status with { error }",
+      async (code) => {
+        readLinkedInvoiceId.mockImplementation(async () => "inv-1");
+        updateInvoice.mockImplementation(async () => ({
+          status: "error",
+          httpStatus: code,
+          error: `fault ${code}`,
+        }));
 
-      const res = await POST(request({ eventId: EVENT_ID }));
+        const res = await POST(request({ eventId: EVENT_ID }));
 
-      expect(res.status).toBe(409);
-      expect(await res.json()).toEqual({ error: message });
-    });
+        expect(res.status).toBe(code);
+        expect(await res.json()).toEqual({ error: `fault ${code}` });
+      },
+    );
 
     it.each([400, 404, 409, 502])(
       "an error of %i from case 2: that status with { error }",

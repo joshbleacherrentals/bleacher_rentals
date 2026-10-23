@@ -91,7 +91,7 @@ export async function loadInvoiceSource(
     supabase
       .from("Events")
       .select(
-        "id, invoice_number, event_status, event_type_uuid, event_name, sales_office_uuid, contact_uuid, finance_contact_uuid, deleted, qbo_invoice_id, qbo_invoice_connection_uuid, qbo_invoice_mismatch, qbo_invoice_mismatch_reasons",
+        "id, invoice_number, event_status, event_type_uuid, event_name, sales_office_uuid, contact_uuid, finance_contact_uuid, deleted, qbo_invoice_id, qbo_invoice_mismatch, qbo_invoice_mismatch_reasons",
       )
       .eq("id", eventId)
       .maybeSingle(),
@@ -135,7 +135,6 @@ export async function loadInvoiceSource(
     salesOfficeId: event.sales_office_uuid,
     connectionId,
     qboInvoiceId: event.qbo_invoice_id,
-    qboInvoiceConnectionId: event.qbo_invoice_connection_uuid,
     qboInvoiceMismatch: event.qbo_invoice_mismatch,
     qboInvoiceMismatchReasons: event.qbo_invoice_mismatch_reasons,
   };

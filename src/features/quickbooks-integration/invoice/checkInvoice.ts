@@ -63,31 +63,30 @@ async function skip(eventId: string, message: string): Promise<InvoiceCheckResul
 }
 
 /**
- * Checks the quote's invoice (`source.qboInvoiceId`, in `source.qboInvoiceConnectionId`: the
- * connection it was written in, not the office's current one; every reference is looked up there
- * too). Nothing is created in QuickBooks and no customer is asked for or made. A QuickBooks failure
- * throws a QboReadError; a failure to save the answer is an ordinary Error.
+ * Checks the quote's invoice (`source.qboInvoiceId`, in `source.connectionId`: the QuickBooks
+ * connection of the quote's sales office; every reference is looked up there too). Nothing is
+ * created in QuickBooks and no customer is asked for or made. A QuickBooks failure throws a
+ * QboReadError; a failure to save the answer is an ordinary Error.
  */
 export async function runInvoiceCheck(
   eventId: string,
   source: InvoiceSource,
 ): Promise<InvoiceCheckResult> {
-  const { qboInvoiceId, qboInvoiceConnectionId } = source;
-  if (!qboInvoiceId || !qboInvoiceConnectionId) {
-    throw new Error("This quote has no QuickBooks invoice to check.");
-  }
+  const { qboInvoiceId } = source;
+  if (!qboInvoiceId) throw new Error("This quote has no QuickBooks invoice to check.");
 
   const issues = validateInvoiceSource(source);
   if (issues.length > 0) return skip(eventId, issues.map((issue) => issue.message).join(" "));
   // validateInvoiceSource has refused a quote without these.
+  const connectionId = source.connectionId!;
   const eventTypeName = source.eventTypeName!;
   const billedContact = source.billedContact!;
 
   let item;
   let invoice;
   try {
-    item = await findQboItem(qboInvoiceConnectionId, eventTypeName);
-    invoice = await readQboInvoice(qboInvoiceConnectionId, qboInvoiceId);
+    item = await findQboItem(connectionId, eventTypeName);
+    invoice = await readQboInvoice(connectionId, qboInvoiceId);
   } catch (e) {
     await recordFailure(eventId);
     throw new QboReadError(messageOf(e));
@@ -101,15 +100,13 @@ export async function runInvoiceCheck(
     throw new QboReadError("QuickBooks sent an invoice whose total or tax is not an amount.");
   }
 
-  const customerId = await readLinkedCustomerId(qboInvoiceConnectionId, billedContact.id);
-  const zoneClass = await resolveZoneClass(qboInvoiceConnectionId, source.venue.state);
+  const customerId = await readLinkedCustomerId(connectionId, billedContact.id);
+  const zoneClass = await resolveZoneClass(connectionId, source.venue.state);
   const canadianTaxCodeId =
     source.canadianProvince && source.taxCents > 0
-      ? await resolveProvinceTaxCode(qboInvoiceConnectionId, source.canadianProvince)
+      ? await resolveProvinceTaxCode(connectionId, source.canadianProvince)
       : null;
-  const noTaxCodeId = source.canadianProvince
-    ? await resolveNoTaxCode(qboInvoiceConnectionId)
-    : null;
+  const noTaxCodeId = source.canadianProvince ? await resolveNoTaxCode(connectionId) : null;
   // QuickBooks Canada refuses any other code on a line with no tax (spec 03d), so the invoice the
   // quote would make cannot be built.
   if (needsNoTaxCode(source, canadianTaxCodeId) && !noTaxCodeId) {

@@ -123,7 +123,6 @@ export async function saveInvoiceLink(
   link: {
     eventId: string;
     invoiceId: string;
-    connectionId: string;
     replacingInvoiceId?: string;
   },
 ): Promise<string | null> {
@@ -131,7 +130,6 @@ export async function saveInvoiceLink(
     .from("Events")
     .update({
       qbo_invoice_id: link.invoiceId,
-      qbo_invoice_connection_uuid: link.connectionId,
       qbo_invoice_mismatch: false,
       qbo_invoice_mismatch_reasons: null,
       qbo_invoice_checked_at: null,
@@ -158,19 +156,18 @@ export async function saveInvoiceLink(
 
 /**
  * Step 11 of create, step 10 of update: compares the invoice just written with the quote and stores
- * the answer (spec 06). The invoice just linked is the one checked, in the connection it was made in.
+ * the answer (spec 06). The invoice just linked is the one checked, in the sales office's connection.
  * A check that cannot finish does not fail the request: it becomes the `invoice_check_failed`
  * warning, and the stored flag stays as it was.
  */
 export async function checkInvoiceAfterWrite(
   source: InvoiceSource,
-  link: { invoiceId: string; connectionId: string },
+  link: { invoiceId: string },
 ): Promise<{ check?: InvoiceCheck; warning?: InvoiceCheckFailedWarning }> {
   try {
     const result = await runInvoiceCheck(source.eventId, {
       ...source,
       qboInvoiceId: link.invoiceId,
-      qboInvoiceConnectionId: link.connectionId,
     });
     if (result.status === "missing") {
       return {
@@ -315,7 +312,6 @@ export async function createInvoiceFromSource(
   const linkedId = await saveInvoiceLink(supabase, {
     eventId,
     invoiceId: invoice.id,
-    connectionId,
     replacingInvoiceId,
   });
   if (linkedId === null) {
@@ -340,7 +336,6 @@ export async function createInvoiceFromSource(
   // 11: the invoice check, which sets qbo_invoice_mismatch and its reasons (spec 06).
   const { check, warning: checkWarning } = await checkInvoiceAfterWrite(source, {
     invoiceId: invoice.id,
-    connectionId,
   });
   if (checkWarning) warnings.push(checkWarning);
 

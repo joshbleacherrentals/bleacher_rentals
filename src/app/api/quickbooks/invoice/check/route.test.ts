@@ -5,7 +5,7 @@ import type { WebRole } from "@/features/userAccess/logic/determineAccess";
 // docs/specs/qbo-invoice-06-totals-check.md §6 (the contract) and
 // docs/specs/qbo-invoice-06a-check-on-save.md §3 (the guard): any role that may open
 // /quotes-bookings and can read the quote; the body is { eventId }; the invoice is checked in the
-// connection stored on the quote; an admin and an accountant get the whole answer, anyone else the
+// connection of the quote's sales office; an admin and an accountant get the whole answer, anyone else the
 // status only.
 
 const auth = vi.fn(async (): Promise<{ userId: string | null }> => ({ userId: "clerk_1" }));
@@ -79,7 +79,6 @@ const linkedSource = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
   salesOfficeId: "office-1",
   connectionId: "conn-office",
   qboInvoiceId: "inv-1",
-  qboInvoiceConnectionId: "conn-stored",
   qboInvoiceMismatch: false,
   qboInvoiceMismatchReasons: null,
   ...over,
@@ -299,7 +298,7 @@ describe("POST /api/quickbooks/invoice/check", () => {
       });
     });
 
-    it("checks the quote that was loaded, whose invoice is in the stored connection", async () => {
+    it("checks the quote that was loaded, whose invoice is in its sales office's connection", async () => {
       const source = linkedSource();
       loadInvoiceSource.mockImplementation(async () => source);
 
@@ -307,9 +306,6 @@ describe("POST /api/quickbooks/invoice/check", () => {
 
       expect(runInvoiceCheck).toHaveBeenCalledTimes(1);
       expect(runInvoiceCheck).toHaveBeenCalledWith(EVENT_ID, source);
-      const [, checked] = runInvoiceCheck.mock.calls[0] as [string, InvoiceSource];
-      expect(checked.qboInvoiceConnectionId).toBe("conn-stored");
-      expect(checked.qboInvoiceConnectionId).not.toBe(checked.connectionId);
     });
   });
 

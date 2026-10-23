@@ -78,34 +78,6 @@ export async function readLinkedInvoiceId(eventId: string): Promise<string | nul
   return data?.qbo_invoice_id ?? null;
 }
 
-async function readConnectionNames(ids: string[]): Promise<Map<string, string>> {
-  const { data, error } = await getSupabaseAdmin()
-    .from("QboConnections")
-    .select("id, display_name")
-    .in("id", ids);
-  if (error) throw new Error(`Failed to read the QuickBooks connections: ${error.message}`);
-  return new Map((data ?? []).map((connection) => [connection.id, connection.display_name]));
-}
-
-/**
- * Step 1 (case 1; case 2 when relinking): the invoice must be in the company the quote's office uses
- * now. An office with no connection is left to the validation, which says so.
- */
-async function wrongCompanyFailure(source: InvoiceSource): Promise<CreateInvoiceResult | null> {
-  if (!source.connectionId || source.qboInvoiceConnectionId === source.connectionId) return null;
-
-  const stored = source.qboInvoiceConnectionId;
-  const names = await readConnectionNames(
-    stored ? [stored, source.connectionId] : [source.connectionId],
-  );
-  const oldName = (stored && names.get(stored)) || "unknown";
-  const newName = names.get(source.connectionId) ?? "unknown";
-  return fail(
-    409,
-    `This invoice is in the ${oldName} QuickBooks company, but this quote's office now uses ${newName}. Nothing was changed. Fix it by hand in QuickBooks.`,
-  );
-}
-
 type ReplaceContent = {
   /** The quote, loaded and found valid by the caller. */
   source: InvoiceSource;
@@ -179,7 +151,6 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
     const linkedId = await saveInvoiceLink(supabase, {
       eventId,
       invoiceId: invoice.id,
-      connectionId,
       replacingInvoiceId,
     });
     if (linkedId === null) {
@@ -205,7 +176,6 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
   // 10: the invoice check, which sets qbo_invoice_mismatch and its reasons (spec 06).
   const { check, warning: checkWarning } = await checkInvoiceAfterWrite(source, {
     invoiceId: invoice.id,
-    connectionId,
   });
   if (checkWarning) warnings.push(checkWarning);
 
@@ -236,8 +206,6 @@ export async function updateInvoice(params: UpdateInvoiceParams): Promise<Update
   if (!source) return fail(404, "Quote not found.");
   const linkedInvoiceId = source.qboInvoiceId;
   if (!linkedInvoiceId) return fail(409, "This quote has no QuickBooks invoice to update.");
-  const moved = await wrongCompanyFailure(source);
-  if (moved) return moved;
 
   // 2: the booked rule is not applied.
   const issues = validateInvoiceSource(source);
@@ -300,10 +268,6 @@ export async function overwriteInvoice(
   const relinkingId = replaceMissing ? source.qboInvoiceId : null;
   if (source.qboInvoiceId && !relinkingId) {
     return fail(409, "This quote already has a QuickBooks invoice.");
-  }
-  if (relinkingId) {
-    const moved = await wrongCompanyFailure(source);
-    if (moved) return moved;
   }
 
   // 2: a first link needs a booked quote; relinking is a quote that already had an invoice.

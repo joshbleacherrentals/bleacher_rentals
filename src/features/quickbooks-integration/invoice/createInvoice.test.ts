@@ -210,7 +210,6 @@ function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
     salesOfficeId: "office-1",
     connectionId: "conn-1",
     qboInvoiceId: null,
-    qboInvoiceConnectionId: null,
     qboInvoiceMismatch: false,
     qboInvoiceMismatchReasons: null,
     ...over,
@@ -891,13 +890,12 @@ describe("createInvoice — the idempotency key", () => {
 });
 
 describe("createInvoice — saving the link", () => {
-  it("saves the id, the connection, no mismatch, no reasons, no check times and is_qbo in one guarded update", async () => {
+  it("saves the id, no mismatch, no reasons, no check times and is_qbo in one guarded update", async () => {
     await run();
 
     expect(state.updates).toHaveLength(1);
     expect(state.updates[0].values).toEqual({
       qbo_invoice_id: "inv-1",
-      qbo_invoice_connection_uuid: "conn-1",
       qbo_invoice_mismatch: false,
       qbo_invoice_mismatch_reasons: null,
       qbo_invoice_checked_at: null,
@@ -1044,7 +1042,6 @@ describe("createInvoice — the invoice check (spec 06)", () => {
       expect.objectContaining({
         eventId: EVENT_ID,
         qboInvoiceId: "inv-1",
-        qboInvoiceConnectionId: "conn-1",
         amountCents: 750000,
         taxCents: 52500,
       }),
@@ -1164,7 +1161,7 @@ describe("createInvoice — the invoice check (spec 06)", () => {
 
   it("case 3 runs it too, on the new invoice and not the one it replaces", async () => {
     const result = await createInvoiceFromSource({
-      source: sourceOf({ qboInvoiceId: "inv-old", qboInvoiceConnectionId: "conn-1" }),
+      source: sourceOf({ qboInvoiceId: "inv-old" }),
       item: ITEM,
       userUuid: "user-1",
       replacingInvoiceId: "inv-old",
@@ -1173,10 +1170,7 @@ describe("createInvoice — the invoice check (spec 06)", () => {
     expect(result).toMatchObject({ status: "created", check: { matches: true } });
     expect(calls.indexOf("log:recreated")).toBeLessThan(calls.indexOf("check"));
     expect(calls.indexOf("check")).toBeLessThan(calls.indexOf("pdf"));
-    expect(state.checkArgs[1]).toMatchObject({
-      qboInvoiceId: "inv-1",
-      qboInvoiceConnectionId: "conn-1",
-    });
+    expect(state.checkArgs[1]).toMatchObject({ qboInvoiceId: "inv-1", connectionId: "conn-1" });
   });
 });
 
@@ -1186,7 +1180,7 @@ describe("createInvoiceFromSource — case 3 of spec 05, creating again after 'n
 
   const again = (over: Partial<Parameters<typeof createInvoiceFromSource>[0]> = {}) =>
     createInvoiceFromSource({
-      source: sourceOf({ qboInvoiceId: OLD_ID, qboInvoiceConnectionId: "conn-1" }),
+      source: sourceOf({ qboInvoiceId: OLD_ID }),
       item: ITEM,
       userUuid: "user-1",
       replacingInvoiceId: OLD_ID,
@@ -1221,7 +1215,6 @@ describe("createInvoiceFromSource — case 3 of spec 05, creating again after 'n
     ]);
     expect(state.updates[0].values).toEqual({
       qbo_invoice_id: "inv-1",
-      qbo_invoice_connection_uuid: "conn-1",
       qbo_invoice_mismatch: false,
       qbo_invoice_mismatch_reasons: null,
       qbo_invoice_checked_at: null,
@@ -1249,11 +1242,7 @@ describe("createInvoiceFromSource — case 3 of spec 05, creating again after 'n
 
   it("does not apply the booked rule (the caller decided; a lost quote is created again)", async () => {
     const result = await again({
-      source: sourceOf({
-        eventStatus: "lost",
-        qboInvoiceId: OLD_ID,
-        qboInvoiceConnectionId: "conn-1",
-      }),
+      source: sourceOf({ eventStatus: "lost", qboInvoiceId: OLD_ID }),
     });
 
     expect(result.status).toBe("created");
@@ -1327,7 +1316,7 @@ describe("createInvoiceFromSource — case 3 of spec 05, creating again after 'n
     state.noTaxCode = null;
 
     const result = await again({
-      source: canadian({ taxCents: 0, qboInvoiceId: OLD_ID, qboInvoiceConnectionId: "conn-1" }),
+      source: canadian({ taxCents: 0, qboInvoiceId: OLD_ID }),
     });
 
     expect(result).toMatchObject({ status: "error", httpStatus: 400 });

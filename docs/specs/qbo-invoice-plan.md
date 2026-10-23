@@ -86,7 +86,10 @@ Taken in the chat of 2026-10-20 … 2026-10-22:
   cache); the token refresh, which has no lock (06, R5); a change made by hand in QuickBooks, or outside
   Save (the address book, settings), which only the next Save, Update or Check again picks up.
 - **PDF fails to attach:** the invoice stays, the user sees a warning, Update retries it.
-- **Office moved to the other QuickBooks file:** Update is refused with a message.
+- **One source for the QuickBooks file (2026-10-23):** `Events` has no connection column; every
+  QuickBooks call uses the quote's sales office's connection (`sales_office_uuid` →
+  `quickbook_uuid`). **Office moved to the other QuickBooks file:** not detected (user's answer);
+  the earlier refusal of Update is gone (spec 01 §1, §8, R3).
 - **Notification places:** sidebar counts, tab counts, a row mark in the lists, and a banner
   on the quote card. Accountants only. An admin who is not an accountant sees the Need
   attention tab but none of the signals.
@@ -98,8 +101,8 @@ Taken in the chat of 2026-10-20 … 2026-10-22:
 Each one is a separate commit with one logic. Counted files = migrations, `database.types.ts`,
 `AppSchema.ts`, `permissionPageData.ts`, `package.json`, and source files.
 
-- **01 — link and flag** (3 counted): the `Events` columns: the link, the mismatch flag and its
-  reasons. (The file keeps the name `…link-and-hash`.)
+- **01 — link and flag** (3 counted): the `Events` columns: the invoice id, the mismatch flag
+  and its reasons. (The file keeps the name `…link-and-hash`.)
 - **02 — customer** (4): the contact-to-customer link table and the customer resolver.
 - **03 — payload** (4): loading the quote and building the QuickBooks invoice body.
 - **03a — Canadian tax code** (8): the code per province, its table and its screen.
@@ -108,7 +111,7 @@ Each one is a separate commit with one logic. Counted files = migrations, `datab
 - **03e — CAD only** (3): the province section and the no-tax row appear only for a CAD
   connection.
 - **04 — create** (7): the route, the invoice-number check, create, PDF, log.
-- **05 — update** (6): update, overwrite by number, missing invoice, wrong company.
+- **05 — update** (6): update, overwrite by number, missing invoice.
 - **06 — invoice check** (10): the comparison of the whole invoice, the flag and reasons, the
   check route. (The file keeps the name `…totals-check`.)
 - **06a — check on save** (3): the Save caller, and the check route open to every role that can

@@ -45,8 +45,7 @@ const { calls, state, createClient } = vi.hoisted(() => {
     linkedId: null as string | null,
     updates: [] as Array<{ values: Record<string, unknown>; filters: unknown[] }>,
     eventWrites: 0,
-    connections: [] as Array<{ id: string; display_name: string }>,
-    connectionsError: null as { message: string } | null,
+    tokenConnections: [] as string[],
     linkReadError: null as { message: string } | null,
   };
   const createClient = vi.fn(() => ({
@@ -90,14 +89,6 @@ const { calls, state, createClient } = vi.hoisted(() => {
           return { data: { qbo_invoice_id: state.linkedId }, error: null };
         },
         then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => {
-          if (table === "QboConnections") {
-            calls.push("connections");
-            const ids = ((ctx.filters[0] as unknown[])?.[2] as string[]) ?? [];
-            const result = state.connectionsError
-              ? { data: null, error: state.connectionsError }
-              : { data: state.connections.filter((c) => ids.includes(c.id)), error: null };
-            return Promise.resolve(result).then(resolve, reject);
-          }
           if (table !== "Events") throw new Error(`unexpected table ${table}`);
           // An awaited update(...): the rows it changed.
           calls.push(ctx.values.qbo_invoice_id !== undefined ? "save-link" : "save-unexpected");
@@ -116,7 +107,10 @@ vi.mock("@supabase/supabase-js", () => ({ createClient }));
 
 vi.mock("../util", () => ({
   getBaseUrl: () => "https://qbo.example.com/v3/company",
-  getQboAccessTokenAndRealmId: vi.fn(async () => ({ accessToken: "tok", realmId: "123" })),
+  getQboAccessTokenAndRealmId: vi.fn(async (connectionId: string) => {
+    state.tokenConnections.push(connectionId);
+    return { accessToken: "tok", realmId: "123" };
+  }),
 }));
 
 vi.mock("./loadInvoiceSource", () => ({
@@ -206,7 +200,7 @@ import { overwriteInvoice, readLinkedInvoiceId, updateInvoice } from "./updateIn
 
 const EVENT_ID = "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b";
 
-/** A quote that already has an invoice in the same company as its office. */
+/** A quote that already has an invoice, in the QuickBooks file of its office. */
 function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
   return {
     eventId: EVENT_ID,
@@ -233,7 +227,6 @@ function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
     salesOfficeId: "office-1",
     connectionId: "conn-1",
     qboInvoiceId: "inv-1",
-    qboInvoiceConnectionId: "conn-1",
     qboInvoiceMismatch: false,
     qboInvoiceMismatchReasons: null,
     ...over,
@@ -244,7 +237,6 @@ function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
 const unlinked = (over: Partial<InvoiceSource> = {}) =>
   sourceOf({
     qboInvoiceId: null,
-    qboInvoiceConnectionId: null,
     ...over,
   });
 
@@ -336,8 +328,7 @@ beforeEach(() => {
     linkedId: null,
     updates: [],
     eventWrites: 0,
-    connections: [],
-    connectionsError: null,
+    tokenConnections: [],
     linkReadError: null,
   });
   vi.stubGlobal(
@@ -459,7 +450,7 @@ describe("updateInvoice — case 1, the order of §4", () => {
     }
   });
 
-  it("reads the invoice by the stored id, in the quote's connection", async () => {
+  it("reads the invoice by the stored id, in the quote's office's connection", async () => {
     await run();
 
     expect(state.reads).toEqual(["inv-1"]);
@@ -513,7 +504,7 @@ describe("updateInvoice — the sparse update", () => {
     });
   });
 
-  it("goes to the quote's connection's company, with no request id (the SyncToken guards it)", async () => {
+  it("goes to the office's QuickBooks company, with no request id (the SyncToken guards it)", async () => {
     await run();
 
     expect(state.posts[0].url).toContain("https://qbo.example.com/v3/company/123/invoice");
@@ -581,7 +572,7 @@ describe("updateInvoice — the Log and the PDF", () => {
     ]);
   });
 
-  it("replaces the PDF of the stored invoice, in the stored connection", async () => {
+  it("replaces the PDF of the stored invoice, in the office's connection", async () => {
     await run();
 
     expect(state.replaceArgs).toEqual(["conn-1", "inv-1", EVENT_ID]);
@@ -703,63 +694,50 @@ describe("updateInvoice — the Canadian no-tax code", () => {
   });
 });
 
-describe("updateInvoice — the company moved (step 1)", () => {
-  const MESSAGE =
-    "This invoice is in the BR USA QuickBooks company, but this quote's office now uses BR Canada. Nothing was changed. Fix it by hand in QuickBooks.";
-
+describe("updateInvoice — the quote's office decides the QuickBooks file (step 1)", () => {
   beforeEach(() => {
-    state.source = sourceOf({ qboInvoiceConnectionId: "conn-old" });
-    state.connections = [
-      { id: "conn-old", display_name: "BR USA" },
-      { id: "conn-1", display_name: "BR Canada" },
-    ];
+    state.source = sourceOf({ connectionId: "conn-office" });
   });
 
-  it("answers 409 naming both companies, and writes nothing", async () => {
+  it("does everything in the office's connection, and asks for no other", async () => {
     const result = await run();
 
-    expect(result).toEqual({ status: "error", httpStatus: 409, error: MESSAGE });
-    expect(calls).toEqual(["load", "connections"]);
+    expect(result.status).toBe("updated");
+    expect(state.tokenConnections.length).toBeGreaterThan(0);
+    expect(new Set(state.tokenConnections)).toEqual(new Set(["conn-office"]));
+    expect(state.customerArgs[0]).toBe("conn-office");
+    expect(state.replaceArgs).toEqual(["conn-office", "inv-1", EVENT_ID]);
+    expect(state.checkArgs[1]).toMatchObject({ connectionId: "conn-office" });
+  });
+
+  it("an office that moved to another file is not refused: the id is looked up in the new file", async () => {
+    delete state.invoicesById["inv-1"];
+
+    const result = await run();
+
+    expect(result).toEqual({ status: "invoice_missing" });
+    expect(new Set(state.tokenConnections)).toEqual(new Set(["conn-office"]));
     expectNothingWritten();
   });
 
-  it("reads the two names with one query", async () => {
-    await run();
+  it("with replaceMissing, the new invoice is made in the new file", async () => {
+    delete state.invoicesById["inv-1"];
 
-    expect(calls.filter((c) => c === "connections")).toHaveLength(1);
+    const result = await run({ replaceMissing: true });
+
+    expect(result.status).toBe("created");
+    expect(new Set(state.tokenConnections)).toEqual(new Set(["conn-office"]));
   });
 
-  it("is checked before the validation and the booked rule", async () => {
-    state.source = sourceOf({
-      qboInvoiceConnectionId: "conn-old",
-      eventStatus: "lost",
-      invoiceNumber: null,
-    });
-
-    expect(errorOf(await run())).toBe(MESSAGE);
-  });
-
-  it("falls back to a plain word for a company it cannot name", async () => {
-    state.connections = [{ id: "conn-1", display_name: "BR Canada" }];
-
-    expect(errorOf(await run())).toContain("in the unknown QuickBooks company");
-  });
-
-  it("an unreadable connection table is not swallowed", async () => {
-    state.connectionsError = { message: "boom" };
-
-    await expect(run()).rejects.toThrow(/boom/);
-    expectNothingWritten();
-  });
-
-  it("is not raised when the office has no connection: the validation says so instead", async () => {
-    state.source = sourceOf({ qboInvoiceConnectionId: "conn-old", connectionId: null });
+  it("an office with no connection: the validation says so, and QuickBooks is not asked", async () => {
+    state.source = sourceOf({ connectionId: null });
 
     const result = await run();
 
     expect(result).toMatchObject({ status: "error", httpStatus: 400 });
     expect(errorOf(result)).toMatch(/QuickBooks connection/);
     expect(calls).toEqual(["load"]);
+    expect(state.tokenConnections).toEqual([]);
   });
 });
 
@@ -1023,7 +1001,6 @@ describe("updateInvoice — case 3, creating again after 'not found'", () => {
     ]);
     expect(state.updates[0].values).toEqual({
       qbo_invoice_id: "inv-new",
-      qbo_invoice_connection_uuid: "conn-1",
       qbo_invoice_mismatch: false,
       qbo_invoice_mismatch_reasons: null,
       qbo_invoice_checked_at: null,
@@ -1048,18 +1025,9 @@ describe("updateInvoice — case 3, creating again after 'not found'", () => {
     expect((await run({ replaceMissing: true })).status).toBe("created");
   });
 
-  it("applies the validation and the company check", async () => {
+  it("applies the validation", async () => {
     state.source = sourceOf({ invoiceNumber: null });
     expect(await run({ replaceMissing: true })).toMatchObject({ status: "error", httpStatus: 400 });
-    expectNothingWritten();
-
-    calls.length = 0;
-    state.source = sourceOf({ qboInvoiceConnectionId: "conn-old" });
-    state.connections = [
-      { id: "conn-old", display_name: "BR USA" },
-      { id: "conn-1", display_name: "BR Canada" },
-    ];
-    expect(await run({ replaceMissing: true })).toMatchObject({ status: "error", httpStatus: 409 });
     expectNothingWritten();
   });
 
@@ -1114,7 +1082,7 @@ describe("updateInvoice — the invoice check (spec 06)", () => {
     expect(calls.indexOf("check")).toBeLessThan(calls.indexOf("pdf-replace"));
   });
 
-  it("checks the stored invoice, in the stored connection, against the quote", async () => {
+  it("checks the stored invoice, in the office's connection, against the quote", async () => {
     await run();
 
     expect(state.checkArgs).toEqual([
@@ -1122,7 +1090,7 @@ describe("updateInvoice — the invoice check (spec 06)", () => {
       expect.objectContaining({
         eventId: EVENT_ID,
         qboInvoiceId: "inv-1",
-        qboInvoiceConnectionId: "conn-1",
+        connectionId: "conn-1",
         amountCents: 750000,
         taxCents: 52500,
       }),
@@ -1253,14 +1221,11 @@ describe("updateInvoice — the invoice check (spec 06)", () => {
     expect(result).toMatchObject({ status: "updated", check: { matches: true } });
     expect(calls.indexOf("log:linked")).toBeLessThan(calls.indexOf("check"));
     expect(calls.indexOf("check")).toBeLessThan(calls.indexOf("pdf-replace"));
-    expect(state.checkArgs[1]).toMatchObject({
-      qboInvoiceId: "inv-77",
-      qboInvoiceConnectionId: "conn-1",
-    });
+    expect(state.checkArgs[1]).toMatchObject({ qboInvoiceId: "inv-77", connectionId: "conn-1" });
   });
 
   it("relinking checks the invoice it linked, not the missing one", async () => {
-    state.source = sourceOf({ qboInvoiceId: "inv-old", qboInvoiceConnectionId: "conn-1" });
+    state.source = sourceOf({ qboInvoiceId: "inv-old" });
 
     await overwrite({ replaceMissing: true });
 
@@ -1319,13 +1284,12 @@ describe("overwriteInvoice — case 2, overwriting the invoice found by number",
     expect(state.posts[0].body).toMatchObject({ Id: "inv-77", SyncToken: "3", sparse: true });
   });
 
-  it("saves the id, the connection, no mismatch, no reasons, no check times and is_qbo, guarded by IS NULL", async () => {
+  it("saves the id, no mismatch, no reasons, no check times and is_qbo, guarded by IS NULL", async () => {
     await overwrite();
 
     expect(state.updates).toHaveLength(1);
     expect(state.updates[0].values).toEqual({
       qbo_invoice_id: "inv-77",
-      qbo_invoice_connection_uuid: "conn-1",
       qbo_invoice_mismatch: false,
       qbo_invoice_mismatch_reasons: null,
       qbo_invoice_checked_at: null,
@@ -1512,7 +1476,7 @@ describe("overwriteInvoice — case 2, overwriting the invoice found by number",
 
 describe("overwriteInvoice — case 2, relinking a link that points at a missing invoice", () => {
   beforeEach(() => {
-    state.source = sourceOf({ qboInvoiceId: "inv-old", qboInvoiceConnectionId: "conn-1" });
+    state.source = sourceOf({ qboInvoiceId: "inv-old" });
   });
 
   it("with replaceMissing it links the invoice found by number and answers updated", async () => {
@@ -1538,48 +1502,24 @@ describe("overwriteInvoice — case 2, relinking a link that points at a missing
     ]);
     expect(state.updates[0].values).toMatchObject({
       qbo_invoice_id: "inv-77",
-      qbo_invoice_connection_uuid: "conn-1",
       qbo_invoice_mismatch: false,
       is_qbo: true,
     });
   });
 
   it("does not apply the booked rule", async () => {
-    state.source = sourceOf({
-      eventStatus: "lost",
-      qboInvoiceId: "inv-old",
-      qboInvoiceConnectionId: "conn-1",
-    });
+    state.source = sourceOf({ eventStatus: "lost", qboInvoiceId: "inv-old" });
 
     expect((await overwrite({ replaceMissing: true })).status).toBe("updated");
   });
 
   it("still applies the validation", async () => {
-    state.source = sourceOf({
-      invoiceNumber: null,
-      qboInvoiceId: "inv-old",
-      qboInvoiceConnectionId: "conn-1",
-    });
+    state.source = sourceOf({ invoiceNumber: null, qboInvoiceId: "inv-old" });
 
     expect(await overwrite({ replaceMissing: true })).toMatchObject({
       status: "error",
       httpStatus: 400,
     });
-    expectNothingWritten();
-  });
-
-  it("still applies the company check, before anything else", async () => {
-    state.source = sourceOf({ qboInvoiceId: "inv-old", qboInvoiceConnectionId: "conn-old" });
-    state.connections = [
-      { id: "conn-old", display_name: "BR USA" },
-      { id: "conn-1", display_name: "BR Canada" },
-    ];
-
-    const result = await overwrite({ replaceMissing: true });
-
-    expect(result).toMatchObject({ status: "error", httpStatus: 409 });
-    expect(errorOf(result)).toContain("BR USA");
-    expect(calls).toEqual(["load", "connections"]);
     expectNothingWritten();
   });
 

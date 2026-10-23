@@ -29,10 +29,9 @@ export type InvoiceSource = {
   /** A province code, or null for any other state. */
   canadianProvince: ProvinceCode | null;
   salesOfficeId: string | null;
-  /** The sales office's QuickBooks connection. */
+  /** The sales office's QuickBooks connection: the file of every call, the invoice's too. */
   connectionId: string | null;
   qboInvoiceId: string | null;
-  qboInvoiceConnectionId: string | null;
   qboInvoiceMismatch: boolean;
   /** The stored JSON array of reason codes, or null (spec 01). */
   qboInvoiceMismatchReasons: string | null;

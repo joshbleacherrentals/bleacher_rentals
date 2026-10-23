@@ -11,7 +11,8 @@
 -- Everything runs in a transaction that is ROLLED BACK at the end.
 --
 -- What it pins down:
---   * the six columns exist with the right types and defaults, and the two hash columns do not;
+--   * the five columns exist with the right types and defaults, and the two hash columns and
+--     qbo_invoice_connection_uuid do not (the QuickBooks file is the sales office's);
 --   * the migration left recompute_quote_hashes() and the Contacts trigger as they were before it;
 --   * the server-written columns cause no trigger recursion and change neither content_hash nor
 --     contract_hash, and leave an active signature active;
@@ -31,8 +32,8 @@ SELECT is(
   (SELECT string_agg(column_name || ':' || data_type, ',' ORDER BY column_name COLLATE "C")
    FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'Events' AND column_name LIKE 'qbo\_invoice\_%'),
-  'qbo_invoice_check_failed_at:timestamp with time zone,qbo_invoice_checked_at:timestamp with time zone,qbo_invoice_connection_uuid:uuid,qbo_invoice_id:text,qbo_invoice_mismatch:boolean,qbo_invoice_mismatch_reasons:text',
-  'Events has exactly the six qbo_invoice_* columns with the specified types (no hash columns)');
+  'qbo_invoice_check_failed_at:timestamp with time zone,qbo_invoice_checked_at:timestamp with time zone,qbo_invoice_id:text,qbo_invoice_mismatch:boolean,qbo_invoice_mismatch_reasons:text',
+  'Events has exactly the five qbo_invoice_* columns with the specified types (no hash columns, no connection column)');
 
 SELECT is(
   (SELECT is_nullable || '/' || coalesce(column_default, '-') FROM information_schema.columns
@@ -43,27 +44,25 @@ SELECT is(
   (SELECT count(*)::int FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'Events' AND column_name LIKE 'qbo\_invoice\_%'
      AND column_name <> 'qbo_invoice_mismatch' AND is_nullable = 'YES'),
-  5, 'the other five are nullable');
+  4, 'the other four are nullable');
 
 SELECT is(
   (SELECT count(*)::int FROM pg_constraint c
    WHERE c.conrelid = 'public."Events"'::regclass AND c.contype = 'f'
-     AND c.confrelid = 'public."QboConnections"'::regclass AND c.confdeltype = 'r'
-     AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute
-                           WHERE attrelid = 'public."Events"'::regclass AND attname = 'qbo_invoice_connection_uuid')]),
-  1, 'qbo_invoice_connection_uuid references QboConnections ON DELETE RESTRICT');
+     AND c.confrelid = 'public."QboConnections"'::regclass),
+  0, 'Events has no foreign key to QboConnections: the QuickBooks file is the sales office''s');
 
 SELECT is(
   (SELECT count(*)::int FROM pg_attribute a
    WHERE a.attrelid = 'public."Events"'::regclass AND a.attname LIKE 'qbo\_invoice\_%'
      AND NOT a.attisdropped AND col_description(a.attrelid, a.attnum) IS NOT NULL),
-  6, 'each column has a comment');
+  5, 'each column has a comment');
 
 SELECT is(
   (SELECT count(*)::int FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'Events'
-     AND column_name IN ('qbo_invoice_hash', 'qbo_invoice_sent_hash')),
-  0, 'the two hash columns do not exist');
+     AND column_name IN ('qbo_invoice_hash', 'qbo_invoice_sent_hash', 'qbo_invoice_connection_uuid')),
+  0, 'the two hash columns and the connection column do not exist');
 
 -- ═══ THE HASH MACHINERY IS AS IT WAS BEFORE THE MIGRATION ═══════════════════
 
@@ -106,7 +105,7 @@ RETURNING id AS line \gset
 -- ═══ A NEW EVENT ════════════════════════════════════════════════════════════
 
 SELECT is(
-  (SELECT (qbo_invoice_id IS NULL AND qbo_invoice_connection_uuid IS NULL
+  (SELECT (qbo_invoice_id IS NULL
            AND qbo_invoice_mismatch_reasons IS NULL AND qbo_invoice_checked_at IS NULL
            AND qbo_invoice_check_failed_at IS NULL AND qbo_invoice_mismatch = false)
    FROM public."Events" WHERE id = :'ev'),
@@ -119,15 +118,12 @@ CREATE TEMP TABLE before_hashes AS
 -- Written as the table owner (the service role is not 'authenticated' either): no hash change,
 -- no error from trigger recursion.
 
-INSERT INTO public."QboConnections" (display_name, encrypted_token_value)
-VALUES ('QIH Conn', 'x') RETURNING id AS conn \gset
-
 SELECT lives_ok(
-  format($q$UPDATE public."Events" SET qbo_invoice_id = '42', qbo_invoice_connection_uuid = %L,
+  format($q$UPDATE public."Events" SET qbo_invoice_id = '42',
             qbo_invoice_mismatch = true, qbo_invoice_mismatch_reasons = '["dates"]',
             qbo_invoice_checked_at = '2026-10-23 12:00:00+00',
-            qbo_invoice_check_failed_at = '2026-10-23 12:05:00+00' WHERE id = %L$q$, :'conn', :'ev'),
-  'the owner can write the six columns without a recursion error');
+            qbo_invoice_check_failed_at = '2026-10-23 12:05:00+00' WHERE id = %L$q$, :'ev'),
+  'the owner can write the five columns without a recursion error');
 SELECT is(
   (SELECT (e.content_hash = h.content_hash AND e.contract_hash = h.contract_hash)
    FROM public."Events" e, before_hashes h WHERE e.id = :'ev'),

@@ -1,10 +1,12 @@
 # QuickBooks invoice — the create route
 
-Status: **Implemented 2026-10-22; AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions.
+Status: **Implemented 2026-10-22; AMENDED 2026-10-23 — approved and implemented.** 0 open decisions.
 Step 8 was amended on 2026-10-22 by [03d](qbo-invoice-03d-canadian-line-tax-code.md) (the Canadian
 line's tax code). **The 2026-10-23 amendment removes the hash** (spec 01): step 4 goes, the saved
 link no longer carries a sent hash, the `requestid` is made from the event alone, and the hook of
-step 11 is the invoice check of [06](qbo-invoice-06-totals-check.md). The text below is the
+step 11 is the invoice check of [06](qbo-invoice-06-totals-check.md). **The second 2026-10-23
+amendment drops the saved connection** (spec 01: `Events.qbo_invoice_connection_uuid` is gone; the
+invoice's file is the sales office's): step 9 saves no connection. The text below is the
 amended one; step numbers are kept so that references to them hold.
 Implementation order: **04** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
@@ -116,7 +118,7 @@ In this order; a step that fails ends the request with its error and nothing aft
    from the event id alone (§2, Idempotency). The warnings of the two resolvers and of the
    builder go into the response's `warnings`. QuickBooks refuses → 502.
 9. Save the link in one `UPDATE Events … WHERE id = ? AND qbo_invoice_id IS NULL`:
-   `qbo_invoice_id`, `qbo_invoice_connection_uuid`, `qbo_invoice_mismatch` false,
+   `qbo_invoice_id`, `qbo_invoice_mismatch` false,
    `qbo_invoice_mismatch_reasons` null, `qbo_invoice_checked_at` and `qbo_invoice_check_failed_at`
    null, and `is_qbo` true. If no row changed because another request linked the same invoice
    first (same id), carry on; if it linked a different one, fail
@@ -215,7 +217,7 @@ Red first. Prettier only on touched files.
   - the order of §4 is kept; a failing step stops the later ones;
   - 409, the booked rule, each issue → 400; nothing is written to QuickBooks in those cases;
   - `invoice_number_exists` and `choose_customer` write nothing to QuickBooks or to `Events`;
-  - the saved row has the id, the connection, `qbo_invoice_mismatch` false, no reasons, no check times and
+  - the saved row has the id (and no connection: `Events` stores none, spec 01), `qbo_invoice_mismatch` false, no reasons, no check times and
     `is_qbo` true, and no hash column (there is none); the update is guarded by
     `qbo_invoice_id IS NULL`;
   - the link is saved before the PDF; a PDF failure still returns `created` with the warning;

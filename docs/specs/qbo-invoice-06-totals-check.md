@@ -2,10 +2,12 @@
 
 (The file keeps its old name, `…totals-check`, by the user's choice of 2026-10-23.)
 
-Status: **AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions; four readings to confirm
+Status: **AMENDED 2026-10-23 — approved and implemented.** 0 open decisions; four readings to confirm
 (§1, last paragraph). The earlier version compared QuickBooks' total and tax only and was
 implemented on 2026-10-23; the user then asked to compare the whole invoice and to drop the hash
-(§1). Everything here replaces that code.
+(§1). Everything here replaces that code. **A second amendment of 2026-10-23** drops the stored
+connection (spec 01: `Events.qbo_invoice_connection_uuid` is gone): the invoice is read, and every
+reference looked up, in the connection of the quote's sales office (§2, §3 step 1, §7).
 Implementation order: **06** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (the flag and the reasons),
@@ -76,8 +78,9 @@ the quote; a tolerance (the user said none).
   no-tax code (database); the customer from the contact's stored link (`ContactQboCustomers`,
   database). The create and update routes may also create a customer or ask the accountant to
   pick one; the check never does either.
-- **The connection.** The invoice is read, and every reference looked up, in the connection stored
-  on the quote (`qbo_invoice_connection_uuid`), not the office's current one.
+- **The connection.** The invoice is read, and every reference looked up, in the connection of the
+  quote's sales office (`InvoiceSource.connectionId`, from `sales_office_uuid` →
+  `quickbook_uuid`). `Events` stores no connection of its own (spec 01).
 - **The earlier totals check** lives in `checkInvoiceTotals.ts` (`dollarsToCents`,
   `compareInvoiceTotals`, `runTotalsCheck`, `QboReadError`) and in the check route; `dollarsToCents`
   and `QboReadError` are kept.
@@ -123,9 +126,10 @@ null. It does not look the customer up in QuickBooks, create it or drop a stale 
 **`…/invoice/checkInvoice.ts` (new; it replaces `checkInvoiceTotals.ts`, which is deleted).**
 `runInvoiceCheck(eventId, source)` — server-only, service role:
 
-1. The quote must have `qboInvoiceId` and `qboInvoiceConnectionId` (the route and the hooks give
-   them), else an error.
-2. `validateInvoiceSource(source)` (spec 03). Any issue → `skipped` with the messages joined.
+1. The quote must have `qboInvoiceId` (the route and the hooks give it), else an error.
+2. `validateInvoiceSource(source)` (spec 03). Any issue → `skipped` with the messages joined. An
+   office with no QuickBooks connection is one of them (`no_connection`), so from here on
+   `source.connectionId` is set; every lookup below uses it.
 3. `findQboItem(connection, eventTypeName)`; then `readQboInvoice(connection, id)`. No invoice →
    `missing`. A failure of either is a `QboReadError` (QuickBooks' side).
 4. The references: `readLinkedCustomerId`, `resolveZoneClass`, and for a Canadian quote
@@ -205,8 +209,11 @@ differently.
   a province with no code (the invoice was made untaxed, with a warning) and a tax typed by hand
   on the quote all show as `totals` (or `tax_code`, when the code on the line is not the one the
   settings give).
-- **The office moved to the other QuickBooks file.** The invoice is read and compared in the file
-  it lives in; whether it is in the office's company is not a reason (Update says so, spec 05).
+- **The office moved to the other QuickBooks file, or the quote to another office.** Nothing
+  notices it (spec 01 §1 and R3). The stored invoice id is looked up in the office's current file:
+  not there → `missing`, a failed check (the failure time is stored, the flag is left as it was); an
+  invoice of the same id there → that invoice is compared, and will most likely show `customer` and
+  other reasons.
 - **Sub-cent rounding.** QuickBooks rounds tax per line; with one line the totals can still
   differ by a cent from the quote's. That is reported: there is no tolerance.
 - **Invoice paid or voided.** QuickBooks' fields are read as they are.
@@ -275,7 +282,8 @@ Red first. Prettier only on touched files.
   a successful check writes the flag, the reasons and the check time together and clears the
   failure time; a match after a mismatch writes false and null; a QuickBooks failure is a
   `QboReadError`, writes only the failure time and leaves the rest; the invoice is read and every
-  reference looked up in the stored connection; the lookups never create anything.
+  reference looked up in the connection of the quote's sales office; the lookups never create
+  anything.
 - **`qboInvoiceApi` tests:** the snapshot of a full invoice; a missing `TxnTaxDetail` is tax 0;
   a non-sales-item line is left out; a fault 610 is still null.
 - **`route.test.ts` (check):** 400, 404, 409, `checked`, `invoice_missing`, `skipped`, 502.

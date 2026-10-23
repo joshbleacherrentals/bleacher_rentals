@@ -3,10 +3,12 @@
 Status: **Implemented 2026-10-22.** 0 open
 decisions. The tax code per Canadian province ([03a](qbo-invoice-03a-province-tax-codes.md))
 and the QuickBooks Class ([03b](qbo-invoice-03b-zone-class.md)) are separate specs; the
-builder here takes both as inputs. **The Canadian branch was amended on 2026-10-22 by
+builder here takes both as inputs. **Amended a second time 2026-10-23 (approved and implemented):**
+`Events` no longer stores the invoice's connection (spec 01), so `InvoiceSource` loses
+`qboInvoiceConnectionId` and `connectionId` is the only connection (§3, §4). **The Canadian branch was amended on 2026-10-22 by
 [03c](qbo-invoice-03c-no-tax-code.md) and [03d](qbo-invoice-03d-canadian-line-tax-code.md)**
 after the first sandbox run (QuickBooks Canada refuses `TAX` and `NON` on a line): the text
-below is the amended one. **Amended 2026-10-23 — awaiting "Approved":** the invoice hash this
+below is the amended one. **Amended 2026-10-23 (approved and implemented):** the invoice hash this
 builder had to stay in step with is gone (spec 01); the comparison of
 [06](qbo-invoice-06-totals-check.md) now covers every member the builder writes (§2, §9, §11).
 Implementation order: **03** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
@@ -84,8 +86,9 @@ province (`normalizeCanadianProvince`).
   `invoiceNumber`, `title`, `eventTypeName`, `eventStart`, `dueDate`, `venue` (street, city,
   state, zip), `billedContact` (id, first name, last name, email, company name),
   `billToName`, `amountCents`, `taxCents`, `currency`, `canadianProvince` (a province code, or
-  null for any other state), `connectionId` (the sales office's QuickBooks connection), plus
-  the link columns of spec 01 (`qboInvoiceId`, …).
+  null for any other state), `connectionId` (the sales office's QuickBooks connection: the one
+  and only connection of the quote, for the invoice too), plus the link and flag columns of spec
+  01 (`qboInvoiceId`, `qboInvoiceMismatch`, `qboInvoiceMismatchReasons`).
 - `InvoiceIssue` — `{ code, message }`. Codes: `deleted`, `no_invoice_number`, `no_event_type`,
   `no_sales_office`, `no_connection`, `no_contact`, `no_venue`.
 - `QboItemRef` — `{ id, name, description }`.
@@ -105,7 +108,7 @@ when the event does not exist.
 - It then reads what the document lacks with **one table per query, merged in JS** (no query
   with several joins): the event row (`invoice_number`, `event_status`, `event_type_uuid`,
   `event_name`, `sales_office_uuid`, `contact_uuid`, `finance_contact_uuid`, `deleted` and
-  the link columns of spec 01); the event type's name; the sales office's `quickbook_uuid`;
+  the link and flag columns of spec 01); the event type's name; the sales office's `quickbook_uuid`;
   the billed contact (finance contact when set, else contact) and, when it has one, its
   company's name.
 - `dueDate` is the latest `paymentSchedule[].dueDate`, or `dates.eventStart` when empty.
