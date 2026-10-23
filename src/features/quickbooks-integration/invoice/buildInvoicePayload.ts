@@ -1,0 +1,143 @@
+import type {
+  InvoiceBuildWarning,
+  InvoiceIssue,
+  InvoiceRefs,
+  InvoiceSource,
+  QboInvoiceBody,
+  QboInvoiceLine,
+} from "./invoiceTypes";
+
+/**
+ * Pure: turns a quote (InvoiceSource) into the body of a QuickBooks invoice.
+ * Every member it writes must be covered by the invoice comparison — see compareCoverage.test.ts.
+ * Spec: docs/specs/qbo-invoice-03-payload.md
+ */
+
+/** Cents as a two-decimal dollar string, by integer arithmetic (no floating point). */
+export function centsToDollars(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+}
+
+/** What a Canadian invoice that needs the connection's no-tax code is refused with when it has none. */
+export const NO_TAX_CODE_MISSING =
+  "This QuickBooks connection has no 'no tax' code for Canadian invoices. Ask an admin to choose one on the QuickBooks page.";
+
+/** What stops this quote from being invoiced, each message for the person who pressed the button. */
+export function validateInvoiceSource(source: InvoiceSource): InvoiceIssue[] {
+  const issues: InvoiceIssue[] = [];
+
+  if (source.deleted) {
+    issues.push({
+      code: "deleted",
+      message: "This quote is deleted. Restore it before creating an invoice.",
+    });
+  }
+  if (source.invoiceNumber === null) {
+    issues.push({
+      code: "no_invoice_number",
+      message: "This quote has no invoice number, so it cannot be invoiced in QuickBooks.",
+    });
+  }
+  if (!source.eventTypeName) {
+    issues.push({
+      code: "no_event_type",
+      message: "Choose an event type on the quote (City, Corporate or Rural) and try again.",
+    });
+  }
+  if (!source.salesOfficeId) {
+    issues.push({
+      code: "no_sales_office",
+      message: "Choose a sales office on the quote and try again.",
+    });
+  } else if (!source.connectionId) {
+    issues.push({
+      code: "no_connection",
+      message: "This quote's sales office has no QuickBooks connection. Ask an admin to set one.",
+    });
+  }
+
+  const contact = source.billedContact;
+  if (!contact || !(contact.firstName.trim() || contact.lastName?.trim())) {
+    issues.push({
+      code: "no_contact",
+      message: "Add a contact with a name to the quote and try again.",
+    });
+  }
+  if (!source.venue.street.trim() || !source.venue.state.trim()) {
+    issues.push({
+      code: "no_venue",
+      message: "Add the venue's street address and state to the quote and try again.",
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Whether a Canadian line must carry the connection's no-tax code: the quote has no tax, or it has
+ * tax but its province has no code mapped. A US quote never needs it.
+ * Spec: docs/specs/qbo-invoice-03d-canadian-line-tax-code.md
+ */
+export function needsNoTaxCode(source: InvoiceSource, canadianTaxCodeId: string | null): boolean {
+  return !!source.canadianProvince && !(source.taxCents > 0 && canadianTaxCodeId);
+}
+
+/** The invoice body and what the caller should tell the user about it. */
+export function buildInvoicePayload(
+  source: InvoiceSource,
+  refs: InvoiceRefs,
+): { body: QboInvoiceBody; warnings: InvoiceBuildWarning[] } {
+  const warnings: InvoiceBuildWarning[] = [];
+  const taxed = source.taxCents > 0;
+
+  // The US file takes TAX or NON on the line and calculates the tax from the address. The Canadian
+  // file refuses both: the line carries a real tax code of the file, and QuickBooks builds the tax
+  // from it. Taxed but no code mapped for the province → the no-tax code, and a warning.
+  const province = source.canadianProvince;
+  let taxCode: string;
+  if (province) {
+    const provinceCode = taxed ? refs.canadianTaxCodeId : null;
+    if (taxed && !provinceCode) warnings.push({ code: "tax_code_missing", province });
+    const code = provinceCode ?? refs.noTaxCodeId;
+    // The create route has refused a Canadian quote that needs the no-tax code and has none.
+    if (!code) throw new Error("A Canadian invoice line needs the connection's no-tax code");
+    taxCode = code;
+  } else {
+    taxCode = taxed ? "TAX" : "NON";
+  }
+
+  const amount = centsToDollars(source.amountCents);
+  const line: QboInvoiceLine = {
+    DetailType: "SalesItemLineDetail",
+    Amount: amount,
+    ...(refs.item.description ? { Description: refs.item.description } : {}),
+    SalesItemLineDetail: {
+      ItemRef: { value: refs.item.id, name: refs.item.name },
+      Qty: 1,
+      UnitPrice: amount,
+      TaxCodeRef: { value: taxCode },
+      ...(refs.classId ? { ClassRef: { value: refs.classId } } : {}),
+    },
+  };
+
+  const body: QboInvoiceBody = {
+    DocNumber: String(source.invoiceNumber),
+    TxnDate: source.eventStart,
+    DueDate: source.dueDate,
+    CustomerRef: { value: refs.customerId },
+    BillAddr: { Line1: source.billToName },
+    ShipAddr: {
+      Line1: source.venue.street,
+      City: source.venue.city,
+      CountrySubDivisionCode: source.venue.state,
+      PostalCode: source.venue.zip,
+    },
+    PrivateNote: source.title,
+    GlobalTaxCalculation: "TaxExcluded",
+    Line: [line],
+  };
+
+  return { body, warnings };
+}

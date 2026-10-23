@@ -385,6 +385,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ContactQboCustomers": {
+                  Row: {
+                    "contact_uuid": string,"created_at": string,"id": string,"qbo_connection_uuid": string,"qbo_customer_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contact_uuid": string,"created_at"?: string,"id"?: string,"qbo_connection_uuid": string,"qbo_customer_id": string
+                  }
+                  Update: {
+                    "contact_uuid"?: string,"created_at"?: string,"id"?: string,"qbo_connection_uuid"?: string,"qbo_customer_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ContactQboCustomers_contact_uuid_fkey"
+      columns: ["contact_uuid"]
+isOneToOne: false
+      referencedRelation: "Contacts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ContactQboCustomers_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"Contacts": {
                   Row: {
                     "company_uuid": string | null,"created_at": string,"created_by_user_uuid": string | null,"default_venue_uuid": string | null,"deleted": boolean,"email": string | null,"first_name": string,"id": string,"last_name": string | null,"notes": string | null,"phone": string | null,"preferred_language": Database["public"]['Enums']["preferred_language"]
@@ -1135,14 +1161,14 @@ isOneToOne: false
                   ]
                 },"Events": {
                   Row: {
-                    "address_uuid": string | null,"booked_at": string | null,"contact_uuid": string | null,"content_hash": string | null,"contract_hash": string | null,"contract_revenue_cents": number | null,"created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"dropoff_instructions": string | null,"event_end": string,"event_name": string,"event_start": string,"event_status": Database["public"]['Enums']["event_status"] | null,"event_type_uuid": string | null,"external_notes": string | null,"fifteen_row": number | null,"finance_contact_uuid": string | null,"goodshuffle_url": string | null,"hide_lead_alert": boolean,"hsl_hue": number | null,"id": string,"internal_notes": string | null,"invoice_number": number | null,"is_qbo": boolean,"is_tax_overridden": boolean,"lead_submission": Json | null,"lenient": boolean,"lost_reason": Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note": string | null,"must_be_clean": boolean,"notes": string | null,"pickup_instructions": string | null,"po_number": string | null,"quote_sent_at": string | null,"quote_valid_till": string | null,"sales_office_uuid": string | null,"setup_start": string | null,"seven_row": number | null,"tax_amount_cents": number | null,"tax_percent": number | null,"teardown_end": string | null,"ten_row": number | null,"terms_and_conditions_uuid": string | null,"total_seats": number | null,"venue_uuid": string | null
+                    "address_uuid": string | null,"booked_at": string | null,"contact_uuid": string | null,"content_hash": string | null,"contract_hash": string | null,"contract_revenue_cents": number | null,"created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"dropoff_instructions": string | null,"event_end": string,"event_name": string,"event_start": string,"event_status": Database["public"]['Enums']["event_status"] | null,"event_type_uuid": string | null,"external_notes": string | null,"fifteen_row": number | null,"finance_contact_uuid": string | null,"goodshuffle_url": string | null,"hide_lead_alert": boolean,"hsl_hue": number | null,"id": string,"internal_notes": string | null,"invoice_number": number | null,"is_qbo": boolean,"is_tax_overridden": boolean,"lead_submission": Json | null,"lenient": boolean,"lost_reason": Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note": string | null,"must_be_clean": boolean,"notes": string | null,"pickup_instructions": string | null,"po_number": string | null,"qbo_invoice_check_failed_at": string | null,"qbo_invoice_checked_at": string | null,"qbo_invoice_id": string | null,"qbo_invoice_mismatch": boolean,"qbo_invoice_mismatch_reasons": string | null,"quote_sent_at": string | null,"quote_valid_till": string | null,"sales_office_uuid": string | null,"setup_start": string | null,"seven_row": number | null,"tax_amount_cents": number | null,"tax_percent": number | null,"teardown_end": string | null,"ten_row": number | null,"terms_and_conditions_uuid": string | null,"total_seats": number | null,"venue_uuid": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end": string,"event_name": string,"event_start": string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient": boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
+                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end": string,"event_name": string,"event_start": string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient": boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"qbo_invoice_check_failed_at"?: string | null,"qbo_invoice_checked_at"?: string | null,"qbo_invoice_id"?: string | null,"qbo_invoice_mismatch"?: boolean,"qbo_invoice_mismatch_reasons"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
                   }
                   Update: {
-                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end"?: string,"event_name"?: string,"event_start"?: string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient"?: boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
+                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end"?: string,"event_name"?: string,"event_start"?: string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient"?: boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"qbo_invoice_check_failed_at"?: string | null,"qbo_invoice_checked_at"?: string | null,"qbo_invoice_id"?: string | null,"qbo_invoice_mismatch"?: boolean,"qbo_invoice_mismatch_reasons"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
                   }
                   Relationships: [
                     {
@@ -1543,16 +1569,36 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"QboConnections": {
+                },"ProvinceQboTaxCodes": {
                   Row: {
-                    "currency": string | null,"display_name": string,"encrypted_token_value": string,"id": string,"qbo_tax_code_id": string | null,"realm_id": string | null
+                    "created_at": string,"id": string,"province": string,"qbo_connection_uuid": string,"qbo_tax_code_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "currency"?: string | null,"display_name": string,"encrypted_token_value": string,"id"?: string,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                    "created_at"?: string,"id"?: string,"province": string,"qbo_connection_uuid": string,"qbo_tax_code_id": string
                   }
                   Update: {
-                    "currency"?: string | null,"display_name"?: string,"encrypted_token_value"?: string,"id"?: string,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                    "created_at"?: string,"id"?: string,"province"?: string,"qbo_connection_uuid"?: string,"qbo_tax_code_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ProvinceQboTaxCodes_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"QboConnections": {
+                  Row: {
+                    "currency": string | null,"display_name": string,"encrypted_token_value": string,"id": string,"qbo_no_tax_code_id": string | null,"qbo_tax_code_id": string | null,"realm_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "currency"?: string | null,"display_name": string,"encrypted_token_value": string,"id"?: string,"qbo_no_tax_code_id"?: string | null,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                  }
+                  Update: {
+                    "currency"?: string | null,"display_name"?: string,"encrypted_token_value"?: string,"id"?: string,"qbo_no_tax_code_id"?: string | null,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
                   }
                   Relationships: [
                     

@@ -27,7 +27,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the internal chat, Companies & Contacts, and Edit Team Members", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice, the internal chat, Companies & Contacts, and Edit Team Members", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -40,6 +40,7 @@ describe("permission matrix", () => {
         "Event Chat",
         "Events",
         "Payment History",
+        "QuickBooks Invoice (create and update)",
         "QuickBooks Invoice Flag",
         "Quote Files",
         "Record a Payment",
@@ -562,6 +563,129 @@ describe("permission matrix", () => {
     it("only reads Events and Work Trackers — the dashboard shows them, nothing more", () => {
       expect(row("Events")?.level).toBe("read");
       expect(row("Work Trackers")?.level).toBe("read");
+    });
+  });
+
+  // docs/specs/qbo-invoice-03a-province-tax-codes.md §4: the QuickBooks page also holds the tax
+  // code of each Canadian province. Only an administrator maintains it; no role gains anything.
+  describe("Quickbooks Connections (province tax codes)", () => {
+    const connections = PERMISSIONS.find((p) => p.label === "Quickbooks Connections");
+
+    // docs/specs/qbo-invoice-03e-canadian-settings-cad-only.md §3: only a CAD connection has them.
+    it("tells an administrator they also set the tax code of every Canadian province, for each Canadian (CAD) connection", () => {
+      expect(connections?.roles.admin.level).toBe("full");
+      expect(connections?.roles.admin.note).toContain(
+        "also sets, for each Canadian (CAD) connection, the QuickBooks tax code to use for every Canadian province",
+      );
+    });
+
+    // docs/specs/qbo-invoice-03c-no-tax-code.md §4: and the code a Canadian invoice line carries
+    // when it has no tax.
+    it("tells an administrator they also set the 'no tax' code of a Canadian invoice", () => {
+      expect(connections?.roles.admin.note).toContain(
+        "the QuickBooks tax code that means 'no tax' on a Canadian invoice",
+      );
+    });
+
+    it("still keeps the page from every other role", () => {
+      for (const role of ROLE_ORDER.filter((r) => r !== "admin")) {
+        expect(connections?.roles[role].level, role).toBe("none");
+      }
+    });
+  });
+
+  // docs/specs/qbo-invoice-07-card-buttons.md §5: the Create invoice and Update invoice buttons on
+  // the Billing tab are the first place a person can use the feature, so the matrix says who may.
+  describe("QuickBooks Invoice (create and update) (spec qbo-invoice-07)", () => {
+    const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice (create and update)");
+    const flagRow = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Flag");
+    const eventsRow = PERMISSIONS.find((p) => p.label === "Events");
+
+    it("is a Day to Day Operations row that answers for every role", () => {
+      expect(row?.category).toBe("Day to Day Operations");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+    });
+
+    it("is full for an admin and an accountant, and none for every other role", () => {
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "none",
+        accountant: "full",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("describes the buttons, and says the invoice is never sent to the client", () => {
+      expect(row?.description).toMatch(
+        /^The Create invoice and Update invoice buttons on the Billing tab of a quote or booking\. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data\. The invoice is saved in QuickBooks for the books and is never sent to the client\./,
+      );
+    });
+
+    // docs/specs/qbo-invoice-08-view-and-check.md §5: the description gains the two extra buttons and
+    // the check time; the levels do not change (the test of the levels above still holds).
+    it("spec 08: also describes View in QuickBooks, Check again and the check time", () => {
+      expect(row?.description).toMatch(
+        / A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked\.$/,
+      );
+    });
+
+    it("tells an admin and an accountant what they can do, and that Update asks first", () => {
+      expect(row?.roles.admin.note).toBe(
+        "Can create the invoice of any booked quote and update any invoice.",
+      );
+      expect(row?.roles.accountant.note).toBe(
+        "Can create the invoice of any booked quote, on a quote of any office, and update any invoice. Update always asks first.",
+      );
+    });
+
+    it("tells an account manager they cannot, and that they can still tick the flag", () => {
+      expect(row?.roles.account_manager.note).toBe(
+        "Cannot create or update a QuickBooks invoice. They can still tick the QuickBooks Invoice Flag.",
+      );
+      expect(row?.roles.viewer.note).toBe("Cannot create or update a QuickBooks invoice.");
+      expect(row?.roles.driver.note).toBe("Drivers only have access to the Driver Mobile App.");
+    });
+
+    it("keeps the developer note about quotes and the maintainer note of the other rows", () => {
+      expect(row?.roles.developer.note).toBe(flagRow?.roles.developer.note);
+      expect(row?.roles.maintainer.note).toBe(flagRow?.roles.maintainer.note);
+    });
+
+    it("no longer says the QuickBooks Invoice Flag pushes nothing to QuickBooks, and points to the new row", () => {
+      expect(flagRow?.description).not.toMatch(/does not push anything to QuickBooks/);
+      expect(flagRow?.description).toMatch(
+        /It is also ticked automatically when an invoice is created from the quote \(see QuickBooks Invoice \(create and update\)\)\.$/,
+      );
+    });
+
+    it("keeps the levels of the QuickBooks Invoice Flag row where they were", () => {
+      const levels = Object.fromEntries(
+        Object.entries(flagRow?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "full",
+        accountant: "full",
+        viewer: "read",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("names the invoice in the accountant's role description and in their note on Events", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).toMatch(
+        /and create or update a quote's QuickBooks invoice/,
+      );
+      expect(eventsRow?.roles.accountant.note).toMatch(
+        /and the QuickBooks invoice \(see those rows\)/,
+      );
     });
   });
 });

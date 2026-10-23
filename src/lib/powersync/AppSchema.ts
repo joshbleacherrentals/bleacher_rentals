@@ -258,6 +258,12 @@ const EventsCols = {
   tax_amount_cents: column.integer,
   is_tax_overridden: column.integer,
   finance_contact_uuid: column.text,
+  // Written by the server (service role). The two timestamps are text locally.
+  qbo_invoice_id: column.text,
+  qbo_invoice_mismatch: column.integer,
+  qbo_invoice_mismatch_reasons: column.text,
+  qbo_invoice_checked_at: column.text,
+  qbo_invoice_check_failed_at: column.text,
   content_hash: column.text,
   contract_hash: column.text,
   venue_uuid: column.text,

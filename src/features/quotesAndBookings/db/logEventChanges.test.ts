@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { logEventChanges, logSingleChange, logLineItemChanges, formatCentsForLog } from "./logEventChanges";
+import {
+  logEventChanges,
+  logSingleChange,
+  logLineItemChanges,
+  formatCentsForLog,
+  FIELD_LABELS,
+} from "./logEventChanges";
 
 const mockInsert = vi.fn();
 
@@ -17,6 +23,17 @@ const mockSupabase = {
     };
   }),
 } as any;
+
+describe("FIELD_LABELS", () => {
+  it("names the invoice the app made in QuickBooks, so the Log tab does not show the raw field", () => {
+    // docs/specs/qbo-invoice-04-create.md §6
+    expect(FIELD_LABELS.qbo_invoice).toBe("QuickBooks Invoice (made by the app)");
+  });
+
+  it("keeps the label of the manual checkbox", () => {
+    expect(FIELD_LABELS.is_qbo).toBe("QuickBooks Invoice");
+  });
+});
 
 describe("formatCentsForLog", () => {
   it("formats positive cents as USD", () => {

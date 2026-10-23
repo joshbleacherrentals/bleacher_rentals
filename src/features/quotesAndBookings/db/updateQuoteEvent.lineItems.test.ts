@@ -52,6 +52,7 @@ vi.mock("../utils/notifyFinanceBooked", () => ({
   postFinanceBookedNotice: vi.fn(),
   shouldNotifyFinanceBooked: () => false,
 }));
+vi.mock("../utils/requestInvoiceCheck", () => ({ requestInvoiceCheck: vi.fn() }));
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToast: vi.fn() }));
 
 import { updateQuoteEvent } from "./updateQuoteEvent";
