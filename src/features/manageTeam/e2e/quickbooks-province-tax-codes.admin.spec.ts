@@ -10,6 +10,8 @@ const CONNECTION = {
   display_name: "Canada Division",
   realm_id: "9341000000001",
   qbo_tax_code_id: null,
+  // The section is drawn for a CAD connection only (docs/specs/qbo-invoice-03e).
+  currency: "CAD",
 };
 const TAX_CODES = [
   { id: "5", name: "HST ON 13%", description: null, taxable: true },
@@ -78,7 +80,7 @@ async function openSection(page: Page) {
 }
 
 test.describe("Province tax codes on /quickbooks (admin)", () => {
-  test("S1: each connection has the section, listing the 13 provinces", async ({ page }) => {
+  test("S1: a CAD connection has the section, listing the 13 provinces", async ({ page }) => {
     await fakeQuickBooks(page);
 
     await openSection(page);

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchProvinceTaxCodes, setProvinceTaxCodeApi, setQboConnectionNoTaxCodeApi } from "./api";
+import {
+  fetchProvinceTaxCodes,
+  isCanadianConnection,
+  setProvinceTaxCodeApi,
+  setQboConnectionNoTaxCodeApi,
+} from "./api";
 
 // docs/specs/qbo-invoice-03a-province-tax-codes.md §4: the page reaches db.ts through the
 // province-tax-codes route; these two functions are its only callers.
@@ -12,6 +17,21 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+// docs/specs/qbo-invoice-03e-canadian-settings-cad-only.md §3 and §6: the province section and the
+// no-tax row are drawn for a connection whose recorded currency is exactly CAD.
+describe("isCanadianConnection", () => {
+  it("is true for CAD", () => {
+    expect(isCanadianConnection("CAD")).toBe(true);
+  });
+
+  it.each([["USD"], [null], [undefined], [""], ["cad"], [" CAD"], ["EUR"]])(
+    "is false for %j",
+    (currency) => {
+      expect(isCanadianConnection(currency as string | null | undefined)).toBe(false);
+    },
+  );
 });
 
 // docs/specs/qbo-invoice-03c-no-tax-code.md §4: the "no tax" code is saved through the connections

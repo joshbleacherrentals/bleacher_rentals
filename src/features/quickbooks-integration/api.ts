@@ -83,7 +83,19 @@ export type QboConnection = {
   realm_id: string | null;
   qbo_tax_code_id: string | null;
   qbo_no_tax_code_id: string | null;
+  /** The company's currency, recorded when the connection was authenticated; null until then. */
+  currency: string | null;
 };
+
+/**
+ * Whether a connection is a Canadian company: its recorded currency is exactly CAD. Only such a
+ * connection shows the tax code per province and the no-tax code on the QuickBooks page; one with
+ * any other currency, or none recorded yet, shows neither.
+ * Spec: docs/specs/qbo-invoice-03e-canadian-settings-cad-only.md
+ */
+export function isCanadianConnection(currency: string | null | undefined): boolean {
+  return currency === "CAD";
+}
 
 export type QboTaxCode = {
   id: string;

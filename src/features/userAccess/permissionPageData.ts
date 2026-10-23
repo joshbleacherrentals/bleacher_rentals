@@ -580,7 +580,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Configuration",
     roles: {
       admin: full(
-        "Able to create, update, delete, and edit all Quickbooks connections in the Quickbooks page, and also sets, for each connection, the QuickBooks tax code to use for every Canadian province, and the QuickBooks tax code that means 'no tax' on a Canadian invoice.",
+        "Able to create, update, delete, and edit all Quickbooks connections in the Quickbooks page, and also sets, for each Canadian (CAD) connection, the QuickBooks tax code to use for every Canadian province, and the QuickBooks tax code that means 'no tax' on a Canadian invoice.",
       ),
       account_manager: none("Account managers can't even see this page even on sidebar"),
       developer: none(

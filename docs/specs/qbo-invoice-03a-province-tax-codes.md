@@ -3,7 +3,8 @@
 Status: **Implemented 2026-10-22.** 0 open decisions; three readings to confirm (§1, last
 paragraph). Two changes were approved while implementing: the migration is numbered
 `20261022150000` (§3), and the page reaches `db.ts` through a route plus two `api.ts` functions
-(§4, §6).
+(§4, §6). **Narrowed on 2026-10-23 by [03e](qbo-invoice-03e-canadian-settings-cad-only.md):**
+the section is drawn only for a connection whose currency is CAD (§1, third reading; §5 S1).
 Implementation order: **03a**, after [03](qbo-invoice-03-payload.md) and before
 [04](qbo-invoice-04-create.md). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
@@ -36,7 +37,7 @@ codes in QuickBooks; the US file (it calculates tax itself).
 **Question — a taxed Canadian quote whose province has no code mapped**
 
 - **Option A — refuse the invoice** with a message. **Option B — create it without tax and
-  warn;** the totals check then reports a mismatch until the code is mapped and the invoice
+  warn;** the invoice check then reports a mismatch until the code is mapped and the invoice
   updated.
 - **User's answer: B — create untaxed, with a warning.**
 
@@ -47,9 +48,9 @@ codes in QuickBooks; the US file (it calculates tax itself).
 
 **Readings to confirm at review.**
 
-- The section sits on the existing `/quickbooks` page, under each connection's Default Tax Code
-  row, and is shown for **every** connection (a connection's country is not stored reliably);
-  a US connection simply never reads it.
+- The section sits on the existing `/quickbooks` page, under a connection's Default Tax Code
+  row. ~~It is shown for **every** connection.~~ **Amended by 03e:** it is shown only for a
+  connection whose `QboConnections.currency` is `CAD`; a US connection never reads it.
 - Only an **admin** maintains it, because the page is admin-only and the Default Tax Code is
   already set there; no role gains anything new.
 - The choices of a province's code are the connection's own QuickBooks tax codes, loaded the
@@ -125,7 +126,8 @@ Row level security is **enabled**, with four policies (select, insert, update, d
 
 Playwright, written, **not run**; the QuickBooks tax-code list is replaced by a fake.
 
-- **S1** admin on `/quickbooks`: each connection has the section; it lists the 13 provinces.
+- **S1** admin on `/quickbooks`: each CAD connection has the section and it lists the 13
+  provinces; a USD connection and one with no currency do not have it (03e).
 - **S2** admin picks a code for Ontario: it survives a reload; picking "— none —" removes it.
 - **S3** a failed save: the error toast and the old value back.
 - **S4** an account manager, accountant and viewer cannot open the page (unchanged).
@@ -195,7 +197,7 @@ Red first. Prettier only on touched files.
 ## 9. Risks
 
 - **R1 — a code whose rate differs from the calculator's** (the table changed, or a wrong
-  code chosen) makes every invoice of that province show a mismatch; that is the totals check
+  code chosen) makes every invoice of that province show a mismatch; that is the invoice check
   doing its job.
 - **R2 — an unmapped province** gives untaxed invoices with a warning (§1) until mapped and
   updated; the quotes land on Need attention.

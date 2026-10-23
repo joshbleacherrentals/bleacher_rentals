@@ -1,7 +1,9 @@
 # QuickBooks invoice — the "no tax" code of a connection
 
 Status: **Implemented 2026-10-22.** 0 open decisions; three readings to confirm
-(§1, last paragraph).
+(§1, last paragraph). **Narrowed on 2026-10-23 by
+[03e](qbo-invoice-03e-canadian-settings-cad-only.md):** the row is renamed "No-tax code" and
+drawn only for a connection whose currency is CAD (§1, first reading; §4; §5 S1; §8).
 Implementation order: **03c**, then [03d](qbo-invoice-03d-canadian-line-tax-code.md); both come
 after [04](qbo-invoice-04-create.md), which is already implemented. Plan:
 [qbo-invoice-plan.md](qbo-invoice-plan.md).
@@ -34,8 +36,9 @@ file.
 
 **Readings to confirm at review.**
 
-- The row sits on the existing `/quickbooks` page, under the Default Tax Code row, and is shown for
-  **every** connection (as in 03a); a US connection never reads it.
+- The row sits on the existing `/quickbooks` page, under the Default Tax Code row.
+  ~~It is shown for **every** connection (as in 03a).~~ **Amended by 03e:** it is shown only for a
+  CAD connection, as the province section is, and a US connection never reads it.
 - It is stored as a nullable column on `QboConnections`, saved through the connections route like
   the Default Tax Code, and only an **admin** maintains it, so no role gains anything new.
 - The app does not check that the chosen code is "Exempt": the admin picks from the connection's own
@@ -80,7 +83,8 @@ No policy, trigger or index changes: the column follows the table's existing rul
 - **`connections/route.ts`:** `PATCH` handles a body that has the key `noTaxCodeId`: `null` clears
   the code, a non-empty string sets it, anything else answers 400 (a body that forgot the value must
   not clear it); answers `{ success: true }`. Admin-only, as the rest of the route.
-- **`quickbooks/page.tsx`:** a row "No-tax code (Canada)" under the Default Tax Code row: a `select`
+- **`quickbooks/page.tsx`:** a row "No-tax code" (03e: it was "No-tax code (Canada)", and is drawn
+  for CAD connections only) under the Default Tax Code row: a `select`
   of the connection's tax codes with "— none —", saved at once, in the same way and with the same
   failure behaviour as the Default Tax Code row. Until the codes are loaded it shows the stored id.
 - **`resolveProvinceTaxCode.ts`:** a second export, `resolveNoTaxCode(connectionId)`, reads the
@@ -92,7 +96,8 @@ No policy, trigger or index changes: the column follows the table's existing rul
 
 Playwright, written, **not run**; the QuickBooks tax-code list is replaced by a fake.
 
-- **S1** admin on `/quickbooks`: each connection shows "No-tax code (Canada)".
+- **S1** admin on `/quickbooks`: each CAD connection shows "No-tax code"; a USD connection and
+  one with no currency do not (03e).
 - **S2** admin picks a code: it survives a reload; "— none —" clears it.
 - **S3** a failed save: the error toast and the old value back.
 - **S4** an account manager, accountant and viewer cannot open the page (unchanged).
@@ -138,7 +143,7 @@ Red first. Prettier only on touched files.
   the message passes on (spec 04). The select shows the stored id.
 - **A connection that is not healthy.** The tax-code list does not load; the row shows the stored
   id and cannot change it, as the Default Tax Code row does.
-- **A US connection.** The row is shown but never read.
+- **A US connection.** The row is not drawn (03e) and its column is never read.
 - **Two admins edit at once.** The last write wins.
 - **Offline / PowerSync.** Not applicable: online-only.
 - **Clerk.** The route is guarded by `requireAdmin`.
@@ -146,7 +151,7 @@ Red first. Prettier only on touched files.
 ## 9. Risks
 
 - **R1 — a wrong code chosen** (one that carries a rate) puts that rate on every untaxed Canadian
-  invoice; the totals check (spec 06) reports it as a mismatch.
+  invoice; the invoice check (spec 06) reports it as a mismatch.
 - **R2 — no code chosen** makes a Canadian invoice that needs it impossible to build (spec 03d
   refuses it with a message).
 

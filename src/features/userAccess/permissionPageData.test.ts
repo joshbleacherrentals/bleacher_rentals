@@ -571,10 +571,11 @@ describe("permission matrix", () => {
   describe("Quickbooks Connections (province tax codes)", () => {
     const connections = PERMISSIONS.find((p) => p.label === "Quickbooks Connections");
 
-    it("tells an administrator they also set the tax code of every Canadian province", () => {
+    // docs/specs/qbo-invoice-03e-canadian-settings-cad-only.md §3: only a CAD connection has them.
+    it("tells an administrator they also set the tax code of every Canadian province, for each Canadian (CAD) connection", () => {
       expect(connections?.roles.admin.level).toBe("full");
       expect(connections?.roles.admin.note).toContain(
-        "also sets, for each connection, the QuickBooks tax code to use for every Canadian province",
+        "also sets, for each Canadian (CAD) connection, the QuickBooks tax code to use for every Canadian province",
       );
     });
 

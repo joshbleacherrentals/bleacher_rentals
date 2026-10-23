@@ -63,12 +63,14 @@ async function fakeQuickBooks(page: Page, opts: { failSave?: boolean } = {}) {
 const noTaxSelect = (page: Page) => page.getByTestId(`no-tax-code-${CONNECTION.id}`);
 
 test.describe("No-tax code on /quickbooks (admin)", () => {
-  test("S1: each connection shows the No-tax code row, listing its tax codes", async ({ page }) => {
+  test("S1: a CAD connection shows the No-tax code row, listing its tax codes", async ({
+    page,
+  }) => {
     await fakeQuickBooks(page);
 
     await page.goto("/quickbooks");
 
-    await expect(page.getByText("No-tax code (Canada)")).toBeVisible();
+    await expect(page.getByText("No-tax code", { exact: true })).toBeVisible();
     await expect(noTaxSelect(page)).toBeVisible();
     for (const name of ["— none —", "Exempt", "Zero-rated", "HST ON"]) {
       await expect(noTaxSelect(page).locator("option", { hasText: name })).toHaveCount(1);
