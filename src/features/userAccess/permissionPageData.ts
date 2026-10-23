@@ -126,7 +126,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "QuickBooks Invoice (create and update)",
     description:
-      "The Create invoice and Update invoice buttons on the Billing tab of a quote or booking. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data. The invoice is saved in QuickBooks for the books and is never sent to the client.",
+      "The Create invoice and Update invoice buttons on the Billing tab of a quote or booking. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data. The invoice is saved in QuickBooks for the books and is never sent to the client. A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked.",
     category: "Day to Day Operations",
     roles: {
       admin: full("Can create the invoice of any booked quote and update any invoice."),

@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  checkOutcome,
   createInvoiceFlow,
   NETWORK_ERROR_MESSAGE,
   NOT_FOUND_DECLINED_MESSAGE,
+  postCheck,
   postInvoice,
+  runCheckAgain,
   warningMessage,
+  type CheckFlowIo,
+  type CheckResult,
   type InvoiceDialog,
   type InvoiceFlowIo,
   type InvoiceRequest,
@@ -556,5 +561,207 @@ describe("Update flow", () => {
     expect(io.fail).toHaveBeenCalledWith(
       "Could not reach the server. Check your connection and try again.",
     );
+  });
+});
+
+// --- Check again (docs/specs/qbo-invoice-08-view-and-check.md §4) ----------------------------------
+
+const MATCHING: CheckResult = { status: "checked", matches: true, reasons: [], differences: [] };
+
+const DIFFERING: CheckResult = {
+  status: "checked",
+  matches: false,
+  reasons: ["dates", "amount"],
+  differences: [
+    { reason: "dates", field: "Due date", quote: "2026-11-14", qbo: "2026-11-01" },
+    { reason: "dates", field: "Invoice date", quote: "2026-11-10", qbo: "2026-11-09" },
+    { reason: "amount", field: "Amount", quote: "7500.00", qbo: "7499.99" },
+  ],
+};
+
+describe("postCheck", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("POSTs { eventId } as JSON to the check route and returns the answer", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(DIFFERING), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(postCheck(EVENT_ID)).resolves.toEqual(DIFFERING);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/quickbooks/invoice/check");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({ "Content-Type": "application/json" });
+    expect(JSON.parse(init.body as string)).toEqual({ eventId: EVENT_ID });
+  });
+
+  it.each<CheckResult>([
+    { status: "invoice_missing" },
+    { status: "skipped", message: "This quote has no venue street yet." },
+  ])("returns %j as an answer, not as an error", async (answer) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(answer), { status: 200 })),
+    );
+
+    await expect(postCheck(EVENT_ID)).resolves.toEqual(answer);
+  });
+
+  it.each([400, 401, 403, 404, 409, 502])(
+    "turns an HTTP %i into an exception carrying the route's message",
+    async (status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () => new Response(JSON.stringify({ error: "Refused by the route" }), { status }),
+        ),
+      );
+
+      await expect(postCheck(EVENT_ID)).rejects.toThrow("Refused by the route");
+    },
+  );
+
+  it("still throws, naming the status, when the error answer is not the route's JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("<html>Gateway Timeout</html>", { status: 504 })),
+    );
+
+    await expect(postCheck(EVENT_ID)).rejects.toThrow("504");
+  });
+
+  it("turns a network failure into the 'Could not reach the server' message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+
+    await expect(postCheck(EVENT_ID)).rejects.toThrow(NETWORK_ERROR_MESSAGE);
+  });
+});
+
+describe("checkOutcome", () => {
+  it("S5: an invoice that matches is a success: 'The invoice matches the quote.'", () => {
+    expect(checkOutcome(MATCHING)).toEqual({
+      tone: "success",
+      lines: ["The invoice matches the quote."],
+    });
+  });
+
+  it("S5: a different invoice is an error with one line per difference, each starting with the reason's short text", () => {
+    expect(checkOutcome(DIFFERING)).toEqual({
+      tone: "error",
+      lines: [
+        "Dates do not match — Due date: QuickBooks 2026-11-01, quote 2026-11-14.",
+        "Dates do not match — Invoice date: QuickBooks 2026-11-09, quote 2026-11-10.",
+        "Amount does not match — Amount: QuickBooks 7499.99, quote 7500.00.",
+      ],
+    });
+  });
+
+  it("S5: invoice_missing: 'The invoice was not found in QuickBooks.'", () => {
+    expect(checkOutcome({ status: "invoice_missing" })).toEqual({
+      tone: "error",
+      lines: ["The invoice was not found in QuickBooks."],
+    });
+  });
+
+  it("S5: skipped: the route's message, as it came", () => {
+    expect(
+      checkOutcome({ status: "skipped", message: "The quote has no venue street yet." }),
+    ).toEqual({ tone: "error", lines: ["The quote has no venue street yet."] });
+  });
+});
+
+describe("runCheckAgain", () => {
+  /** The flow with fakes; `answers` are what the route says to each request, in order. */
+  function checkHarness(answers: Array<CheckResult | Error> = []) {
+    const log: string[] = [];
+    const io: CheckFlowIo = {
+      post: vi.fn(async (eventId: string) => {
+        log.push(`post:${eventId}`);
+        const answer = answers.shift();
+        if (!answer) throw new Error("the fake route has no answer left");
+        if (answer instanceof Error) throw answer;
+        return answer;
+      }),
+      setChecking: vi.fn((checking: boolean) => log.push(`checking:${checking ? "on" : "off"}`)),
+      success: vi.fn(),
+      fail: vi.fn(),
+    };
+    return { io, log };
+  }
+
+  it("sends only the event id, and the button is busy from before the request until after the toast", async () => {
+    const { io, log } = checkHarness([MATCHING]);
+    (io.success as ReturnType<typeof vi.fn>).mockImplementation(() => log.push("toast"));
+
+    await runCheckAgain(EVENT_ID, io);
+
+    expect(log).toEqual(["checking:on", `post:${EVENT_ID}`, "toast", "checking:off"]);
+  });
+
+  it("S5: an equal invoice shows the success toast and no error", async () => {
+    const { io } = checkHarness([MATCHING]);
+
+    await runCheckAgain(EVENT_ID, io);
+
+    expect(io.success).toHaveBeenCalledWith(["The invoice matches the quote."]);
+    expect(io.fail).not.toHaveBeenCalled();
+  });
+
+  it("S5: a different invoice shows the error toast naming each reason, and no success", async () => {
+    const { io } = checkHarness([DIFFERING]);
+
+    await runCheckAgain(EVENT_ID, io);
+
+    expect(io.fail).toHaveBeenCalledTimes(1);
+    expect(io.fail).toHaveBeenCalledWith([
+      "Dates do not match — Due date: QuickBooks 2026-11-01, quote 2026-11-14.",
+      "Dates do not match — Invoice date: QuickBooks 2026-11-09, quote 2026-11-10.",
+      "Amount does not match — Amount: QuickBooks 7499.99, quote 7500.00.",
+    ]);
+    expect(io.success).not.toHaveBeenCalled();
+  });
+
+  it("S5: invoice_missing shows its message", async () => {
+    const { io } = checkHarness([{ status: "invoice_missing" }]);
+
+    await runCheckAgain(EVENT_ID, io);
+
+    expect(io.fail).toHaveBeenCalledWith(["The invoice was not found in QuickBooks."]);
+    expect(io.success).not.toHaveBeenCalled();
+  });
+
+  it("S5: skipped shows the route's message", async () => {
+    const { io } = checkHarness([
+      { status: "skipped", message: "The quote has no venue street yet." },
+    ]);
+
+    await runCheckAgain(EVENT_ID, io);
+
+    expect(io.fail).toHaveBeenCalledWith(["The quote has no venue street yet."]);
+  });
+
+  it("S5: an error shows the route's message and clears the busy state", async () => {
+    const { io, log } = checkHarness([new Error("QuickBooks could not be reached.")]);
+
+    await runCheckAgain(EVENT_ID, io);
+
+    expect(io.fail).toHaveBeenCalledWith(["QuickBooks could not be reached."]);
+    expect(io.success).not.toHaveBeenCalled();
+    expect(log.at(-1)).toBe("checking:off");
+  });
+
+  it("an error thrown by something that is not an Error still reaches the user", async () => {
+    const { io } = checkHarness();
+    (io.post as ReturnType<typeof vi.fn>).mockRejectedValue("boom");
+
+    await runCheckAgain(EVENT_ID, io);
+
+    expect(io.fail).toHaveBeenCalledWith(["boom"]);
   });
 });

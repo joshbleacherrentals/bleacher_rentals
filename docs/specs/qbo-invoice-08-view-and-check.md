@@ -1,7 +1,7 @@
 # QuickBooks invoice — View in QuickBooks and Check again
 
-Status: **DRAFT 2026-10-22; AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions. The
-amendment follows spec 06's new comparison (the whole invoice, not only the totals): Check again
+Status: **Implemented 2026-10-23** (approved in chat, with the 2026-10-23 amendment). 0 open
+decisions. The amendment followed spec 06's new comparison (the whole invoice, not only the totals): Check again
 stays as a button (the user's answer of 2026-10-23, although the check now also runs after a Save,
 [06a](qbo-invoice-06a-check-on-save.md), and not when a quote is opened or QuickBooks changes), what it reports changes (§4), and the card shows when the quote was last checked (§4).
 Implementation order: **08** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).

@@ -622,8 +622,16 @@ describe("permission matrix", () => {
     });
 
     it("describes the buttons, and says the invoice is never sent to the client", () => {
-      expect(row?.description).toBe(
-        "The Create invoice and Update invoice buttons on the Billing tab of a quote or booking. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data. The invoice is saved in QuickBooks for the books and is never sent to the client.",
+      expect(row?.description).toMatch(
+        /^The Create invoice and Update invoice buttons on the Billing tab of a quote or booking\. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data\. The invoice is saved in QuickBooks for the books and is never sent to the client\./,
+      );
+    });
+
+    // docs/specs/qbo-invoice-08-view-and-check.md §5: the description gains the two extra buttons and
+    // the check time; the levels do not change (the test of the levels above still holds).
+    it("spec 08: also describes View in QuickBooks, Check again and the check time", () => {
+      expect(row?.description).toMatch(
+        / A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked\.$/,
       );
     });
 

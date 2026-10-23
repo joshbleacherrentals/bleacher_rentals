@@ -63,6 +63,12 @@ vi.mock("@/components/toasts/ErrorToast", () => ({
   createErrorToastNoThrow: vi.fn(),
 }));
 vi.mock("./useInvoiceState", () => ({ useInvoiceState: () => mocks.invoiceState() }));
+// The check time reads the local database; its own test (InvoiceCheckTime.test.tsx) covers that.
+vi.mock("./InvoiceCheckTime", () => ({
+  InvoiceCheckTime: ({ eventId }: { eventId: string }) => (
+    <p data-testid="check-time">{`check time of ${eventId}`}</p>
+  ),
+}));
 
 import { CustomerChoiceDialog } from "./CustomerChoiceDialog";
 import { InvoiceButtons, InvoiceButtonsView, InvoiceDialogs } from "./InvoiceButtons";
@@ -280,10 +286,13 @@ describe("InvoiceButtonsView", () => {
   const view = (over: Partial<Parameters<typeof InvoiceButtonsView>[0]> = {}, onPress = vi.fn()) =>
     renderToStaticMarkup(
       <InvoiceButtonsView
+        eventId="evt-1"
         hasInvoice={false}
         canCreate={false}
         busy={null}
+        checking={false}
         onPress={onPress}
+        onCheck={vi.fn()}
         {...over}
       />,
     );
@@ -327,18 +336,121 @@ describe("InvoiceButtonsView", () => {
 
   it("pressing Create asks for a create, and pressing Update asks for an update", () => {
     const onPress = vi.fn();
+    const props = { eventId: "evt-1", busy: null, checking: false, onPress, onCheck: vi.fn() };
     press(
-      expand(InvoiceButtonsView({ hasInvoice: false, canCreate: true, busy: null, onPress })),
+      expand(InvoiceButtonsView({ ...props, hasInvoice: false, canCreate: true })),
       "Create invoice",
     );
     expect(onPress).toHaveBeenLastCalledWith("create");
 
     press(
-      expand(InvoiceButtonsView({ hasInvoice: true, canCreate: false, busy: null, onPress })),
+      expand(InvoiceButtonsView({ ...props, hasInvoice: true, canCreate: false })),
       "Update invoice",
     );
     expect(onPress).toHaveBeenLastCalledWith("update");
     expect(onPress).toHaveBeenCalledTimes(2);
+  });
+
+  describe("View in QuickBooks and Check again (spec 08 §4)", () => {
+    /** The opening tag of the link, so that its attributes can be read. */
+    const linkTag = (html: string) => html.match(/<a\b[^>]*>/)?.[0] ?? "";
+
+    it("S1: a quote with an invoice draws both, beside Update invoice", () => {
+      const html = view({ hasInvoice: true });
+      expect(html).toContain("Update invoice");
+      expect(html).toContain("View in QuickBooks");
+      expect(html).toContain("Check again");
+    });
+
+    it("S2: a quote with no invoice draws neither, whether or not it can be created", () => {
+      for (const canCreate of [true, false]) {
+        const html = view({ hasInvoice: false, canCreate });
+        expect(html).not.toContain("View in QuickBooks");
+        expect(html).not.toContain("Check again");
+      }
+    });
+
+    it("S3: a quote that is not booked but has an invoice draws both", () => {
+      const html = view({ hasInvoice: true, canCreate: false });
+      expect(html).toContain("View in QuickBooks");
+      expect(html).toContain("Check again");
+    });
+
+    it("S4: View in QuickBooks is a link to the view route for this event, opened in a new tab", () => {
+      const tag = linkTag(view({ hasInvoice: true, eventId: "evt-1" }));
+
+      expect(tag).toContain('href="/api/quickbooks/invoice/view?eventId=evt-1"');
+      expect(tag).toContain('target="_blank"');
+    });
+
+    it("S4: the new tab is given no access to this one (noopener)", () => {
+      expect(linkTag(view({ hasInvoice: true }))).toMatch(/rel="[^"]*\bnoopener\b[^"]*"/);
+    });
+
+    it("View in QuickBooks is an ordinary link, not a button with a script behind it", () => {
+      const tree = expand(
+        InvoiceButtonsView({
+          eventId: "evt-1",
+          hasInvoice: true,
+          canCreate: false,
+          busy: null,
+          checking: false,
+          onPress: vi.fn(),
+          onCheck: vi.fn(),
+        }),
+      );
+      expect(
+        buttons(tree).filter((b) => textOf(b.props.children) === "View in QuickBooks"),
+      ).toHaveLength(0);
+    });
+
+    it("pressing Check again asks for a check, and does not ask for a create or an update", () => {
+      const onPress = vi.fn();
+      const onCheck = vi.fn();
+      press(
+        expand(
+          InvoiceButtonsView({
+            eventId: "evt-1",
+            hasInvoice: true,
+            canCreate: false,
+            busy: null,
+            checking: false,
+            onPress,
+            onCheck,
+          }),
+        ),
+        "Check again",
+      );
+
+      expect(onCheck).toHaveBeenCalledTimes(1);
+      expect(onPress).not.toHaveBeenCalled();
+    });
+
+    it("while a check is open the button is busy and cannot be pressed again", () => {
+      const html = view({ hasInvoice: true, checking: true });
+
+      expect(html).toContain("Checking…");
+      expect(html).not.toContain("Check again");
+      // Update invoice is not disabled by a check: only the busy button is.
+      expect(html.match(/ disabled=""/g)).toHaveLength(1);
+      expect(html).toContain("View in QuickBooks");
+    });
+
+    it("while a create or update is open, the other buttons stay as they were", () => {
+      const html = view({ hasInvoice: true, busy: "update" });
+
+      expect(html).toContain("Updating…");
+      expect(html).toContain("View in QuickBooks");
+      expect(html).toContain("Check again");
+      expect(html.match(/ disabled=""/g)).toHaveLength(1);
+    });
+
+    it("a create that is open on a quote with no invoice yet draws neither", () => {
+      const html = view({ hasInvoice: false, canCreate: true, busy: "create" });
+      expect(html).toContain("Creating…");
+      expect(html).not.toContain("View in QuickBooks");
+      expect(html).not.toContain("Check again");
+    });
   });
 });
 
@@ -360,6 +472,28 @@ describe("InvoiceButtons", () => {
 
   it("draws nothing for a quote that is not booked and has no invoice", () => {
     expect(draw({ hasInvoice: false, canCreate: false })).toBe("");
+  });
+
+  it("S1: draws View in QuickBooks and Check again for a quote with an invoice", () => {
+    const html = draw({ hasInvoice: true, canCreate: false });
+    expect(html).toContain("View in QuickBooks");
+    expect(html).toContain("Check again");
+    expect(html).toContain('href="/api/quickbooks/invoice/view?eventId=evt-1"');
+  });
+
+  it("S2: draws neither for a booked quote with no invoice", () => {
+    const html = draw({ hasInvoice: false, canCreate: true });
+    expect(html).not.toContain("View in QuickBooks");
+    expect(html).not.toContain("Check again");
+  });
+
+  it("S7: draws the check time under the buttons when the quote has an invoice, and not otherwise", () => {
+    const withInvoice = draw({ hasInvoice: true, canCreate: false });
+    expect(withInvoice).toContain("check time of evt-1");
+    expect(withInvoice.indexOf("Check again")).toBeLessThan(withInvoice.indexOf("check time of"));
+
+    expect(draw({ hasInvoice: false, canCreate: true })).not.toContain("check time of");
+    expect(draw({ hasInvoice: false, canCreate: false })).not.toContain("check time of");
   });
 });
 

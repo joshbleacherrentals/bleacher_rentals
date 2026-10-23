@@ -3,14 +3,20 @@ import type {
   QboCustomerSummary,
 } from "@/features/quickbooks-integration/customers";
 import type { InvoiceWarning } from "@/features/quickbooks-integration/invoice/createInvoice";
+import {
+  INVOICE_REASON_SHORT_TEXT,
+  type InvoiceDifference,
+  type InvoiceReason,
+} from "@/features/quickbooks-integration/invoice/invoiceTypes";
 import type { ExistingInvoice } from "@/features/quickbooks-integration/invoice/qboInvoiceApi";
 import type { UpdateInvoiceResult } from "@/features/quickbooks-integration/invoice/updateInvoice";
 
 /**
- * What the Billing tab's Create invoice and Update invoice buttons do: ask the invoice route and
- * decide, from its answer, which toast or window comes next. Online only (the route talks to
- * QuickBooks); nothing here writes to the local database.
- * Spec: docs/specs/qbo-invoice-07-card-buttons.md §3 and §4
+ * What the Billing tab's Create invoice, Update invoice and Check again buttons do: ask the invoice
+ * routes and decide, from the answer, which toast or window comes next. Online only (the routes talk
+ * to QuickBooks); nothing here writes to the local database.
+ * Spec: docs/specs/qbo-invoice-07-card-buttons.md §3 and §4,
+ * docs/specs/qbo-invoice-08-view-and-check.md §4
  */
 
 /** The route's body, as `POST /api/quickbooks/invoice` reads it. */
@@ -30,13 +36,14 @@ export const NETWORK_ERROR_MESSAGE =
 export const NOT_FOUND_DECLINED_MESSAGE =
   "If the invoice was not deleted in QuickBooks, this is probably a bug — please tell the developer.";
 
-export async function postInvoice(request: InvoiceRequest): Promise<InvoiceResult> {
+/** POSTs JSON to one of the invoice routes; an HTTP error becomes an exception with its message. */
+async function postJson<T>(url: string, payload: unknown): Promise<T> {
   let response: Response;
   try {
-    response = await fetch("/api/quickbooks/invoice", {
+    response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
   } catch {
     throw new Error(NETWORK_ERROR_MESSAGE);
@@ -51,7 +58,11 @@ export async function postInvoice(request: InvoiceRequest): Promise<InvoiceResul
         : `The server answered ${response.status}. Try again.`,
     );
   }
-  return body as InvoiceResult;
+  return body as T;
+}
+
+export function postInvoice(request: InvoiceRequest): Promise<InvoiceResult> {
+  return postJson<InvoiceResult>("/api/quickbooks/invoice", request);
 }
 
 /** The text of one warning of a `created` or `updated` answer; each is shown as its own toast. */
@@ -178,3 +189,61 @@ export function createInvoiceFlow(eventId: string, io: InvoiceFlowIo) {
 }
 
 export type InvoiceFlow = ReturnType<typeof createInvoiceFlow>;
+
+// --- Check again (spec 08 §4) ------------------------------------------------------------------
+
+/** The check route's answers of HTTP 200 for an admin or an accountant (spec 06 §6). */
+export type CheckResult =
+  | {
+      status: "checked";
+      matches: boolean;
+      reasons: InvoiceReason[];
+      differences: InvoiceDifference[];
+    }
+  | { status: "invoice_missing" }
+  | { status: "skipped"; message: string };
+
+export function postCheck(eventId: string): Promise<CheckResult> {
+  return postJson<CheckResult>("/api/quickbooks/invoice/check", { eventId });
+}
+
+/** What a check says to the user: a success toast or an error toast, one line per fact. */
+export function checkOutcome(result: CheckResult): { tone: "success" | "error"; lines: string[] } {
+  switch (result.status) {
+    case "checked":
+      if (result.matches) return { tone: "success", lines: ["The invoice matches the quote."] };
+      return {
+        tone: "error",
+        lines: result.differences.map(
+          (difference) =>
+            `${INVOICE_REASON_SHORT_TEXT[difference.reason]} — ${difference.field}: QuickBooks ${difference.qbo}, quote ${difference.quote}.`,
+        ),
+      };
+    case "invoice_missing":
+      return { tone: "error", lines: ["The invoice was not found in QuickBooks."] };
+    case "skipped":
+      return { tone: "error", lines: [result.message] };
+  }
+}
+
+/** Everything Check again touches, so that it can be run without a browser. */
+export type CheckFlowIo = {
+  post: (eventId: string) => Promise<CheckResult>;
+  /** True from before the request until after its toast: the button is busy and cannot be pressed. */
+  setChecking: (checking: boolean) => void;
+  success: (lines: string[]) => void;
+  fail: (lines: string[]) => void;
+};
+
+export async function runCheckAgain(eventId: string, io: CheckFlowIo): Promise<void> {
+  io.setChecking(true);
+  try {
+    const outcome = checkOutcome(await io.post(eventId));
+    if (outcome.tone === "success") io.success(outcome.lines);
+    else io.fail(outcome.lines);
+  } catch (error) {
+    io.fail([error instanceof Error ? error.message : String(error)]);
+  } finally {
+    io.setChecking(false);
+  }
+}
