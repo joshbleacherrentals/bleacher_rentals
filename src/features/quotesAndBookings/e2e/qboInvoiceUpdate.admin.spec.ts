@@ -12,7 +12,7 @@ import { cleanupQuote, createQuote, type CreatedQuote } from "./helpers/quoteTes
  *    (the office moved to another company / a quote that is not booked but has an invoice), so no
  *    QuickBooks call is made;
  *  - S1, S2, S3 and S8 replace the route with a fake that writes to Events what the real one writes,
- *    then check what the quote shows afterwards;
+ *    then check what the quote shows afterwards (the flag a check stores is in checkInvoice.test.ts);
  *  - S4 (a wrong number) needs a QuickBooks sandbox company and is asserted in updateInvoice.test.ts.
  */
 
@@ -34,7 +34,7 @@ async function updateEvent(eventId: string, fields: Record<string, unknown>) {
 async function readEvent(eventId: string) {
   const { data, error } = await serviceRole()
     .from("Events")
-    .select("qbo_invoice_id, qbo_invoice_hash, qbo_invoice_sent_hash, is_qbo")
+    .select("qbo_invoice_id, qbo_invoice_mismatch, qbo_invoice_mismatch_reasons, is_qbo")
     .eq("id", eventId)
     .single();
   if (error || !data) throw new Error(`readEvent failed: ${error?.message}`);
@@ -65,17 +65,23 @@ test.describe("Update invoice route (admin)", () => {
     await cleanupQuote(quote.eventId);
   });
 
-  test("S1: an update makes the sent hash equal the current hash", async ({ page }) => {
+  test("S1: an update whose check finds an equal invoice clears the flag and its reasons", async ({
+    page,
+  }) => {
     await updateEvent(quote.eventId, {
       qbo_invoice_id: "e2e-fake-invoice",
-      qbo_invoice_sent_hash: "e2e-an-older-hash",
+      qbo_invoice_mismatch: true,
+      qbo_invoice_mismatch_reasons: '["dates"]',
     });
 
-    // The fake does what the real route's step 8 does, then answers `updated`.
+    // The fake does what the real route's step 10 does (the invoice check), then answers `updated`.
     await page.route(`**${INVOICE_ROUTE}`, async (route) => {
       const { eventId } = route.request().postDataJSON();
-      const { qbo_invoice_hash } = await readEvent(eventId);
-      await updateEvent(eventId, { qbo_invoice_sent_hash: qbo_invoice_hash });
+      await updateEvent(eventId, {
+        qbo_invoice_mismatch: false,
+        qbo_invoice_mismatch_reasons: null,
+        qbo_invoice_checked_at: new Date().toISOString(),
+      });
       await route.fulfill({
         json: {
           status: "updated",
@@ -83,20 +89,22 @@ test.describe("Update invoice route (admin)", () => {
           qboInvoiceId: "e2e-fake-invoice",
           linkedExisting: false,
           warnings: [],
+          check: { matches: true, reasons: [], differences: [] },
         },
       });
     });
 
     await page.goto(`/quotes-bookings/${quote.eventId}?tab=billing`);
     const before = await readEvent(quote.eventId);
-    expect(before.qbo_invoice_hash).toBeTruthy();
-    expect(before.qbo_invoice_sent_hash).not.toBe(before.qbo_invoice_hash);
+    expect(before.qbo_invoice_mismatch).toBe(true);
+    expect(before.qbo_invoice_mismatch_reasons).toBe('["dates"]');
 
     const { body } = await post(page, { eventId: quote.eventId });
     expect(body.status).toBe("updated");
 
     const after = await readEvent(quote.eventId);
-    expect(after.qbo_invoice_sent_hash).toBe(after.qbo_invoice_hash);
+    expect(after.qbo_invoice_mismatch).toBe(false);
+    expect(after.qbo_invoice_mismatch_reasons).toBeNull();
   });
 
   test("S2: a missing invoice is reported, and with replaceMissing a new one is linked", async ({
@@ -196,7 +204,8 @@ test.describe("Update invoice route (admin)", () => {
         sales_office_uuid: office.id,
         qbo_invoice_id: "e2e-linked-invoice",
         qbo_invoice_connection_uuid: a.id,
-        qbo_invoice_sent_hash: "e2e-an-older-hash",
+        qbo_invoice_mismatch: true,
+        qbo_invoice_mismatch_reasons: '["dates"]',
       });
 
       const res = await page.request.post(INVOICE_ROUTE, { data: { eventId: quote.eventId } });
@@ -209,7 +218,8 @@ test.describe("Update invoice route (admin)", () => {
 
       const after = await readEvent(quote.eventId);
       expect(after.qbo_invoice_id).toBe("e2e-linked-invoice");
-      expect(after.qbo_invoice_sent_hash).toBe("e2e-an-older-hash");
+      expect(after.qbo_invoice_mismatch).toBe(true);
+      expect(after.qbo_invoice_mismatch_reasons).toBe('["dates"]');
     } finally {
       await updateEvent(quote.eventId, {
         sales_office_uuid: null,

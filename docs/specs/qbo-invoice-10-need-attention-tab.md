@@ -1,7 +1,8 @@
 # QuickBooks invoice — the Need attention tab on /accountant
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
-(§1, last paragraph).
+Status: **DRAFT 2026-10-22; AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions; one
+reading to confirm (§1, last paragraph). The amendment follows spec 09: with the hashes gone there
+is one signal, the mismatch flag, and the **Reason** column shows its real reasons.
 Implementation order: **10** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [09](qbo-invoice-09-banner.md) (the attention rule),
@@ -11,7 +12,7 @@ and its two tabs).
 ## 0. The request, and what it is not
 
 A third tab on `/accountant`, **Need attention**, lists every quote whose QuickBooks invoice
-needs attention: outdated, or with totals that do not match.
+needs attention: the invoice in QuickBooks no longer matches the quote.
 
 **Not part of this spec:** the sidebar counts, the numbers on the tab labels and the row
 marks (spec 11); the banner (spec 09); any change to the AR and AR Deposits tabs.
@@ -27,12 +28,15 @@ marks (spec 11); the banner (spec 09); any change to the AR and AR Deposits tabs
   the tab and its list; the signals of specs 09 and 11 are accountants' only (user's answer).
 - **Whatever the status:** a quote with an invoice stays in the list whatever its status
   (plan: "Keep everything").
-- **What "needs attention" means** is spec 09's rule: outdated, or mismatch.
+- **What "needs attention" means** is spec 09's rule: the mismatch flag is set.
+- **The Reason column shows the real reasons** — "Dates do not match", "Totals do not match",
+  "Service does not match" and so on, not one fixed text (user's answer, 2026-10-23).
 
 **Reading to confirm at review.**
 
 - The list has the **first four columns of the AR tabs** (Event Name, Account Manager, Start
-  Date, Invoice #) and one more, **Reason**. It has no money columns.
+  Date, Invoice #) and one more, **Reason**, which lists every reason of the row, comma-separated,
+  in spec 06's order. It has no money columns.
 - The Status filter is not offered on this tab (a quote here has an invoice, not a status
   to browse by), as on the AR tabs.
 - The page's other controls apply as on the AR tabs: the Filter Panel, Show Deleted, search,
@@ -59,13 +63,14 @@ marks (spec 11); the banner (spec 09); any change to the AR and AR Deposits tabs
 ## 3. Data
 
 **`useNeedAttentionData.ts`** (new, `quotesAndBookings/hooks/`) runs one reactive query on
-`Events`: `id`, `qbo_invoice_id`, `qbo_invoice_hash`, `qbo_invoice_sent_hash`,
-`qbo_invoice_mismatch`, for events that have an invoice (`qbo_invoice_id` is not null). No
-join. It returns the rows.
+`Events`: `id`, `qbo_invoice_id`, `qbo_invoice_mismatch`, `qbo_invoice_mismatch_reasons`, for
+events that have an invoice (`qbo_invoice_id` is not null) and whose flag is set. No join. It
+returns the rows.
 
 **`needAttentionRows.ts`** (new, `quotesAndBookings/utils/`) — pure:
 `needAttentionRows(events, attentionRows)` returns the page's events that have an invoice
-needing attention, each with its `reasons` (spec 09's rule), in the order of `events`. An event
+needing attention, each with its `reasons` (spec 09's rule, so `unspecified` where the flag has
+none), in the order of `events`. An event
 that is not in `events` (filtered out, or deleted while Show Deleted is off) is not in the
 result.
 
@@ -78,7 +83,7 @@ offersStatus: false }`, after AR Deposits. `openingTab` stays `ar`.
   `events`, `searchQuery`, `sort`, paging and `onRowClick` as the AR content does; runs
   `needAttentionRows`; applies `searchEvents`, `sortEvents` and the paging; and draws a
   `DataTable` with the columns of §1. **Reason** shows the short text of each reason
-  (spec 09), both when both apply; it is not sortable. The header of the first column shows
+  (spec 09), all of them comma-separated; it is not sortable. The header of the first column shows
   the row count, as on the AR tabs. Empty message: "No invoice needs attention".
 - **`accountant/page.tsx`** (changed): a `TabsTrigger` **Need attention** after AR Deposits,
   and `NeedAttentionTab` mounted beside `AccountsReceivableTabs`. The row click opens
@@ -87,7 +92,7 @@ offersStatus: false }`, after AR Deposits. `openingTab` stays `ar`.
 ## 5. Permissions — `src/features/userAccess/permissionPageData.ts`
 
 - **Accounts Receivable** — the description gains: "A third tab, Need attention, lists the
-  quotes whose QuickBooks invoice is out of date or whose totals do not match the quote's; it
+  quotes whose QuickBooks invoice no longer matches the quote; it
   opens on the newest event." Roles' levels do not change; the roles that see the page see
   the tab.
 - **QuickBooks Invoice Alerts** — the administrator's note becomes: "Does not see the invoice
@@ -101,10 +106,11 @@ Playwright, written, **not run**; the data is seeded by writing the columns of `
 
 - **S1** admin and accountant: the page has the tab **Need attention**; the page still opens on
   AR; `?tab=need_attention` opens it.
-- **S2** a quote with an invoice whose hashes differ: it is listed with **Invoice out of
-  date**; one whose flag is set: **Totals do not match**; both: both texts.
-- **S3** a quote with an invoice and equal hashes and no flag: not listed. A quote with no
-  invoice and different hashes: not listed.
+- **S2** a quote with an invoice whose flag is set with the reasons `["dates"]`: it is listed
+  with **Dates do not match**; with `["dates","totals"]`: **Dates do not match, Totals do not
+  match**; a set flag with no reasons: **Invoice does not match the quote**.
+- **S3** a quote with an invoice and no flag: not listed. A quote with no invoice and a set flag:
+  not listed.
 - **S4** a quote with an invoice that is no longer `booked` and needs attention: listed.
 - **S5** the tab opens newest event first; sorting by Event Name, Account Manager, Start Date
   and Invoice # works; **Reason** has no sort.
@@ -134,14 +140,15 @@ tests (new); the Playwright spec of §6. No migration, no `AppSchema.ts`, no
 
 Red first. Prettier only on touched files.
 
-- **`needAttentionRows.test.ts`:** an event with an invoice and each reason is returned with
-  its reasons; none for equal hashes without the flag; none for no invoice; an event missing
-  from `events` is not returned; the order of `events` is kept; one result per event.
+- **`needAttentionRows.test.ts`:** an event with an invoice and a set flag is returned with its
+  reasons (several, in spec 06's order; none stored gives `unspecified`); none for a false flag;
+  none for no invoice; an event missing from `events` is not returned; the order of `events` is
+  kept; one result per event.
 - **`listTabs.test.ts`:** the third tab's id, starting sort (event start, descending) and
   no Status filter; the opening tab is still `ar`; `?tab=need_attention` parses; an unknown
   tab opens `ar`.
-- **Hook test:** the query reads the five columns, filters on the invoice id and has no
-  join.
+- **Hook test:** the query reads the four columns, filters on the invoice id and the flag and
+  has no join.
 - **Component and page tests:** the columns; **Reason** texts; the empty message; the count in
   the header; the tab is present on the page; the AR tabs are unchanged.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check` on the touched files. E2E:
@@ -150,7 +157,7 @@ Red first. Prettier only on touched files.
 ## 9. Edge cases and error handling
 
 - **Sync lag.** The list follows the synced columns; a quote leaves it a few seconds after an
-  Update, when its sent hash arrives.
+  Update, when its cleared flag arrives.
 - **A quote hidden by the Filter Panel** is not in the list while the filter is on; the tab
   does not override the filters.
 - **A deleted quote** appears only with Show Deleted, as on the AR tabs.

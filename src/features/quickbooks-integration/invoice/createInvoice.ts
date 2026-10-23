@@ -3,10 +3,15 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../database.types";
 import { resolveInvoiceCustomer, type CustomerChoice, type QboCustomerSummary } from "../customers";
 import { attachQuotePdf } from "./attachQuotePdf";
-import { buildInvoicePayload, needsNoTaxCode, validateInvoiceSource } from "./buildInvoicePayload";
-import { runTotalsCheck, type TotalsComparison } from "./checkInvoiceTotals";
+import {
+  NO_TAX_CODE_MISSING,
+  buildInvoicePayload,
+  needsNoTaxCode,
+  validateInvoiceSource,
+} from "./buildInvoicePayload";
+import { runInvoiceCheck } from "./checkInvoice";
 import { findQboItem } from "./findQboItem";
-import type { InvoiceBuildWarning, InvoiceSource, QboItemRef } from "./invoiceTypes";
+import type { InvoiceBuildWarning, InvoiceCheck, InvoiceSource, QboItemRef } from "./invoiceTypes";
 import { loadInvoiceSource } from "./loadInvoiceSource";
 import { logInvoiceChange, logIsQboSet } from "./logInvoiceChange";
 import { createQboInvoice, findInvoiceByDocNumber, type ExistingInvoice } from "./qboInvoiceApi";
@@ -20,17 +25,17 @@ import { resolveZoneClass, type ClassMissingWarning } from "./resolveZoneClass";
  * Steps 6–13 are also case 3 of the update route: a quote whose linked invoice QuickBooks no longer
  * has gets a new one (createInvoiceFromSource, `replacingInvoiceId`).
  * Spec: docs/specs/qbo-invoice-04-create.md §4, docs/specs/qbo-invoice-05-update.md §4,
- * docs/specs/qbo-invoice-06-totals-check.md §4
+ * docs/specs/qbo-invoice-06-totals-check.md §5
  */
 
 export type PdfNotAttachedWarning = { code: "pdf_not_attached"; reason: string };
 
-export type TotalsCheckFailedWarning = { code: "totals_check_failed"; reason: string };
+export type InvoiceCheckFailedWarning = { code: "invoice_check_failed"; reason: string };
 
 export type InvoiceWarning =
   | ClassMissingWarning
   | InvoiceBuildWarning
-  | TotalsCheckFailedWarning
+  | InvoiceCheckFailedWarning
   | PdfNotAttachedWarning;
 
 export type CreateInvoiceResult =
@@ -40,7 +45,7 @@ export type CreateInvoiceResult =
       qboInvoiceId: string;
       warnings: InvoiceWarning[];
       /** Absent when the check failed itself; the warning says so. */
-      totals?: TotalsComparison;
+      check?: InvoiceCheck;
     }
   | { status: "choose_customer"; candidates: QboCustomerSummary[] }
   | { status: "invoice_number_exists"; invoice: ExistingInvoice }
@@ -59,8 +64,8 @@ type ErrorStatus = Extract<CreateInvoiceResult, { status: "error" }>["httpStatus
 // What getQboAccessTokenAndRealmId and describeQboAuthError throw when the connection lost its token.
 const AUTH_ERROR = /re-authenticate|No tokens found/i;
 
-export const NO_TAX_CODE_MISSING =
-  "This QuickBooks connection has no 'no tax' code for Canadian invoices. Ask an admin to choose one on the QuickBooks page.";
+// The refusal message lives with the builder, which the invoice check needs too.
+export { NO_TAX_CODE_MISSING };
 
 export function getSupabaseAdmin() {
   return createClient<Database>(
@@ -85,13 +90,12 @@ export function setupFailure(e: unknown): CreateInvoiceResult {
 
 /**
  * QuickBooks answers the same `requestid` with the invoice it already made; it takes 50 characters.
- * A quote made again carries the old invoice's id too: the same quote and hash made the deleted one.
+ * It is made from the event alone — no hash of the quote's data (spec 04 §2). A quote made again
+ * carries the old invoice's id too: the same event made the deleted one.
  */
-function requestIdFor(eventId: string, hash: string | null, replacingInvoiceId?: string): string {
+function requestIdFor(eventId: string, replacingInvoiceId?: string): string {
   return createHash("sha256")
-    .update(
-      `${eventId}:${hash ?? ""}${replacingInvoiceId ? `:replaces:${replacingInvoiceId}` : ""}`,
-    )
+    .update(`${eventId}${replacingInvoiceId ? `:replaces:${replacingInvoiceId}` : ""}`)
     .digest("hex")
     .slice(0, 50);
 }
@@ -120,7 +124,6 @@ export async function saveInvoiceLink(
     eventId: string;
     invoiceId: string;
     connectionId: string;
-    sentHash: string | null;
     replacingInvoiceId?: string;
   },
 ): Promise<string | null> {
@@ -129,8 +132,10 @@ export async function saveInvoiceLink(
     .update({
       qbo_invoice_id: link.invoiceId,
       qbo_invoice_connection_uuid: link.connectionId,
-      qbo_invoice_sent_hash: link.sentHash,
       qbo_invoice_mismatch: false,
+      qbo_invoice_mismatch_reasons: null,
+      qbo_invoice_checked_at: null,
+      qbo_invoice_check_failed_at: null,
       is_qbo: true,
     })
     .eq("id", link.eventId);
@@ -152,17 +157,17 @@ export async function saveInvoiceLink(
 }
 
 /**
- * Step 11 of create, step 10 of update: compares QuickBooks' totals with the quote's and stores the
- * flag (spec 06). The invoice just linked is the one checked, in the connection it was made in. A check
- * that fails does not fail the request: it becomes the `totals_check_failed` warning, and the flag
- * stays as it was.
+ * Step 11 of create, step 10 of update: compares the invoice just written with the quote and stores
+ * the answer (spec 06). The invoice just linked is the one checked, in the connection it was made in.
+ * A check that cannot finish does not fail the request: it becomes the `invoice_check_failed`
+ * warning, and the stored flag stays as it was.
  */
-export async function checkTotalsAfterWrite(
+export async function checkInvoiceAfterWrite(
   source: InvoiceSource,
   link: { invoiceId: string; connectionId: string },
-): Promise<{ totals?: TotalsComparison; warning?: TotalsCheckFailedWarning }> {
+): Promise<{ check?: InvoiceCheck; warning?: InvoiceCheckFailedWarning }> {
   try {
-    const result = await runTotalsCheck(source.eventId, {
+    const result = await runInvoiceCheck(source.eventId, {
       ...source,
       qboInvoiceId: link.invoiceId,
       qboInvoiceConnectionId: link.connectionId,
@@ -170,14 +175,23 @@ export async function checkTotalsAfterWrite(
     if (result.status === "missing") {
       return {
         warning: {
-          code: "totals_check_failed",
+          code: "invoice_check_failed",
           reason: "QuickBooks did not return the invoice that was just written.",
         },
       };
     }
-    return { totals: { matches: result.matches, differences: result.differences } };
+    if (result.status === "skipped") {
+      return { warning: { code: "invoice_check_failed", reason: result.message } };
+    }
+    return {
+      check: {
+        matches: result.matches,
+        reasons: result.reasons,
+        differences: result.differences,
+      },
+    };
   } catch (e) {
-    return { warning: { code: "totals_check_failed", reason: messageOf(e) } };
+    return { warning: { code: "invoice_check_failed", reason: messageOf(e) } };
   }
 }
 
@@ -209,7 +223,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
   const connectionId = source.connectionId!;
   const eventTypeName = source.eventTypeName!;
 
-  // 4: the hash is remembered from `source` in createInvoiceFromSource.
+  // 4: removed with the hash (spec 04, 2026-10-23).
 
   // 5
   let item;
@@ -243,10 +257,6 @@ export async function createInvoiceFromSource(
   const connectionId = source.connectionId!;
   const billedContact = source.billedContact!;
   const docNumber = String(source.invoiceNumber);
-
-  // 4: the hash the invoice will be built from. The loader read it with the quote's data, so a
-  // quote edited meanwhile leaves this hash older than the data, which can only read as "outdated".
-  const sentHash = source.qboInvoiceHash;
 
   // 6
   let existing: ExistingInvoice | null;
@@ -292,11 +302,7 @@ export async function createInvoiceFromSource(
 
   let created;
   try {
-    created = await createQboInvoice(
-      connectionId,
-      body,
-      requestIdFor(eventId, sentHash, replacingInvoiceId),
-    );
+    created = await createQboInvoice(connectionId, body, requestIdFor(eventId, replacingInvoiceId));
   } catch (e) {
     return fail(502, messageOf(e));
   }
@@ -310,7 +316,6 @@ export async function createInvoiceFromSource(
     eventId,
     invoiceId: invoice.id,
     connectionId,
-    sentHash,
     replacingInvoiceId,
   });
   if (linkedId === null) {
@@ -332,12 +337,12 @@ export async function createInvoiceFromSource(
   });
   if (!wasQbo) await logIsQboSet({ eventId, userUuid });
 
-  // 11: the totals check, which sets qbo_invoice_mismatch (spec 06).
-  const { totals, warning: totalsWarning } = await checkTotalsAfterWrite(source, {
+  // 11: the invoice check, which sets qbo_invoice_mismatch and its reasons (spec 06).
+  const { check, warning: checkWarning } = await checkInvoiceAfterWrite(source, {
     invoiceId: invoice.id,
     connectionId,
   });
-  if (totalsWarning) warnings.push(totalsWarning);
+  if (checkWarning) warnings.push(checkWarning);
 
   // 12: the invoice stays whatever happens to the PDF.
   try {
@@ -352,6 +357,6 @@ export async function createInvoiceFromSource(
     docNumber: invoice.docNumber,
     qboInvoiceId: invoice.id,
     warnings,
-    ...(totals ? { totals } : {}),
+    ...(check ? { check } : {}),
   };
 }

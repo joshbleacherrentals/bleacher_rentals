@@ -1,9 +1,13 @@
 # QuickBooks invoice from a quote — plan and decisions
 
-Status: **DRAFT 2026-10-22 — awaiting review.** Thirteen specs (01–11, 03a, 03b), no code. None is blocked.
+Status: **DRAFT 2026-10-22; AMENDED 2026-10-23 — the amended specs await "Approved".** The
+amendment of 2026-10-23 (user's request): **the hashes are removed**; the app compares the invoice
+with QuickBooks instead (specs 01, 04, 05, 06, 06a, 09, 10, 11), and the Canadian settings on
+`/quickbooks` are shown for CAD connections only (03e). None is blocked.
 Branch: `q4-sprint1-finance-role`.
-Specs: `qbo-invoice-01` … `qbo-invoice-11`, plus `qbo-invoice-03a-province-tax-codes.md` and
-`qbo-invoice-03b-zone-class.md`.
+Specs: `qbo-invoice-01` … `qbo-invoice-11`, plus `03a-province-tax-codes`, `03b-zone-class`,
+`03c-no-tax-code`, `03d-canadian-line-tax-code`, `03e-canadian-settings-cad-only` and
+`06a-check-on-save`.
 Builds on: [accountant-quotes-05-is-qbo-column.md](accountant-quotes-05-is-qbo-column.md),
 [quote-staleness-detection.md](quote-staleness-detection.md),
 [accountant-role.md](accountant-role.md).
@@ -18,7 +22,7 @@ quote page. The invoice is for the accountants' books only: it is saved in Quick
 
 When the quote changes, an **Update invoice** button replaces the invoice's content with the
 quote's data. The accountant is warned on the quote card, in the lists and in the sidebar
-when an invoice is outdated or its totals do not match the quote.
+when the invoice in QuickBooks no longer matches the quote, and told what differs.
 
 ## 1. The invoice, field by field (decided by the user)
 
@@ -61,8 +65,9 @@ Taken in the chat of 2026-10-20 … 2026-10-22:
   handed, so each Canadian province gets its own QuickBooks tax code, mapped per connection
   by an admin on `/quickbooks` (spec 03a). A taxed Canadian quote whose province has no code
   is created without tax, with a warning.
-- **Hash:** two hashes on `Events`, kept by a trigger (current) and by the server (sent). The
-  current hash includes `tax_percent`, `tax_amount_cents` and `is_tax_overridden`.
+- **No hash (2026-10-23):** `Events` has no invoice hash. The invoice is compared with QuickBooks
+  over the network (spec 06) and the answer is stored as `qbo_invoice_mismatch` plus its reasons
+  (spec 01). The `requestid` of a create is made from the event alone (spec 04).
 - **Customer:** the finance contact when set, otherwise the contact. The search looks at the
   company, the name and the email. One match is used; several open a picker; none creates a
   new flat customer (company in its Company name field). The choice is remembered per
@@ -71,8 +76,15 @@ Taken in the chat of 2026-10-20 … 2026-10-22:
   links that invoice to the quote and replaces its content with the quote's data.
 - **Linked invoice missing in QuickBooks:** the app says it was not found and offers a new
   one. If the user says no, it is probably a bug and they go to the developer.
-- **Totals check:** after every create and update, plus a **Check again** button. Zero
-  tolerance. A mismatch is a notification for accountants.
+- **Invoice check:** the whole invoice is compared, every field the app writes (user's answer,
+  2026-10-23), with zero tolerance on money. It runs after a create, after an update, after a
+  quote's Save, and on **Check again** (06, 06a) — **only these** (user's answer, 2026-10-23, after
+  the QuickBooks request limits were explained). Opening a quote checks nothing, and there is no
+  QuickBooks webhook. A mismatch is a notification for accountants, with its reasons; the card shows
+  when the quote was last checked.
+- **Left as they are (user's answers, 2026-10-23):** the two QuickBooks calls per check (no Item
+  cache); the token refresh, which has no lock (06, R5); a change made by hand in QuickBooks, or outside
+  Save (the address book, settings), which only the next Save, Update or Check again picks up.
 - **PDF fails to attach:** the invoice stays, the user sees a warning, Update retries it.
 - **Office moved to the other QuickBooks file:** Update is refused with a message.
 - **Notification places:** sidebar counts, tab counts, a row mark in the lists, and a banner
@@ -86,16 +98,24 @@ Taken in the chat of 2026-10-20 … 2026-10-22:
 Each one is a separate commit with one logic. Counted files = migrations, `database.types.ts`,
 `AppSchema.ts`, `permissionPageData.ts`, `package.json`, and source files.
 
-- **01 — link and hashes** (4 counted): the `Events` columns, the current hash, its trigger.
+- **01 — link and flag** (3 counted): the `Events` columns: the link, the mismatch flag and its
+  reasons. (The file keeps the name `…link-and-hash`.)
 - **02 — customer** (4): the contact-to-customer link table and the customer resolver.
 - **03 — payload** (4): loading the quote and building the QuickBooks invoice body.
 - **03a — Canadian tax code** (8): the code per province, its table and its screen.
 - **03b — zone class** (1): finding the QuickBooks Class of a quote.
+- **03c, 03d — no-tax code, Canadian line code:** the setting and its use on a Canadian line.
+- **03e — CAD only** (3): the province section and the no-tax row appear only for a CAD
+  connection.
 - **04 — create** (7): the route, the invoice-number check, create, PDF, log.
 - **05 — update** (6): update, overwrite by number, missing invoice, wrong company.
-- **06 — totals check** (5): the comparison, the mismatch flag, the Check again route.
+- **06 — invoice check** (10): the comparison of the whole invoice, the flag and reasons, the
+  check route. (The file keeps the name `…totals-check`.)
+- **06a — check on save** (3): the Save caller, and the check route open to every role that can
+  open a quote.
 - **07 — card: Create and Update** (9): the buttons, the dialogs, the capability, the matrix.
-- **08 — card: View and Check again** (5): the two extra buttons and the view route.
+- **08 — card: View, Check again, check time** (7): the two extra buttons, the view route and the
+  "last checked" line.
 - **09 — card: banner** (6): the attention rule and the banner on the quote card.
 - **10 — Need attention tab** (6): the third tab of `/accountant` and its list.
 - **11 — counts and marks** (8): sidebar counts, tab counts, row marks.
@@ -111,9 +131,6 @@ given.
 - A signed-in server route writes with the user's token, and the accountant guard trigger on
   `Events` (spec 05 of the accountant series) refuses every column but `is_qbo`. The service
   role is not checked, which is why the invoice route writes with it.
-- The existing `content_hash` and `contract_hash` read only `Events.contact_uuid`; they ignore
-  `finance_contact_uuid`, although the quote document shows the finance contact first. The new
-  hash follows the quote document, so spec 01 also lets a finance-contact edit reach the hash.
 - The quote form's tax is calculated by `/api/quickbooks/tax-percent`: US addresses through a
   temporary QuickBooks Estimate (Automated Sales Tax), Canadian provinces from a static table.
   Nothing in the app writes a document to QuickBooks Canada today.
@@ -130,11 +147,9 @@ given.
 
 Places where the wording of a decision left a detail, and the spec reads it one way.
 
-- The invoice amount, the tax and the totals check use the quote document's own figures:
+- The invoice amount, the tax and the invoice check use the quote document's own figures:
   line items after discounts, and `tax_amount_cents` when set, else the rate on the taxable
   amount (spec 03).
-- The "client" part of the hash is the billed contact's id and first and last name — not the
-  email or the company (spec 01).
 - A company alone does not make a QuickBooks customer a match; a person at an existing
   company who is not in QuickBooks is created as a new flat customer (spec 02).
 - The picker also offers "Create a new customer" (spec 02, 07).
@@ -167,5 +182,7 @@ Places where the wording of a decision left a detail, and the spec reads it one 
 
 ## 7. Deploy order
 
-Migrations 01, 02 and 03a, then the app. No `sync_rules.yaml` change: `Events` already syncs whole-row
+Migrations 01, 02 and 03a, then the app. Migration 01 was **edited in place** on 2026-10-23
+(the hashes removed); a database that ran its first version must be reset or reverted by hand
+(spec 01, §8). No `sync_rules.yaml` change: `Events` already syncs whole-row
 to admin and accountant, and the new tables of specs 02 and 03a are server-only.

@@ -9,7 +9,7 @@ import type {
 
 /**
  * Pure: turns a quote (InvoiceSource) into the body of a QuickBooks invoice.
- * Every field it reads must be covered by the invoice hash — see invoiceHashParity.test.ts.
+ * Every member it writes must be covered by the invoice comparison — see compareCoverage.test.ts.
  * Spec: docs/specs/qbo-invoice-03-payload.md
  */
 
@@ -19,6 +19,10 @@ export function centsToDollars(cents: number): string {
   const abs = Math.abs(cents);
   return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
 }
+
+/** What a Canadian invoice that needs the connection's no-tax code is refused with when it has none. */
+export const NO_TAX_CODE_MISSING =
+  "This QuickBooks connection has no 'no tax' code for Canadian invoices. Ask an admin to choose one on the QuickBooks page.";
 
 /** What stops this quote from being invoiced, each message for the person who pressed the button. */
 export function validateInvoiceSource(source: InvoiceSource): InvoiceIssue[] {

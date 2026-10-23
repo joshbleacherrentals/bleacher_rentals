@@ -6,11 +6,13 @@ and the QuickBooks Class ([03b](qbo-invoice-03b-zone-class.md)) are separate spe
 builder here takes both as inputs. **The Canadian branch was amended on 2026-10-22 by
 [03c](qbo-invoice-03c-no-tax-code.md) and [03d](qbo-invoice-03d-canadian-line-tax-code.md)**
 after the first sandbox run (QuickBooks Canada refuses `TAX` and `NON` on a line): the text
-below is the amended one.
+below is the amended one. **Amended 2026-10-23 — awaiting "Approved":** the invoice hash this
+builder had to stay in step with is gone (spec 01); the comparison of
+[06](qbo-invoice-06-totals-check.md) now covers every member the builder writes (§2, §9, §11).
 Implementation order: **03** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
-Builds on: [qbo-invoice-01-link-and-hash.md](qbo-invoice-01-link-and-hash.md) (the hash this
-payload must stay in step with). Reads, but does not change, `buildQuoteDocumentData`.
+Builds on: [qbo-invoice-01-link-and-hash.md](qbo-invoice-01-link-and-hash.md) (the link columns
+and the flag). Reads, but does not change, `buildQuoteDocumentData`.
 
 ## 0. The request, and what it is not
 
@@ -19,7 +21,7 @@ turns a quote into the body of a QuickBooks invoice — nothing is sent to Quick
 Item lookup. It is a pure builder plus a loader, with no route and no screen.
 
 **Not part of this spec:** the customer (spec 02), finding the province's tax code (03a) and
-the Class (03b), writing or updating an invoice (specs 04–05), the totals comparison
+the Class (03b), writing or updating an invoice (specs 04–05), the invoice comparison
 (spec 06).
 
 ## 1. Decisions (all taken by the user)
@@ -72,8 +74,9 @@ province (`normalizeCanadianProvince`).
   built the tax itself (amount 100.00, tax 13.00, total 113.00). The American file takes only
   `TAX` or `NON`.
 - **Event types** are the `EventTypes` rows named `Rural`, `City`, `Corporate`.
-- **Hash parity.** Spec 01's current hash lists what the payload may read. A payload member
-  with no hash member would never light "outdated".
+- **Comparison parity.** Spec 06 compares the invoice with the body this builder produces, member
+  by member. A member the builder writes that the comparison does not cover could never light the
+  flag; spec 06's coverage test pins the list.
 
 ## 3. Types — `src/features/quickbooks-integration/invoice/invoiceTypes.ts` (new)
 
@@ -198,9 +201,9 @@ Red first. Prettier only on touched files.
   and falls back to the Event Start; `canadianProvince` is set for "ON", "Ontario" and
   "Québec" and null for "SC"; no query joins more than one table; a missing event gives null.
 - **`findQboItem.test.ts`:** found; none; two; a name with an apostrophe is escaped.
-- **Parity test (`invoiceHashParity.test.ts`):** a static list maps every `InvoiceSource`
-  field the builder reads to the matching member of spec 01's hash document; the test fails
-  when a field is read that is not on the list. Changing each listed input changes the body.
+- **Parity test:** `invoiceHashParity.test.ts` is **deleted** with the hash; spec 06's
+  `compareCoverage.test.ts` replaces it (every member of the body mapped to the reason that
+  covers it). The builder's own tests above keep checking that each input changes the body.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check` on the touched files. E2E:
   SKIPPED (not run locally, by instruction).
 
@@ -210,7 +213,7 @@ Red first. Prettier only on touched files.
 - **A street that already holds a whole composed address** (see `combineAddressLine`) goes in
   `Line1` as stored. Whether QuickBooks' tax engine reads it correctly: to verify in a sandbox.
 - **A US file that is not on Automated Sales Tax.** The body has no transaction tax code, so
-  QuickBooks adds no tax and the totals check (spec 06) reports a mismatch. Not handled here.
+  QuickBooks adds no tax and the invoice check (spec 06) reports a mismatch. Not handled here.
 - **A Canadian quote typed with a tax by hand** (`is_tax_overridden`). QuickBooks still
   applies the mapped code's rate to the amount, so a different typed tax shows as a mismatch.
 - **QuickBooks field names** (`PrivateNote` for "Memo on statement", `ShipAddr` for "Location of
@@ -221,8 +224,9 @@ Red first. Prettier only on touched files.
 
 ## 11. Risks
 
-- **R1 — two sources of truth for one invoice.** The hash is computed in SQL, the payload in
-  TypeScript. The parity test and spec 01's SQL test are what keep them in step.
+- **R1 — the builder and the comparison must stay in step.** The comparison reads the builder's
+  body, so a new member the builder writes is compared only once spec 06's list covers it; the
+  coverage test fails until it does.
 - **R2 — `buildQuoteDocumentData` is a large read** (it also loads terms and signature).
   Using it keeps the invoice equal to the quote; it costs one extra read per press.
 

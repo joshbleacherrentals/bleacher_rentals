@@ -71,9 +71,8 @@ beforeEach(() => {
     deleted: false,
     qbo_invoice_id: null,
     qbo_invoice_connection_uuid: null,
-    qbo_invoice_hash: "h1",
-    qbo_invoice_sent_hash: null,
     qbo_invoice_mismatch: false,
+    qbo_invoice_mismatch_reasons: null,
   };
   tables.EventTypes = { name: "Corporate" };
   tables.SalesOffices = { quickbook_uuid: "conn-1" };
@@ -117,9 +116,8 @@ describe("loadInvoiceSource", () => {
       connectionId: "conn-1",
       qboInvoiceId: null,
       qboInvoiceConnectionId: null,
-      qboInvoiceHash: "h1",
-      qboInvoiceSentHash: null,
       qboInvoiceMismatch: false,
+      qboInvoiceMismatchReasons: null,
     });
   });
 

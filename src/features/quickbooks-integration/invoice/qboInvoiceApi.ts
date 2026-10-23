@@ -1,13 +1,15 @@
 import { escapeQboQueryValue } from "../customers";
 import { parseQboApiResponseText } from "../parseQboApiResponse";
 import { getBaseUrl, getQboAccessTokenAndRealmId } from "../util";
+import { dollarsToCentsOrNull } from "./compareInvoice";
 import { interpretQboInvoiceError } from "./interpretQboInvoiceError";
-import type { QboInvoiceBody } from "./invoiceTypes";
+import type { QboInvoiceBody, QboInvoiceSnapshot } from "./invoiceTypes";
 
 /**
  * The QuickBooks invoice calls the invoice route makes: look an invoice up by its number, create one,
  * read one by its id and update one. Server-only.
- * Spec: docs/specs/qbo-invoice-04-create.md §4, docs/specs/qbo-invoice-05-update.md §4
+ * Spec: docs/specs/qbo-invoice-04-create.md §4, docs/specs/qbo-invoice-05-update.md §4,
+ * docs/specs/qbo-invoice-06-totals-check.md §3
  */
 
 const MINOR_VERSION = 40;
@@ -28,30 +30,43 @@ export type CreateQboInvoiceResult =
   | { ok: false; error: string };
 
 /**
- * The total and the tax QuickBooks calculated, in dollars as it sent them (a number or a string); null
- * when it sent none. An invoice with no tax has no TxnTaxDetail. Spec 06 turns them into cents.
- */
-export type QboInvoiceTotals = {
-  totalAmt: number | string | null;
-  totalTax: number | string | null;
-};
-
-/**
- * What an update must carry: the invoice's id and the SyncToken it was read with. The totals ride
- * along for the totals check (docs/specs/qbo-invoice-06-totals-check.md §3).
+ * What an update must carry: the invoice's id and the SyncToken it was read with. The snapshot rides
+ * along for the invoice check (docs/specs/qbo-invoice-06-totals-check.md §3).
  */
 export type QboInvoiceVersion = {
   id: string;
   syncToken: string;
   docNumber: string;
-  totals: QboInvoiceTotals;
+  snapshot: QboInvoiceSnapshot;
+};
+
+type RawQboLine = {
+  DetailType?: string;
+  Amount?: number | string;
+  Description?: string;
+  SalesItemLineDetail?: {
+    ItemRef?: { value?: string };
+    TaxCodeRef?: { value?: string };
+    ClassRef?: { value?: string };
+  };
 };
 
 type RawQboInvoice = {
   Id: string;
   SyncToken?: string;
   DocNumber?: string;
+  TxnDate?: string;
+  DueDate?: string;
   CustomerRef?: { value?: string; name?: string };
+  BillAddr?: { Line1?: string };
+  ShipAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+  };
+  PrivateNote?: string;
+  Line?: RawQboLine[];
   TotalAmt?: number | string;
   TxnTaxDetail?: { TotalTax?: number | string };
 };
@@ -141,9 +156,45 @@ function isObjectNotFound(fault: { code?: string; Message?: string } | undefined
 }
 
 /**
+ * Every value the comparison reads, from QuickBooks' raw invoice. It never throws: a value that is
+ * absent is empty, and an amount that is not one is null, so an update can read an odd invoice.
+ */
+function snapshotOf(invoice: RawQboInvoice): QboInvoiceSnapshot {
+  return {
+    docNumber: invoice.DocNumber ?? "",
+    txnDate: invoice.TxnDate ?? "",
+    dueDate: invoice.DueDate ?? "",
+    customerId: invoice.CustomerRef?.value ?? "",
+    billToLine1: invoice.BillAddr?.Line1 ?? "",
+    ship: {
+      street: invoice.ShipAddr?.Line1 ?? "",
+      city: invoice.ShipAddr?.City ?? "",
+      state: invoice.ShipAddr?.CountrySubDivisionCode ?? "",
+      zip: invoice.ShipAddr?.PostalCode ?? "",
+    },
+    memo: invoice.PrivateNote ?? "",
+    lines: (invoice.Line ?? [])
+      .filter((line) => line.DetailType === "SalesItemLineDetail")
+      .map((line) => ({
+        amountCents: dollarsToCentsOrNull(line.Amount),
+        itemId: line.SalesItemLineDetail?.ItemRef?.value ?? "",
+        description: line.Description ?? "",
+        taxCodeId: line.SalesItemLineDetail?.TaxCodeRef?.value ?? "",
+        classId: line.SalesItemLineDetail?.ClassRef?.value ?? null,
+      })),
+    totalCents: dollarsToCentsOrNull(invoice.TotalAmt),
+    // An invoice with no tax has no TxnTaxDetail, which reads as 0.
+    taxCents:
+      invoice.TxnTaxDetail?.TotalTax === undefined
+        ? 0
+        : dollarsToCentsOrNull(invoice.TxnTaxDetail.TotalTax),
+  };
+}
+
+/**
  * The invoice with this id in the connection's QuickBooks file, with the SyncToken an update needs
- * and the totals QuickBooks calculated, or null when QuickBooks no longer has it. Any other failure
- * throws.
+ * and a snapshot of what the comparison reads, or null when QuickBooks no longer has it. Any other
+ * failure throws.
  */
 export async function readQboInvoice(
   connectionId: string,
@@ -177,10 +228,7 @@ export async function readQboInvoice(
     id: invoice.Id,
     syncToken: invoice.SyncToken,
     docNumber: invoice.DocNumber ?? "",
-    totals: {
-      totalAmt: invoice.TotalAmt ?? null,
-      totalTax: invoice.TxnTaxDetail?.TotalTax ?? null,
-    },
+    snapshot: snapshotOf(invoice),
   };
 }
 

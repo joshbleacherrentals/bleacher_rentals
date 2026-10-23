@@ -162,6 +162,7 @@ import {
   escapeQboQueryValue,
   findCustomerCandidates,
   createCustomer,
+  readLinkedCustomerId,
   resolveInvoiceCustomer,
   type BilledContact,
 } from "./customers";
@@ -469,5 +470,38 @@ describe("findCustomerCandidates / createCustomer", () => {
       DisplayName: "Ann Lee",
     });
     expect(created.id).toBe("900");
+  });
+});
+
+// docs/specs/qbo-invoice-06-totals-check.md §3: the invoice check reads the contact's stored link
+// and nothing else — it looks nothing up in QuickBooks, creates nothing and drops no stale link.
+describe("readLinkedCustomerId", () => {
+  it("returns the QuickBooks customer the contact is linked to in that connection", async () => {
+    linkRows = [
+      { contact_uuid: "contact-1", qbo_connection_uuid: CONN, qbo_customer_id: "77" },
+      { contact_uuid: "contact-1", qbo_connection_uuid: "conn-2", qbo_customer_id: "88" },
+      { contact_uuid: "contact-2", qbo_connection_uuid: CONN, qbo_customer_id: "99" },
+    ];
+
+    expect(await readLinkedCustomerId(CONN, "contact-1")).toBe("77");
+  });
+
+  it("returns null when the contact has no link in that connection", async () => {
+    linkRows = [
+      { contact_uuid: "contact-1", qbo_connection_uuid: "conn-2", qbo_customer_id: "88" },
+    ];
+
+    expect(await readLinkedCustomerId(CONN, "contact-1")).toBeNull();
+  });
+
+  it("calls QuickBooks never, writes nothing and drops no link, even a stale one", async () => {
+    linkRows = [{ contact_uuid: "contact-1", qbo_connection_uuid: CONN, qbo_customer_id: "gone" }];
+
+    await readLinkedCustomerId(CONN, "contact-1");
+
+    expect(qboCalls).toHaveLength(0);
+    expect(insertedLinks).toHaveLength(0);
+    expect(deletedLinks).toHaveLength(0);
+    expect(linkRows).toHaveLength(1);
   });
 });

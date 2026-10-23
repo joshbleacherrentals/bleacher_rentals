@@ -1,16 +1,19 @@
 import type { CustomerChoice } from "../customers";
 import { resolveInvoiceCustomer } from "../customers";
 import { replaceQuotePdf } from "./attachQuotePdf";
-import { buildInvoicePayload, needsNoTaxCode, validateInvoiceSource } from "./buildInvoicePayload";
-import type { TotalsComparison } from "./checkInvoiceTotals";
+import {
+  NO_TAX_CODE_MISSING,
+  buildInvoicePayload,
+  needsNoTaxCode,
+  validateInvoiceSource,
+} from "./buildInvoicePayload";
 import {
   bookedRuleFailure,
-  checkTotalsAfterWrite,
+  checkInvoiceAfterWrite,
   createInvoiceFromSource,
   fail,
   getSupabaseAdmin,
   messageOf,
-  NO_TAX_CODE_MISSING,
   readIsQbo,
   saveInvoiceLink,
   setupFailure,
@@ -18,7 +21,7 @@ import {
   type InvoiceWarning,
 } from "./createInvoice";
 import { findQboItem } from "./findQboItem";
-import type { InvoiceSource, QboItemRef } from "./invoiceTypes";
+import type { InvoiceCheck, InvoiceSource, QboItemRef } from "./invoiceTypes";
 import { loadInvoiceSource } from "./loadInvoiceSource";
 import { logInvoiceChange, logIsQboSet } from "./logInvoiceChange";
 import { readQboInvoice, updateQboInvoice, type QboInvoiceVersion } from "./qboInvoiceApi";
@@ -31,7 +34,7 @@ import { resolveZoneClass } from "./resolveZoneClass";
  * has gets a new one (case 3, createInvoiceFromSource). The numbered steps are the ones of the spec.
  * A step that fails ends the request with its error and nothing after it runs. Server-only: it
  * writes Events and the Log with the service role.
- * Spec: docs/specs/qbo-invoice-05-update.md §4, docs/specs/qbo-invoice-06-totals-check.md §4
+ * Spec: docs/specs/qbo-invoice-05-update.md §4, docs/specs/qbo-invoice-06-totals-check.md §5
  */
 
 export type UpdateInvoiceResult =
@@ -43,7 +46,7 @@ export type UpdateInvoiceResult =
       linkedExisting: boolean;
       warnings: InvoiceWarning[];
       /** Absent when the check failed itself; the warning says so. */
-      totals?: TotalsComparison;
+      check?: InvoiceCheck;
     }
   | { status: "invoice_missing" }
   | CreateInvoiceResult;
@@ -125,9 +128,6 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
   const connectionId = source.connectionId!;
   const billedContact = source.billedContact!;
 
-  // The hash the invoice will be built from; read with the quote's data (spec 04 step 4).
-  const sentHash = source.qboInvoiceHash;
-
   // 6
   let resolution;
   try {
@@ -170,23 +170,16 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
   if (!updated.ok) return fail(502, updated.error);
   const docNumber = updated.invoice.docNumber;
 
-  // 8: `is_qbo` is left to the accountant, except when the invoice is first linked.
-  const supabase = getSupabaseAdmin();
+  // 8: an update writes nothing to Events itself (the check of step 10 writes the flag); `is_qbo` is
+  // left to the accountant, except when the invoice is first linked.
   let wasQbo = true;
-  if (mode === "update") {
-    const { error } = await supabase
-      .from("Events")
-      .update({ qbo_invoice_sent_hash: sentHash })
-      .eq("id", eventId);
-    if (error)
-      throw new Error(`Failed to save the QuickBooks invoice's sent hash: ${error.message}`);
-  } else {
+  if (mode === "link") {
+    const supabase = getSupabaseAdmin();
     wasQbo = await readIsQbo(supabase, eventId);
     const linkedId = await saveInvoiceLink(supabase, {
       eventId,
       invoiceId: invoice.id,
       connectionId,
-      sentHash,
       replacingInvoiceId,
     });
     if (linkedId === null) {
@@ -209,12 +202,12 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
   });
   if (!wasQbo) await logIsQboSet({ eventId, userUuid });
 
-  // 10: the totals check, which sets qbo_invoice_mismatch (spec 06).
-  const { totals, warning: totalsWarning } = await checkTotalsAfterWrite(source, {
+  // 10: the invoice check, which sets qbo_invoice_mismatch and its reasons (spec 06).
+  const { check, warning: checkWarning } = await checkInvoiceAfterWrite(source, {
     invoiceId: invoice.id,
     connectionId,
   });
-  if (totalsWarning) warnings.push(totalsWarning);
+  if (checkWarning) warnings.push(checkWarning);
 
   // 11: the invoice stays whatever happens to the PDF.
   try {
@@ -230,7 +223,7 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
     qboInvoiceId: invoice.id,
     linkedExisting: mode === "link",
     warnings,
-    ...(totals ? { totals } : {}),
+    ...(check ? { check } : {}),
   };
 }
 
@@ -253,7 +246,7 @@ export async function updateInvoice(params: UpdateInvoiceParams): Promise<Update
   const connectionId = source.connectionId!;
   const eventTypeName = source.eventTypeName!;
 
-  // 3: the hash is remembered from `source` in replaceInvoiceContent and createInvoiceFromSource.
+  // 3: removed with the hash (spec 05, 2026-10-23).
 
   // 4
   let item;

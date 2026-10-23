@@ -28,9 +28,8 @@ const source = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
   connectionId: "conn-1",
   qboInvoiceId: null,
   qboInvoiceConnectionId: null,
-  qboInvoiceHash: "hash",
-  qboInvoiceSentHash: null,
   qboInvoiceMismatch: false,
+  qboInvoiceMismatchReasons: null,
   ...over,
 });
 

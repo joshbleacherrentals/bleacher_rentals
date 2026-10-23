@@ -199,7 +199,7 @@ test.describe("Create and Update invoice buttons (admin)", () => {
       await fakeRoute(page, () =>
         createdAnswer(quote, [
           { code: "pdf_not_attached", reason: "disk full" },
-          { code: "totals_check_failed", reason: "timed out" },
+          { code: "invoice_check_failed", reason: "timed out" },
           { code: "class_missing", state: "SC", reason: "no_class" },
           { code: "tax_code_missing", province: "ON" },
         ]),
@@ -210,7 +210,9 @@ test.describe("Create and Update invoice buttons (admin)", () => {
       await expect(
         page.getByText("The PDF was not attached (disk full). Press Update invoice to try again."),
       ).toBeVisible();
-      await expect(page.getByText("The totals could not be checked.")).toBeVisible();
+      await expect(
+        page.getByText("The invoice could not be checked against the quote."),
+      ).toBeVisible();
       await expect(
         page.getByText(
           "No QuickBooks Class was found for SC. The invoice was made without one; set the Class in QuickBooks.",

@@ -59,8 +59,8 @@ export function warningMessage(warning: InvoiceWarning): string {
   switch (warning.code) {
     case "pdf_not_attached":
       return `The PDF was not attached (${warning.reason}). Press Update invoice to try again.`;
-    case "totals_check_failed":
-      return "The totals could not be checked.";
+    case "invoice_check_failed":
+      return "The invoice could not be checked against the quote.";
     case "class_missing":
       return `No QuickBooks Class was found for ${warning.state}. The invoice was made without one; set the Class in QuickBooks.`;
     case "tax_code_missing":

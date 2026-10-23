@@ -1,7 +1,9 @@
 # QuickBooks invoice — Create and Update on the Billing tab
 
 Status: **Implemented 2026-10-23** (approved in chat). 0 open decisions; one reading to confirm
-(§1, last paragraph).
+(§1, last paragraph). **Amended 2026-10-23 by [06](qbo-invoice-06-totals-check.md)
+(awaiting "Approved"):** the warning `totals_check_failed` is renamed `invoice_check_failed` and
+its toast reads "The invoice could not be checked against the quote." (§4, S9).
 Implementation order: **07** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [04](qbo-invoice-04-create.md) and [05](qbo-invoice-05-update.md) (the route and its
@@ -15,7 +17,7 @@ with no invoice) or **Update invoice** (a quote with one). The screen asks what 
 asks about, and the user stays on the quote page.
 
 **Not part of this spec:** View in QuickBooks, Check again (spec 08); the banner (spec 09); the Need
-attention tab, the counts and the marks (specs 10–11); the route and the totals check.
+attention tab, the counts and the marks (specs 10–11); the route and the invoice check.
 
 ## 1. Decisions (all taken by the user)
 
@@ -93,7 +95,7 @@ one more field):
 - **Create** → `postInvoice({ eventId })`:
   - `created` → success toast "Invoice {number} created in QuickBooks"; each warning is its
     own toast (`pdf_not_attached`: "The PDF was not attached ({reason}). Press Update
-    invoice to try again."; `totals_check_failed`: "The totals could not be checked."; `class_missing`: "No QuickBooks Class was found for {state}. The invoice was made without one; set the Class in QuickBooks."; `tax_code_missing`: "No QuickBooks tax code is mapped for {province}. The invoice was made without tax; map the code on the QuickBooks page, then press Update invoice.").
+    invoice to try again."; `invoice_check_failed` (once `totals_check_failed`): "The invoice could not be checked against the quote."; `class_missing`: "No QuickBooks Class was found for {state}. The invoice was made without one; set the Class in QuickBooks."; `tax_code_missing`: "No QuickBooks tax code is mapped for {province}. The invoice was made without tax; map the code on the QuickBooks page, then press Update invoice.").
   - `choose_customer` → the customer window; its answer is sent as `customerChoice`.
   - `invoice_number_exists` → the number window; **Overwrite** sends `overwriteInvoiceId`.
 - **Update** → the confirmation "Update the QuickBooks invoice? This replaces its content with
@@ -165,7 +167,7 @@ Playwright, written, **not run**; the route is replaced by a fake with `page.rou
   asks first; **Cancel** sends nothing.
 - **S8** the fake answers `invoice_missing`: **Yes** sends `replaceMissing`; **No** shows the
   developer message and sends nothing.
-- **S9** each warning (`pdf_not_attached`, `totals_check_failed`, `class_missing`,
+- **S9** each warning (`pdf_not_attached`, `invoice_check_failed`, `class_missing`,
   `tax_code_missing`) shows its own toast.
 - **S10** a route error shows its message.
 
@@ -231,5 +233,6 @@ Red first. Prettier only on touched files.
 
 - View in QuickBooks and Check again (spec 08); the banner (spec 09).
 - Anything on `/accountant`, the sidebar or the lists (specs 10–11).
-- Showing the totals result as a toast (the banner of spec 09 is the signal).
+- Showing the check's result as a toast after a create or update (the banner of spec 09 is the
+  signal; Check again of spec 08 is the only place a result is shown as a toast).
 - Deleting an invoice, or unlinking one from the quote.

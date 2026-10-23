@@ -1,10 +1,14 @@
 # QuickBooks invoice — the update route
 
 Status: **Implemented 2026-10-22** (approved in chat, amended the same day before
-implementing). 0 open decisions; one reading to confirm (§1, last paragraph). Three amendments, all answered by the
+implementing); **AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions; one reading to
+confirm (§1, last paragraph). Three amendments of 2026-10-22, all answered by the
 user: the Canadian no-tax code of [03c](qbo-invoice-03c-no-tax-code.md) and
 [03d](qbo-invoice-03d-canadian-line-tax-code.md) (§4, case 1 step 7), the Log values (§6), and
-the fourth routing row for a link that points at a missing invoice (§4).
+the fourth routing row for a link that points at a missing invoice (§4). **The 2026-10-23
+amendment removes the hash** (spec 01): no sent hash is remembered or saved, so case 1 writes
+nothing to `Events` itself, and the hook of step 10 is the invoice check of
+[06](qbo-invoice-06-totals-check.md). Step numbers are kept so that references to them hold.
 Implementation order: **05** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [04](qbo-invoice-04-create.md) (the route and the create flow), which in turn needs
@@ -18,7 +22,7 @@ awkward cases the user described: the invoice number is already in QuickBooks, t
 invoice is gone from QuickBooks, and the quote's office moved to the other QuickBooks file.
 
 **Not part of this spec:** the "are you sure?" question (the screen asks, spec 07); the
-totals comparison (spec 06); any screen; deleting or voiding invoices.
+invoice comparison (spec 06); any screen; deleting or voiding invoices.
 
 ## 1. Decisions (all taken by the user)
 
@@ -55,7 +59,7 @@ as a whole, so a line the accountant added by hand is removed.
 - **Attachments.** An invoice's attachments are listed by their reference to the invoice; the
   app's own file is the one named `{invoice number}.pdf`. A file the accountant attached
   keeps its own name and is left alone.
-- **The link columns** are spec 01's; the saved hash rule is spec 04 step 4.
+- **The link columns** are spec 01's.
 - **Connection names.** `QboConnections.display_name` names a company in a message.
 
 ## 3. The contract (additions to spec 04's)
@@ -95,7 +99,7 @@ in the `{ error }` body of every other error.
    the quote's sales office, else 409: "This invoice is in the {old} QuickBooks company, but
    this quote's office now uses {new}. Nothing was changed. Fix it by hand in QuickBooks."
 2. `validateInvoiceSource`. The **booked** rule is not applied.
-3. Remember the current `qbo_invoice_hash` (as spec 04 step 4).
+3. _(Removed 2026-10-23: there is no hash to remember.)_
 4. `findQboItem`.
 5. Read the invoice by the stored id. Not found and `replaceMissing` is not true →
    `invoice_missing`, stop.
@@ -107,10 +111,11 @@ in the `{ error }` body of every other error.
    same 400 as spec 04 step 8 (spec 03d). `buildInvoicePayload` with those refs; a sparse
    update with the invoice's `Id` and `SyncToken`. Their warnings (`class_missing`,
    `tax_code_missing`) go into `warnings`. A QuickBooks refusal → 502.
-8. Save `qbo_invoice_sent_hash` (step 3); `UPDATE Events … WHERE id = ?`. `is_qbo` is **not**
-   touched (an accountant who unticked it by hand is not overruled).
+8. _(Nothing is written to `Events` here since 2026-10-23: the sent hash is gone. The flag and
+   its reasons are written by the check of step 10.)_ `is_qbo` is **not** touched (an
+   accountant who unticked it by hand is not overruled).
 9. Write the Log (§6): "Updated".
-10. _Hook for spec 06: the totals check._
+10. _Hook for spec 06: the invoice check, which sets `qbo_invoice_mismatch` and its reasons._
 11. Replace the PDF (§5). A failure is the `pdf_not_attached` warning.
 12. Return `updated`.
 
@@ -120,8 +125,8 @@ file; it must exist and its `DocNumber` must equal the quote's invoice number, e
 id may not point at any invoice). Then steps 3–12 of case 1, except: step 8 saves the id, the
 connection and `is_qbo` true as well, guarded by `qbo_invoice_id IS NULL`; the Log says
 "Linked and updated"; the result has `linkedExisting` true. The save also sets
-`qbo_invoice_mismatch` false (a first link has nothing to be compared with yet; spec 06 sets it
-right after).
+`qbo_invoice_mismatch` false, `qbo_invoice_mismatch_reasons` null and both check times null (a
+first link has nothing to be compared with yet; spec 06 sets them right after).
 
 **Case 2, relinking.** The quote has a link to an invoice that QuickBooks no longer has, and
 the user chose to overwrite the invoice found by number. Case 1 step 1 (the company) applies
@@ -135,8 +140,8 @@ step 5 found nothing. The create flow of spec 04 runs from its step 5 (Item, num
 customer, create, save), with these differences: the booked rule is not applied; the saved
 link replaces the old one with `WHERE qbo_invoice_id = {the old id}`; the Log says "Created
 again (the previous invoice was not found)"; the result is `created`. The `requestid` also
-carries the old invoice's id: the same quote and hash made the deleted invoice, and
-QuickBooks must not answer with it.
+carries the old invoice's id: the same event made the deleted invoice (its `requestid` is made
+from the event alone, spec 04 §2), and QuickBooks must not answer with it.
 
 ## 5. The PDF — `attachQuotePdf.tsx` (changed)
 
@@ -166,16 +171,17 @@ The case-2 and case-3 flows that set `is_qbo` write its second row as spec 04 do
 - **`overwriteInvoiceId` of an invoice in another company or with another number:** 400.
 - **A deleted invoice and a new one with the same number.** Case 3's number check (spec 04
   step 6) finds it and the user is offered the overwrite instead.
-- **Timeout after step 7.** The invoice changed; the sent hash may not be saved, so the quote
-  still reads "outdated"; pressing Update again is harmless.
+- **Timeout after step 7.** The invoice changed; the check of step 10 may not have run, so the
+  stored flag is the one from before. The next Save of the quote (spec 06a) or Check again checks it, and pressing Update again is harmless.
 - **Offline / PowerSync, Clerk.** As spec 04.
 
 ## 8. Behaviour scenarios
 
 Playwright, written, **not run** (the route is replaced by a fake):
 
-- **S1** a quote with an invoice: the response is `updated`; the sent hash now equals the
-  current hash.
+- **S1** a quote with an invoice whose flag was set: the response is `updated` and carries the
+  check's result; with the fake now returning an equal invoice the flag is false and its reasons
+  are null.
 - **S2** the fake says the invoice is gone: `invoice_missing`; with `replaceMissing` the
   response is `created` and the link is the new id.
 - **S3** a quote with no link and an `overwriteInvoiceId` of the right number: `updated` with
@@ -209,7 +215,7 @@ Red first. Prettier only on touched files.
 - **`updateInvoice.test.ts`** (fakes as in spec 04): the order of case 1; a moved office
   writes nothing and names both companies; a missing invoice returns `invoice_missing` and
   writes nothing; `is_qbo` is untouched by an update and set by case 2; the sparse body
-  carries the `Id` and `SyncToken`; the saved sent hash is the one read first; case 2 refuses
+  carries the `Id` and `SyncToken`; case 1 writes nothing to `Events` itself; case 2 refuses
   a wrong number and an unknown id; case 3 replaces only the old id's link; each case writes
   the right Log text; the booked rule applies to case 2 and not to cases 1, 3 and the
   relinking case 2; the relinking case 2 replaces only the old id's link.
@@ -236,7 +242,7 @@ Red first. Prettier only on touched files.
 ## 12. Out of scope
 
 - The confirmation question and every dialog (spec 07).
-- The totals check (spec 06).
+- The invoice check (spec 06).
 - Deleting, voiding or restoring an invoice in QuickBooks.
 - Updating an invoice whose quote is in another company automatically.
 - Merging the accountant's hand edits with the quote's data.

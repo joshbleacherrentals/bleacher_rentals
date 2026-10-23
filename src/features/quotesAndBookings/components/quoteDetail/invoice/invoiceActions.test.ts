@@ -155,9 +155,9 @@ describe("warningMessage", () => {
     );
   });
 
-  it("totals_check_failed", () => {
-    expect(warningMessage({ code: "totals_check_failed", reason: "timed out" })).toBe(
-      "The totals could not be checked.",
+  it("invoice_check_failed", () => {
+    expect(warningMessage({ code: "invoice_check_failed", reason: "timed out" })).toBe(
+      "The invoice could not be checked against the quote.",
     );
   });
 
@@ -199,7 +199,7 @@ describe("Create flow", () => {
       created({
         warnings: [
           { code: "pdf_not_attached", reason: "disk full" },
-          { code: "totals_check_failed", reason: "timed out" },
+          { code: "invoice_check_failed", reason: "timed out" },
           { code: "class_missing", state: "SC", reason: "no_class" },
           { code: "tax_code_missing", province: "ON" },
         ],
@@ -211,7 +211,7 @@ describe("Create flow", () => {
     expect(io.success).toHaveBeenCalledTimes(1);
     expect(vi.mocked(io.warn).mock.calls.map(([line]) => line)).toEqual([
       "The PDF was not attached (disk full). Press Update invoice to try again.",
-      "The totals could not be checked.",
+      "The invoice could not be checked against the quote.",
       "No QuickBooks Class was found for SC. The invoice was made without one; set the Class in QuickBooks.",
       "No QuickBooks tax code is mapped for ON. The invoice was made without tax; map the code on the QuickBooks page, then press Update invoice.",
     ]);

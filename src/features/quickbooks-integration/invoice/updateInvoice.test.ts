@@ -35,9 +35,9 @@ const { calls, state, createClient } = vi.hoisted(() => {
     pdfArgs: [] as unknown[],
     replaceError: null as Error | null,
     replaceArgs: [] as unknown[],
-    totals: { status: "checked", matches: true, differences: [] } as unknown,
-    totalsError: null as Error | null,
-    totalsArgs: [] as unknown[],
+    check: { status: "checked", matches: true, reasons: [], differences: [] } as unknown,
+    checkError: null as Error | null,
+    checkArgs: [] as unknown[],
     logs: [] as unknown[],
     logIsQbo: [] as unknown[],
     isQbo: false,
@@ -100,7 +100,7 @@ const { calls, state, createClient } = vi.hoisted(() => {
           }
           if (table !== "Events") throw new Error(`unexpected table ${table}`);
           // An awaited update(...): the rows it changed.
-          calls.push(ctx.values.qbo_invoice_id !== undefined ? "save-link" : "save-sent-hash");
+          calls.push(ctx.values.qbo_invoice_id !== undefined ? "save-link" : "save-unexpected");
           state.eventWrites++;
           state.updates.push({ values: ctx.values, filters: ctx.filters });
           return Promise.resolve({ data: state.updateRows, error: null }).then(resolve, reject);
@@ -182,12 +182,12 @@ vi.mock("./attachQuotePdf", () => ({
   }),
 }));
 
-vi.mock("./checkInvoiceTotals", () => ({
-  runTotalsCheck: vi.fn(async (...args: unknown[]) => {
-    calls.push("totals");
-    state.totalsArgs = args;
-    if (state.totalsError) throw state.totalsError;
-    return state.totals;
+vi.mock("./checkInvoice", () => ({
+  runInvoiceCheck: vi.fn(async (...args: unknown[]) => {
+    calls.push("check");
+    state.checkArgs = args;
+    if (state.checkError) throw state.checkError;
+    return state.check;
   }),
 }));
 
@@ -234,9 +234,8 @@ function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
     connectionId: "conn-1",
     qboInvoiceId: "inv-1",
     qboInvoiceConnectionId: "conn-1",
-    qboInvoiceHash: "hash-A",
-    qboInvoiceSentHash: "hash-old",
     qboInvoiceMismatch: false,
+    qboInvoiceMismatchReasons: null,
     ...over,
   };
 }
@@ -246,7 +245,6 @@ const unlinked = (over: Partial<InvoiceSource> = {}) =>
   sourceOf({
     qboInvoiceId: null,
     qboInvoiceConnectionId: null,
-    qboInvoiceSentHash: null,
     ...over,
   });
 
@@ -328,9 +326,9 @@ beforeEach(() => {
     pdfArgs: [],
     replaceError: null,
     replaceArgs: [],
-    totals: { status: "checked", matches: true, differences: [] },
-    totalsError: null,
-    totalsArgs: [],
+    check: { status: "checked", matches: true, reasons: [], differences: [] },
+    checkError: null,
+    checkArgs: [],
     logs: [],
     logIsQbo: [],
     isQbo: false,
@@ -395,7 +393,7 @@ function expectNothingWritten() {
   expect(state.logs).toHaveLength(0);
   expect(calls).not.toContain("qbo:update-invoice");
   expect(calls).not.toContain("qbo:create-invoice");
-  expect(calls).not.toContain("save-sent-hash");
+  expect(calls).not.toContain("save-unexpected");
   expect(calls).not.toContain("save-link");
   expect(calls).not.toContain("pdf");
   expect(calls).not.toContain("pdf-replace");
@@ -413,7 +411,7 @@ describe("updateInvoice — case 1, the order of §4", () => {
       qboInvoiceId: "inv-1",
       linkedExisting: false,
       warnings: [],
-      totals: { matches: true, differences: [] },
+      check: { matches: true, reasons: [], differences: [] },
     });
     expect(calls).toEqual([
       "load",
@@ -422,9 +420,8 @@ describe("updateInvoice — case 1, the order of §4", () => {
       "customer",
       "zone-class",
       "qbo:update-invoice",
-      "save-sent-hash",
       "log:updated",
-      "totals",
+      "check",
       "pdf-replace",
     ]);
   });
@@ -549,20 +546,12 @@ describe("updateInvoice — the sparse update", () => {
 });
 
 describe("updateInvoice — what is saved", () => {
-  it("saves only the sent hash, the one the quote had when it was loaded", async () => {
-    state.source = sourceOf({ qboInvoiceHash: "hash-before-the-data" });
-
+  it("writes nothing to Events itself: the flag and its reasons are the check's to write", async () => {
     await run();
 
-    expect(state.updates).toHaveLength(1);
-    expect(state.updates[0].values).toEqual({ qbo_invoice_sent_hash: "hash-before-the-data" });
-    expect(state.updates[0].filters).toEqual([["eq", "id", EVENT_ID]]);
-  });
-
-  it("uses the service role", async () => {
-    await run();
-
-    expect(createClient).toHaveBeenCalledWith("http://localhost:54321", "service-key");
+    expect(state.updates).toHaveLength(0);
+    expect(state.eventWrites).toBe(0);
+    expect(calls).not.toContain("save-unexpected");
   });
 
   it("does not touch is_qbo, even when the box was unticked by hand", async () => {
@@ -571,15 +560,14 @@ describe("updateInvoice — what is saved", () => {
     await run();
 
     expect(calls).not.toContain("read-is-qbo");
-    expect(state.updates[0].values).not.toHaveProperty("is_qbo");
+    expect(state.updates).toHaveLength(0);
     expect(state.logIsQbo).toHaveLength(0);
   });
 
-  it("saves after QuickBooks accepted the update, before the Log and the PDF", async () => {
+  it("logs after QuickBooks accepted the update, and before the PDF", async () => {
     await run();
 
-    expect(calls.indexOf("qbo:update-invoice")).toBeLessThan(calls.indexOf("save-sent-hash"));
-    expect(calls.indexOf("save-sent-hash")).toBeLessThan(calls.indexOf("log:updated"));
+    expect(calls.indexOf("qbo:update-invoice")).toBeLessThan(calls.indexOf("log:updated"));
     expect(calls.indexOf("log:updated")).toBeLessThan(calls.indexOf("pdf-replace"));
   });
 });
@@ -609,9 +597,9 @@ describe("updateInvoice — the Log and the PDF", () => {
       qboInvoiceId: "inv-1",
       linkedExisting: false,
       warnings: [{ code: "pdf_not_attached", reason: "render blew up" }],
-      totals: { matches: true, differences: [] },
+      check: { matches: true, reasons: [], differences: [] },
     });
-    expect(calls).toContain("save-sent-hash");
+    expect(calls).toContain("qbo:update-invoice");
     expect(calls).toContain("log:updated");
   });
 
@@ -1001,7 +989,7 @@ describe("updateInvoice — case 3, creating again after 'not found'", () => {
       docNumber: "100200300",
       qboInvoiceId: "inv-new",
       warnings: [],
-      totals: { matches: true, differences: [] },
+      check: { matches: true, reasons: [], differences: [] },
     });
   });
 
@@ -1020,7 +1008,7 @@ describe("updateInvoice — case 3, creating again after 'not found'", () => {
       "save-link",
       "log:recreated",
       "log:is_qbo",
-      "totals",
+      "check",
       "pdf",
     ]);
   });
@@ -1036,8 +1024,10 @@ describe("updateInvoice — case 3, creating again after 'not found'", () => {
     expect(state.updates[0].values).toEqual({
       qbo_invoice_id: "inv-new",
       qbo_invoice_connection_uuid: "conn-1",
-      qbo_invoice_sent_hash: "hash-A",
       qbo_invoice_mismatch: false,
+      qbo_invoice_mismatch_reasons: null,
+      qbo_invoice_checked_at: null,
+      qbo_invoice_check_failed_at: null,
       is_qbo: true,
     });
   });
@@ -1115,19 +1105,19 @@ describe("updateInvoice — case 3, creating again after 'not found'", () => {
   });
 });
 
-describe("updateInvoice — the totals check (spec 06)", () => {
-  it("runs after the sent hash is saved and the Log is written, before the PDF", async () => {
+describe("updateInvoice — the invoice check (spec 06)", () => {
+  it("runs after QuickBooks accepted the update and the Log is written, before the PDF", async () => {
     await run();
 
-    expect(calls.indexOf("save-sent-hash")).toBeLessThan(calls.indexOf("totals"));
-    expect(calls.indexOf("log:updated")).toBeLessThan(calls.indexOf("totals"));
-    expect(calls.indexOf("totals")).toBeLessThan(calls.indexOf("pdf-replace"));
+    expect(calls.indexOf("qbo:update-invoice")).toBeLessThan(calls.indexOf("check"));
+    expect(calls.indexOf("log:updated")).toBeLessThan(calls.indexOf("check"));
+    expect(calls.indexOf("check")).toBeLessThan(calls.indexOf("pdf-replace"));
   });
 
-  it("checks the stored invoice, in the stored connection, against the quote's figures", async () => {
+  it("checks the stored invoice, in the stored connection, against the quote", async () => {
     await run();
 
-    expect(state.totalsArgs).toEqual([
+    expect(state.checkArgs).toEqual([
       EVENT_ID,
       expect.objectContaining({
         eventId: EVENT_ID,
@@ -1140,8 +1130,10 @@ describe("updateInvoice — the totals check (spec 06)", () => {
   });
 
   it("a mismatch is a result, not a failure: updated, with the differences and no warning", async () => {
-    const differences = [{ field: "total", quoteCents: 802500, qboCents: 802501 }];
-    state.totals = { status: "checked", matches: false, differences };
+    const differences = [
+      { reason: "totals", field: "Total", quote: "$8,025.00", qbo: "$8,025.01" },
+    ];
+    state.check = { status: "checked", matches: false, reasons: ["totals"], differences };
 
     expect(await run()).toEqual({
       status: "updated",
@@ -1149,12 +1141,12 @@ describe("updateInvoice — the totals check (spec 06)", () => {
       qboInvoiceId: "inv-1",
       linkedExisting: false,
       warnings: [],
-      totals: { matches: false, differences },
+      check: { matches: false, reasons: ["totals"], differences },
     });
   });
 
-  it("a check that fails still returns updated, with totals_check_failed and its reason, and no totals", async () => {
-    state.totalsError = new Error("QuickBooks invoice read failed: fetch failed");
+  it("a check that fails still returns updated, with invoice_check_failed and its reason, and no check", async () => {
+    state.checkError = new Error("QuickBooks invoice read failed: fetch failed");
 
     const result = await run();
 
@@ -1164,36 +1156,64 @@ describe("updateInvoice — the totals check (spec 06)", () => {
       qboInvoiceId: "inv-1",
       linkedExisting: false,
       warnings: [
-        { code: "totals_check_failed", reason: "QuickBooks invoice read failed: fetch failed" },
+        { code: "invoice_check_failed", reason: "QuickBooks invoice read failed: fetch failed" },
       ],
     });
-    expect(result).not.toHaveProperty("totals");
+    expect(result).not.toHaveProperty("check");
   });
 
-  it("a failed check leaves the saved hash, the Log and the PDF as they are", async () => {
-    state.totalsError = new Error("boom");
+  it("a failed check leaves the update, the Log and the PDF as they are", async () => {
+    state.checkError = new Error("boom");
 
     await run();
 
-    expect(calls).toContain("save-sent-hash");
+    expect(calls).toContain("qbo:update-invoice");
     expect(calls).toContain("log:updated");
     expect(calls).toContain("pdf-replace");
   });
 
-  it("an invoice QuickBooks cannot find is the same warning, and no totals", async () => {
-    state.totals = { status: "missing" };
+  it("an invoice QuickBooks cannot find is the same warning, and no check", async () => {
+    state.check = { status: "missing" };
 
     const result = await run();
 
     expect(result).toMatchObject({
       status: "updated",
-      warnings: [{ code: "totals_check_failed", reason: expect.stringContaining("QuickBooks") }],
+      warnings: [{ code: "invoice_check_failed", reason: expect.stringContaining("QuickBooks") }],
     });
-    expect(result).not.toHaveProperty("totals");
+    expect(result).not.toHaveProperty("check");
+  });
+
+  it("a quote the check could not compare is the same warning, with its message, and no check", async () => {
+    state.check = { status: "skipped", message: "Add a contact with a name to the quote." };
+
+    const result = await run();
+
+    expect(result).toMatchObject({
+      status: "updated",
+      warnings: [
+        { code: "invoice_check_failed", reason: "Add a contact with a name to the quote." },
+      ],
+    });
+    expect(result).not.toHaveProperty("check");
+  });
+
+  it("a quote the check could not compare is the same warning, with its message, and no check", async () => {
+    state.check = { status: "skipped", message: "Add a contact with a name to the quote." };
+
+    const result = await run();
+
+    expect(result).toMatchObject({
+      status: "updated",
+      warnings: [
+        { code: "invoice_check_failed", reason: "Add a contact with a name to the quote." },
+      ],
+    });
+    expect(result).not.toHaveProperty("check");
   });
 
   it("the warning comes after the others and before the PDF's", async () => {
-    state.totalsError = new Error("boom");
+    state.checkError = new Error("boom");
     state.replaceError = new Error("render blew up");
     state.zoneClass = {
       classId: null,
@@ -1204,7 +1224,7 @@ describe("updateInvoice — the totals check (spec 06)", () => {
 
     expect((result as { warnings: Array<{ code: string }> }).warnings.map((w) => w.code)).toEqual([
       "class_missing",
-      "totals_check_failed",
+      "invoice_check_failed",
       "pdf_not_attached",
     ]);
   });
@@ -1214,7 +1234,7 @@ describe("updateInvoice — the totals check (spec 06)", () => {
 
     await run();
 
-    expect(calls).not.toContain("totals");
+    expect(calls).not.toContain("check");
   });
 
   it("does not run for an invoice that is missing in QuickBooks", async () => {
@@ -1222,7 +1242,7 @@ describe("updateInvoice — the totals check (spec 06)", () => {
 
     await run();
 
-    expect(calls).not.toContain("totals");
+    expect(calls).not.toContain("check");
   });
 
   it("an overwrite by number checks the invoice it linked, not the one the quote had", async () => {
@@ -1230,10 +1250,10 @@ describe("updateInvoice — the totals check (spec 06)", () => {
 
     const result = await overwrite();
 
-    expect(result).toMatchObject({ status: "updated", totals: { matches: true } });
-    expect(calls.indexOf("log:linked")).toBeLessThan(calls.indexOf("totals"));
-    expect(calls.indexOf("totals")).toBeLessThan(calls.indexOf("pdf-replace"));
-    expect(state.totalsArgs[1]).toMatchObject({
+    expect(result).toMatchObject({ status: "updated", check: { matches: true } });
+    expect(calls.indexOf("log:linked")).toBeLessThan(calls.indexOf("check"));
+    expect(calls.indexOf("check")).toBeLessThan(calls.indexOf("pdf-replace"));
+    expect(state.checkArgs[1]).toMatchObject({
       qboInvoiceId: "inv-77",
       qboInvoiceConnectionId: "conn-1",
     });
@@ -1244,7 +1264,7 @@ describe("updateInvoice — the totals check (spec 06)", () => {
 
     await overwrite({ replaceMissing: true });
 
-    expect(state.totalsArgs[1]).toMatchObject({ qboInvoiceId: "inv-77" });
+    expect(state.checkArgs[1]).toMatchObject({ qboInvoiceId: "inv-77" });
   });
 
   it("creating again after 'not found' checks the new invoice, after the Log and before the PDF", async () => {
@@ -1252,10 +1272,10 @@ describe("updateInvoice — the totals check (spec 06)", () => {
 
     const result = await run({ replaceMissing: true });
 
-    expect(result).toMatchObject({ status: "created", totals: { matches: true } });
-    expect(calls.indexOf("log:recreated")).toBeLessThan(calls.indexOf("totals"));
-    expect(calls.indexOf("totals")).toBeLessThan(calls.indexOf("pdf"));
-    expect(state.totalsArgs[1]).toMatchObject({ qboInvoiceId: "inv-new" });
+    expect(result).toMatchObject({ status: "created", check: { matches: true } });
+    expect(calls.indexOf("log:recreated")).toBeLessThan(calls.indexOf("check"));
+    expect(calls.indexOf("check")).toBeLessThan(calls.indexOf("pdf"));
+    expect(state.checkArgs[1]).toMatchObject({ qboInvoiceId: "inv-new" });
   });
 });
 
@@ -1273,7 +1293,7 @@ describe("overwriteInvoice — case 2, overwriting the invoice found by number",
       qboInvoiceId: "inv-77",
       linkedExisting: true,
       warnings: [],
-      totals: { matches: true, differences: [] },
+      check: { matches: true, reasons: [], differences: [] },
     });
     expect(calls).toEqual([
       "load",
@@ -1286,7 +1306,7 @@ describe("overwriteInvoice — case 2, overwriting the invoice found by number",
       "save-link",
       "log:linked",
       "log:is_qbo",
-      "totals",
+      "check",
       "pdf-replace",
     ]);
   });
@@ -1299,15 +1319,17 @@ describe("overwriteInvoice — case 2, overwriting the invoice found by number",
     expect(state.posts[0].body).toMatchObject({ Id: "inv-77", SyncToken: "3", sparse: true });
   });
 
-  it("saves the id, the connection, the sent hash, no mismatch and is_qbo, guarded by IS NULL", async () => {
+  it("saves the id, the connection, no mismatch, no reasons, no check times and is_qbo, guarded by IS NULL", async () => {
     await overwrite();
 
     expect(state.updates).toHaveLength(1);
     expect(state.updates[0].values).toEqual({
       qbo_invoice_id: "inv-77",
       qbo_invoice_connection_uuid: "conn-1",
-      qbo_invoice_sent_hash: "hash-A",
       qbo_invoice_mismatch: false,
+      qbo_invoice_mismatch_reasons: null,
+      qbo_invoice_checked_at: null,
+      qbo_invoice_check_failed_at: null,
       is_qbo: true,
     });
     expect(state.updates[0].filters).toEqual([
@@ -1502,7 +1524,7 @@ describe("overwriteInvoice — case 2, relinking a link that points at a missing
       qboInvoiceId: "inv-77",
       linkedExisting: true,
       warnings: [],
-      totals: { matches: true, differences: [] },
+      check: { matches: true, reasons: [], differences: [] },
     });
   });
 

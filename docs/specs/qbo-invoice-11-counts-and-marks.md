@@ -1,7 +1,8 @@
 # QuickBooks invoice — sidebar counts, tab counts and row marks
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; three readings to
-confirm (§1, last paragraph).
+Status: **DRAFT 2026-10-22; AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions; three
+readings to confirm (§1, last paragraph). The amendment follows spec 09: one signal, the mismatch
+flag, with its stored reasons; no hashes.
 Implementation order: **11** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [09](qbo-invoice-09-banner.md) (the rule and `seeInvoiceAlerts`),
@@ -31,7 +32,7 @@ itself.
   the row the count is about.
 - **Accountants only.** An admin who is not an accountant sees none of them.
 - **Whatever the status:** an invoice that exists keeps its signals (plan: "Keep everything").
-- **What counts** is spec 09's rule: outdated, or mismatch.
+- **What counts** is spec 09's rule: the mismatch flag is set.
 
 **Readings to confirm at review.**
 
@@ -60,9 +61,9 @@ itself.
 
 ## 3. The data — `useInvoiceAlerts.ts` (new, `quotesAndBookings/hooks/`)
 
-One reactive query on `Events`: `id`, `qbo_invoice_id`, `qbo_invoice_hash`,
-`qbo_invoice_sent_hash`, `qbo_invoice_mismatch`, for non-deleted events that have an
-invoice. No join.
+One reactive query on `Events`: `id`, `qbo_invoice_id`, `qbo_invoice_mismatch`,
+`qbo_invoice_mismatch_reasons`, for non-deleted events that have an invoice and whose flag is
+set. No join.
 
 It returns `{ reasonsByEvent, count }`: a map from an event's id to its reasons (spec 09's
 rule; an event with none is absent) and the number of events in it.
@@ -102,8 +103,8 @@ column).
 - **QuickBooks Invoice Alerts** — the description now reads: "The red notice on a quote whose
   QuickBooks invoice needs attention, the red count on the Accountant and Quotes & Bookings
   entries of the sidebar and on the tabs of the Accountant page, and the red mark on the
-  quote's row in the lists. A quote needs attention when the quote changed since the invoice
-  was last updated, or QuickBooks' total or tax does not match the quote's." The accountant's
+  quote's row in the lists. A quote needs attention when its invoice in QuickBooks no longer
+  matches the quote." The accountant's
   note gains "and in the counts and marks". The administrator's note (spec 10) is unchanged.
 - `permissionPageData.test.ts` — the changed texts.
 
@@ -111,16 +112,17 @@ column).
 
 Playwright, written, **not run**; the data is seeded by writing the columns of `Events`.
 
-- **S1** an accountant with three quotes that need attention (two outdated, one mismatched):
-  the sidebar items Accountant and Quotes & Bookings both show 3.
+- **S1** an accountant with three quotes whose flag is set (two with `["dates"]`, one with
+  `["totals"]`): the sidebar items Accountant and Quotes & Bookings both show 3.
 - **S2** the same quotes for an admin who is not an accountant: no sidebar count, no tab
   number, no mark.
 - **S3** a deleted quote that needs attention is not in the sidebar count.
 - **S4** `/accountant`: Need attention shows the count of its rows; AR and AR Deposits show
   their own numbers; a Filter Panel filter changes the three numbers and not the sidebar's.
 - **S5** the marks: a quote that needs attention has the red dot on `/quotes-bookings` and on
-  its AR row; hovering shows "Invoice out of date" and/or "Totals do not match".
-- **S6** after **Update invoice** (a fake route that saves the sent hash) the count, the
+  its AR row; hovering shows the short text of each of its reasons ("Dates do not match", "Totals
+  do not match", …).
+- **S6** after **Update invoice** (a fake route that clears the flag) the count, the
   tab numbers and the mark fall without a reload.
 - **S7** a quote with no invoice: no mark, no count.
 - **S8** the AR tabs still show the same rows and balances as before.
@@ -147,10 +149,11 @@ Playwright spec of §6. No migration, no `AppSchema.ts`, no `database.types.ts`,
 
 Red first. Prettier only on touched files.
 
-- **`useInvoiceAlerts` test:** the query reads the five columns, filters on the invoice id and
-  `deleted = 0`, has no join; the map and the count agree; for a role without
+- **`useInvoiceAlerts` test:** the query reads the four columns, filters on the invoice id, the
+  flag and `deleted = 0`, has no join; the map and the count agree; for a role without
   `seeInvoiceAlerts` the map is empty and the count 0 and the query matches no row.
-- **Mark tests:** none for no reasons; each reason's text; both texts when both apply.
+- **Mark tests:** none for no reasons; each reason's short text; all the texts, one per reason,
+  when there are several.
 - **`eventListCells` tests:** the name cell is unchanged without `attention`.
 - **Sidebar tests:** the badge on both items with the right label; absent at 0; absent for a
   user who is not an accountant.

@@ -16,7 +16,7 @@ this: it wants the **real tax code on the line**. This spec changes the Canadian
 builder and of the create route; nothing else.
 
 **Not part of this spec:** the setting that holds the no-tax code (03c); the US path, which stays
-as it is; the province mapping (03a); the totals check (spec 06).
+as it is; the province mapping (03a); the invoice check (spec 06).
 
 ## 1. Decisions (all taken by the user)
 
@@ -104,8 +104,8 @@ Red first. Prettier only on touched files.
     and the message of §2, and nothing is created in QuickBooks, written to `Events` or logged;
   - a Canadian quote whose province code is mapped does not need the no-tax code, so a missing one
     does not stop it.
-- **`invoiceHashParity.test.ts`:** unchanged unless it names `TxnTaxDetail` (then that mention is
-  removed).
+- **`invoiceHashParity.test.ts`:** deleted with the hash (spec 01); spec 06's coverage test
+  replaces it and does not name `TxnTaxDetail`.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check` on the touched files. E2E: SKIPPED
   (not run locally, by instruction). A sandbox re-run is the user's: a taxed Canadian quote and an
   untaxed one, both created and shown with the right tax.
@@ -115,15 +115,17 @@ Red first. Prettier only on touched files.
 - **A province code that is not a code of the file.** QuickBooks refuses the invoice; the message
   passes on (spec 04).
 - **A province code whose rate differs from the calculator's.** The invoice carries QuickBooks'
-  tax; the totals check (spec 06) reports the mismatch (03a, R1).
+  tax; the invoice check (spec 06) reports the mismatch (03a, R1).
 - **A taxed quote with no province code.** Created with the no-tax code and the warning; its tax
   in QuickBooks is zero until the province is mapped and the invoice updated (spec 05).
 - **A Canadian file that still wants a transaction-level code.** Not expected after the sandbox
   run; if it happens, QuickBooks' own message passes on.
 - **The invoice's currency.** The sandbox invoice came back in USD although the file's tax codes
   are Canadian; the body does not set a currency. To verify in the real Canadian company.
-- **The hash.** The codes come from settings, not from the quote, so changing a mapping does not
-  make an invoice "outdated" (as before).
+- **The comparison.** The codes come from settings, not from the quote. The invoice check
+  (spec 06) builds the expected line with the settings as they are **now**, so after a mapping is
+  changed an invoice made with the old code shows `tax_code` at its next check, until Update
+  (this replaces the hash-era rule that a changed mapping never made an invoice "outdated").
 - **Offline / PowerSync.** Not applicable: server-only.
 - **Clerk.** The route that calls this code checks the role (spec 04).
 

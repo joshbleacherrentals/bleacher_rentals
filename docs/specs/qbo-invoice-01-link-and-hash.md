@@ -1,188 +1,160 @@
-# QuickBooks invoice — the link columns and the current hash
+# QuickBooks invoice — the link columns and the mismatch flag
 
-Status: **Implemented 2026-10-22.** 0 open decisions.
+(The file keeps its old name, `…link-and-hash`, by the user's choice of 2026-10-23: the hash it
+once described is gone.)
+
+Status: **AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions. The earlier version
+(five columns and a current hash kept by a trigger) was implemented on 2026-10-22; the user then
+asked to remove the hashes (§1). The migration `20261022140000_qbo_invoice_link_and_hash.sql` is
+edited in place — the feature is not in production.
 Implementation order: **01** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
-Builds on: [quote-staleness-detection.md](quote-staleness-detection.md) (the same trigger
-machinery), [accountant-quotes-05-is-qbo-column.md](accountant-quotes-05-is-qbo-column.md)
+Builds on: [accountant-quotes-05-is-qbo-column.md](accountant-quotes-05-is-qbo-column.md)
 (the accountant guard on `Events`).
 
 ## 0. The request, and what it is not
 
-The app will keep, on each quote, which QuickBooks invoice it made and whether that invoice
-still matches the quote. This spec adds the storage and the one value the database can keep
-by itself:
+The app keeps, on each quote, which QuickBooks invoice it made and whether that invoice still
+matches the quote. This spec is the storage for that:
 
-- five columns on `Events`;
-- a **current hash** — a fingerprint of everything the invoice is built from — kept up to
-  date by the same triggers that keep `content_hash` and `contract_hash`.
+- the link: the invoice's id and the QuickBooks file it lives in;
+- the **mismatch flag** and the **reasons** behind it.
 
-The **sent hash** (what the invoice was built from when it was last written) is a column
-here but is written by later specs. "Outdated" will mean: current hash is not the sent hash.
+The user's request of 2026-10-23: **remove the hashes from `Events`** (`qbo_invoice_hash`,
+`qbo_invoice_sent_hash`) and everything that writes or reads them. Instead of a fingerprint kept in
+the database, the app asks QuickBooks: it reads the invoice over the network, compares it with the
+quote and stores the answer (spec 06). The flag is `qbo_invoice_mismatch`.
 
-**Not part of this spec:** any route, screen or QuickBooks call; the customer link (spec 02);
-who may read these columns beyond what `Events` already gives.
+**Not part of this spec:** any route, screen or QuickBooks call; the comparison itself (06); the
+customer link (02); who may read these columns beyond what `Events` already gives.
 
 ## 1. Decisions (all taken by the user)
 
-**D1 — where the link lives and who writes it**
+**D1 — where the link lives and who writes it** (unchanged)
 
-- **Question:** the invoice id, the sent hash and the mismatch flag need a home, and the
-  invoice route needs a way to write them.
 - **Option A — `Events` columns, written with the service role.** No change to the accountant
-  guard; no `sync_rules.yaml` edit.
-- **Option B — `Events` columns, written with the user's token;** the guard is widened.
-- **Option C — a new table `EventQboInvoices`;** RLS, `AppSchema.ts` and a sync rule.
+  guard; no `sync_rules.yaml` edit. **Option B** — user's token, guard widened. **Option C** — a
+  new table `EventQboInvoices`.
 - **User's answer: A.**
 
-**D2 — may a browser write these columns**
+**D2 — may a browser write these columns** (unchanged)
 
-- **Option A — leave them like any other `Events` column:** admin and account manager can
-  PATCH them; only the accountant is fenced. **Option B — a guard trigger** refusing every
-  `authenticated` write to them.
-- **User's answer: A — leave as any column.** No guard trigger is added.
+- **User's answer: A — leave them like any other `Events` column.** Admin and account manager can
+  PATCH them; only the accountant is fenced. No guard trigger is added.
 
-**D3 — does the hash include the tax fields**
+**D3 — does the hash include the tax fields: VOID.** There is no hash any more. A tax that
+differs is found by the comparison (spec 06).
 
-- **Option A — include `tax_percent`, `tax_amount_cents`, `is_tax_overridden`.** Any tax edit
-  makes the invoice outdated. **Option B — exclude them.**
-- **User's answer: A — include.**
+**From the user's own words, 2026-10-23 (not options):**
 
-**From the user's own words (not options):** two hash columns on `Events`, "like
-`content_hash`", kept by a trigger. The hashed fields: the event type, the amount, the
-client, the venue address, the invoice number, the Event Start, the due date, the title.
+- **Remove the hashes** from the `Events` table and from the migration, and with them everything
+  that writes or reads a hash.
+- **Compare with a request to QuickBooks.** Equal → `qbo_invoice_mismatch = false`; any
+  difference → `qbo_invoice_mismatch = true` (spec 06, which says when it runs).
+- **The Need attention list shows the real reason** (for example "Dates do not match"), not one
+  fixed text (spec 10). So the reasons must be kept, which is why the table gains a column (§3).
+- **The card shows when the quote was last checked** (user's answer, 2026-10-23), so a check that
+  did not run is not mistaken for a clean invoice. Two timestamps are kept for it (§3).
 
 ## 2. Research findings
 
-- **The function and its triggers.** `recompute_quote_hashes(p_event_id)` builds two jsonb
-  documents and writes `content_hash` and `contract_hash` only when one differs. Its latest
-  body is in `20260922120000_percentage_payment_schedules.sql`. It is called from triggers on
-  `Events`, `EventLineItems`, `PaymentInstallments`, `ContractSignatures`, `Contacts`,
-  `TermsAndConditions`, `SalesOffices` and `Addresses`.
-- **The Contacts trigger reads one column.** `trg_recompute_quote_hashes_contacts` recomputes
-  events with `contact_uuid = NEW.id` only. The quote document shows the **finance contact**
-  first (`financeContact ?? contact`), but neither existing hash reads
-  `finance_contact_uuid`. Not fixed here for `content_hash`; the new hash needs it (§3.3).
-- **Signatures are safe.** `trg_invalidate_signature_on_contract_change` compares the
-  signature's stored hash with the new `contract_hash`. A write that leaves `contract_hash`
-  as it was cannot invalidate anything, even though it names the column.
-- **Which address.** The quote document's venue is `Events.address_uuid`, not `venue_uuid`.
-- **Line items.** `EventLineItems.quantity` is a nullable integer (null means 1); discounts
-  are lines with a negative `value_cents`; soft-deleted lines have `deleted = true`.
-- **The guard.** `guard_events_accountant_columns` refuses an accountant's change to any
-  column but `is_qbo`, but skips every caller whose `current_user` is not `authenticated` —
-  the service role included. That is why the invoice route can write these columns.
+- **What the first version did, and so what is removed.** `20261022140000` added five columns,
+  rebuilt `recompute_quote_hashes()` with a third jsonb document hashed into `qbo_invoice_hash`,
+  widened `trg_recompute_quote_hashes_contacts` to the finance contact, and backfilled every event
+  under a disabled signature-invalidation trigger. All of that except the columns existed only
+  for the hash.
+- **`recompute_quote_hashes` after the edit.** The migration no longer touches it: the function
+  stays exactly as `20260922120000_percentage_payment_schedules.sql` left it, and the Contacts
+  trigger stays as it was before. `content_hash` and `contract_hash` are not affected.
+- **The guard.** `guard_events_accountant_columns` refuses an accountant's change to any column
+  but `is_qbo`, and skips every caller whose `current_user` is not `authenticated` — the service
+  role included. That is why the invoice route can write these columns.
 - **Sync.** `Events` already syncs whole-row to admin, account manager and accountant.
 
-## 3. Database — `supabase/migrations/20261022130000_qbo_invoice_link_and_hash.sql`
+## 3. Database — `supabase/migrations/20261022140000_qbo_invoice_link_and_hash.sql` (edited)
 
-(After `20261022120000`, the latest on the branch; renumbered from `20261022120000`, which `events_quote_sent_at` already uses.)
-
-**3.1 Columns on `public."Events"`.**
+Six columns on `public."Events"`, each with a `COMMENT`:
 
 - `qbo_invoice_id` — `text`, null. QuickBooks' own id of the invoice.
 - `qbo_invoice_connection_uuid` — `uuid`, null, `references "QboConnections"(id)` with
   `ON DELETE RESTRICT` (as `Vendors.qbo_connection_uuid`). The QuickBooks file the invoice
   lives in.
-- `qbo_invoice_hash` — `text`, null. The current hash. Written only by the trigger.
-- `qbo_invoice_sent_hash` — `text`, null. The value `qbo_invoice_hash` had when the invoice
-  was last written. Written by the server.
-- `qbo_invoice_mismatch` — `boolean`, not null, `false`. True while QuickBooks' totals
-  disagree with the quote's. Written by the server.
+- `qbo_invoice_mismatch` — `boolean`, not null, `false`. True while the last comparison found a
+  difference between the quote and its QuickBooks invoice.
+- `qbo_invoice_mismatch_reasons` — `text`, null. **New.** A JSON array of reason codes (spec 06,
+  §4), for example `["dates","totals"]`. Null whenever the flag is false. Written in the same
+  statement as the flag.
+- `qbo_invoice_checked_at` — `timestamptz`, null. **New.** When the last check that read the
+  invoice finished (spec 06). Null until the first check.
+- `qbo_invoice_check_failed_at` — `timestamptz`, null. **New.** When the last check that could not
+  finish was tried (QuickBooks unreachable, the invoice missing, the quote not comparable). Cleared
+  by the next successful check. Only the time is kept, not the message.
 
-Each column gets a `COMMENT`.
+**Removed from the file:** the columns `qbo_invoice_hash` and `qbo_invoice_sent_hash`; the
+`CREATE OR REPLACE` of `recompute_quote_hashes`; the `CREATE OR REPLACE` of
+`trg_recompute_quote_hashes_contacts`; the backfill and its drift check. What is left is the
+`ALTER TABLE … ADD COLUMN` and the comments, and the header comment is rewritten to say so.
 
-**3.2 The third document in `recompute_quote_hashes`.** `CREATE OR REPLACE` with the body of
-`20260922120000`, plus a third canonical jsonb document hashed with SHA-256 the same way and
-written to `qbo_invoice_hash`. Fixed key order; its members:
-
-- **eventType:** `event_type_uuid`.
-- **amountCents:** the sum of `coalesce(quantity, 1) * value_cents` over the event's
-  non-deleted line items — the price after discounts, before tax.
-- **taxPercent, taxAmountCents, isTaxOverridden:** the three `Events` columns (D3).
-- **customer:** the billed contact — the finance contact when `finance_contact_uuid` is set,
-  otherwise the contact: its id, first name and last name.
-- **venue:** street, city, state and zip of `address_uuid`.
-- **invoiceNumber:** `invoice_number`.
-- **invoiceDate:** `event_start`.
-- **dueDate:** the latest `PaymentInstallments.due_date` of the event; `event_start` when it
-  has none.
-- **title:** `event_name`.
-
-The function still writes only when a hash differs. `content_hash` and `contract_hash` must
-come out **exactly as before** for every event (§7.1 checks this).
-
-**3.3 The Contacts trigger.** `CREATE OR REPLACE` of `trg_recompute_quote_hashes_contacts` so
-it recomputes every event where `contact_uuid = NEW.id` **or** `finance_contact_uuid = NEW.id`.
-
-**3.4 Backfill.** As in `20260903120000`: disable `invalidate_signature_on_contract_change`,
-run `recompute_quote_hashes` for every event, enable it again, and abort the migration if any
-active signature then disagrees with its event.
-
-**3.5 Deliberately not changed:** every RLS policy, `guard_events_accountant_columns`,
-`sync_rules.yaml`, the existing two hashes' fields.
+**Deliberately not changed:** every RLS policy, `guard_events_accountant_columns`,
+`sync_rules.yaml`, `content_hash`, `contract_hash` and the triggers that keep them.
 
 ## 4. App changes
 
-- `src/lib/powersync/AppSchema.ts`: the five columns in `EventsCols` — four `column.text`
-  and `qbo_invoice_mismatch` as `column.integer` (booleans are 0/1 locally).
-- `database.types.ts`: the five columns by hand on `Events` `Row`, `Insert` and `Update`
-  (`gtl` is not used: the local database lags the migrations), and the foreign key to
-  `QboConnections` in `Relationships`.
-- No component, hook or route reads these columns yet.
+- `src/lib/powersync/AppSchema.ts`: six columns in `EventsCols` — `qbo_invoice_id`,
+  `qbo_invoice_connection_uuid`, `qbo_invoice_mismatch_reasons`, `qbo_invoice_checked_at` and
+  `qbo_invoice_check_failed_at` as `column.text` (timestamps are text locally);
+  `qbo_invoice_mismatch` as `column.integer` (booleans are 0/1 locally). The two hash columns are
+  taken out, and the comment above them is corrected.
+- `database.types.ts`: by hand (`gtl` is not used: the local database lags the migrations) — the
+  two hash columns out of `Events` `Row`, `Insert` and `Update`, the three new columns in, and the
+  foreign key to `QboConnections` stays in `Relationships`.
+- **Every reader and writer of the two hashes is removed** — they live in specs 03, 04, 05, 09, 10
+  and 11, which say how, and in the e2e specs and tests listed there. Nothing outside the
+  QuickBooks invoice feature reads them.
 
 ## 5. Behaviour scenarios
 
-No screen changes, so there is no Playwright scenario. The behaviour is asserted in the SQL
-test of §7.1.
+No screen changes, so there is no Playwright scenario. The behaviour is asserted in the SQL test
+of §7.1.
 
 ## 6. Files
 
-**Counted — 4 files** (limit 10):
+**Counted — 3 files** (limit 10):
 
-1. `supabase/migrations/20261022130000_qbo_invoice_link_and_hash.sql` — new
-2. `database.types.ts` — changed: the five `Events` columns and the foreign key
-3. `src/lib/powersync/AppSchema.ts` — changed: the five columns
-4. `package.json` — changed: `test:db:qboinvoicehash`, added to `test:db:all`
+1. `supabase/migrations/20261022140000_qbo_invoice_link_and_hash.sql` — changed (§3)
+2. `database.types.ts` — changed: the columns of §4
+3. `src/lib/powersync/AppSchema.ts` — changed: the columns of §4
 
-**Not counted:** `supabase/tests/qbo_invoice_hash.test.sql` — new. No `sync_rules.yaml`, no
-`permissionPageData.ts` (no role gains or loses anything here).
+**Not counted:** `supabase/tests/qbo_invoice_hash.test.sql` — rewritten (§7.1); its file name and
+the script `test:db:qboinvoicehash` in `package.json` keep their names (the user's choice), so
+`package.json` is not edited. No `sync_rules.yaml`, no `permissionPageData.ts` (no role gains or
+loses anything here).
 
 ## 7. Tests and implementation sequence
 
 Red first. Playwright: not applicable. Prettier only on touched files.
 
-**7.1 Database**
+**7.1 Database** — `qbo_invoice_hash.test.sql` keeps only what still has a meaning:
 
-- **Test asserts, each its own assertion:**
-  - a new event has a non-null `qbo_invoice_hash`; `qbo_invoice_id`, `…_sent_hash`,
-    `…_connection_uuid` are null and `qbo_invoice_mismatch` is false;
-  - each of these changes flips `qbo_invoice_hash`: a line item's price; its quantity; a line
-    soft-deleted; `tax_percent`; `tax_amount_cents`; `is_tax_overridden`; the contact's first
-    name; the contact's last name; `finance_contact_uuid` set; the finance contact's name; the
-    address's street; `invoice_number`; `event_start`; `event_name`; the last installment's
-    `due_date`; `event_type_uuid`;
-  - with a finance contact set, renaming the **plain contact** does not flip it, and renaming
-    the **finance contact** does;
-  - with no installment the due date is `event_start`; adding one that is later changes it;
-  - these changes leave it alone: `external_notes`, `po_number`, `internal_notes`,
-    `quote_valid_till`, the contact's email and phone, a company's name, `event_end`;
-  - reverting a change restores the original hash (deterministic);
-  - writing `qbo_invoice_id`, `qbo_invoice_connection_uuid`, `qbo_invoice_sent_hash` and
-    `qbo_invoice_mismatch` as the table owner does not change `qbo_invoice_hash` and raises
-    no error (no trigger recursion);
-  - `content_hash` and `contract_hash` of a sample of events are identical before and after
-    the migration's function change;
-  - a change that flips only `qbo_invoice_hash` (`is_tax_overridden`) leaves an active
-    signature active;
-  - an accountant-only user cannot change `qbo_invoice_id` or `qbo_invoice_mismatch` (the
-    guard refuses with `42501`) and the row is read back unchanged;
-  - after the backfill no event has a null `qbo_invoice_hash`.
-- **Gate:** dry-run in `BEGIN … ROLLBACK` through the `supabase_db_bleacher_rentals`
-  container, with the pending migrations applied inside the same pipe; the new test passes
-  and `quote_content_hash.test.sql`, `contract_signature_invalidation.test.sql`,
-  `accountant_events_is_qbo.test.sql` stay green. A mutation run (a hash member removed)
-  goes red.
+- the six columns exist with the right types and defaults: a new event has `qbo_invoice_id`,
+  `qbo_invoice_connection_uuid`, `qbo_invoice_mismatch_reasons`, `qbo_invoice_checked_at` and
+  `qbo_invoice_check_failed_at` null and `qbo_invoice_mismatch` false;
+- the two hash columns **do not exist** (`information_schema.columns` has no row for them);
+- writing the six columns as the table owner raises no error and does not change
+  `content_hash` or `contract_hash` (no trigger recursion);
+- `content_hash` and `contract_hash` of a sample of events are identical before and after the
+  migration;
+- a change to the invoice columns leaves an active signature active;
+- an accountant-only user cannot change `qbo_invoice_id`, `qbo_invoice_mismatch`,
+  `qbo_invoice_mismatch_reasons`, `qbo_invoice_checked_at` or `qbo_invoice_check_failed_at` (the
+  guard refuses with `42501`) and the row is read back unchanged.
+
+All the "each field flips the hash" assertions of the first version are deleted with the hash.
+
+- **Gate:** dry-run in `BEGIN … ROLLBACK` through the `supabase_db_bleacher_rentals` container,
+  with the pending migrations applied inside the same pipe; the rewritten test passes and
+  `quote_content_hash.test.sql`, `contract_signature_invalidation.test.sql`,
+  `accountant_events_is_qbo.test.sql` stay green.
 
 **7.2 Types**
 
@@ -191,33 +163,29 @@ Red first. Playwright: not applicable. Prettier only on touched files.
 
 ## 8. Edge cases and error handling
 
-- **A contact edited in the address book.** The Contacts trigger recomputes the events that
-  use it as contact or finance contact; the cost is one hash per such event.
-- **An event with no address, contact or line items.** The document carries nulls and zero;
-  the hash exists. Whether such an event can be invoiced is spec 04's rule.
-- **`qbo_invoice_sent_hash` null while `qbo_invoice_id` is set.** Cannot happen through the
-  route (spec 04 writes both together). If it does, specs 09–11 read it as outdated.
-- **A deleted event** keeps its hash and its link.
+- **A database that already ran the first version of the migration** has the two hash columns,
+  the third document in `recompute_quote_hashes` and the widened Contacts trigger, and editing the
+  file does not undo them. Such a database (the user's local one, and any shared dev one) must be
+  rebuilt (`npx supabase db reset`) or have the three changes reverted by hand; otherwise the old
+  function keeps writing a column the app no longer reads. A database that never ran it needs
+  nothing.
+- **A flag with no reasons.** The flag is the truth and the reasons explain it. A browser may PATCH
+  one column without the other (D2), and rows written before the reasons existed have none: a
+  reader's rule in spec 09 shows a generic text for a set flag with no reasons.
+- **A deleted event** keeps its link and its flag.
 - **Offline.** The columns sync down read-only; this app never writes them from the client.
 - **Clerk.** Nothing new: no route, token or webhook is touched.
 
 ## 9. Risks
 
-- **R1 — one more document on the hot function.** `recompute_quote_hashes` runs on every
-  quote-related write; it now builds and hashes a third document. The cost is small but
-  real.
-- **R2 — parity with the payload.** The hash says "outdated" only for fields it lists. If the
-  payload of spec 03 ever reads another field, the hash must grow with it; spec 03's test
-  pins the list.
-- **R3 — the widened Contacts trigger** also recomputes `content_hash` for events that use
-  the edited contact as finance contact. That hash's own document does not read the finance
-  contact, so its value does not change; only the work is added.
-- **R4 — the finance-contact gap in `content_hash`** (§2) is left as it is.
+- **R1 — applied copies of an edited migration** (§8). The edit is safe only because the feature
+  is not in production; the shared databases that ran it need the reset.
+- **R2 — columns that can disagree** (§8): the flag and its reasons are written together by the
+  server and apart by a hand PATCH; the check times only by the server.
 
 ## 10. Out of scope
 
 - Any route, screen, hook or QuickBooks call.
 - The customer link table (spec 02).
-- Writing the sent hash or the mismatch flag (specs 04–06).
-- Fixing `content_hash` and `contract_hash` for the finance contact.
+- Writing the flag, the reasons and the check times (specs 04–06).
 - A guard trigger that stops browsers writing the new columns (D2).

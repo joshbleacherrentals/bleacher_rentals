@@ -232,6 +232,18 @@ async function readLink(contactId: string, connectionId: string): Promise<string
   return data?.qbo_customer_id ?? null;
 }
 
+/**
+ * The QuickBooks customer the contact is linked to in this connection, or null. Reads the link only:
+ * it does not look the customer up in QuickBooks, create it or drop a stale link (the invoice
+ * check, docs/specs/qbo-invoice-06-totals-check.md §3).
+ */
+export async function readLinkedCustomerId(
+  connectionId: string,
+  contactId: string,
+): Promise<string | null> {
+  return readLink(contactId, connectionId);
+}
+
 async function deleteLink(contactId: string, connectionId: string): Promise<void> {
   const { error } = await getSupabaseAdmin()
     .from("ContactQboCustomers")

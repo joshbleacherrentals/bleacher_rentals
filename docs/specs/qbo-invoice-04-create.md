@@ -1,7 +1,11 @@
 # QuickBooks invoice — the create route
 
-Status: **Implemented 2026-10-22.** 0 open decisions. Step 8 was amended the same day by
-[03d](qbo-invoice-03d-canadian-line-tax-code.md) (the Canadian line's tax code).
+Status: **Implemented 2026-10-22; AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions.
+Step 8 was amended on 2026-10-22 by [03d](qbo-invoice-03d-canadian-line-tax-code.md) (the Canadian
+line's tax code). **The 2026-10-23 amendment removes the hash** (spec 01): step 4 goes, the saved
+link no longer carries a sent hash, the `requestid` is made from the event alone, and the hook of
+step 11 is the invoice check of [06](qbo-invoice-06-totals-check.md). The text below is the
+amended one; step numbers are kept so that references to them hold.
 Implementation order: **04** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (the columns), [02](qbo-invoice-02-customer.md)
@@ -17,7 +21,7 @@ The caller sends only the event's id; everything else is read on the server.
 It is **not** reachable by any screen yet (spec 07), so no role gains a visible ability here.
 
 **Not part of this spec:** updating an invoice, overwriting one found by number, the
-"invoice was deleted" case (spec 05); the totals comparison (spec 06, which hooks in at the
+"invoice was deleted" case (spec 05); the invoice comparison (spec 06, which hooks in at the
 marked step); any screen.
 
 ## 1. Decisions (all taken by the user)
@@ -54,7 +58,13 @@ marked step); any screen.
   link is saved **before** the PDF so that a timeout can never leave an invoice nobody knows
   about.
 - **Idempotency.** QuickBooks accepts a `requestid` on a write and returns the earlier result
-  when the same id is sent again. To verify in a sandbox.
+  when the same id is sent again. To verify in a sandbox, together with what it answers when the
+  same id comes with a different body. The id is made from **the event's id alone** (and, in
+  case 3 of spec 05, the replaced invoice's id) — the user's choice of 2026-10-23, so that no
+  hash of the data is involved. A repeat of a Create that the quote has since changed therefore
+  returns the invoice made from the older data; the comparison of spec 06 then reports the
+  difference and Update fixes it. Step 6's number check also catches a repeat that finds the
+  first invoice already made.
 - **Errors.** `interpretQboBillError` is worded for bills; an invoice needs its own wording
   and falls back to QuickBooks' own text for what it does not know.
 - **The Log.** `EventChangeLog` rows carry `field_name`, `prev_value`, `next_value` and
@@ -69,7 +79,8 @@ marked step); any screen.
 
 - `created` — `docNumber`, `qboInvoiceId`, `warnings` (a list; may hold `pdf_not_attached`
   with its reason, `class_missing` with the state and reason, `tax_code_missing` with the
-  province; spec 06 adds the totals result).
+  province, `invoice_check_failed` with its reason; spec 06 adds the comparison's result as
+  `check`).
 - `choose_customer` — `candidates` (spec 02's summaries). Nothing was written to QuickBooks
   or to `Events`.
 - `invoice_number_exists` — `invoice`: id, number, customer name, total in cents. Nothing
@@ -91,9 +102,7 @@ In this order; a step that fails ends the request with its error and nothing aft
 1. `loadInvoiceSource` (spec 03). No event → 404. Already linked → 409.
 2. Status must be exactly `booked`.
 3. `validateInvoiceSource`; any issue → 400.
-4. Remember the event's current `qbo_invoice_hash` (the hash the invoice will be built from).
-   It is read before the data, so a quote edited meanwhile leaves the stored sent hash
-   older, which can only read as "outdated", never as "up to date".
+4. _(Removed 2026-10-23: there is no hash to remember.)_
 5. `findQboItem`.
 6. Look for an invoice with this `DocNumber` in the connection's QuickBooks file. Found →
    `invoice_number_exists`, stop.
@@ -104,16 +113,17 @@ In this order; a step that fails ends the request with its error and nothing aft
    connection's no-tax code (`resolveNoTaxCode`, spec 03c). When a Canadian line needs the
    no-tax code and the connection has none, the request ends with a 400 (spec 03d). Then
    `buildInvoicePayload` with those refs, and create the invoice, carrying a `requestid` made
-   from the event id and the
-   hash of step 4. The warnings of the two resolvers and of the builder go into the response's
-   `warnings`. QuickBooks refuses → 502.
+   from the event id alone (§2, Idempotency). The warnings of the two resolvers and of the
+   builder go into the response's `warnings`. QuickBooks refuses → 502.
 9. Save the link in one `UPDATE Events … WHERE id = ? AND qbo_invoice_id IS NULL`:
-   `qbo_invoice_id`, `qbo_invoice_connection_uuid`, `qbo_invoice_sent_hash` (step 4),
-   `qbo_invoice_mismatch` false and `is_qbo` true. If no row changed because another request
-   linked the same invoice first (same id), carry on; if it linked a different one, fail
+   `qbo_invoice_id`, `qbo_invoice_connection_uuid`, `qbo_invoice_mismatch` false,
+   `qbo_invoice_mismatch_reasons` null, `qbo_invoice_checked_at` and `qbo_invoice_check_failed_at`
+   null, and `is_qbo` true. If no row changed because another request linked the same invoice
+   first (same id), carry on; if it linked a different one, fail
    with the message of §8.
 10. Write the Log (§6).
-11. _Hook for spec 06: the totals check runs here and sets `qbo_invoice_mismatch`._
+11. _Hook for spec 06: the invoice check runs here and sets `qbo_invoice_mismatch` and its
+    reasons._
 12. Attach the quote PDF (§5). A failure becomes the `pdf_not_attached` warning.
 13. Return `created`.
 
@@ -156,8 +166,9 @@ invoice in QuickBooks." A platform error page (504 and the like, no JSON) goes t
   the invoice by number (step 6) and offers the overwrite, which links it (spec 05).
 - **Timeout between steps 9 and 12.** The link is saved, the PDF is not. The user sees an
   error; Update (spec 05) retries the attachment.
-- **A quote edited between steps 4 and 8.** The invoice is built from newer data than the
-  stored sent hash; the quote shows "outdated" and Update fixes it.
+- **A quote edited while the request runs.** The invoice is built from the data loaded at
+  step 1. The next check (spec 06, 06a: a Save, or Check again) compares QuickBooks
+  with the edited quote and reports the difference; Update fixes it.
 - **Token expired / refresh gone.** The readable errors of `describeQboAuthError` are passed
   on, with 502.
 - **Offline / PowerSync.** The route is online-only (the documented exception: it talks to
@@ -204,8 +215,8 @@ Red first. Prettier only on touched files.
   - the order of §4 is kept; a failing step stops the later ones;
   - 409, the booked rule, each issue → 400; nothing is written to QuickBooks in those cases;
   - `invoice_number_exists` and `choose_customer` write nothing to QuickBooks or to `Events`;
-  - the saved row has the id, the connection, the sent hash from before the data was read,
-    `qbo_invoice_mismatch` false and `is_qbo` true; the update is guarded by
+  - the saved row has the id, the connection, `qbo_invoice_mismatch` false, no reasons, no check times and
+    `is_qbo` true, and no hash column (there is none); the update is guarded by
     `qbo_invoice_id IS NULL`;
   - the link is saved before the PDF; a PDF failure still returns `created` with the warning;
   - a quote with no Class returns `created` with `class_missing` and a body without
@@ -213,7 +224,8 @@ Red first. Prettier only on touched files.
     `tax_code_missing` and a body whose line carries the no-tax code (spec 03d); both warnings
     can come together;
   - a QuickBooks refusal returns 502 and writes nothing to `Events`;
-  - the `requestid` is the same for the same event and hash and differs for another hash;
+  - the `requestid` is the same for the same event whatever the quote's data, and differs for
+    another event and for the same event with a `replacingInvoiceId`;
   - an `is_qbo` that was already true gets no second Log row.
 - **`route.test.ts`:** 401, 403, 400 for a missing or non-uuid id, each `status` is relayed
   with the right HTTP code.
@@ -233,11 +245,13 @@ Red first. Prettier only on touched files.
   `create-bill` does.
 - **R2 — a duplicate invoice** in QuickBooks is possible in the rare race of §8; it is
   reported, not deleted.
-- **R3 — `requestid` behaviour** is not confirmed (§2).
+- **R3 — `requestid` behaviour** is not confirmed (§2). With the id made from the event alone,
+  a repeat made after the quote changed may be answered with the old invoice, or, if QuickBooks
+  refuses the same id with another body, with an error; both are to be seen in a sandbox.
 
 ## 13. Out of scope
 
-- Update, overwrite, "invoice deleted" (spec 05); the totals check (spec 06); screens.
+- Update, overwrite, "invoice deleted" (spec 05); the invoice check (spec 06); screens.
 - Deleting or voiding an invoice in QuickBooks, including the duplicate of §8.
 - Sending the invoice to anyone.
 - Choosing the Class and the Canadian tax code (specs 03a and 03b).
