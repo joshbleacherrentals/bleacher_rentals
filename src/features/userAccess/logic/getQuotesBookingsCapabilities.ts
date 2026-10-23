@@ -48,6 +48,12 @@ export type QuotesBookingsCapabilities = {
    */
   setQuickBooksFlag: boolean;
   /**
+   * The Billing tab's Create invoice and Update invoice: drawn when true, not drawn when false.
+   * An admin or an accountant, on a quote of any office
+   * (docs/specs/qbo-invoice-07-card-buttons.md §3).
+   */
+  manageQuickBooksInvoice: boolean;
+  /**
    * The Messages tab's internal chat. Delegates to getInternalChatCapabilities, so the rule — an
    * admin, an account manager or an accountant — lives in one place
    * (docs/specs/accountant-quotes-11-accountant-internal-chat.md).
@@ -103,6 +109,9 @@ export function getQuotesBookingsCapabilities(input: {
     // The one cell the accountant has: the database lets them change Events.is_qbo and no other
     // column (docs/specs/accountant-quotes-05-is-qbo-column.md).
     setQuickBooksFlag: isStaff || isAccountant,
+    // The route behind the buttons admits an admin or an accountant (requireAdminOrAccountant), on
+    // any quote: not the owner rule, not manageQuote, and not the flag an account manager also has.
+    manageQuickBooksInvoice: isAdmin || isAccountant,
     useInternalChat: getInternalChatCapabilities({ roles, isSubscribed: false }).useInternalChat,
     openInDashboard: canAccessPath(roles, "/dashboard"),
   };

@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -97,14 +97,14 @@ export const PERMISSIONS: PermissionEntry[] = [
         "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
       accountant: read(
-        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments (see those rows).",
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments, and the QuickBooks invoice (see those rows).",
       ),
     },
   },
   {
     label: "QuickBooks Invoice Flag",
     description:
-      "The 'QuickBooks Invoice' checkbox on the Billing tab of a quote or booking, which records by hand that the event has been invoiced in QuickBooks. It is bookkeeping only — it does not push anything to QuickBooks.",
+      "The 'QuickBooks Invoice' checkbox on the Billing tab of a quote or booking, which records by hand that the event has been invoiced in QuickBooks. It is also ticked automatically when an invoice is created from the quote (see QuickBooks Invoice (create and update)).",
     category: "Day to Day Operations",
     roles: {
       admin: full("Can tick or untick the flag on any quote or booking."),
@@ -119,6 +119,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
         "Can tick or untick the flag on any quote or booking, deleted ones included. Apart from payments (see Record a Payment), it is the only thing an accountant can change on a quote or booking — the database refuses every other change.",
+      ),
+    },
+  },
+  // docs/specs/qbo-invoice-07-card-buttons.md §5: the Create invoice and Update invoice buttons.
+  {
+    label: "QuickBooks Invoice (create and update)",
+    description:
+      "The Create invoice and Update invoice buttons on the Billing tab of a quote or booking. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data. The invoice is saved in QuickBooks for the books and is never sent to the client.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can create the invoice of any booked quote and update any invoice."),
+      account_manager: none(
+        "Cannot create or update a QuickBooks invoice. They can still tick the QuickBooks Invoice Flag.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Cannot create or update a QuickBooks invoice."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can create the invoice of any booked quote, on a quote of any office, and update any invoice. Update always asks first.",
       ),
     },
   },

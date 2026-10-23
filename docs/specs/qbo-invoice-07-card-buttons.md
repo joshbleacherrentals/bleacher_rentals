@@ -1,6 +1,6 @@
 # QuickBooks invoice — Create and Update on the Billing tab
 
-Status: **DRAFT 2026-10-22 — awaiting "Approved".** 0 open decisions; one reading to confirm
+Status: **Implemented 2026-10-23** (approved in chat). 0 open decisions; one reading to confirm
 (§1, last paragraph).
 Implementation order: **07** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
