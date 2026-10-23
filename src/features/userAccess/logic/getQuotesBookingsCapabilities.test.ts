@@ -27,12 +27,13 @@ const NOTHING: QuotesBookingsCapabilities = {
   recordPayment: false,
   setQuickBooksFlag: false,
   manageQuickBooksInvoice: false,
+  seeInvoiceAlerts: false,
   useInternalChat: false,
   openInDashboard: false,
 };
 
 describe("admin", () => {
-  it("can do everything, on any quote", () => {
+  it("can do everything but see the invoice alerts, on any quote", () => {
     expect(capsFor(["admin"])).toEqual({
       createQuote: true,
       manageQuote: true,
@@ -40,6 +41,7 @@ describe("admin", () => {
       recordPayment: true,
       setQuickBooksFlag: true,
       manageQuickBooksInvoice: true,
+      seeInvoiceAlerts: false,
       useInternalChat: true,
       openInDashboard: true,
     });
@@ -64,6 +66,7 @@ describe("lead account manager", () => {
       recordPayment: false,
       setQuickBooksFlag: true,
       manageQuickBooksInvoice: false,
+      seeInvoiceAlerts: false,
       useInternalChat: true,
       openInDashboard: true,
     });
@@ -218,17 +221,22 @@ describe("accountant", () => {
     expect(capsFor(["accountant"]).manageQuickBooksInvoice).toBe(true);
   });
 
-  it("can do nothing else: the flag, the payments, the invoice and the chat are the only 'yes' in their column", () => {
+  it("sees the invoice alerts (spec qbo-invoice-09)", () => {
+    expect(capsFor(["accountant"]).seeInvoiceAlerts).toBe(true);
+  });
+
+  it("can do nothing else: the flag, the payments, the invoice, its alerts and the chat are the only 'yes' in their column", () => {
     expect(capsFor(["accountant"])).toEqual({
       ...NOTHING,
       setQuickBooksFlag: true,
       recordPayment: true,
       manageQuickBooksInvoice: true,
+      seeInvoiceAlerts: true,
       useInternalChat: true,
     });
   });
 
-  it("stays at the flag, the payments, the invoice and the chat even with the zones and the ownership that would help a manager", () => {
+  it("stays at the flag, the payments, the invoice, its alerts and the chat even with the zones and the ownership that would help a manager", () => {
     expect(
       capsFor(["accountant"], {
         leadZoneIds: ["zone-a"],
@@ -240,6 +248,7 @@ describe("accountant", () => {
       setQuickBooksFlag: true,
       recordPayment: true,
       manageQuickBooksInvoice: true,
+      seeInvoiceAlerts: true,
       useInternalChat: true,
     });
   });
@@ -415,6 +424,66 @@ describe("manageQuickBooksInvoice: admin and accountant only", () => {
   });
 });
 
+// docs/specs/qbo-invoice-09-banner.md §4: the red notice on a quote whose QuickBooks invoice needs
+// attention is drawn for an accountant, on any quote. An admin who is not an accountant sees none;
+// roles are additive, so one who is also an accountant does.
+describe("seeInvoiceAlerts: accountant only", () => {
+  const lead = { leadZoneIds: ["zone-a"], accountManagerZoneIds: ["zone-a"] };
+  const own = { quote: { createdByUserId: ME } };
+  const others = { quote: { createdByUserId: SOMEONE_ELSE } };
+
+  it("is true for an accountant, on any quote and on none", () => {
+    expect(capsFor(["accountant"], own).seeInvoiceAlerts).toBe(true);
+    expect(capsFor(["accountant"], others).seeInvoiceAlerts).toBe(true);
+    expect(capsFor(["accountant"], { quote: undefined }).seeInvoiceAlerts).toBe(true);
+  });
+
+  it("is true for an admin who is also an accountant", () => {
+    expect(capsFor(["admin", "accountant"], others).seeInvoiceAlerts).toBe(true);
+    expect(capsFor(["accountant", "admin"], own).seeInvoiceAlerts).toBe(true);
+  });
+
+  it("is false for an admin alone, though they can create and update the invoice", () => {
+    const caps = capsFor(["admin"], others);
+    expect(caps.manageQuickBooksInvoice).toBe(true);
+    expect(caps.seeInvoiceAlerts).toBe(false);
+    expect(capsFor(["admin"], own).seeInvoiceAlerts).toBe(false);
+    expect(capsFor(["admin"], { quote: undefined }).seeInvoiceAlerts).toBe(false);
+  });
+
+  it("is false for an account manager, lead or not, on their own quote and on someone else's", () => {
+    expect(capsFor(["account_manager"], own).seeInvoiceAlerts).toBe(false);
+    expect(capsFor(["account_manager"], others).seeInvoiceAlerts).toBe(false);
+    expect(capsFor(["account_manager"], { ...lead, ...own }).seeInvoiceAlerts).toBe(false);
+    expect(capsFor(["account_manager"], { ...lead, ...others }).seeInvoiceAlerts).toBe(false);
+  });
+
+  it.each(["viewer", "developer", "driver", "maintainer"] as const)(
+    "is false for a %s, even on a quote they created",
+    (role) => {
+      expect(capsFor([role], own).seeInvoiceAlerts).toBe(false);
+      expect(capsFor([role], others).seeInvoiceAlerts).toBe(false);
+    },
+  );
+
+  it("is false with no roles, and for a role the function does not know", () => {
+    expect(capsFor([]).seeInvoiceAlerts).toBe(false);
+    expect(capsFor(["superuser" as WebRole]).seeInvoiceAlerts).toBe(false);
+  });
+
+  it("follows the accountant right when a user holds several roles", () => {
+    expect(capsFor(["account_manager", "accountant"], others).seeInvoiceAlerts).toBe(true);
+    expect(capsFor(["viewer", "accountant"], others).seeInvoiceAlerts).toBe(true);
+    expect(capsFor(["account_manager", "viewer"], own).seeInvoiceAlerts).toBe(false);
+    expect(capsFor(["admin", "viewer"], others).seeInvoiceAlerts).toBe(false);
+  });
+
+  it("is not tied to manageQuickBooksInvoice: an admin has that and not this", () => {
+    expect(capsFor(["admin"]).manageQuickBooksInvoice).toBe(true);
+    expect(capsFor(["admin"]).seeInvoiceAlerts).toBe(false);
+  });
+});
+
 describe("roles are additive", () => {
   it("admin + viewer: admin's rights", () => {
     expect(capsFor(["admin", "viewer"])).toEqual(capsFor(["admin"]));
@@ -428,21 +497,23 @@ describe("roles are additive", () => {
     ).toBe(true);
   });
 
-  it("account manager + accountant: what the account manager has, the payments and the invoice", () => {
+  it("account manager + accountant: what the account manager has, the payments, the invoice and its alerts", () => {
     expect(capsFor(["account_manager", "accountant"])).toEqual({
       ...capsFor(["account_manager"]),
       recordPayment: true,
       manageQuickBooksInvoice: true,
+      seeInvoiceAlerts: true,
     });
   });
 
-  it("viewer + accountant: the flag, the payments, the invoice, the chat and the dashboard, still no create, manage or send", () => {
+  it("viewer + accountant: the flag, the payments, the invoice, its alerts, the chat and the dashboard, still no create, manage or send", () => {
     expect(capsFor(["viewer", "accountant"])).toEqual({
       ...NOTHING,
       openInDashboard: true,
       setQuickBooksFlag: true,
       recordPayment: true,
       manageQuickBooksInvoice: true,
+      seeInvoiceAlerts: true,
       useInternalChat: true,
     });
   });

@@ -27,7 +27,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice, the internal chat, Companies & Contacts, and Edit Team Members", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, and Edit Team Members", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -41,6 +41,7 @@ describe("permission matrix", () => {
         "Events",
         "Payment History",
         "QuickBooks Invoice (create and update)",
+        "QuickBooks Invoice Alerts",
         "QuickBooks Invoice Flag",
         "Quote Files",
         "Record a Payment",
@@ -122,6 +123,31 @@ describe("permission matrix", () => {
         /To, Cc and Bcc addresses, the subject and the attachments/i,
       );
       expect(row?.roles.account_manager.note).toMatch(/quote PDF always stays attached/i);
+    });
+
+    // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose QuickBooks invoice needs
+    // attention. Only an accountant sees it; an admin who is not an accountant does not.
+    it("has a QuickBooks Invoice Alerts row: full for an accountant, none for everyone else", () => {
+      const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Alerts");
+      expect(row?.category).toBe("Day to Day Operations");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "none",
+        account_manager: "none",
+        accountant: "full",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+      expect(row?.description).toMatch(/no longer matches the quote/i);
+      expect(row?.description).toMatch(/refreshed when the quote is saved/i);
+      expect(row?.description).toMatch(/only the roles below see the result/i);
+      expect(row?.roles.admin.note).toMatch(/can still create and update the invoice/i);
+      expect(row?.roles.accountant.note).toMatch(/deleted quotes excepted/i);
     });
 
     it("can neither create, edit, delete nor release a work tracker — and the matrix says so", () => {

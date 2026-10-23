@@ -144,6 +144,26 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
     },
   },
+  // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose invoice needs attention.
+  {
+    label: "QuickBooks Invoice Alerts",
+    description:
+      "The red notice on a quote whose QuickBooks invoice needs attention: the invoice in QuickBooks no longer matches the quote, and the notice says what differs. The check is refreshed when the quote is saved, whatever the role of the person who saves it, and when someone presses Check again, but only the roles below see the result.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: none("Does not see the invoice alerts. They can still create and update the invoice."),
+      account_manager: none("Does not see the invoice alerts."),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Does not see the invoice alerts."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Sees the notice on any quote with a QuickBooks invoice, deleted quotes excepted.",
+      ),
+    },
+  },
   {
     label: "Payment History",
     description:
