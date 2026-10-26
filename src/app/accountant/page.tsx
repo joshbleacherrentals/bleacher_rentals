@@ -1,9 +1,10 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { CountBadge } from "@/components/CountBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination } from "@/components/Pagination";
 import { useLayoutContext } from "@/contexts/LayoutContexts";
@@ -15,11 +16,15 @@ import {
 import { AccountsReceivableTabs } from "@/features/quotesAndBookings/components/AccountsReceivableTabs";
 import { ActiveFilterChips } from "@/features/quotesAndBookings/components/ActiveFilterChips";
 import { NeedAttentionTab } from "@/features/quotesAndBookings/components/NeedAttentionTab";
+import { useInvoiceAlerts } from "@/features/quotesAndBookings/hooks/useInvoiceAlerts";
 import { useListPageState } from "@/features/quotesAndBookings/hooks/useListPageState";
+import { useNeedAttentionData } from "@/features/quotesAndBookings/hooks/useNeedAttentionData";
 import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsData";
+import { useQuotesBookingsCapabilities } from "@/features/quotesAndBookings/hooks/useQuotesBookingsCapabilities";
 import { useOfficeCurrencies } from "@/features/quotesAndBookings/hooks/useOfficeCurrencies";
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
 import { pickEventCurrency } from "@/features/quotesAndBookings/utils/eventCurrency";
+import { needAttentionRows } from "@/features/quotesAndBookings/utils/needAttentionRows";
 import {
   ACCOUNTANT_TABS,
   parseListTab,
@@ -95,6 +100,21 @@ export default function AccountantPage() {
   const currencyOf = useCallback(
     (event: QuotesBookingsEvent) => pickEventCurrency(event.sales_office_uuid, currencyByOfficeId),
     [currencyByOfficeId],
+  );
+
+  // The red dot on the AR rows whose QuickBooks invoice needs attention; empty for all but accountants.
+  const { reasonsByEvent } = useInvoiceAlerts();
+
+  // The number on the Need attention label: the quotes in that tab, after the Filter Panel and Show
+  // Deleted but not the search box. Accountants only (`seeInvoiceAlerts`).
+  const can = useQuotesBookingsCapabilities();
+  const { data: attentionRows } = useNeedAttentionData();
+  const needAttentionCount = useMemo(
+    () =>
+      can.seeInvoiceAlerts && data && attentionRows
+        ? needAttentionRows(data, attentionRows).length
+        : 0,
+    [can.seeInvoiceAlerts, data, attentionRows],
   );
 
   if (error) {
@@ -217,6 +237,14 @@ export default function AccountantPage() {
               </TabsTrigger>
               <TabsTrigger value="need_attention">
                 Need attention
+                {needAttentionCount > 0 && (
+                  <CountBadge
+                    count={needAttentionCount}
+                    label={`${needAttentionCount} QuickBooks invoices need your attention`}
+                    tone="red"
+                    testId="accountant-tab-count-need-attention"
+                  />
+                )}
                 <InfoTooltip
                   label="About the Need attention tab"
                   content={RECEIVABLES_HELP.needAttention}
@@ -238,6 +266,7 @@ export default function AccountantPage() {
           <AccountsReceivableTabs
             events={data}
             eventsLoading={isLoading}
+            attention={reasonsByEvent}
             {...listControls}
             currencyOf={currencyOf}
           />

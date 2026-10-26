@@ -9,6 +9,7 @@ import { useSidebarItems, type SidebarItemConfig } from "./useSidebarItems";
 import { useHasUnreadChangelog } from "@/features/changelog/hooks/useHasUnreadChangelog";
 import { useUnseenInspectionCount } from "@/features/annualInspections/db/annualInspections";
 import { useAttentionCount } from "@/features/workTrackers/db/attentionTrackers";
+import { useInvoiceAlerts } from "@/features/quotesAndBookings/hooks/useInvoiceAlerts";
 
 const SideBar = () => {
   const access = useUserAccess();
@@ -26,6 +27,9 @@ const SideBar = () => {
   // hook answers 0 to anyone who is not an active account manager, so an admin
   // without zones is not nagged about work that is nobody's to re-cover.
   const attentionTrackers = useAttentionCount();
+  // Quotes whose QuickBooks invoice no longer matches the quote, for accountants only: the hook answers
+  // 0 to everyone else, and asks everyone else a query that matches no row (spec 11).
+  const { count: invoiceAlerts } = useInvoiceAlerts();
 
   return (
     <div
@@ -34,7 +38,7 @@ const SideBar = () => {
     >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden pt-2">
         {items.map((item) =>
-          renderItem(item, pathname, hasUnreadChangelog, badges, attentionTrackers),
+          renderItem(item, pathname, hasUnreadChangelog, badges, attentionTrackers, invoiceAlerts),
         )}
       </nav>
     </div>
@@ -74,12 +78,32 @@ const SideNavSection = ({
   );
 };
 
+/** The count at the end of a sidebar button's row, or nothing when the button has none or it is 0. */
+function buttonBadge(key: string, attentionTrackers: number, invoiceAlerts: number) {
+  if (key === "work-trackers" && attentionTrackers > 0) {
+    return {
+      count: attentionTrackers,
+      label: `${attentionTrackers} work trackers by your drivers need your attention`,
+      testId: "sidebar-attention-badge",
+    };
+  }
+  if (key === "accountant" && invoiceAlerts > 0) {
+    return {
+      count: invoiceAlerts,
+      label: `${invoiceAlerts} QuickBooks invoices need your attention`,
+      testId: "sidebar-invoice-attention-badge",
+    };
+  }
+  return undefined;
+}
+
 function renderItem(
   item: SidebarItemConfig,
   pathname: string,
   hasUnreadChangelog: boolean,
   badges: Record<string, number>,
   attentionTrackers: number,
+  invoiceAlerts: number,
 ) {
   switch (item.type) {
     case "button":
@@ -90,15 +114,7 @@ function renderItem(
           href={item.href}
           icon={item.icon}
           showIndicator={item.key === "changelog" && hasUnreadChangelog}
-          badge={
-            item.key === "work-trackers" && attentionTrackers > 0
-              ? {
-                  count: attentionTrackers,
-                  label: `${attentionTrackers} work trackers by your drivers need your attention`,
-                  testId: "sidebar-attention-badge",
-                }
-              : undefined
-          }
+          badge={buttonBadge(item.key, attentionTrackers, invoiceAlerts)}
         />
       );
     case "dropdown":
@@ -115,7 +131,14 @@ function renderItem(
       return (
         <SideNavSection key={item.key} item={item} pathname={pathname}>
           {item.children.map((child) =>
-            renderItem(child, pathname, hasUnreadChangelog, badges, attentionTrackers),
+            renderItem(
+              child,
+              pathname,
+              hasUnreadChangelog,
+              badges,
+              attentionTrackers,
+              invoiceAlerts,
+            ),
           )}
         </SideNavSection>
       );

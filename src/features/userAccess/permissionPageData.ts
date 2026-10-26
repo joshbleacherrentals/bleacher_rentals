@@ -144,11 +144,12 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
     },
   },
-  // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose invoice needs attention.
+  // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose invoice needs attention;
+  // docs/specs/qbo-invoice-11-counts-and-marks.md §5: and the counts and marks.
   {
     label: "QuickBooks Invoice Alerts",
     description:
-      "The red notice on a quote whose QuickBooks invoice needs attention: the invoice in QuickBooks no longer matches the quote, and the notice says what differs. The check is refreshed when the quote is saved, whatever the role of the person who saves it, and when someone presses Check again, but only the roles below see the result.",
+      "The red notice on a quote whose QuickBooks invoice needs attention, the red count on the Accountant entry of the sidebar and on the Need attention tab of the Accountant page, and the red mark on the quote's row in the lists. A quote needs attention when its invoice in QuickBooks no longer matches the quote.",
     category: "Day to Day Operations",
     roles: {
       admin: none(
@@ -162,7 +163,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
-        "Sees the notice on any quote with a QuickBooks invoice, deleted quotes excepted.",
+        "Sees the notice on any quote with a QuickBooks invoice, and in the counts and marks, deleted quotes excepted.",
       ),
     },
   },

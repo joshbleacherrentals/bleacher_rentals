@@ -144,9 +144,19 @@ describe("permission matrix", () => {
         maintainer: "none",
       });
       expect(row?.description).toMatch(/no longer matches the quote/i);
-      expect(row?.description).toMatch(/refreshed when the quote is saved/i);
-      expect(row?.description).toMatch(/only the roles below see the result/i);
       expect(row?.roles.accountant.note).toMatch(/deleted quotes excepted/i);
+    });
+
+    // docs/specs/qbo-invoice-11-counts-and-marks.md §5: the counts and marks join the notice.
+    it("says the alerts are also the red counts on the sidebar's Accountant item and the Need attention tab, and the red mark on a row", () => {
+      const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Alerts");
+      expect(row?.description).toBe(
+        "The red notice on a quote whose QuickBooks invoice needs attention, the red count on the Accountant entry of the sidebar and on the Need attention tab of the Accountant page, and the red mark on the quote's row in the lists. A quote needs attention when its invoice in QuickBooks no longer matches the quote.",
+      );
+      expect(row?.roles.accountant.level).toBe("full");
+      expect(row?.roles.accountant.note).toBe(
+        "Sees the notice on any quote with a QuickBooks invoice, and in the counts and marks, deleted quotes excepted.",
+      );
     });
 
     // docs/specs/qbo-invoice-10-need-attention-tab.md §5: the Need attention tab lists the same quotes,
