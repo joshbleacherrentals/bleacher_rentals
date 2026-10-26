@@ -111,13 +111,20 @@ export function compareInvoice(input: {
 
   // QuickBooks' own total and tax say what the lines above do not: that its calculation agrees with
   // the quote's. A wrong amount, tax code or line count already makes them differ, so they are
-  // reported only when those are right.
+  // reported only when those are right. The total is compared before tax and the tax on its own: a
+  // tax QuickBooks did not save is then one difference (the tax), not two (the tax, and a total
+  // that is off by the same amount).
   const moneyLinesDiffer = found.some(
     (d) => d.reason === "amount" || d.reason === "tax_code" || d.reason === "lines",
   );
   if (!moneyLinesDiffer) {
-    if (actual.totalCents !== quote.totalCents) {
-      add("totals", "Total", money(quote.totalCents), money(actual.totalCents));
+    const quoteBeforeTax = quote.totalCents - quote.taxCents;
+    const qboBeforeTax =
+      actual.totalCents === null || actual.taxCents === null
+        ? null
+        : actual.totalCents - actual.taxCents;
+    if (qboBeforeTax !== quoteBeforeTax) {
+      add("totals", "Total before tax", money(quoteBeforeTax), money(qboBeforeTax));
     }
     if (actual.taxCents !== quote.taxCents) {
       add("totals", "Tax", money(quote.taxCents), money(actual.taxCents));

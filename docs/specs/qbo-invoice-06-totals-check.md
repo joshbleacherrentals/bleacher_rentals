@@ -7,7 +7,11 @@ Status: **AMENDED 2026-10-23 — approved and implemented.** 0 open decisions; f
 implemented on 2026-10-23; the user then asked to compare the whole invoice and to drop the hash
 (§1). Everything here replaces that code. **A second amendment of 2026-10-23** drops the stored
 connection (spec 01: `Events.qbo_invoice_connection_uuid` is gone): the invoice is read, and every
-reference looked up, in the connection of the quote's sales office (§2, §3 step 1, §7).
+reference looked up, in the connection of the quote's sales office (§2, §3 step 1, §7). **A third
+amendment of 2026-10-24** (user's answer, after a sandbox run showed QuickBooks' total 27,450.00 and
+tax 0 against the quote's 29,646.00 and 2,196.00): the `totals` reason compares the **total before
+tax** and the **tax**, each on its own (§4); it no longer compares `TotalAmt` with the quote's total
+including tax, which reported a tax QuickBooks had not saved twice.
 Implementation order: **06** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (the flag and the reasons),
@@ -164,8 +168,10 @@ it covers. The long texts of the banner are spec 09's.
 - **`amount`** — "Amount does not match": the line's `Amount`.
 - **`tax_code`** — "Tax code does not match": the line's `TaxCodeRef`.
 - **`class`** — "Class does not match": the line's `ClassRef`, where "no Class" equals "no Class".
-- **`totals`** — "Totals do not match": `TotalAmt` and `TotalTax` against the quote's. Reported
-  **only when `amount`, `tax_code` and `lines` are all absent** (§1, reading).
+- **`totals`** — "Totals do not match": the total before tax (`TotalAmt` − `TotalTax`, against the
+  quote's amount after discounts; difference label "Total before tax") and `TotalTax` (label "Tax"),
+  each its own difference. Reported **only when `amount`, `tax_code` and `lines` are all absent** (§1,
+  reading).
 
 The codes live in one place (`invoiceTypes.ts`), with their texts, so no surface words a reason
 differently.
@@ -204,7 +210,8 @@ differently.
 - **A quote edited in the address book** (a contact renamed, an address changed) is seen at the
   next check, not when the edit is made.
 - **A US file that is not on Automated Sales Tax.** QuickBooks adds no tax to a line marked
-  taxable (spec 03, §10); the check reports `totals`.
+  taxable (spec 03, §10); the check reports `totals`, as a "Tax" difference only (the total before tax
+  matches).
 - **A Canadian invoice.** A province whose mapped code carries another rate than the calculator,
   a province with no code (the invoice was made untaxed, with a warning) and a tax typed by hand
   on the quote all show as `totals` (or `tax_code`, when the code on the line is not the one the

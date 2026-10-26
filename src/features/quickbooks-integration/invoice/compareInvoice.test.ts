@@ -248,18 +248,59 @@ describe("compareInvoice — each reason on its own", () => {
     ]);
   });
 
-  it("only QuickBooks' total or tax differing is reason totals, one difference each", () => {
+  // The total is compared before tax, and the tax on its own, so a tax QuickBooks did not save is
+  // reported once, as the tax, and not again as a total that is off by the same amount.
+  it("only QuickBooks' total before tax or tax differing is reason totals, one difference each", () => {
     expect(compare(snapshot({ totalCents: 802501 })).differences).toEqual([
-      { reason: "totals", field: "Total", quote: "$8,025.00", qbo: "$8,025.01" },
+      { reason: "totals", field: "Total before tax", quote: "$7,500.00", qbo: "$7,500.01" },
     ]);
-    expect(compare(snapshot({ taxCents: 52501 })).differences).toEqual([
+    // QuickBooks' total moves with its tax, as it does in a real invoice.
+    expect(compare(snapshot({ totalCents: 802501, taxCents: 52501 })).differences).toEqual([
       { reason: "totals", field: "Tax", quote: "$525.00", qbo: "$525.01" },
     ]);
-    expect(compare(snapshot({ totalCents: 800000, taxCents: 50000 })).differences).toHaveLength(2);
+    expect(compare(snapshot({ totalCents: 810000, taxCents: 50000 })).differences).toEqual([
+      { reason: "totals", field: "Total before tax", quote: "$7,500.00", qbo: "$7,600.00" },
+      { reason: "totals", field: "Tax", quote: "$525.00", qbo: "$500.00" },
+    ]);
+  });
+
+  it("QuickBooks saved no tax: the total before tax matches, so only the tax is reported", () => {
+    const result = compare(snapshot({ totalCents: 750000, taxCents: 0 }));
+
+    expect(result.matches).toBe(false);
+    expect(result.reasons).toEqual(["totals"]);
+    expect(result.differences).toEqual([
+      { reason: "totals", field: "Tax", quote: "$525.00", qbo: "$0.00" },
+    ]);
+  });
+
+  it("a quote with no tax and an invoice with none match", () => {
+    const body = expected();
+    body.Line[0].SalesItemLineDetail.TaxCodeRef.value = "NON";
+    const result = compareInvoice({
+      expected: body,
+      quote: { totalCents: 750000, taxCents: 0 },
+      actual: snapshot({
+        ...withLine({ taxCodeId: "NON" }),
+        totalCents: 750000,
+        taxCents: 0,
+      }),
+    });
+
+    expect(result).toEqual({ matches: true, reasons: [], differences: [] });
+  });
+
+  it("an amount that is not one is unreadable, in the total before tax as well as the tax", () => {
+    const result = compare(snapshot({ totalCents: null, taxCents: null }));
+
+    expect(result.differences).toEqual([
+      { reason: "totals", field: "Total before tax", quote: "$7,500.00", qbo: "unreadable" },
+      { reason: "totals", field: "Tax", quote: "$525.00", qbo: "unreadable" },
+    ]);
   });
 
   it("one cent apart is a difference: there is no tolerance", () => {
-    expect(compare(snapshot({ taxCents: 52501 })).reasons).toEqual(["totals"]);
+    expect(compare(snapshot({ totalCents: 802501, taxCents: 52501 })).reasons).toEqual(["totals"]);
     expect(compare(snapshot(withLine({ amountCents: 750001 }))).reasons).toEqual(["amount"]);
   });
 });
@@ -328,7 +369,7 @@ describe("compareInvoice — several reasons", () => {
   });
 
   it("totals are reported with the reasons that are not money lines", () => {
-    const result = compare(snapshot({ memo: "other", taxCents: 52501 }));
+    const result = compare(snapshot({ memo: "other", totalCents: 802501, taxCents: 52501 }));
 
     expect(result.reasons).toEqual(["memo", "totals"]);
   });
