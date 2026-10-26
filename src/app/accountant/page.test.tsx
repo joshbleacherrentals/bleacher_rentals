@@ -7,12 +7,15 @@ import type {
 
 // The page is wired to Next routing, PowerSync and the office currencies.
 // Those are stubbed; what is under test is what the Accountant page draws on each tab.
-const { mockSearchParams, mockArData, mockFilterPanel, mockListData } = vi.hoisted(() => ({
-  mockSearchParams: { current: new URLSearchParams() },
-  mockArData: vi.fn(),
-  mockFilterPanel: vi.fn(),
-  mockListData: vi.fn(),
-}));
+const { mockSearchParams, mockArData, mockFilterPanel, mockListData, mockAttention } = vi.hoisted(
+  () => ({
+    mockSearchParams: { current: new URLSearchParams() },
+    mockArData: vi.fn(),
+    mockFilterPanel: vi.fn(),
+    mockListData: vi.fn(),
+    mockAttention: vi.fn(),
+  }),
+);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -30,6 +33,9 @@ vi.mock("@/features/quotesAndBookings/hooks/useOfficeCurrencies", () => ({
 }));
 vi.mock("@/features/quotesAndBookings/hooks/useAccountsReceivableData", () => ({
   useAccountsReceivableData: (...args: unknown[]) => mockArData(...args),
+}));
+vi.mock("@/features/quotesAndBookings/hooks/useNeedAttentionData", () => ({
+  useNeedAttentionData: () => mockAttention(),
 }));
 vi.mock("@/features/quotesAndBookings/components/FilterPanel", () => ({
   FilterPanel: (props: unknown) => {
@@ -87,10 +93,20 @@ function renderAt(query: string) {
   return renderToStaticMarkup(<AccountantPage />);
 }
 
+// The list event's invoice, flagged by the last check (docs/specs/qbo-invoice-10-need-attention-tab.md).
+const attentionRow = {
+  id: "evt-1",
+  qbo_invoice_id: "inv-1",
+  qbo_invoice_mismatch: 1,
+  qbo_invoice_mismatch_reasons: '["dates","totals"]',
+};
+
 beforeEach(() => {
   mockArData.mockReset();
   mockFilterPanel.mockReset();
   mockListData.mockReset();
+  mockAttention.mockReset();
+  mockAttention.mockReturnValue({ data: [attentionRow], isLoading: false, error: undefined });
   mockArData.mockReturnValue({
     data: { ar: [arRow], ar_deposits: [] },
     isLoading: false,
@@ -119,18 +135,29 @@ describe("/accountant", () => {
 });
 
 describe("/accountant tabs", () => {
-  it("offers AR and AR Deposits and nothing else", () => {
+  it("offers AR, AR Deposits and Need attention, in that order, and nothing else", () => {
     const html = renderAt("");
-    expect(html.match(/role="tab"/g)).toHaveLength(2);
+    expect(html.match(/role="tab"/g)).toHaveLength(3);
     expect(html).toContain(">AR<");
     expect(html).toContain(">AR Deposits<");
+    expect(html).toContain(">Need attention<");
+    expect(html.indexOf(">AR<")).toBeLessThan(html.indexOf(">AR Deposits<"));
+    expect(html.indexOf(">AR Deposits<")).toBeLessThan(html.indexOf(">Need attention<"));
     expect(html).not.toContain(">All Events<");
   });
 
-  it("puts an info icon on both tabs", () => {
+  it("puts an info icon on every tab", () => {
     const html = renderAt("");
     expect(html).toContain('aria-label="About the AR tab"');
     expect(html).toContain('aria-label="About the AR Deposits tab"');
+    expect(html).toContain('aria-label="About the Need attention tab"');
+  });
+
+  it("keeps the info icon inside the Need attention tab, where the AR tabs have theirs", () => {
+    const html = renderAt("");
+    expect(html).toMatch(
+      /<button[^>]*role="tab"[^>]*>Need attention<[^]*?aria-label="About the Need attention tab"[^]*?<\/button>/,
+    );
   });
 
   it("opens AR when ?tab is missing, unknown, or the old All Events", () => {
@@ -143,6 +170,13 @@ describe("/accountant tabs", () => {
     expect(renderAt("tab=ar_deposits")).toMatch(
       /role="tab"[^>]*aria-selected="true"[^>]*>AR Deposits</,
     );
+  });
+
+  it("opens Need attention from ?tab=need_attention, and only then", () => {
+    expect(renderAt("tab=need_attention")).toMatch(
+      /role="tab"[^>]*aria-selected="true"[^>]*>Need attention</,
+    );
+    expect(renderAt("")).not.toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Need attention</);
   });
 });
 
@@ -189,11 +223,74 @@ describe("/accountant receivables", () => {
   });
 });
 
+// docs/specs/qbo-invoice-10-need-attention-tab.md §4 and §6.
+describe("/accountant Need attention", () => {
+  it("lists the quote whose invoice needs attention, with its columns and its reasons", () => {
+    const html = renderAt("tab=need_attention");
+    for (const header of [
+      "Event Name (1)",
+      "Account Manager",
+      "Start Date",
+      "Invoice #",
+      "Reason",
+    ]) {
+      expect(html).toContain(header);
+    }
+    expect(html).toContain("Fall Classic");
+    expect(html).toContain("#1042");
+    expect(html).toContain("Dana Whitfield");
+    expect(html).toContain("Dates do not match, Totals do not match");
+    expect(html).not.toContain("Amount Due");
+    expect(html).not.toContain("Remaining Balance");
+  });
+
+  it("says No invoice needs attention when nothing does", () => {
+    mockAttention.mockReturnValue({ data: [], isLoading: false, error: undefined });
+    expect(renderAt("tab=need_attention")).toContain("No invoice needs attention");
+  });
+
+  it("does not list a quote whose flag is clear", () => {
+    mockAttention.mockReturnValue({
+      data: [{ ...attentionRow, qbo_invoice_mismatch: 0 }],
+      isLoading: false,
+      error: undefined,
+    });
+    expect(renderAt("tab=need_attention")).toContain("No invoice needs attention");
+  });
+
+  it("searches the list by name and by invoice number", () => {
+    expect(renderAt("tab=need_attention&q=fall")).toContain("Fall Classic");
+    expect(renderAt("tab=need_attention&q=%231042")).toContain("Fall Classic");
+    expect(renderAt("tab=need_attention&q=zzz")).toContain("No invoice needs attention");
+  });
+
+  it("is built from the page's list, so Show Deleted adds the deleted quotes to it", () => {
+    renderAt("tab=need_attention&showDeleted=1");
+    expect(mockListData.mock.calls.at(-1)![1]).toBe(true);
+  });
+
+  it("leaves the AR tabs as they were: no Reason column there", () => {
+    for (const query of ["tab=ar", "tab=ar_deposits"]) {
+      const html = renderAt(query);
+      expect(html).not.toContain("Reason");
+      expect(html).not.toContain("Dates do not match");
+    }
+    expect(renderAt("tab=ar")).toContain("Amount Due ($1,000)");
+  });
+
+  it("still works out the receivables from one set of queries on this tab", () => {
+    renderAt("tab=need_attention");
+    expect(mockArData).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("/accountant status filter", () => {
-  it("does not offer Status on either tab", () => {
+  it("does not offer Status on any tab", () => {
     renderAt("tab=ar");
     expect(lastFilterPanelProps().showStatus).toBe(false);
     renderAt("tab=ar_deposits");
+    expect(lastFilterPanelProps().showStatus).toBe(false);
+    renderAt("tab=need_attention");
     expect(lastFilterPanelProps().showStatus).toBe(false);
   });
 
@@ -201,6 +298,8 @@ describe("/accountant status filter", () => {
     renderAt("tab=ar&statuses=quoted");
     expect(lastListFilters().statuses).toEqual([]);
     renderAt("tab=all&statuses=quoted");
+    expect(lastListFilters().statuses).toEqual([]);
+    renderAt("tab=need_attention&statuses=quoted");
     expect(lastListFilters().statuses).toEqual([]);
   });
 });

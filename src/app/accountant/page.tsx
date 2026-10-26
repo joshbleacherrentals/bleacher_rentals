@@ -14,6 +14,7 @@ import {
 } from "@/features/quotesAndBookings/components/FilterSidebar";
 import { AccountsReceivableTabs } from "@/features/quotesAndBookings/components/AccountsReceivableTabs";
 import { ActiveFilterChips } from "@/features/quotesAndBookings/components/ActiveFilterChips";
+import { NeedAttentionTab } from "@/features/quotesAndBookings/components/NeedAttentionTab";
 import { useListPageState } from "@/features/quotesAndBookings/hooks/useListPageState";
 import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsData";
 import { useOfficeCurrencies } from "@/features/quotesAndBookings/hooks/useOfficeCurrencies";
@@ -25,7 +26,8 @@ import {
   tabUsesStatusFilter,
 } from "@/features/quotesAndBookings/utils/listTabs";
 import { RECEIVABLES_HELP } from "@/features/quotesAndBookings/utils/receivablesHelp";
-import { nextSort } from "@/features/quotesAndBookings/utils/sortEvents";
+import type { PageSize } from "@/features/quotesAndBookings/utils/pagination";
+import { nextSort, type SortKey } from "@/features/quotesAndBookings/utils/sortEvents";
 
 /**
  * The Accountant page: the AR and AR Deposits tabs, taken out of /quotes-bookings.
@@ -102,6 +104,22 @@ export default function AccountantPage() {
       </div>
     );
   }
+
+  // What every tab of the list shares: search, sort and paging are the page's state, and a row opens
+  // the quote.
+  const listControls = {
+    searchQuery,
+    sort,
+    onSort: (key: SortKey) => setSort((current) => nextSort(current, key)),
+    page,
+    pageSize,
+    onPageChange: goToPage,
+    onPageSizeChange: (size: PageSize) => {
+      setPageSize(size);
+      setPage(1);
+    },
+    onRowClick: (event: QuotesBookingsEvent) => router.push(`/quotes-bookings/${event.id}`),
+  };
 
   // -m-4 cancels the accountant layout's p-4 so the filter sidebar sits flush against the app
   // sidebar, header and window edge; the content column puts its own padding back.
@@ -197,6 +215,14 @@ export default function AccountantPage() {
                   focusable={false}
                 />
               </TabsTrigger>
+              <TabsTrigger value="need_attention">
+                Need attention
+                <InfoTooltip
+                  label="About the Need attention tab"
+                  content={RECEIVABLES_HELP.needAttention}
+                  focusable={false}
+                />
+              </TabsTrigger>
             </TabsList>
             <ActiveFilterChips
               filters={filters}
@@ -212,19 +238,10 @@ export default function AccountantPage() {
           <AccountsReceivableTabs
             events={data}
             eventsLoading={isLoading}
-            searchQuery={searchQuery}
-            sort={sort}
-            onSort={(key) => setSort((current) => nextSort(current, key))}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={goToPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
+            {...listControls}
             currencyOf={currencyOf}
-            onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
           />
+          <NeedAttentionTab events={data} eventsLoading={isLoading} {...listControls} />
         </Tabs>
       </main>
     </div>

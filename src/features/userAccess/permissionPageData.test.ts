@@ -146,8 +146,17 @@ describe("permission matrix", () => {
       expect(row?.description).toMatch(/no longer matches the quote/i);
       expect(row?.description).toMatch(/refreshed when the quote is saved/i);
       expect(row?.description).toMatch(/only the roles below see the result/i);
-      expect(row?.roles.admin.note).toMatch(/can still create and update the invoice/i);
       expect(row?.roles.accountant.note).toMatch(/deleted quotes excepted/i);
+    });
+
+    // docs/specs/qbo-invoice-10-need-attention-tab.md §5: the Need attention tab lists the same quotes,
+    // and an administrator can open it though they do not see the alerts.
+    it("tells an administrator that the Need attention tab lists the quotes the alerts are about", () => {
+      const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Alerts");
+      expect(row?.roles.admin.level).toBe("none");
+      expect(row?.roles.admin.note).toBe(
+        "Does not see the invoice alerts on the quote or in the counts and marks. The Need attention tab on the Accountant page lists the same quotes, and they can open it.",
+      );
     });
 
     it("can neither create, edit, delete nor release a work tracker — and the matrix says so", () => {
@@ -202,6 +211,13 @@ describe("permission matrix", () => {
       it("describes both tabs", () => {
         expect(row?.description).toMatch(/AR tab/);
         expect(row?.description).toMatch(/AR Deposits tab/);
+      });
+
+      // docs/specs/qbo-invoice-10-need-attention-tab.md §5.
+      it("describes the Need attention tab, which lists the quotes whose invoice no longer matches", () => {
+        expect(row?.description).toContain(
+          "A third tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
+        );
       });
 
       it("is no longer listed under Payment History, which only covers the Billing tab", () => {

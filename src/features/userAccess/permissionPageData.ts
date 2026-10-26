@@ -151,7 +151,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       "The red notice on a quote whose QuickBooks invoice needs attention: the invoice in QuickBooks no longer matches the quote, and the notice says what differs. The check is refreshed when the quote is saved, whatever the role of the person who saves it, and when someone presses Check again, but only the roles below see the result.",
     category: "Day to Day Operations",
     roles: {
-      admin: none("Does not see the invoice alerts. They can still create and update the invoice."),
+      admin: none(
+        "Does not see the invoice alerts on the quote or in the counts and marks. The Need attention tab on the Accountant page lists the same quotes, and they can open it.",
+      ),
       account_manager: none("Does not see the invoice alerts."),
       developer: none(
         "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
@@ -192,7 +194,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Accounts Receivable",
     description:
-      "The Accountant page: the AR tab lists booked events with an amount due that should already have been paid, the AR Deposits tab lists those due later. Each shows the Amount Due and the Remaining Balance. Filters, search and sorting apply to both.",
+      "The Accountant page: the AR tab lists booked events with an amount due that should already have been paid, the AR Deposits tab lists those due later. Each shows the Amount Due and the Remaining Balance. Filters, search and sorting apply to both. A third tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
     category: "Day to Day Operations",
     roles: {
       admin: read("Can open the Accountant page and see the balances of every booking."),
