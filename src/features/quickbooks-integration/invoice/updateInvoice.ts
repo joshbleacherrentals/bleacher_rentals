@@ -212,14 +212,14 @@ export async function updateInvoice(params: UpdateInvoiceParams): Promise<Update
   if (issues.length > 0) return fail(400, issues.map((issue) => issue.message).join(" "));
   // validateInvoiceSource has refused a quote without these.
   const connectionId = source.connectionId!;
-  const eventTypeName = source.eventTypeName!;
+  const qboServiceId = source.qboServiceId!;
 
   // 3: removed with the hash (spec 05, 2026-10-23).
 
   // 4
   let item;
   try {
-    item = await findQboItem(connectionId, eventTypeName);
+    item = await findQboItem(connectionId, qboServiceId);
   } catch (e) {
     return setupFailure(e);
   }
@@ -281,12 +281,12 @@ export async function overwriteInvoice(
   if (issues.length > 0) return fail(400, issues.map((issue) => issue.message).join(" "));
   // validateInvoiceSource has refused a quote without these.
   const connectionId = source.connectionId!;
-  const eventTypeName = source.eventTypeName!;
+  const qboServiceId = source.qboServiceId!;
 
   // 4
   let item;
   try {
-    item = await findQboItem(connectionId, eventTypeName);
+    item = await findQboItem(connectionId, qboServiceId);
   } catch (e) {
     return setupFailure(e);
   }

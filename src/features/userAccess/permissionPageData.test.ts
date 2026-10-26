@@ -27,7 +27,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, and Edit Team Members", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Edit Team Members, and Quote Types", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -44,6 +44,7 @@ describe("permission matrix", () => {
         "QuickBooks Invoice Alerts",
         "QuickBooks Invoice Flag",
         "Quote Files",
+        "Quote Types",
         "Record a Payment",
         "Work Trackers",
       ]);
@@ -646,6 +647,81 @@ describe("permission matrix", () => {
     });
   });
 
+  // docs/specs/qbo-invoice-12a-quote-types-page.md §4: the Quote Types page assigns each quote type
+  // its QuickBooks Product/Service. An admin and an accountant open it; nobody else does.
+  describe("Quote Types (spec qbo-invoice-12a)", () => {
+    const row = PERMISSIONS.find((p) => p.label === "Quote Types");
+
+    it("is a Configuration row that answers for every role, right after Work Tracker Types", () => {
+      expect(row?.category).toBe("Configuration");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+      const labels = PERMISSIONS.map((p) => p.label);
+      expect(labels.indexOf("Quote Types")).toBe(labels.indexOf("Work Tracker Types") + 1);
+    });
+
+    // docs/specs/qbo-invoice-12c-manage-quote-types.md §4: an administrator also adds, renames and
+    // deletes the types, so the accountant, who only assigns Products/Services, is `custom`.
+    it("is full for an admin, custom for an accountant, and none for every other role", () => {
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "none",
+        accountant: "custom",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("describes the page: a Product/Service per quote type and QuickBooks connection, and that an administrator also adds, renames and deletes the types", () => {
+      expect(row?.description).toBe(
+        "This applies to the Quote Types page under Configuration, where each quote type (City, Corporate, Rural …) is assigned the QuickBooks Product/Service its invoice line is sold as, per QuickBooks connection. An administrator also adds, renames and deletes the types; a type that quotes or prices use cannot be deleted.",
+      );
+    });
+
+    it("tells an admin they can manage the types and assign, and an accountant they can only assign", () => {
+      expect(row?.roles.admin.note).toBe(
+        "Can add, rename and delete quote types (not one that quotes or prices use), and assign, change or clear the Product/Service of any quote type, per QuickBooks connection.",
+      );
+      expect(row?.roles.accountant.note).toBe(
+        "Can assign, change or clear the Product/Service of any quote type, per QuickBooks connection. Cannot add, rename or delete a quote type.",
+      );
+    });
+
+    it("tells every other role the page is hidden, in the wording of the neighbouring rows", () => {
+      const neighbour = PERMISSIONS.find((p) => p.label === "Work Tracker Types");
+      for (const role of [
+        "account_manager",
+        "developer",
+        "viewer",
+        "driver",
+        "maintainer",
+      ] as const) {
+        expect(row?.roles[role].level, role).toBe("none");
+        expect(row?.roles[role].note, role).toBeTruthy();
+      }
+      expect(row?.roles.maintainer.note).toBe(neighbour?.roles.maintainer.note);
+      expect(row?.roles.viewer.note).toBe(neighbour?.roles.viewer.note);
+      expect(row?.roles.driver.note).toBe(neighbour?.roles.driver.note);
+    });
+
+    it("names the page in the accountant's role description, and in the note that says what else is hidden", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).toContain(
+        "Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type.",
+      );
+      expect(
+        ROLE_DESCRIPTIONS.accountant.endsWith(
+          "Everything else on the web dashboard is hidden from this role.",
+        ),
+      ).toBe(true);
+      const hidden = PERMISSIONS.find((p) => p.label === "Quickbooks Connections");
+      expect(hidden?.roles.accountant.note).toMatch(/Quote Types page under Configuration/);
+    });
+  });
+
   // docs/specs/qbo-invoice-07-card-buttons.md §5: the Create invoice and Update invoice buttons on
   // the Billing tab are the first place a person can use the feature, so the matrix says who may.
   describe("QuickBooks Invoice (create and update) (spec qbo-invoice-07)", () => {
@@ -683,7 +759,14 @@ describe("permission matrix", () => {
     // the check time; the levels do not change (the test of the levels above still holds).
     it("spec 08: also describes View in QuickBooks, Check again and the check time", () => {
       expect(row?.description).toMatch(
-        / A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked\.$/,
+        / A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked\./,
+      );
+    });
+
+    // docs/specs/qbo-invoice-12b-use-the-mapping.md §4: where the line's Product/Service comes from.
+    it("spec 12b: says the line's Product/Service is the one assigned on the Quote Types page, and that a type with none cannot be invoiced", () => {
+      expect(row?.description).toMatch(
+        / The line's Product\/Service is the one assigned to the quote's type on the Quote Types page; a quote whose type has none cannot be invoiced\.$/,
       );
     });
 

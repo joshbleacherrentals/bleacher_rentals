@@ -3,24 +3,20 @@ import { getBaseUrl, getQboAccessTokenAndRealmId } from "../util";
 import type { QboItemRef } from "./invoiceTypes";
 
 /**
- * Finds the QuickBooks Item an invoice line is sold as: `Bleacher Rental - {event type}`.
- * Server-only; reads only, never creates an Item.
- * Spec: docs/specs/qbo-invoice-03-payload.md
+ * Finds the QuickBooks Item an invoice line is sold as: the Product/Service assigned to the quote's
+ * event type on the Quote Types page, by its id. Server-only; reads only, never creates an Item.
+ * Spec: docs/specs/qbo-invoice-12b-use-the-mapping.md
  */
 
 const MINOR_VERSION = 40;
 
 type RawQboItem = { Id: string; Name: string; Description?: string };
 
-export async function findQboItem(
-  connectionId: string,
-  eventTypeName: string,
-): Promise<QboItemRef> {
-  const name = `Bleacher Rental - ${eventTypeName}`;
+export async function findQboItem(connectionId: string, itemId: string): Promise<QboItemRef> {
   const { accessToken, realmId } = await getQboAccessTokenAndRealmId(connectionId);
 
   const query = encodeURIComponent(
-    `select * from Item where Name = '${escapeQboQueryValue(name)}' and Active = true`,
+    `select * from Item where Id = '${escapeQboQueryValue(itemId)}' and Active = true`,
   );
   const response = await fetch(
     `${getBaseUrl()}/${realmId}/query?query=${query}&minorversion=${MINOR_VERSION}`,
@@ -36,10 +32,9 @@ export async function findQboItem(
 
   const items: RawQboItem[] = data?.QueryResponse?.Item ?? [];
   if (items.length === 0) {
-    throw new Error(`QuickBooks has no active Item named "${name}" in this company`);
-  }
-  if (items.length > 1) {
-    throw new Error(`QuickBooks has more than one active Item named "${name}" in this company`);
+    throw new Error(
+      `The QuickBooks Product/Service assigned to this quote type (id ${itemId}) is not an active Item in this company. Assign another on the Quote Types page.`,
+    );
   }
   const [item] = items;
   return { id: item.Id, name: item.Name, description: item.Description?.trim() || null };

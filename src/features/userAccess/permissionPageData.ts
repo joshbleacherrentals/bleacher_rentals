@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -69,7 +69,7 @@ const MAINTAINER_NO_ACCESS_NOTE =
 // Quotes & Bookings read-only; docs/specs/accountant-address-book.md adds Companies & Contacts;
 // docs/specs/accountant-team.md adds the Team page. It has nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor. Everything else on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -126,7 +126,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "QuickBooks Invoice (create and update)",
     description:
-      "The Create invoice and Update invoice buttons on the Billing tab of a quote or booking. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data. The invoice is saved in QuickBooks for the books and is never sent to the client. A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked.",
+      "The Create invoice and Update invoice buttons on the Billing tab of a quote or booking. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data. The invoice is saved in QuickBooks for the books and is never sent to the client. A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked. The line's Product/Service is the one assigned to the quote's type on the Quote Types page; a quote whose type has none cannot be invoiced.",
     category: "Day to Day Operations",
     roles: {
       admin: full("Can create the invoice of any booked quote and update any invoice."),
@@ -632,6 +632,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  // docs/specs/qbo-invoice-12a-quote-types-page.md §4: the Product/Service of each quote type.
+  {
+    label: "Quote Types",
+    description:
+      "This applies to the Quote Types page under Configuration, where each quote type (City, Corporate, Rural …) is assigned the QuickBooks Product/Service its invoice line is sold as, per QuickBooks connection. An administrator also adds, renames and deletes the types; a type that quotes or prices use cannot be deleted.",
+    category: "Configuration",
+    roles: {
+      admin: full(
+        "Can add, rename and delete quote types (not one that quotes or prices use), and assign, change or clear the Product/Service of any quote type, per QuickBooks connection.",
+      ),
+      account_manager: none("Account managers can't even see this page even on sidebar"),
+      developer: none(
+        "Unable to even access the pages where they can see quote types, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Viewers do not have access to the web configuration pages."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: custom(
+        "Can assign, change or clear the Product/Service of any quote type, per QuickBooks connection. Cannot add, rename or delete a quote type.",
+      ),
     },
   },
   {

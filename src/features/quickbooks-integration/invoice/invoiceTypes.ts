@@ -16,6 +16,12 @@ export type InvoiceSource = {
   invoiceNumber: number | null;
   title: string;
   eventTypeName: string | null;
+  /**
+   * The QuickBooks Product/Service (Item) assigned to the event type in the sales office's
+   * connection, on the Quote Types page; null when the quote has no type or no connection, or the
+   * pair has no row (spec 12b).
+   */
+  qboServiceId: string | null;
   /** YYYY-MM-DD */
   eventStart: string;
   /** YYYY-MM-DD */
@@ -41,6 +47,7 @@ export type InvoiceIssueCode =
   | "deleted"
   | "no_invoice_number"
   | "no_event_type"
+  | "no_service"
   | "no_sales_office"
   | "no_connection"
   | "no_contact"

@@ -67,6 +67,7 @@ const linkedSource = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
   invoiceNumber: 100200300,
   title: "SC - CLEMSON - RALLY",
   eventTypeName: "Corporate",
+  qboServiceId: "item-1",
   eventStart: "2026-11-01",
   dueDate: "2026-10-15",
   venue: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631" },

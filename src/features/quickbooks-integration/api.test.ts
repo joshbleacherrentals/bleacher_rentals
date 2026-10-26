@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchProvinceTaxCodes,
+  fetchQboItems,
   isCanadianConnection,
   setProvinceTaxCodeApi,
   setQboConnectionNoTaxCodeApi,
@@ -122,5 +123,33 @@ describe("setProvinceTaxCodeApi", () => {
     );
 
     await expect(setProvinceTaxCodeApi("conn-1", "ON", "5")).rejects.toThrow("Forbidden");
+  });
+});
+
+// docs/specs/qbo-invoice-12-event-type-services.md §4: the picker on the Quote Types page loads a
+// connection's Products/Services through the items route.
+describe("fetchQboItems", () => {
+  it("GETs the route with the connection id and returns the Items", async () => {
+    const items = [{ id: "7", name: "Rental", fullyQualifiedName: "Rental", type: "Service" }];
+    fakeFetch.mockResolvedValue(new Response(JSON.stringify({ items })));
+
+    const result = await fetchQboItems("conn 1");
+
+    expect(fakeFetch).toHaveBeenCalledWith("/api/quickbooks/items?connectionId=conn%201");
+    expect(result).toEqual(items);
+  });
+
+  it("returns an empty list when the route sends none", async () => {
+    fakeFetch.mockResolvedValue(new Response(JSON.stringify({})));
+
+    expect(await fetchQboItems("conn-1")).toEqual([]);
+  });
+
+  it("throws the route's message on a failure", async () => {
+    fakeFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    );
+
+    await expect(fetchQboItems("conn-1")).rejects.toThrow("Forbidden");
   });
 });

@@ -4,10 +4,14 @@ Status: **DRAFT 2026-10-22; AMENDED 2026-10-23 — the amended specs await "Appr
 amendment of 2026-10-23 (user's request): **the hashes are removed**; the app compares the invoice
 with QuickBooks instead (specs 01, 04, 05, 06, 06a, 09, 10, 11), and the Canadian settings on
 `/quickbooks` are shown for CAD connections only (03e). None is blocked.
+**Amended 2026-10-26 (user's request; approved and implemented):** the line's Product/Service is no longer
+built from the event type's name; each event type is **assigned** a QuickBooks Product/Service per
+connection, on a new Quote Types page under Configuration (specs 12, 12a, 12b).
 Branch: `q4-sprint1-finance-role`.
 Specs: `qbo-invoice-01` … `qbo-invoice-11`, plus `03a-province-tax-codes`, `03b-zone-class`,
-`03c-no-tax-code`, `03d-canadian-line-tax-code`, `03e-canadian-settings-cad-only` and
-`06a-check-on-save`.
+`03c-no-tax-code`, `03d-canadian-line-tax-code`, `03e-canadian-settings-cad-only`,
+`06a-check-on-save`, and `12-event-type-services`, `12a-quote-types-page`,
+`12b-use-the-mapping` and `12c-manage-quote-types`.
 Builds on: [accountant-quotes-05-is-qbo-column.md](accountant-quotes-05-is-qbo-column.md),
 [quote-staleness-detection.md](quote-staleness-detection.md),
 [accountant-role.md](accountant-role.md).
@@ -26,9 +30,11 @@ when the invoice in QuickBooks no longer matches the quote, and told what differ
 
 ## 1. The invoice, field by field (decided by the user)
 
-- **Product/service:** one line, `Bleacher Rental - {event type}`. Event types today are
-  City, Corporate and Rural; Sale is added later. The names are the same in both QuickBooks
-  files.
+- **Product/service:** one line. ~~`Bleacher Rental - {event type}`, the same names in both
+  QuickBooks files.~~ **Amended 2026-10-26 (12, 12a, 12b):** the Product/Service **assigned** to
+  the quote's event type for the QuickBooks connection of its sales office, set on the Quote
+  Types page. Event types today are City, Corporate and Rural; Sale is added later and then
+  needs an assignment too.
 - **Description:** the QuickBooks Item's own Description.
 - **Qty and Rate:** Qty is always 1. Amount is the quote's price after discounts, without tax.
 - **Tax:** calculated by QuickBooks. A state with no tax gets the Tax box unchecked, not 0%.
@@ -90,6 +96,12 @@ Taken in the chat of 2026-10-20 … 2026-10-22:
   QuickBooks call uses the quote's sales office's connection (`sales_office_uuid` →
   `quickbook_uuid`). **Office moved to the other QuickBooks file:** not detected (user's answer);
   the earlier refusal of Update is gone (spec 01 §1, §8, R3).
+- **Product/Service assignment (2026-10-26):** a junction table `EventTypeQboServices` (event type,
+  connection, `qbo_service_id`); a **Quote Types** page under Configuration, opened by an **admin
+  and an accountant**, where **each select saves at once**; the picker lists **every active
+  Item that can be sold**; a type with **no assignment is refused** with a message (Create and
+  Update do not run, the check is skipped), with no fallback to the old name. The accountant sees
+  the Configuration section with Quote Types as its only entry.
 - **Notification places:** sidebar counts, tab counts, a row mark in the lists, and a banner
   on the quote card. Accountants only. An admin who is not an accountant sees the Need
   attention tab but none of the signals.
@@ -116,6 +128,12 @@ Each one is a separate commit with one logic. Counted files = migrations, `datab
   check route. (The file keeps the name `…totals-check`.)
 - **06a — check on save** (3): the Save caller, and the check route open to every role that can
   open a quote.
+- **12 — Product/Service mapping** (6): the `EventTypeQboServices` table, the Items route and
+  the picker. (Added 2026-10-26.)
+- **12a — Quote Types page** (5): the page, the accountant's access and sidebar entry, the matrix.
+- **12b — the invoice uses the mapping** (8): the loader, the refusal, the Item looked up by id.
+- **12c — manage quote types** (3): an admin adds, renames and deletes the types on the Quote Types page
+  (added 2026-10-26, approved and implemented).
 - **07 — card: Create and Update** (9): the buttons, the dialogs, the capability, the matrix.
 - **08 — card: View, Check again, check time** (7): the two extra buttons, the view route and the
   "last checked" line.
@@ -176,7 +194,10 @@ Places where the wording of a decision left a detail, and the spec reads it one 
 ## 6. Not in any of these specs
 
 - Sending the invoice to the client, or any QuickBooks email.
-- The Sale event type (added to `EventTypes` by the user later).
+- The Sale event type (added to `EventTypes` by the user later; it then appears on the Quote Types
+  page and needs an assignment).
+- ~~Adding, renaming or deleting event types on the Quote Types page.~~ **Amended by 12c:** an admin does
+  these there; restoring a deleted type and a duplicate-name check stay out.
 - Reading QuickBooks' tax rates to compare them with the calculator's.
 - Creating QuickBooks Items or Classes from the app.
 - Merging the contacts and companies tables.
@@ -189,3 +210,11 @@ Migrations 01, 02 and 03a, then the app. Migration 01 was **edited in place** on
 (the hashes removed); a database that ran its first version must be reset or reverted by hand
 (spec 01, §8). No `sync_rules.yaml` change: `Events` already syncs whole-row
 to admin and accountant, and the new tables of specs 02 and 03a are server-only.
+
+**Specs 12 – 12b (2026-10-26):** migration 12, then the app. The table `EventTypeQboServices` is
+online-only: no `AppSchema.ts` and no `sync_rules.yaml` change (the Quote Types page lists the
+types from `EventTypes`, which already syncs to admin and accountant). **Before anyone creates or
+updates an invoice, an admin or an accountant assigns every event type for every connection** on
+Quote Types, choosing for each the Item `Bleacher Rental - {type}` that the invoices were made with
+so far: until then Create and Update refuse and checks are skipped, and a type assigned to any
+other Item shows the reason `service` on the next check of its invoices (12b §1).

@@ -33,6 +33,24 @@ async function readEventTypeName(
   return data?.name ?? null;
 }
 
+/** The Product/Service assigned to the event type in that connection (spec 12b), or null. */
+async function readQboServiceId(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  eventTypeId: string | null,
+  connectionId: string | null,
+): Promise<string | null> {
+  if (!eventTypeId || !connectionId) return null;
+  const { data, error } = await supabase
+    .from("EventTypeQboServices")
+    .select("qbo_service_id")
+    .eq("event_type_uuid", eventTypeId)
+    .eq("qbo_connection_uuid", connectionId)
+    .maybeSingle();
+  if (error)
+    throw new Error(`Failed to read the Product/Service of the quote type: ${error.message}`);
+  return data?.qbo_service_id ?? null;
+}
+
 async function readConnectionId(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   salesOfficeId: string | null,
@@ -106,6 +124,9 @@ export async function loadInvoiceSource(
     readBilledContact(supabase, event.finance_contact_uuid ?? event.contact_uuid),
   ]);
 
+  // After the connection: the assignment is per event type and connection.
+  const qboServiceId = await readQboServiceId(supabase, event.event_type_uuid, connectionId);
+
   const dueDate = doc.paymentSchedule.reduce(
     (latest, installment) => (installment.dueDate > latest ? installment.dueDate : latest),
     "",
@@ -118,6 +139,7 @@ export async function loadInvoiceSource(
     invoiceNumber: event.invoice_number,
     title: event.event_name,
     eventTypeName,
+    qboServiceId,
     eventStart: doc.dates.eventStart,
     dueDate: dueDate || doc.dates.eventStart,
     venue: {

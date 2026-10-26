@@ -110,6 +110,7 @@ function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
     invoiceNumber: 100200300,
     title: "SC - CLEMSON - RALLY",
     eventTypeName: "Corporate",
+    qboServiceId: "item-7",
     eventStart: "2026-11-01",
     dueDate: "2026-10-15",
     venue: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631" },
@@ -206,7 +207,8 @@ describe("runInvoiceCheck — the order, and where it looks", () => {
   it("does everything in the connection of the quote's sales office", async () => {
     await runInvoiceCheck(EVENT_ID, sourceOf());
 
-    expect(state.itemArgs).toEqual(["conn-office", "Corporate"]);
+    // The Item is the one assigned to the event type, found by its id (spec 12b), never by a name.
+    expect(state.itemArgs).toEqual(["conn-office", "item-7"]);
     expect(state.invoiceArgs).toEqual(["conn-office", "inv-1"]);
     expect(state.customerArgs).toEqual(["conn-office", "contact-1"]);
     expect(state.zoneArgs).toEqual(["conn-office", "SC"]);
@@ -367,6 +369,21 @@ describe("runInvoiceCheck — a quote that cannot be compared", () => {
     expect(state.updates.map((u) => u.values)).toEqual([failureOnly]);
   });
 
+  // docs/specs/qbo-invoice-12b-use-the-mapping.md §4, §7: an event type with no Product/Service
+  // assigned is skipped with the message, before QuickBooks is asked anything.
+  it("a quote whose event type has no assigned Product/Service is skipped, and QuickBooks is not asked anything", async () => {
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf({ qboServiceId: null }));
+
+    expect(result).toMatchObject({
+      status: "skipped",
+      message: expect.stringContaining("Quote Types page"),
+    });
+    expect((result as { message: string }).message).toContain('quote type "Corporate"');
+    expect(calls).toEqual(["write"]);
+    expect(state.itemArgs).toEqual([]);
+    expect(state.updates.map((u) => u.values)).toEqual([failureOnly]);
+  });
+
   it("every issue is in the message", async () => {
     const result = await runInvoiceCheck(
       EVENT_ID,
@@ -404,12 +421,14 @@ describe("runInvoiceCheck — a check that fails", () => {
   });
 
   it("the Item not found is a QboReadError too", async () => {
-    state.itemError = new Error("QuickBooks has no active Item named Bleacher Rental - Corporate");
+    state.itemError = new Error(
+      "The QuickBooks Product/Service assigned to this quote type (id item-7) is not an active Item in this company. Assign another on the Quote Types page.",
+    );
 
     const failure = await runInvoiceCheck(EVENT_ID, sourceOf()).catch((e) => e);
 
     expect(failure).toBeInstanceOf(QboReadError);
-    expect(failure.message).toContain("no active Item");
+    expect(failure.message).toContain("not an active Item");
     expect(calls).not.toContain("read-invoice");
     expect(state.updates.map((u) => u.values)).toEqual([failureOnly]);
   });

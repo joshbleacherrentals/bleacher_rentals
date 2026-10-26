@@ -1247,6 +1247,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"EventTypeQboServices": {
+                  Row: {
+                    "created_at": string,"event_type_uuid": string,"id": string,"qbo_connection_uuid": string,"qbo_service_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"event_type_uuid": string,"id"?: string,"qbo_connection_uuid": string,"qbo_service_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"event_type_uuid"?: string,"id"?: string,"qbo_connection_uuid"?: string,"qbo_service_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "EventTypeQboServices_event_type_uuid_fkey"
+      columns: ["event_type_uuid"]
+isOneToOne: false
+      referencedRelation: "EventTypes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "EventTypeQboServices_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"EventTypes": {
                   Row: {
                     "created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"id": string,"name": string

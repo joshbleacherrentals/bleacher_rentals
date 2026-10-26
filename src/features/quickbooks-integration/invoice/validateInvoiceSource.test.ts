@@ -9,6 +9,7 @@ const source = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
   invoiceNumber: 100200300,
   title: "SC - CLEMSON - RALLY",
   eventTypeName: "Corporate",
+  qboServiceId: "item-7",
   eventStart: "2026-11-14",
   dueDate: "2026-11-01",
   venue: { street: "100 Tiger Blvd", city: "Clemson", state: "SC", zip: "29634" },
@@ -63,6 +64,31 @@ describe("validateInvoiceSource", () => {
     expect(codes(validateInvoiceSource(source({ eventTypeName: null })))).toEqual([
       "no_event_type",
     ]);
+  });
+
+  // docs/specs/qbo-invoice-12b-use-the-mapping.md §4: a type with no assigned Product/Service is refused.
+  it("no_service: the event type has no Product/Service assigned for the connection", () => {
+    const issues = validateInvoiceSource(source({ qboServiceId: null }));
+    expect(codes(issues)).toEqual(["no_service"]);
+    expect(issues[0].message).toBe(
+      'No QuickBooks Product/Service is assigned to the quote type "Corporate" for this quote\'s QuickBooks company. An admin or an accountant assigns it on the Quote Types page.',
+    );
+  });
+
+  it("no_service is not added on top of a missing event type, sales office or connection", () => {
+    expect(
+      codes(validateInvoiceSource(source({ eventTypeName: null, qboServiceId: null }))),
+    ).toEqual(["no_event_type"]);
+    expect(
+      codes(
+        validateInvoiceSource(
+          source({ salesOfficeId: null, connectionId: null, qboServiceId: null }),
+        ),
+      ),
+    ).toEqual(["no_sales_office"]);
+    expect(
+      codes(validateInvoiceSource(source({ connectionId: null, qboServiceId: null }))),
+    ).toEqual(["no_connection"]);
   });
 
   it("no_sales_office", () => {

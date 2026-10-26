@@ -218,14 +218,14 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
   if (issues.length > 0) return fail(400, issues.map((issue) => issue.message).join(" "));
   // validateInvoiceSource has refused a quote without these.
   const connectionId = source.connectionId!;
-  const eventTypeName = source.eventTypeName!;
+  const qboServiceId = source.qboServiceId!;
 
   // 4: removed with the hash (spec 04, 2026-10-23).
 
   // 5
   let item;
   try {
-    item = await findQboItem(connectionId, eventTypeName);
+    item = await findQboItem(connectionId, qboServiceId);
   } catch (e) {
     return setupFailure(e);
   }

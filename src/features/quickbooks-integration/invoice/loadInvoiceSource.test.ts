@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { tables, queries, doc } = vi.hoisted(() => ({
+const { tables, errors, queries, doc } = vi.hoisted(() => ({
   tables: {} as Record<string, unknown>,
+  // A table named here answers every read with this error.
+  errors: {} as Record<string, string>,
   queries: [] as Array<{ table: string; select: string; eq: [string, unknown][] }>,
   doc: { current: null as unknown },
 }));
@@ -11,7 +13,10 @@ vi.mock("@supabase/supabase-js", () => ({
     from: (table: string) => {
       const q = { table, select: "", eq: [] as [string, unknown][] };
       queries.push(q);
-      const result = () => ({ data: tables[table] ?? null, error: null });
+      const result = () =>
+        errors[table]
+          ? { data: null, error: { message: errors[table] } }
+          : { data: tables[table] ?? null, error: null };
       const chain: any = {
         select: (s: string) => {
           q.select = s;
@@ -57,6 +62,7 @@ const quoteDoc = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   queries.length = 0;
+  for (const table of Object.keys(errors)) delete errors[table];
   doc.current = quoteDoc();
   vi.mocked(buildQuoteDocumentData).mockClear();
   tables.Events = {
@@ -74,6 +80,7 @@ beforeEach(() => {
     qbo_invoice_mismatch_reasons: null,
   };
   tables.EventTypes = { name: "Corporate" };
+  tables.EventTypeQboServices = { qbo_service_id: "item-7" };
   tables.SalesOffices = { quickbook_uuid: "conn-1" };
   tables.Contacts = {
     id: "contact-plain",
@@ -96,6 +103,7 @@ describe("loadInvoiceSource", () => {
       invoiceNumber: 100200300,
       title: "SC - CLEMSON - RALLY",
       eventTypeName: "Corporate",
+      qboServiceId: "item-7",
       eventStart: "2026-11-14",
       dueDate: "2026-11-14",
       venue: { street: "100 Tiger Blvd", city: "Clemson", state: "SC", zip: "29634" },
@@ -187,7 +195,14 @@ describe("loadInvoiceSource", () => {
     expect(queries.length).toBeGreaterThan(0);
     for (const q of queries) expect(q.select).not.toMatch(/[()]/);
     expect(new Set(queries.map((q) => q.table))).toEqual(
-      new Set(["Events", "EventTypes", "SalesOffices", "Contacts", "Companies"]),
+      new Set([
+        "Events",
+        "EventTypes",
+        "SalesOffices",
+        "EventTypeQboServices",
+        "Contacts",
+        "Companies",
+      ]),
     );
   });
 
@@ -212,5 +227,58 @@ describe("loadInvoiceSource", () => {
     expect(s?.salesOfficeId).toBeNull();
     expect(s?.connectionId).toBeNull();
     expect(s?.billedContact).toBeNull();
+    expect(s?.qboServiceId).toBeNull();
+  });
+});
+
+// docs/specs/qbo-invoice-12b-use-the-mapping.md §4, §7: the Product/Service assigned to the quote's
+// event type, in the QuickBooks connection of its sales office.
+describe("loadInvoiceSource — the assigned Product/Service", () => {
+  it("reads the assignment for the quote's event type and the office's connection", async () => {
+    const s = await loadInvoiceSource("event-1", "o");
+
+    expect(s?.qboServiceId).toBe("item-7");
+    const query = queries.find((q) => q.table === "EventTypeQboServices")!;
+    expect(query.select).toBe("qbo_service_id");
+    expect(query.eq).toContainEqual(["event_type_uuid", "type-1"]);
+    expect(query.eq).toContainEqual(["qbo_connection_uuid", "conn-1"]);
+  });
+
+  it("is null when the pair has no assignment", async () => {
+    tables.EventTypeQboServices = null;
+
+    expect((await loadInvoiceSource("event-1", "o"))?.qboServiceId).toBeNull();
+  });
+
+  it("is null, with no query on the table, when the quote has no event type", async () => {
+    Object.assign(tables.Events as object, { event_type_uuid: null });
+
+    expect((await loadInvoiceSource("event-1", "o"))?.qboServiceId).toBeNull();
+    expect(queries.some((q) => q.table === "EventTypeQboServices")).toBe(false);
+  });
+
+  it("is null, with no query on the table, when the office has no connection", async () => {
+    tables.SalesOffices = { quickbook_uuid: null };
+
+    const s = await loadInvoiceSource("event-1", "o");
+
+    expect(s?.connectionId).toBeNull();
+    expect(s?.qboServiceId).toBeNull();
+    expect(queries.some((q) => q.table === "EventTypeQboServices")).toBe(false);
+  });
+
+  it("is null, with no query on the table, when the quote has no sales office", async () => {
+    Object.assign(tables.Events as object, { sales_office_uuid: null });
+
+    expect((await loadInvoiceSource("event-1", "o"))?.qboServiceId).toBeNull();
+    expect(queries.some((q) => q.table === "EventTypeQboServices")).toBe(false);
+  });
+
+  it("throws when the table cannot be read, and does not read the failure as no assignment", async () => {
+    errors.EventTypeQboServices = "permission denied";
+
+    await expect(loadInvoiceSource("event-1", "o")).rejects.toThrow(
+      "Failed to read the Product/Service of the quote type: permission denied",
+    );
   });
 });

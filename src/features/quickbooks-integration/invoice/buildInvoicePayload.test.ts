@@ -9,6 +9,7 @@ const source = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
   invoiceNumber: 100200300,
   title: "SC - CLEMSON - RALLY",
   eventTypeName: "Corporate",
+  qboServiceId: "item-1",
   eventStart: "2026-11-14",
   dueDate: "2026-11-01",
   venue: { street: "100 Tiger Blvd", city: "Clemson", state: "SC", zip: "29634" },

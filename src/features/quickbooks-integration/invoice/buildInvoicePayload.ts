@@ -58,6 +58,15 @@ export function validateInvoiceSource(source: InvoiceSource): InvoiceIssue[] {
     });
   }
 
+  // An event type and a connection are there, so the assignment is what is missing. When either is
+  // missing, its own issue above is the one to fix first.
+  if (source.eventTypeName && source.connectionId && !source.qboServiceId) {
+    issues.push({
+      code: "no_service",
+      message: `No QuickBooks Product/Service is assigned to the quote type "${source.eventTypeName}" for this quote's QuickBooks company. An admin or an accountant assigns it on the Quote Types page.`,
+    });
+  }
+
   const contact = source.billedContact;
   if (!contact || !(contact.firstName.trim() || contact.lastName?.trim())) {
     issues.push({

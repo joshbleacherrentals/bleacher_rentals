@@ -79,13 +79,13 @@ export async function runInvoiceCheck(
   if (issues.length > 0) return skip(eventId, issues.map((issue) => issue.message).join(" "));
   // validateInvoiceSource has refused a quote without these.
   const connectionId = source.connectionId!;
-  const eventTypeName = source.eventTypeName!;
+  const qboServiceId = source.qboServiceId!;
   const billedContact = source.billedContact!;
 
   let item;
   let invoice;
   try {
-    item = await findQboItem(connectionId, eventTypeName);
+    item = await findQboItem(connectionId, qboServiceId);
     invoice = await readQboInvoice(connectionId, qboInvoiceId);
   } catch (e) {
     await recordFailure(eventId);

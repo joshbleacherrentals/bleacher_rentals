@@ -11,6 +11,7 @@ const { calls, state, createClient } = vi.hoisted(() => {
     source: null as unknown,
     loadArgs: [] as unknown[],
     itemError: null as Error | null,
+    itemArgs: [] as unknown[],
     customer: { kind: "customer", customerId: "cust-1", how: "linked" } as unknown,
     customerError: null as Error | null,
     customerArgs: [] as unknown[],
@@ -122,15 +123,11 @@ vi.mock("./loadInvoiceSource", () => ({
 }));
 
 vi.mock("./findQboItem", () => ({
-  findQboItem: vi.fn(async (connectionId: string, eventTypeName: string) => {
+  findQboItem: vi.fn(async (connectionId: string, itemId: string) => {
     calls.push("item");
+    state.itemArgs = [connectionId, itemId];
     if (state.itemError) throw state.itemError;
-    return {
-      id: "item-1",
-      name: `Bleacher Rental - ${eventTypeName}`,
-      description: "Seats",
-      connectionId,
-    };
+    return { id: itemId, name: "Corporate rental", description: "Seats", connectionId };
   }),
 }));
 
@@ -209,6 +206,7 @@ function sourceOf(over: Partial<InvoiceSource> = {}): InvoiceSource {
     invoiceNumber: 100200300,
     title: "SC - CLEMSON - RALLY",
     eventTypeName: "Corporate",
+    qboServiceId: "item-1",
     eventStart: "2026-11-01",
     dueDate: "2026-10-15",
     venue: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631" },
@@ -294,6 +292,7 @@ beforeEach(() => {
     source: sourceOf(),
     loadArgs: [],
     itemError: null,
+    itemArgs: [],
     customer: { kind: "customer", customerId: "cust-1", how: "linked" },
     customerError: null,
     customerArgs: [],
@@ -764,6 +763,7 @@ describe("updateInvoice — a quote that cannot be updated", () => {
     ["deleted", { deleted: true }, /deleted/],
     ["no invoice number", { invoiceNumber: null }, /no invoice number/],
     ["no event type", { eventTypeName: null }, /event type/],
+    ["no assigned Product/Service", { qboServiceId: null }, /Product\/Service.*Quote Types page/],
     ["no sales office", { salesOfficeId: null, connectionId: null }, /sales office/],
     ["no connection", { connectionId: null }, /QuickBooks connection/],
     ["no contact", { billedContact: null }, /contact/],
@@ -783,10 +783,59 @@ describe("updateInvoice — a quote that cannot be updated", () => {
   );
 });
 
+// docs/specs/qbo-invoice-12b-use-the-mapping.md §4, §7: the invoice line is the Product/Service
+// assigned to the event type, found by its id.
+describe("updateInvoice — the Product/Service assigned to the event type (spec 12b)", () => {
+  it("update looks the Item up in the quote's connection by the assigned id, never by the type's name", async () => {
+    state.source = sourceOf({ eventTypeName: "Rural", qboServiceId: "item-42" });
+
+    await run();
+
+    expect(state.itemArgs).toEqual(["conn-1", "item-42"]);
+  });
+
+  it("overwrite looks the Item up by the assigned id too", async () => {
+    state.source = sourceOf({
+      eventTypeName: "Rural",
+      qboServiceId: "item-42",
+      qboInvoiceId: null,
+    });
+
+    await overwrite({ overwriteInvoiceId: "inv-77" });
+
+    expect(state.itemArgs).toEqual(["conn-1", "item-42"]);
+  });
+
+  it("a type with nothing assigned is refused with the message, and QuickBooks is not asked", async () => {
+    state.source = sourceOf({ qboServiceId: null });
+
+    const result = await run();
+
+    expect(result).toMatchObject({ status: "error", httpStatus: 400 });
+    expect(errorOf(result)).toBe(
+      'No QuickBooks Product/Service is assigned to the quote type "Corporate" for this quote\'s QuickBooks company. An admin or an accountant assigns it on the Quote Types page.',
+    );
+    expect(calls).toEqual(["load"]);
+    expect(state.itemArgs).toEqual([]);
+    expectNothingWritten();
+  });
+
+  it("overwrite with nothing assigned is refused the same way", async () => {
+    state.source = sourceOf({ qboServiceId: null, qboInvoiceId: null });
+
+    const result = await overwrite({ overwriteInvoiceId: "inv-77" });
+
+    expect(result).toMatchObject({ status: "error", httpStatus: 400 });
+    expect(errorOf(result)).toContain("Quote Types page");
+    expect(state.itemArgs).toEqual([]);
+    expectNothingWritten();
+  });
+});
+
 describe("updateInvoice — a failing step ends the request", () => {
   it("the Item missing in QuickBooks: 400 with its message, nothing after it", async () => {
     state.itemError = new Error(
-      'QuickBooks has no active Item named "Bleacher Rental - Corporate"',
+      "The QuickBooks Product/Service assigned to this quote type (id item-1) is not an active Item in this company. Assign another on the Quote Types page.",
     );
 
     const result = await run();

@@ -11,6 +11,10 @@ after the first sandbox run (QuickBooks Canada refuses `TAX` and `NON` on a line
 below is the amended one. **Amended 2026-10-23 (approved and implemented):** the invoice hash this
 builder had to stay in step with is gone (spec 01); the comparison of
 [06](qbo-invoice-06-totals-check.md) now covers every member the builder writes (§2, §9, §11).
+**Amended 2026-10-26 by [12b](qbo-invoice-12b-use-the-mapping.md) (approved and implemented):** the
+line's Item is the Product/Service assigned to the event type on the Quote Types page, looked up by
+its id, not the Item named `Bleacher Rental - {event type}` (§1, §6, §12; `InvoiceSource` gains
+`qboServiceId`).
 Implementation order: **03** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Builds on: [qbo-invoice-01-link-and-hash.md](qbo-invoice-01-link-and-hash.md) (the link columns
@@ -30,8 +34,9 @@ the Class (03b), writing or updating an invoice (specs 04–05), the invoice com
 
 **From the user's own words (not options):**
 
-- **One line.** Product/service `Bleacher Rental - {event type}`; Qty 1; Amount the price
-  after discounts, without tax. Event types: City, Corporate, Rural (Sale later).
+- **One line.** Product/service ~~`Bleacher Rental - {event type}`~~ (**amended by 12b:** the
+  Product/Service assigned to the event type); Qty 1; Amount the price after discounts, without
+  tax. Event types: City, Corporate, Rural (Sale later).
 - **Description** of the line: the QuickBooks Item's own Description (user's answer to
   "what goes into the Description").
 - **Bill to:** the client's full name. **Location of Sale:** the quote's venue address.
@@ -159,10 +164,15 @@ string, never by floating point.
 
 ## 6. The Item — `…/invoice/findQboItem.ts` (new)
 
-`findQboItem(connectionId, eventTypeName)` asks QuickBooks for the active Item named
+~~`findQboItem(connectionId, eventTypeName)` asks QuickBooks for the active Item named
 `Bleacher Rental - {eventTypeName}` (the name is escaped as in spec 02) and returns a
 `QboItemRef`. No Item → an error "QuickBooks has no active Item named … in this company";
-more than one → "more than one". It never creates an Item.
+more than one → "more than one". It never creates an Item.~~ **Amended by
+[12b](qbo-invoice-12b-use-the-mapping.md):** `findQboItem(connectionId, itemId)` asks QuickBooks
+for the active Item with the id assigned to the event type, and returns the same `QboItemRef`; no
+Item → an error naming the id and the Quote Types page. A quote whose type has no assignment is
+refused by `validateInvoiceSource` (issue `no_service`) before this is called. It never creates an
+Item.
 
 ## 7. Behaviour scenarios
 
@@ -222,6 +232,8 @@ Red first. Prettier only on touched files.
 - **QuickBooks field names** (`PrivateNote` for "Memo on statement", `ShipAddr` for "Location of
   Sale", `BillAddr.Line1` for "Bill to"): to verify in a sandbox before the feature ships.
 - **An Item renamed in QuickBooks** is not found; the message names the wanted Item.
+  (**Amended by 12b:** the Item is found by its id, so a rename changes nothing; an Item made
+  inactive or deleted is not found.)
 - **Offline / PowerSync.** Not applicable: server-only.
 - **Clerk.** The route that calls this code checks the role (spec 04).
 
@@ -236,7 +248,8 @@ Red first. Prettier only on touched files.
 ## 12. Out of scope
 
 - Finding the province's tax code (03a) and the Class (03b); this spec only places them.
-- Creating Items, or using any Item but the one named after the event type.
+- Creating Items, or using any Item but the one assigned to the event type (12b; it was the one
+  named after the event type).
 - Itemising the quote's line items on the invoice.
 - The Sale event type.
 - Any QuickBooks write.

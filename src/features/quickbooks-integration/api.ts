@@ -77,6 +77,34 @@ export async function fetchQboClasses(connectionId: string): Promise<QboClass[]>
   return data.classes || [];
 }
 
+/** A QuickBooks Product/Service (Item) an invoice line can be sold as. */
+export type QboItem = {
+  id: string;
+  name: string;
+  fullyQualifiedName: string;
+  type: string;
+};
+
+/**
+ * Fetches the active Products/Services of a connection's company that an invoice line can use.
+ * Spec: docs/specs/qbo-invoice-12-event-type-services.md
+ */
+export async function fetchQboItems(connectionId: string): Promise<QboItem[]> {
+  const response = await fetch(
+    `/api/quickbooks/items?connectionId=${encodeURIComponent(connectionId)}`,
+  );
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Failed to fetch products and services" }));
+    throw new Error(error.error || "Failed to fetch products and services");
+  }
+
+  const data = await response.json();
+  return data.items || [];
+}
+
 export type QboConnection = {
   id: string;
   display_name: string;
