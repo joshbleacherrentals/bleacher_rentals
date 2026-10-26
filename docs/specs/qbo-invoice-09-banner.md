@@ -1,6 +1,6 @@
 # QuickBooks invoice — the attention rule and the banner on the quote card
 
-Status: **DRAFT 2026-10-22; AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions; four
+Status: **Implemented 2026-10-22** 0 open decisions; four
 readings to confirm (§1, last paragraph). The amendment follows spec 01 and spec 06: there is no
 "outdated" any more (it was decided by the hashes); a quote needs attention when the last
 comparison with QuickBooks found a difference, and the reasons are stored.
