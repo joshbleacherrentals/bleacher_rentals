@@ -1,6 +1,6 @@
 # QuickBooks invoice — the Need attention tab on /accountant
 
-Status: **DRAFT 2026-10-22; AMENDED 2026-10-23 — awaiting "Approved".** 0 open decisions; one
+Status: **Implemented 2026-10-26.** 0 open decisions; one
 reading to confirm (§1, last paragraph). The amendment follows spec 09: with the hashes gone there
 is one signal, the mismatch flag, and the **Reason** column shows its real reasons.
 Implementation order: **10** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
