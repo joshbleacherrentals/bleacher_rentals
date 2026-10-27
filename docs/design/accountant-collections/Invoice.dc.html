@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice Collections Page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0;background:#ffffff}
+.iv-tip:hover .iv-tipbody,.iv-tip:focus-within .iv-tipbody{display:block !important}
+.iv-btn:focus-visible{outline:2px solid #1d62a3;outline-offset:2px}
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;background:#ffffff;font-family:Geist,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827">
+  <div style="max-width:1040px;margin:0 auto;padding:16px 32px 56px;box-sizing:border-box">
+
+    <a href="Main.dc.html" class="iv-btn" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;font-size:14px;line-height:20px;font-weight:500;color:#10365a;text-decoration:none">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+      Back to tasks
+    </a>
+
+    <div style="position:sticky;top:0;z-index:10;border-radius:10px 10px 0 0;background:linear-gradient(to right,#1f2937,#4b5563)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 24px;padding:16px 24px;color:#ffffff">
+        <div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 14px;min-width:0">
+          <h1 style="margin:0;font-size:20px;line-height:28px;font-weight:700">Riverside Charity Run</h1>
+          <span style="font-size:14px;line-height:20px;font-weight:600;color:#fecaca">3 days overdue</span>
+        </div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
+          <button type="button" class="iv-btn" style="height:36px;padding:0 14px;border:0;border-radius:6px;background:#ffffff;font-family:inherit;font-size:14px;font-weight:500;color:#10365a;cursor:pointer">Record Payment</button>
+          <button type="button" class="iv-btn" style="height:36px;padding:0 14px;border:1px solid rgba(255,255,255,.55);border-radius:6px;background:transparent;font-family:inherit;font-size:14px;font-weight:500;color:#ffffff;cursor:pointer">Send Email</button>
+          <span title="Status is calculated from payments" style="display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:6px;background:#fbe7e5;font-size:14px;font-weight:600;color:#a8403a">Collections</span>
+        </div>
+      </div>
+      <div role="tablist" aria-label="Invoice sections" style="display:flex;gap:4px;padding:0 24px">
+        <button type="button" role="tab" aria-selected="{{ infoTab.selected }}" onClick="{{ selectInfo }}" class="iv-btn" style="flex:1;padding:14px 12px;border:0;border-radius:6px 6px 0 0;background:{{ infoTab.bg }};font-family:inherit;font-size:16px;font-weight:500;color:{{ infoTab.color }};cursor:pointer">Information</button>
+        <button type="button" role="tab" aria-selected="{{ tasksTab.selected }}" onClick="{{ selectTasks }}" class="iv-btn" style="flex:1;padding:14px 12px;border:0;border-radius:6px 6px 0 0;background:{{ tasksTab.bg }};font-family:inherit;font-size:16px;font-weight:500;color:{{ tasksTab.color }};cursor:pointer">Tasks</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:24px;padding:24px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 10px 10px;background:#ffffff">
+
+      <sc-if value="{{ showInfo }}" hint-placeholder-val="{{ true }}">
+        <div role="tabpanel" aria-label="Information" style="display:flex;flex-direction:column;gap:16px">
+
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px 24px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;font-size:14px;line-height:20px">
+            <div><span style="color:#6b7280">Invoice</span><span style="margin-left:8px;font-weight:600">123456</span></div>
+            <div><span style="color:#6b7280">Account Manager</span><span style="margin-left:8px;font-weight:600">Max Gavryshkiv</span></div>
+          </div>
+
+          <dc-import name="Contacts" variant="{{ contactsVariant }}" hint-size="100%,300px"></dc-import>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:16px">
+            <section aria-label="Venue" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
+              <h3 style="margin:0 0 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Venue</h3>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">Venue name</span><span>Riverside Park, Field 3</span></div>
+                <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">Venue address</span><span>120 Riverside Drive, Toronto, ON</span></div>
+              </div>
+            </section>
+            <section aria-label="Event" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
+              <h3 style="margin:0 0 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Event</h3>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">Event start date</span><span>Oct 24, 2026</span></div>
+                <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">Event end date</span><span>Oct 25, 2026</span></div>
+                <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">Event type</span><span>Sports</span></div>
+              </div>
+            </section>
+          </div>
+
+          <section aria-label="Money" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
+            <h3 style="margin:0 0 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Money</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:24px">
+              <div style="display:flex;flex-direction:column;max-width:480px">
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px;line-height:20px">
+                  <span style="display:inline-flex;align-items:center;gap:6px;color:#4b5563">Contract Subtotal
+                    <span class="iv-tip" style="position:relative;display:inline-flex">
+                      <button type="button" class="iv-btn" aria-label="About Contract Subtotal" style="display:inline-flex;border:0;background:none;padding:0;color:#6b7280;cursor:help"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+                      <span role="tooltip" class="iv-tipbody" style="display:none;position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:260px;padding:10px 12px;border-radius:8px;background:#1f2937;box-shadow:0 8px 24px rgba(15,42,68,.25);font-size:12px;line-height:18px;font-weight:400;color:#ffffff">Total after discounts, not including taxes.</span>
+                    </span>
+                  </span>
+                  <span style="font-weight:500;font-variant-numeric:tabular-nums">C$11,254.78</span>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px;line-height:20px">
+                  <span style="color:#4b5563">Taxes (15%)</span>
+                  <span style="font-weight:500;font-variant-numeric:tabular-nums">C$1,688.22</span>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #d1d5db;font-size:14px;line-height:20px">
+                  <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600">Total
+                    <span class="iv-tip" style="position:relative;display:inline-flex">
+                      <button type="button" class="iv-btn" aria-label="About Total" style="display:inline-flex;border:0;background:none;padding:0;color:#6b7280;cursor:help"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+                      <span role="tooltip" class="iv-tipbody" style="display:none;position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:260px;padding:10px 12px;border-radius:8px;background:#1f2937;box-shadow:0 8px 24px rgba(15,42,68,.25);font-size:12px;line-height:18px;font-weight:400;color:#ffffff">Total after discounts, including taxes.</span>
+                    </span>
+                  </span>
+                  <span style="font-weight:700;font-variant-numeric:tabular-nums">C$12,943.00</span>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px;line-height:20px">
+                  <span style="display:inline-flex;align-items:center;gap:6px;color:#4b5563">Already paid
+                    <span class="iv-tip" style="position:relative;display:inline-flex">
+                      <button type="button" class="iv-btn" aria-label="About Already paid" style="display:inline-flex;border:0;background:none;padding:0;color:#6b7280;cursor:help"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+                      <span role="tooltip" class="iv-tipbody" style="display:none;position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:260px;padding:10px 12px;border-radius:8px;background:#1f2937;box-shadow:0 8px 24px rgba(15,42,68,.25);font-size:12px;line-height:18px;font-weight:400;color:#ffffff">Funds that have been credited as of now.</span>
+                    </span>
+                  </span>
+                  <span style="font-weight:500;font-variant-numeric:tabular-nums;color:#166534">C$4,735.75</span>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;font-size:14px;line-height:20px">
+                  <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600">Remaining Payment
+                    <span class="iv-tip" style="position:relative;display:inline-flex">
+                      <button type="button" class="iv-btn" aria-label="About Remaining Payment" style="display:inline-flex;border:0;background:none;padding:0;color:#6b7280;cursor:help"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+                      <span role="tooltip" class="iv-tipbody" style="display:none;position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:260px;padding:10px 12px;border-radius:8px;background:#1f2937;box-shadow:0 8px 24px rgba(15,42,68,.25);font-size:12px;line-height:18px;font-weight:400;color:#ffffff">What the customer still needs to pay: the total (after discounts and taxes) minus what is already paid.</span>
+                    </span>
+                  </span>
+                  <span style="font-weight:700;font-variant-numeric:tabular-nums">C$8,207.25</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;padding:20px;border-radius:10px;background:#fbe7e5">
+                <span style="display:inline-flex;align-items:center;gap:6px;font-size:14px;line-height:20px;font-weight:600;color:#a8403a">Current Overdue amount
+                  <span class="iv-tip" style="position:relative;display:inline-flex">
+                    <button type="button" class="iv-btn" aria-label="About Current Overdue amount" style="display:inline-flex;border:0;background:none;padding:0;color:#a8403a;cursor:help"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+                    <span role="tooltip" class="iv-tipbody" style="display:none;position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:280px;padding:10px 12px;border-radius:8px;background:#1f2937;box-shadow:0 8px 24px rgba(15,42,68,.25);font-size:12px;line-height:18px;font-weight:400;color:#ffffff">What the customer was supposed to have paid as of now, according to the payment schedule. For example, if the schedule called for 3,000 yesterday and another 3,000 tomorrow, the current overdue amount is 3,000.</span>
+                  </span>
+                </span>
+                <span style="font-size:28px;line-height:36px;font-weight:700;font-variant-numeric:tabular-nums;color:#a8403a">C$1,735.75</span>
+              </div>
+            </div>
+          </section>
+
+          <section aria-label="Payment Schedule" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
+            <h3 style="margin:0 0 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Payment Schedule</h3>
+            <div style="overflow-x:auto">
+              <table style="width:100%;min-width:560px;border-collapse:collapse;font-size:14px;line-height:20px">
+                <thead>
+                  <tr style="text-align:left;font-size:12px;line-height:16px;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">
+                    <th scope="col" style="width:40px;padding:8px 8px 8px 0;border-bottom:1px solid #e5e7eb;font-weight:500">#</th>
+                    <th scope="col" style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500">Due Date</th>
+                    <th scope="col" style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500;text-align:right">Amount</th>
+                    <th scope="col" style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500;text-align:center">Status</th>
+                    <th scope="col" style="padding:8px 0 8px 8px;border-bottom:1px solid #e5e7eb;font-weight:500">Paid at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="padding:12px 8px 12px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">1</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6">Aug 30, 2026</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:500;font-variant-numeric:tabular-nums">C$3,235.75</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#dcfce7;font-size:12px;line-height:16px;font-weight:500;color:#166534">Paid</span></td>
+                    <td style="padding:12px 0 12px 8px;border-bottom:1px solid #f3f4f6">Aug 29, 2026</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:12px 8px 12px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">2</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6">Nov 7, 2026</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:500;font-variant-numeric:tabular-nums">C$3,235.75</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#fef3c7;font-size:12px;line-height:16px;font-weight:500;color:#92400e">Partial</span><div style="margin-top:2px;font-size:12px;line-height:16px;color:#6b7280">C$1,500.00 of C$3,235.75</div></td>
+                    <td style="padding:12px 0 12px 8px;border-bottom:1px solid #f3f4f6;color:#6b7280">&mdash;</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:12px 8px 12px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">3</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6">Nov 14, 2026</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:500;font-variant-numeric:tabular-nums">C$3,235.75</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#fef9c3;font-size:12px;line-height:16px;font-weight:500;color:#854d0e">Unpaid</span></td>
+                    <td style="padding:12px 0 12px 8px;border-bottom:1px solid #f3f4f6;color:#6b7280">&mdash;</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:12px 8px 12px 0;color:#6b7280">4</td>
+                    <td style="padding:12px 8px">Nov 21, 2026</td>
+                    <td style="padding:12px 8px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums">C$3,235.75</td>
+                    <td style="padding:12px 8px;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#fef9c3;font-size:12px;line-height:16px;font-weight:500;color:#854d0e">Unpaid</span></td>
+                    <td style="padding:12px 0 12px 8px;color:#6b7280">&mdash;</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section aria-label="Payment History" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+              <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Payment History</h3>
+              <button type="button" class="iv-btn" style="height:32px;padding:0 12px;border:1px solid #10365a;border-radius:6px;background:#ffffff;font-family:inherit;font-size:14px;font-weight:500;color:#10365a;cursor:pointer">Record payment</button>
+            </div>
+            <div style="overflow-x:auto">
+              <table style="width:100%;min-width:560px;border-collapse:collapse;font-size:14px;line-height:20px">
+                <thead>
+                  <tr style="text-align:left;font-size:12px;line-height:16px;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">
+                    <th scope="col" style="width:40px;padding:8px 8px 8px 0;border-bottom:1px solid #e5e7eb;font-weight:500">#</th>
+                    <th scope="col" style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500">Date</th>
+                    <th scope="col" style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500;text-align:right">Amount</th>
+                    <th scope="col" style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500">Method</th>
+                    <th scope="col" style="padding:8px 0 8px 8px;border-bottom:1px solid #e5e7eb;font-weight:500">Payer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="padding:12px 8px 12px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">1</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6">Aug 29, 2026, 03:14 PM</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:500;font-variant-numeric:tabular-nums">C$3,235.75</td>
+                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6">Stripe</td>
+                    <td style="padding:12px 0 12px 8px;border-bottom:1px solid #f3f4f6">Dana Whitfield</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:12px 8px 12px 0;color:#6b7280">2</td>
+                    <td style="padding:12px 8px">Nov 3, 2026, 11:14 AM</td>
+                    <td style="padding:12px 8px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums">C$1,500.00</td>
+                    <td style="padding:12px 8px">Check</td>
+                    <td style="padding:12px 0 12px 8px">Priya Raman</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p style="margin:12px 0 0;font-size:12px;line-height:16px;color:#6b7280">Stripe payments cannot be edited or deleted.</p>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showTasks }}" hint-placeholder-val="{{ false }}">
+        <div role="tabpanel" aria-label="Tasks" style="display:flex;flex-direction:column;gap:20px">
+
+          <section aria-label="Task list" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
+            <h3 style="margin:0 0 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Task list</h3>
+            <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">
+              <li style="display:flex;flex-direction:column;gap:2px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:8px">
+                <span style="font-size:12px;line-height:16px;color:#6b7280">3 days ago</span>
+                <span style="font-size:14px;line-height:20px">Call to the customer and ask about payment</span>
+              </li>
+              <li style="display:flex;flex-direction:column;gap:2px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:8px">
+                <span style="font-size:12px;line-height:16px;color:#6b7280">10 days ago</span>
+                <span style="font-size:14px;line-height:20px">Send a follow up message to the customer</span>
+              </li>
+              <li style="display:flex;flex-direction:column;gap:2px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:8px">
+                <span style="font-size:12px;line-height:16px;color:#6b7280">20 days ago</span>
+                <span style="font-size:14px;line-height:20px">Send a reminder about payment</span>
+              </li>
+            </ol>
+          </section>
+
+          <section aria-label="Current task due now" style="display:flex;flex-direction:column;gap:16px;padding:20px;border:1px solid #5392cf;border-radius:10px;background:#f4f8fc">
+            <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#1d62a3">Current task due now</h3>
+            <p style="margin:0;font-size:16px;line-height:24px">Called again to follow up and he said the check was sent yesterday.</p>
+            <div>
+              <button type="button" onClick="{{ openModal }}" class="iv-btn" style="height:40px;padding:0 16px;border:0;border-radius:6px;background:#10365a;font-family:inherit;font-size:14px;font-weight:600;color:#ffffff;cursor:pointer">Done / Next Task</button>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <div style="display:flex;justify-content:space-between;gap:16px;padding-top:24px;border-top:1px solid #e5e7eb">
+        <button type="button" class="iv-btn" style="display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 24px;border:1px solid #10365a;border-radius:8px;background:#ffffff;font-family:inherit;font-size:15px;font-weight:500;color:#10365a;cursor:pointer">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+          Previous Task
+        </button>
+        <button type="button" class="iv-btn" style="display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 24px;border:1px solid #10365a;border-radius:8px;background:#ffffff;font-family:inherit;font-size:15px;font-weight:500;color:#10365a;cursor:pointer">
+          Next Task
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:0;right:0;bottom:0;left:0;z-index:30;display:flex;align-items:flex-start;justify-content:center;padding-top:180px;box-sizing:border-box;background:rgba(17,24,39,.5)">
+      <div role="dialog" aria-modal="true" aria-labelledby="iv-modal-title" style="position:relative;display:flex;flex-direction:column;gap:20px;width:min(440px,92%);padding:24px;box-sizing:border-box;border-radius:12px;background:#ffffff;box-shadow:0 8px 24px rgba(15,42,68,.12),0 24px 64px -16px rgba(15,42,68,.35)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <h2 id="iv-modal-title" style="margin:0;font-size:18px;line-height:28px;font-weight:600">Done / Next Task</h2>
+          <button type="button" aria-label="Close" onClick="{{ closeModal }}" class="iv-btn" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:6px;background:none;color:#6b7280;cursor:pointer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+        </div>
+
+        <div style="position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+          <span style="font-size:14px;line-height:20px;font-weight:500">Next Task Due:</span>
+          <button type="button" aria-haspopup="dialog" aria-expanded="{{ pickerOpen }}" onClick="{{ togglePicker }}" class="iv-btn" style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid #10365a;border-radius:8px;background:#ffffff;font-family:inherit;font-size:14px;font-weight:600;color:#10365a;cursor:pointer">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg>
+            {{ dueLabel }}
+          </button>
+
+          <sc-if value="{{ pickerOpen }}" hint-placeholder-val="{{ false }}">
+            <div role="dialog" aria-label="Choose the date for the next task" style="position:absolute;top:calc(100% + 8px);left:0;z-index:40;width:288px;padding:12px;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:12px;background:#ffffff;box-shadow:0 8px 24px rgba(15,42,68,.12),0 24px 64px -16px rgba(15,42,68,.3)">
+              <div style="padding:4px 0 12px;text-align:center;font-size:14px;line-height:20px;font-weight:600">November 2026</div>
+              <div aria-hidden="true" style="display:grid;grid-template-columns:repeat(7,36px);gap:2px;margin-bottom:4px;text-align:center;font-size:12px;line-height:20px;color:#6b7280"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+              <div style="display:grid;grid-template-columns:repeat(7,36px);gap:2px">
+                <sc-for list="{{ days }}" as="c" hint-placeholder-count="30">
+                  <button type="button" disabled="{{ c.disabled }}" aria-label="{{ c.label }}" aria-pressed="{{ c.selected }}" onClick="{{ c.onPick }}" class="iv-btn" style="width:36px;height:36px;padding:0;border:0;border-radius:8px;background:{{ c.bg }};box-shadow:{{ c.ring }};font-family:inherit;font-size:14px;font-weight:{{ c.weight }};color:{{ c.color }};cursor:{{ c.cursor }}">{{ c.n }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label for="iv-note" style="font-size:14px;line-height:20px;font-weight:500">Note to self:</label>
+          <textarea id="iv-note" rows="3" style="width:100%;min-height:88px;padding:10px 12px;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;font-family:inherit;font-size:14px;line-height:20px;color:#111827;resize:vertical">Did we get the check yet?</textarea>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end">
+          <button type="button" onClick="{{ closeModal }}" class="iv-btn" style="height:40px;padding:0 20px;border:0;border-radius:6px;background:#10365a;font-family:inherit;font-size:14px;font-weight:600;color:#ffffff;cursor:pointer">Save</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tab":{"editor":"enum","default":"info","options":["info","tasks"]},"contacts":{"editor":"enum","default":"both","options":["both","no-finance","no-company"]},"modalOpen":{"editor":"boolean","default":false},"pickerOpen":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: null, modal: null, picker: null, day: 12 };
+  }
+
+  renderVals() {
+    const p = this.props || {};
+    const s = this.state;
+    const tab = s.tab || p.tab || 'info';
+    const modalOpen = s.modal === null ? !!p.modalOpen : s.modal;
+    const pickerOpen = modalOpen && (s.picker === null ? !!p.pickerOpen : s.picker);
+
+    // The mockup's "today" is Nov 10, 2026.
+    const TODAY = 10;
+    const diff = s.day - TODAY;
+    const dueLabel = diff <= 0 ? 'Today' : diff === 1 ? '1 Day' : diff + ' Days';
+
+    const days = [];
+    for (let d = 1; d <= 30; d++) {
+      const past = d < TODAY;
+      const selected = d === s.day;
+      days.push({
+        n: d,
+        label: 'November ' + d + ', 2026',
+        disabled: past,
+        selected,
+        bg: selected ? '#10365a' : 'transparent',
+        color: selected ? '#ffffff' : past ? '#9ca3af' : '#111827',
+        ring: d === TODAY && !selected ? 'inset 0 0 0 1px #10365a' : 'none',
+        weight: selected ? 600 : 400,
+        cursor: past ? 'default' : 'pointer',
+        onPick: () => this.setState({ day: d, picker: false }),
+      });
+    }
+
+    const tabStyle = (on) => ({
+      selected: on,
+      bg: on ? '#ffffff' : 'rgba(0,0,0,.2)',
+      color: on ? '#111827' : '#ffffff',
+    });
+
+    return {
+      showInfo: tab === 'info',
+      showTasks: tab === 'tasks',
+      infoTab: tabStyle(tab === 'info'),
+      tasksTab: tabStyle(tab === 'tasks'),
+      selectInfo: () => this.setState({ tab: 'info' }),
+      selectTasks: () => this.setState({ tab: 'tasks' }),
+      contactsVariant: p.contacts || 'both',
+      modalOpen,
+      pickerOpen,
+      openModal: () => this.setState({ modal: true, picker: false }),
+      closeModal: () => this.setState({ modal: false, picker: false }),
+      togglePicker: () => this.setState({ picker: !pickerOpen }),
+      dueLabel,
+      days,
+    };
+  }
+}
+</script>
+</body>
+</html>

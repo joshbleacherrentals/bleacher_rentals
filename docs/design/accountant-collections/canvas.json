@@ -1,0 +1,29 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-27T21:30:00Z" },
+  "title": "Accountant Collections",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 800, "expand": "fill", "is_interactive": true, "title": "Collections tab" },
+    "CollectionsNotDue.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 1220, "expand": "fill", "is_interactive": true, "title": "Collections: Show Not Due Yet on" },
+    "Invoice.dc.html": { "x": 0, "y": 1340, "w": 1280, "h": 1900, "expand": "fill", "is_interactive": true, "title": "Invoice: Information" },
+    "InvoiceTasks.dc.html": { "x": 1360, "y": 1340, "w": 1280, "h": 900, "expand": "fill", "is_interactive": true, "title": "Invoice: Tasks" },
+    "InvoiceTaskModal.dc.html": { "x": 2720, "y": 1340, "w": 1280, "h": 900, "expand": "fill", "is_interactive": true, "title": "Done / Next Task modal" },
+    "InvoiceTaskPicker.dc.html": { "x": 1360, "y": 2360, "w": 1280, "h": 900, "expand": "fill", "is_interactive": true, "title": "Done / Next Task: date picker open" },
+    "Contacts.dc.html": { "x": 2720, "y": 2360, "w": 1280, "h": 900, "expand": "fill", "title": "Contact card variants" }
+  },
+  "order": [
+    "Main.dc.html",
+    "CollectionsNotDue.dc.html",
+    "Invoice.dc.html",
+    "InvoiceTasks.dc.html",
+    "InvoiceTaskModal.dc.html",
+    "InvoiceTaskPicker.dc.html",
+    "Contacts.dc.html"
+  ],
+  "notes": {
+    "t1": { "x": 0, "y": -280, "text": "Accountant: Collections and Invoice", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

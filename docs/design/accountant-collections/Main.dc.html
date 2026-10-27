@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Collections Tab</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0;background:#ffffff}
+.col-row:hover{background:#f9fafb}
+.col-th:hover{color:#1f2937}
+.col-row:focus-visible,.col-th:focus-visible,.col-btn:focus-visible{outline:2px solid #1d62a3;outline-offset:2px}
+</style>
+</helmet>
+<div style="max-width:1280px;margin:0 auto;padding:24px 32px 48px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;font-family:Geist,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827;background:#ffffff">
+  <h1 style="margin:0;font-size:24px;line-height:32px;font-weight:700;color:#10365a">Accountant</h1>
+
+  <div role="tablist" aria-label="Accountant sections" style="display:inline-flex;align-self:flex-start;align-items:center;gap:2px;height:36px;padding:3px;border-radius:10px;background:#f5f5f5">
+    <button type="button" role="tab" aria-selected="true" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.1);font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">Collections</button>
+    <button type="button" role="tab" aria-selected="false" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:none;font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">AR</button>
+    <button type="button" role="tab" aria-selected="false" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:none;font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">AR Deposits</button>
+    <button type="button" role="tab" aria-selected="false" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:none;font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">Need attention</button>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 24px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span id="col-status-label" style="font-size:14px;font-weight:500;color:#374151">Status</span>
+      <div role="group" aria-labelledby="col-status-label" style="display:flex;align-items:center;gap:8px">
+        <button type="button" aria-pressed="false" class="col-btn" style="display:inline-flex;align-items:center;height:32px;padding:0 14px;border:0;border-radius:6px;background:#dcede2;font-family:inherit;font-size:14px;font-weight:500;color:#2f6b4c;cursor:pointer">Paid</button>
+        <button type="button" aria-pressed="true" class="col-btn" style="display:inline-flex;align-items:center;height:32px;padding:0 14px;border:0;border-radius:6px;background:#fbe7e5;box-shadow:0 0 0 2px #a8403a;font-family:inherit;font-size:14px;font-weight:600;color:#a8403a;cursor:pointer">Collections</button>
+        <button type="button" aria-pressed="false" class="col-btn" style="display:inline-flex;align-items:center;height:32px;padding:0 14px;border:0;border-radius:6px;background:#eef1f6;font-family:inherit;font-size:14px;font-weight:500;color:#4f6178;cursor:pointer">Cancelled</button>
+      </div>
+    </div>
+
+    <button type="button" role="switch" aria-checked="{{ showNotDue }}" onClick="{{ toggleNotDue }}" class="col-btn" style="display:flex;align-items:center;gap:8px;border:0;background:none;padding:0;font-family:inherit;font-size:14px;color:#4b5563;cursor:pointer">
+      <span>Show Not Due Yet</span>
+      <sc-if value="{{ showNotDue }}" hint-placeholder-val="{{ false }}">
+        <span style="position:relative;display:inline-flex;flex-shrink:0;width:40px;height:22px;border-radius:999px;background:#10365a">
+          <span style="display:inline-block;width:18px;height:18px;margin-top:2px;border-radius:999px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translateX(20px)"></span>
+        </span>
+      </sc-if>
+      <sc-if value="{{ hideNotDue }}" hint-placeholder-val="{{ true }}">
+        <span style="position:relative;display:inline-flex;flex-shrink:0;width:40px;height:22px;border-radius:999px;background:#d1d5db">
+          <span style="display:inline-block;width:18px;height:18px;margin-top:2px;border-radius:999px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translateX(2px)"></span>
+        </span>
+      </sc-if>
+    </button>
+  </div>
+
+  <div style="border:1px solid #e5e7eb;border-radius:10px;background:#ffffff;overflow:hidden">
+    <div style="overflow-x:auto">
+      <div style="min-width:940px">
+        <div style="display:grid;grid-template-columns:minmax(200px,1.6fr) minmax(140px,1fr) minmax(140px,1fr) minmax(220px,2.2fr) minmax(140px,1fr) 20px;column-gap:16px;align-items:center;padding:12px 20px;background:#f9fafb">
+          <span style="font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Name</span>
+
+          <button type="button" class="col-th" onClick="{{ followUp.onClick }}" style="justify-self:start;display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:0;font-family:inherit;font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:{{ followUp.color }};cursor:pointer">
+            <span>Next Follow Up</span>
+            <sc-if value="{{ followUp.none }}" hint-placeholder-val="{{ false }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg>
+            </sc-if>
+            <sc-if value="{{ followUp.asc }}" hint-placeholder-val="{{ false }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg>
+            </sc-if>
+            <sc-if value="{{ followUp.desc }}" hint-placeholder-val="{{ true }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg>
+            </sc-if>
+          </button>
+
+          <button type="button" class="col-th" onClick="{{ overdue.onClick }}" style="justify-self:start;display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:0;font-family:inherit;font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:{{ overdue.color }};cursor:pointer">
+            <span>Payment Overdue</span>
+            <sc-if value="{{ overdue.none }}" hint-placeholder-val="{{ true }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg>
+            </sc-if>
+            <sc-if value="{{ overdue.asc }}" hint-placeholder-val="{{ false }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg>
+            </sc-if>
+            <sc-if value="{{ overdue.desc }}" hint-placeholder-val="{{ false }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg>
+            </sc-if>
+          </button>
+
+          <span style="font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Task Notes</span>
+
+          <button type="button" class="col-th" onClick="{{ amount.onClick }}" style="justify-self:end;display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:0;font-family:inherit;font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:{{ amount.color }};cursor:pointer">
+            <span>Amount Overdue</span>
+            <sc-if value="{{ amount.none }}" hint-placeholder-val="{{ true }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg>
+            </sc-if>
+            <sc-if value="{{ amount.asc }}" hint-placeholder-val="{{ false }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg>
+            </sc-if>
+            <sc-if value="{{ amount.desc }}" hint-placeholder-val="{{ false }}">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg>
+            </sc-if>
+          </button>
+          <span></span>
+        </div>
+
+        <sc-for list="{{ rows }}" as="row" hint-placeholder-count="7">
+          <a href="{{ row.href }}" class="col-row" style="display:grid;grid-template-columns:minmax(200px,1.6fr) minmax(140px,1fr) minmax(140px,1fr) minmax(220px,2.2fr) minmax(140px,1fr) 20px;column-gap:16px;align-items:center;min-height:56px;padding:12px 20px;box-sizing:border-box;border-top:1px solid #e5e7eb;color:inherit;text-decoration:none;font-size:14px;line-height:20px">
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:#111827">{{ row.name }}</span>
+            <span style="color:{{ row.followColor }};font-weight:{{ row.followWeight }}">{{ row.follow }}</span>
+            <span style="color:#111827">{{ row.overdue }}</span>
+            <span title="{{ row.note }}" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#374151">{{ row.note }}</span>
+            <span style="text-align:right;font-weight:600;color:#111827;font-variant-numeric:tabular-nums">{{ row.amount }}</span>
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+          </a>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showNotDue":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { notDue: null, sortKey: 'followUp', sortDir: 'desc' };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const showNotDue = s.notDue === null ? !!(this.props && this.props.showNotDue) : s.notDue;
+
+    const money = (n, cur) =>
+      (cur === 'CAD' ? 'C$' : '$') + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    const DATA = [
+      { name: 'Lakeshore Music Festival', follow: '3 months after', fd: 90, overdue: '3 months', od: 90, note: 'Call the customer about payment', amt: 12345, cur: 'CAD' },
+      { name: 'Eastside Little League Opener', follow: '1 month after', fd: 30, overdue: '2 months', od: 60, note: 'Remind about payment', amt: 8200.5, cur: 'USD' },
+      { name: 'Maple Grove Homecoming', follow: '20 days after', fd: 20, overdue: '1 day', od: 1, note: 'Customer told that payment goes out next week', amt: 3400, cur: 'CAD' },
+      { name: 'Harbourfront Regatta', follow: '10 days after', fd: 10, overdue: '10 days', od: 10, note: 'Call the customer about payment', amt: 15780.25, cur: 'USD' },
+      { name: 'Summit High Graduation', follow: '10 days after', fd: 10, overdue: '23 days', od: 23, note: 'Send an email to follow-up', amt: 6120, cur: 'USD' },
+      { name: 'Pine Ridge Rodeo Weekend', follow: '3 days after', fd: 3, overdue: '3 months', od: 90, note: 'Check is gonna be sent to the head office', amt: 21450.75, cur: 'CAD' },
+      { name: 'Oakville Soccer Finals', follow: 'Due tomorrow', fd: 1, overdue: '1 month', od: 30, note: 'Call the customer to get money by Friday', amt: 9875, cur: 'CAD' },
+      { name: 'Riverside Charity Run', follow: 'Due today', fd: 0, overdue: '3 days', od: 3, note: 'Called again to follow up and he said the check was sent yesterday.', amt: 1735.75, cur: 'CAD' },
+      { name: 'Brantford Fall Fair', follow: '3 days ago', fd: -3, overdue: '2 months', od: 60, note: 'Remind about payment', amt: 4300, cur: 'USD' },
+      { name: 'Westbank Marathon', follow: '10 days ago', fd: -10, overdue: '1 day', od: 1, note: 'Customer told that payment goes out Monday', amt: 2150, cur: 'CAD' },
+      { name: 'Capital City Cheer Cup', follow: '10 days ago', fd: -10, overdue: '10 days', od: 10, note: 'Call the customer about payment', amt: 7600.4, cur: 'USD' },
+      { name: 'Northgate Fireworks Night', follow: '20 days ago', fd: -20, overdue: '23 days', od: 23, note: 'Send an email to follow-up', amt: 5240, cur: 'CAD' },
+      { name: 'Sunset Beach Volleyball Open', follow: '1 month ago', fd: -30, overdue: '3 months', od: 90, note: 'Check is gonna be sent to the head office', amt: 18900, cur: 'USD' },
+      { name: 'Riverbend Cycling Classic', follow: '2 months ago', fd: -60, overdue: '1 month', od: 30, note: 'Call the customer to get money by end of month', amt: 11320.1, cur: 'CAD' },
+    ];
+
+    const pick = {
+      followUp: (r) => r.fd,
+      overdue: (r) => r.od,
+      amount: (r) => r.amt,
+    };
+    const dir = s.sortDir === 'asc' ? 1 : -1;
+    const rows = DATA.map((r, i) => ({ ...r, i }))
+      .filter((r) => showNotDue || r.fd <= 0)
+      .sort((a, b) => (pick[s.sortKey](a) - pick[s.sortKey](b)) * dir || a.i - b.i)
+      .map((r) => ({
+        href: 'Invoice.dc.html',
+        name: r.name,
+        follow: r.follow,
+        followColor: r.fd > 0 ? '#4b5563' : r.fd === 0 ? '#8a6320' : '#a8403a',
+        followWeight: r.fd === 0 ? 600 : 400,
+        overdue: r.overdue,
+        note: r.note,
+        amount: money(r.amt, r.cur),
+      }));
+
+    const head = (key) => {
+      const active = s.sortKey === key;
+      return {
+        color: active ? '#10365a' : '#6b7280',
+        none: !active,
+        asc: active && s.sortDir === 'asc',
+        desc: active && s.sortDir === 'desc',
+        onClick: () =>
+          this.setState((st) =>
+            st.sortKey === key
+              ? { sortDir: st.sortDir === 'asc' ? 'desc' : 'asc' }
+              : { sortKey: key, sortDir: 'desc' }
+          ),
+      };
+    };
+
+    return {
+      showNotDue,
+      hideNotDue: !showNotDue,
+      toggleNotDue: () => this.setState({ notDue: !showNotDue }),
+      followUp: head('followUp'),
+      overdue: head('overdue'),
+      amount: head('amount'),
+      rows,
+    };
+  }
+}
+</script>
+</body>
+</html>
