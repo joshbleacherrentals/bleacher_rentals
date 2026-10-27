@@ -3,20 +3,33 @@ import "server-only";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 export type GmailMessageSummary = {
+  /** Gmail's id for this copy of the message. It belongs to one mailbox. */
   id: string;
   threadId: string;
+  /** The `Message-ID` header: the same email in two mailboxes shares it, so it deduplicates. */
+  messageId: string | null;
   from: string | null;
+  to: string | null;
+  cc: string | null;
   subject: string | null;
   date: string | null;
   snippet: string;
+  /** When Google received it, in epoch milliseconds. Used to order and to page back in time. */
+  internalDate: number | null;
+  /** Gmail labels such as INBOX and SENT. */
+  labelIds: string[];
 };
 
 type GmailMessageResponse = {
   id: string;
   threadId: string;
   snippet?: string;
+  internalDate?: string;
+  labelIds?: string[];
   payload?: { headers?: { name: string; value: string }[] };
 };
+
+const METADATA_HEADERS = ["From", "To", "Cc", "Subject", "Date", "Message-ID"];
 
 export function summarizeMessage(message: GmailMessageResponse): GmailMessageSummary {
   const header = (name: string) =>
@@ -26,10 +39,15 @@ export function summarizeMessage(message: GmailMessageResponse): GmailMessageSum
   return {
     id: message.id,
     threadId: message.threadId,
+    messageId: header("Message-ID"),
     from: header("From"),
+    to: header("To"),
+    cc: header("Cc"),
     subject: header("Subject"),
     date: header("Date"),
     snippet: message.snippet ?? "",
+    internalDate: message.internalDate ? Number(message.internalDate) : null,
+    labelIds: message.labelIds ?? [],
   };
 }
 
@@ -44,24 +62,46 @@ async function gmailGet<T>(accessToken: string, path: string): Promise<T> {
   return res.json();
 }
 
+/**
+ * The ids of up to `maxResults` messages matching a Gmail search (`query`), newest first, or of the
+ * newest messages when there is no query. Cheap: the list call returns only ids. `hasMore` says
+ * there are further matches beyond this page.
+ */
+export async function listMessageIds(
+  accessToken: string,
+  query: string | undefined,
+  maxResults: number,
+): Promise<{ ids: string[]; hasMore: boolean }> {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  params.set("maxResults", String(maxResults));
+
+  const list = await gmailGet<{ messages?: { id: string }[]; nextPageToken?: string }>(
+    accessToken,
+    `/messages?${params}`,
+  );
+  return { ids: (list.messages ?? []).map((m) => m.id), hasMore: !!list.nextPageToken };
+}
+
+/** One message's headers and snippet, without its body. The expensive call: one per message. */
+export async function getMessageSummary(
+  accessToken: string,
+  id: string,
+): Promise<GmailMessageSummary> {
+  const headers = METADATA_HEADERS.map((h) => `metadataHeaders=${encodeURIComponent(h)}`).join("&");
+  return summarizeMessage(
+    await gmailGet<GmailMessageResponse>(
+      accessToken,
+      `/messages/${encodeURIComponent(id)}?format=metadata&${headers}`,
+    ),
+  );
+}
+
 /** The newest `count` messages in the mailbox the token acts as, headers and snippet only. */
 export async function listLatestMessages(
   accessToken: string,
   count: number,
 ): Promise<GmailMessageSummary[]> {
-  const list = await gmailGet<{ messages?: { id: string }[] }>(
-    accessToken,
-    `/messages?maxResults=${count}`,
-  );
-
-  return Promise.all(
-    (list.messages ?? []).map(async ({ id }) =>
-      summarizeMessage(
-        await gmailGet<GmailMessageResponse>(
-          accessToken,
-          `/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-        ),
-      ),
-    ),
-  );
+  const { ids } = await listMessageIds(accessToken, undefined, count);
+  return Promise.all(ids.map((id) => getMessageSummary(accessToken, id)));
 }
