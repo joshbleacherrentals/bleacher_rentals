@@ -12,10 +12,15 @@ export function ClampedText({
   text,
   lines = 3,
   className,
+  onTextClick,
+  textTitle,
 }: {
   text: string;
   lines?: number;
   className?: string;
+  /** Click on the text itself (not the Show more / Show less button). */
+  onTextClick?: () => void;
+  textTitle?: string;
 }) {
   const ref = useRef<HTMLParagraphElement>(null);
   const [expanded, setExpanded] = useState(false);
@@ -37,6 +42,8 @@ export function ClampedText({
     <div>
       <p
         ref={ref}
+        onClick={onTextClick}
+        title={textTitle}
         className={cn("whitespace-pre-wrap break-words", className)}
         style={
           expanded
