@@ -38,6 +38,8 @@ type SidebarButtonItem = {
   key: string;
   label: string;
   href: string;
+  /** Other path prefixes that keep this item highlighted, for a section spread over several pages. */
+  activePrefixes?: string[];
   icon: React.ComponentType<any>;
 };
 
@@ -181,7 +183,8 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     type: "button",
     key: "companies-contacts",
     label: "Companies & Contacts",
-    href: "/companies-contacts",
+    href: "/contacts",
+    activePrefixes: ["/companies"],
     icon: BookUser,
   },
   {

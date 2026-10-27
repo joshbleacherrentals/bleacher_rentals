@@ -88,6 +88,7 @@ function renderItem(
           key={item.key}
           label={item.label}
           href={item.href}
+          activePrefixes={item.activePrefixes}
           icon={item.icon}
           showIndicator={item.key === "changelog" && hasUnreadChangelog}
           badge={

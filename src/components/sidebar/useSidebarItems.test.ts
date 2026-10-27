@@ -189,7 +189,11 @@ describe("useSidebarItems", () => {
     const companiesContacts = items[5];
     expect(companiesContacts.type).toBe("button");
     expect("label" in companiesContacts && companiesContacts.label).toBe("Companies & Contacts");
-    expect("href" in companiesContacts && companiesContacts.href).toBe("/companies-contacts");
+    // Two pages (/contacts, /companies); the button opens the first and stays lit on both.
+    expect("href" in companiesContacts && companiesContacts.href).toBe("/contacts");
+    expect("activePrefixes" in companiesContacts && companiesContacts.activePrefixes).toEqual([
+      "/companies",
+    ]);
 
     const docs = items[6];
     expect(docs.type).toBe("section");

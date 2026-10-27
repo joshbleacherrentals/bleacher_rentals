@@ -70,24 +70,38 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     const config = mergeRoleConfigs(["accountant"]);
     // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: /messages comes after
     // /work-trackers, and /accountant stays first so that it stays the landing page.
-    // docs/specs/accountant-address-book.md §4: /companies-contacts follows /messages.
-    // docs/specs/accountant-team.md §6: /team follows /companies-contacts.
+    // docs/specs/accountant-address-book.md §4: Companies & Contacts (/companies, /contacts)
+    // follows /messages. docs/specs/accountant-team.md §6: /team follows it.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
       "/work-trackers",
       "/messages",
-      "/companies-contacts",
+      "/companies",
+      "/contacts",
       "/team",
       "/permissions",
       "/changelog",
     ]);
   });
 
+  // Companies & Contacts is /companies and /contacts, and the contact profile at /contacts/<uuid>
+  // opens from the Contacts tab: the same four roles get all of it, and no other role does.
+  it("lets exactly the roles that have Companies & Contacts open its pages and a contact profile", () => {
+    const paths = ["/companies", "/contacts", "/contacts/00000000-0000-0000-0000-000000000000"];
+    for (const role of ["admin", "account_manager", "viewer", "accountant"] as const) {
+      for (const path of paths) expect(canAccessPath([role], path), `${role} ${path}`).toBe(true);
+    }
+    for (const role of ["developer", "maintainer", "driver"] as const) {
+      for (const path of paths) expect(canAccessPath([role], path), `${role} ${path}`).toBe(false);
+    }
+  });
+
   // docs/specs/accountant-address-book.md: the accountant creates, edits and soft-deletes companies,
-  // contacts and venues on /companies-contacts. Prefix match, like every other path.
+  // contacts and venues on /companies and /contacts. Prefix match, like every other path.
   it("lets an accountant open Companies & Contacts", () => {
-    expect(canAccessPath(["accountant"], "/companies-contacts")).toBe(true);
+    expect(canAccessPath(["accountant"], "/companies")).toBe(true);
+    expect(canAccessPath(["accountant"], "/contacts")).toBe(true);
   });
 
   // docs/specs/accountant-team.md: the accountant opens /team, sees every user and edits a driver's
