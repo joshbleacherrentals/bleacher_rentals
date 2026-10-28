@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { ContactActivities } from "@/features/companiesContacts/components/ContactActivities";
 import { ContactOverview } from "@/features/companiesContacts/components/ContactOverview";
 
 export default async function ContactPage({
@@ -22,7 +23,7 @@ export default async function ContactPage({
       {/* 25% / 50% / 25% of the width left after the gaps; stacked on narrow screens. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_2fr_1fr]">
         <ContactOverview contactUuid={contactUuid} />
-        <div />
+        <ContactActivities contactUuid={contactUuid} />
         <div />
       </div>
     </div>

@@ -954,6 +954,33 @@ const Contacts = new Table(ContactsCols, {
   indexes: { company_uuid: ["company_uuid"], default_venue_uuid: ["default_venue_uuid"] },
 });
 
+const EmailMessagesCols = {
+  created_at: column.text,
+  mailbox: column.text,
+  google_message_id: column.text,
+  google_id: column.text,
+  google_thread_id: column.text,
+  from_address: column.text,
+  to_addresses: column.text,
+  cc_addresses: column.text,
+  subject: column.text,
+  date: column.text,
+  snippet: column.text,
+  direction: column.text,
+} satisfies PowerSyncColsFor<"EmailMessages">;
+const EmailMessages = new Table(EmailMessagesCols, {
+  indexes: { google_message_id: ["google_message_id"], google_id: ["google_id"] },
+});
+
+const ContactEmailMessagesCols = {
+  created_at: column.text,
+  contact_uuid: column.text,
+  email_message_uuid: column.text,
+} satisfies PowerSyncColsFor<"ContactEmailMessages">;
+const ContactEmailMessages = new Table(ContactEmailMessagesCols, {
+  indexes: { contact_uuid: ["contact_uuid"], email_message_uuid: ["email_message_uuid"] },
+});
+
 const EventAttachmentsCols = {
   created_at: column.text,
   event_uuid: column.text,
@@ -1396,6 +1423,8 @@ export const AppSchema = new Schema({
   BleacherTypes,
   Companies,
   Contacts,
+  EmailMessages,
+  ContactEmailMessages,
   EventAttachments,
   EventChangeLog,
   EventLineItems,

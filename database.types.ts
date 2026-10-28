@@ -385,6 +385,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ContactEmailMessages": {
+                  Row: {
+                    "contact_uuid": string,"created_at": string,"email_message_uuid": string,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contact_uuid": string,"created_at"?: string,"email_message_uuid": string,"id"?: string
+                  }
+                  Update: {
+                    "contact_uuid"?: string,"created_at"?: string,"email_message_uuid"?: string,"id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "contactemailmessages_contact_uuid_fkey"
+      columns: ["contact_uuid"]
+isOneToOne: false
+      referencedRelation: "Contacts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "contactemailmessages_email_message_uuid_fkey"
+      columns: ["email_message_uuid"]
+isOneToOne: false
+      referencedRelation: "EmailMessages"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"Contacts": {
                   Row: {
                     "company_uuid": string | null,"created_at": string,"created_by_user_uuid": string | null,"default_venue_uuid": string | null,"deleted": boolean,"email": string | null,"first_name": string,"id": string,"last_name": string | null,"notes": string | null,"phone": string | null,"preferred_language": Database["public"]['Enums']["preferred_language"]
@@ -840,6 +866,20 @@ isOneToOne: false
       referencedRelation: "Zones"
       referencedColumns: ["id"]
     }
+                  ]
+                },"EmailMessages": {
+                  Row: {
+                    "cc_addresses": string | null,"created_at": string,"date": string | null,"direction": string,"from_address": string | null,"google_id": string,"google_message_id": string | null,"google_thread_id": string,"id": string,"snippet": string | null,"subject": string | null,"to_addresses": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction": string,"from_address"?: string | null,"google_id": string,"google_message_id"?: string | null,"google_thread_id": string,"id"?: string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                  }
+                  Update: {
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction"?: string,"from_address"?: string | null,"google_id"?: string,"google_message_id"?: string | null,"google_thread_id"?: string,"id"?: string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                  }
+                  Relationships: [
+                    
                   ]
                 },"EmailTemplateAttachments": {
                   Row: {

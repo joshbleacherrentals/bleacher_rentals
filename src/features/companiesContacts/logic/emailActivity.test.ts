@@ -1,0 +1,103 @@
+import { describe, expect, it } from "vitest";
+import {
+  parseAddressList,
+  pulledEmailDate,
+  storedToActivityEmail,
+  summarizeAddresses,
+} from "./emailActivity";
+
+describe("parseAddressList", () => {
+  it("splits names and addresses", () => {
+    expect(
+      parseAddressList(
+        "Ryan Verbuyst <rverbuyst@wellmaster.ca>, Paul Hogendoorn <paul@tpi-3.ca>, plain@y.com",
+      ),
+    ).toEqual([
+      { name: "Ryan Verbuyst", address: "rverbuyst@wellmaster.ca" },
+      { name: "Paul Hogendoorn", address: "paul@tpi-3.ca" },
+      { name: null, address: "plain@y.com" },
+    ]);
+  });
+
+  it("keeps a comma inside a quoted name", () => {
+    expect(parseAddressList('"Smith, Jo" <jo@x.com>, b@y.com')).toEqual([
+      { name: "Smith, Jo", address: "jo@x.com" },
+      { name: null, address: "b@y.com" },
+    ]);
+  });
+
+  it("returns nothing for an empty or missing header", () => {
+    expect(parseAddressList(null)).toEqual([]);
+    expect(parseAddressList("  ")).toEqual([]);
+  });
+});
+
+describe("summarizeAddresses", () => {
+  const to =
+    "Ryan Verbuyst <rverbuyst@wellmaster.ca>, Paul Hogendoorn <paul@tpi-3.ca>, Ginny Hanson <ginny.hanson@wellmaster.ca>";
+
+  it("shows the first two people and how many more", () => {
+    expect(summarizeAddresses(to)).toBe("Ryan Verbuyst, Paul Hogendoorn +1");
+  });
+
+  it("shows everyone when there are few, falling back to the address when there is no name", () => {
+    expect(summarizeAddresses("a@x.com, Bo <b@x.com>")).toBe("a@x.com, Bo");
+    expect(summarizeAddresses(to, 1)).toBe("Ryan Verbuyst +2");
+  });
+
+  it("is empty for no header", () => {
+    expect(summarizeAddresses(null)).toBe("");
+  });
+});
+
+describe("pulledEmailDate", () => {
+  it("uses Google's receive time when there is one", () => {
+    expect(
+      pulledEmailDate({ internalDate: 1792600225000, date: "Wed, 21 Oct 2026 12:30:25 -0400" }),
+    ).toBe(new Date(1792600225000).toISOString());
+  });
+
+  it("falls back to the Date header, then to nothing", () => {
+    expect(pulledEmailDate({ internalDate: null, date: "Wed, 21 Oct 2026 12:30:25 -0400" })).toBe(
+      "2026-10-21T16:30:25.000Z",
+    );
+    expect(pulledEmailDate({ internalDate: null, date: "garbage" })).toBeNull();
+    expect(pulledEmailDate({ internalDate: null, date: null })).toBeNull();
+  });
+});
+
+describe("storedToActivityEmail", () => {
+  it("shapes a stored row, reading the stored date and treating unknown directions as received", () => {
+    expect(
+      storedToActivityEmail({
+        id: "uuid-1",
+        from_address: "Pat <pat@xyz.com>",
+        to_addresses: "me@co.com",
+        subject: null,
+        date: "2026-10-21 16:30:25+00",
+        snippet: null,
+        direction: "sent",
+      }),
+    ).toEqual({
+      key: "uuid-1",
+      subject: "(no subject)",
+      from: "Pat",
+      to: "me@co.com",
+      date: "2026-10-21T16:30:25.000Z",
+      snippet: "",
+      direction: "sent",
+    });
+
+    expect(
+      storedToActivityEmail({
+        id: "u",
+        from_address: null,
+        to_addresses: null,
+        subject: "x",
+        date: null,
+        snippet: "s",
+        direction: "weird",
+      }).direction,
+    ).toBe("received");
+  });
+});
