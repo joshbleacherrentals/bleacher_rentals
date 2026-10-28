@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseAddressList,
+  personNameParts,
   pulledEmailDate,
   decodeSnippet,
   storedToActivityEmail,
@@ -136,5 +137,37 @@ describe("storedToActivityEmail", () => {
         direction: "weird",
       }).direction,
     ).toBe("received");
+  });
+});
+
+describe("personNameParts", () => {
+  it("takes the first and last word of a name", () => {
+    expect(personNameParts("Pat Smith")).toEqual({ firstName: "Pat", lastName: "Smith" });
+    expect(personNameParts("Pat Q. Smith")).toEqual({ firstName: "Pat", lastName: "Smith" });
+    expect(personNameParts("Émile Zola")).toEqual({ firstName: "Émile", lastName: "Zola" });
+  });
+
+  it("gives a single word as a first name only", () => {
+    expect(personNameParts("Pat")).toEqual({ firstName: "Pat", lastName: "" });
+  });
+
+  it("reads 'Last, First' the right way round, but not a company's 'Acme, Inc.'", () => {
+    expect(personNameParts("Smith, Pat")).toEqual({ firstName: "Pat", lastName: "Smith" });
+    expect(personNameParts("Acme, Inc.")).toEqual({ firstName: "Acme", lastName: "Inc." });
+  });
+
+  it("skips words that are not names, such as a bracketed company", () => {
+    expect(personNameParts("Pat Smith (Acme)")).toEqual({ firstName: "Pat", lastName: "Smith" });
+  });
+
+  it("falls back to the part of an address before the @", () => {
+    expect(personNameParts("pat.smith@xyz.com")).toEqual({ firstName: "pat", lastName: "smith" });
+    expect(personNameParts("info@xyz.com")).toEqual({ firstName: "info", lastName: "" });
+    expect(personNameParts("mike+news@xyz.com")).toEqual({ firstName: "mike", lastName: "" });
+  });
+
+  it("gives nothing for nothing", () => {
+    expect(personNameParts("")).toEqual({ firstName: "", lastName: "" });
+    expect(personNameParts("  ")).toEqual({ firstName: "", lastName: "" });
   });
 });

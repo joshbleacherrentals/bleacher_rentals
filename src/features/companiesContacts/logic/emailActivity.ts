@@ -87,6 +87,34 @@ export function summarizeAddresses(header: string | null | undefined, max = 2): 
   return `${people.slice(0, max).join(", ")} +${people.length - max}`;
 }
 
+// "Acme, Inc." is a company, not "Last, First".
+const COMPANY_SUFFIX = /^\s*(inc|llc|ltd|limited|corp|corporation|co|incorporated)\b/i;
+
+/**
+ * The first and last name of a sender as `summarizeAddresses` shows them (a name, or an address when
+ * there is no name), for an avatar's initials. A single word is only a first name; words that do not
+ * start with a letter (a bracketed company, say) are skipped; an address uses what is before its @,
+ * split at . _ and -.
+ */
+export function personNameParts(display: string): { firstName: string; lastName: string } {
+  let name = display.trim();
+  if (name.includes("@")) {
+    name = name
+      .split("@")[0]
+      .split("+")[0]
+      .replace(/[._-]+/g, " ");
+  } else if (/^[^,]+,[^,]+$/.test(name)) {
+    const [last, first] = name.split(",");
+    if (!COMPANY_SUFFIX.test(first)) name = `${first} ${last}`;
+  }
+
+  const words = name
+    .replace(/,/g, " ")
+    .split(/\s+/)
+    .filter((word) => /^\p{L}/u.test(word));
+  return { firstName: words[0] ?? "", lastName: words.length > 1 ? words[words.length - 1] : "" };
+}
+
 function toIso(ms: number | null, headerDate: string | null): string | null {
   if (ms !== null && Number.isFinite(ms)) return new Date(ms).toISOString();
   if (headerDate) {

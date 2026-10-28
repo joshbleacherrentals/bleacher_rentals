@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
-import type { ActivityEmail } from "../logic/emailActivity";
+import { UserAvatar } from "@/features/manageTeam/components/util/UserAvatar";
+import { personNameParts, type ActivityEmail } from "../logic/emailActivity";
 import { EmailMessageBody } from "./EmailMessageBody";
 
 function formatDate(iso: string | null): string {
@@ -10,9 +10,11 @@ function formatDate(iso: string | null): string {
 }
 
 /**
- * One email of a thread: a row with an arrow, who it is from and when, and under the name a line of
- * its snippet. Clicking it opens the whole email, and clicking again closes it. Each row opens and
- * closes on its own. An open email drops the snippet, since the email itself is right below.
+ * One email of a thread: a row with the sender's avatar, who it is from and when, and under the name
+ * a line of its snippet. Clicking it opens the whole email, and clicking again closes it. Each row
+ * opens and closes on its own. An open email drops the snippet, since the email itself is right
+ * below. The avatar is the team lists' one, given the sender's initials: only a team member
+ * signed in as themselves gets a photo, and an email's sender has none.
  */
 export function EmailThreadMessage({
   message,
@@ -23,6 +25,8 @@ export function EmailThreadMessage({
   open: boolean;
   onToggle: () => void;
 }) {
+  const { firstName, lastName } = personNameParts(message.from);
+
   return (
     <section className="border-b border-gray-200">
       <button
@@ -31,10 +35,7 @@ export function EmailThreadMessage({
         aria-expanded={open}
         className="flex w-full cursor-pointer items-start gap-3 px-6 py-3 text-left transition-colors hover:bg-gray-50"
       >
-        {/* mt-0.5 centers the arrow on the name's line (20px tall; the arrow is 16px). */}
-        <ChevronRight
-          className={`mt-0.5 h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`}
-        />
+        <UserAvatar firstName={firstName} lastName={lastName} className="h-9 w-9" />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-3">
             <span

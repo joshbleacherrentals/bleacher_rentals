@@ -50,10 +50,10 @@ function EmailHtmlFrame({ title, html }: { title: string; html: string }) {
   }, [srcDoc]);
 
   // The email's text starts 12px inside the frame (its body margin), so the frame is inset 12px
-  // short of where the row above puts the sender (px-6 + the arrow + its gap = 3.25rem) and, on the
-  // right, 12px short of the row's px-6, which lines the body up with the header.
+  // short of where the row above puts the sender (pl-18: see EmailMessageBody) and, on the right,
+  // 12px short of the row's px-6, which lines the body up with the header.
   return (
-    <div className="pl-10 pr-3">
+    <div className="pl-15 pr-3">
       <iframe
         ref={frame}
         title={title}
@@ -71,6 +71,9 @@ function EmailHtmlFrame({ title, html }: { title: string; html: string }) {
  * One email's addresses and body. The body comes from the local database; the first time an email
  * is shown it is read from Gmail and saved there, and this fills in by itself when that finishes.
  * Mount it only when the email is open: that is what keeps a thread's closed emails from loading.
+ *
+ * Everything here is indented 4.5rem (pl-18, or pl-15 plus the frame's 12px margin) so it lines up
+ * under the sender's name in the row above: px-6, the 2.25rem avatar and its 0.75rem gap.
  */
 export function EmailMessageBody({ emailMessageUuid }: { emailMessageUuid: string }) {
   const { email, isLoading } = useEmailMessage(emailMessageUuid);
@@ -92,7 +95,7 @@ export function EmailMessageBody({ emailMessageUuid }: { emailMessageUuid: strin
   return (
     <div>
       {email && (
-        <div className="space-y-0.5 px-6 pb-3 pl-13">
+        <div className="space-y-0.5 px-6 pb-3 pl-18">
           <HeaderLine label="From" value={email.from} />
           <HeaderLine label="To" value={email.to} />
           <HeaderLine label="Cc" value={email.cc} />
@@ -108,7 +111,7 @@ export function EmailMessageBody({ emailMessageUuid }: { emailMessageUuid: strin
         email.bodyHtml ? (
           <EmailHtmlFrame title={email.subject} html={email.bodyHtml} />
         ) : email.bodyText ? (
-          <div className="max-w-4xl px-6 py-2 pl-13 text-sm text-gray-800">
+          <div className="max-w-4xl px-6 py-2 pl-18 text-sm text-gray-800">
             {splitQuotedText(email.bodyText).map((part, i) =>
               part.quoted ? (
                 <details key={i} className="my-2">
