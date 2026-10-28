@@ -8,7 +8,14 @@ const TRIGGER_CLASS =
   "rounded-md text-sm px-4 py-1 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-gray-900 text-gray-500 font-medium transition-all";
 
 /** Everything that has happened with a contact. Emails for now; calls and texts come later. */
-export function ContactActivities({ contactUuid }: { contactUuid: string }) {
+export function ContactActivities({
+  contactUuid,
+  onOpenEmail,
+}: {
+  contactUuid: string;
+  /** Called with an EmailMessages.id when an email in the list is clicked. */
+  onOpenEmail: (emailMessageUuid: string) => void;
+}) {
   const { contacts } = useContactsAll();
   const contact = contacts.find((c) => c.id === contactUuid);
   if (!contact) return null; // the overview next to it already says loading / not found
@@ -25,7 +32,11 @@ export function ContactActivities({ contactUuid }: { contactUuid: string }) {
         </TabsList>
 
         <TabsContent value="emails">
-          <ContactEmailsTab contactUuid={contactUuid} contactEmail={contact.email} />
+          <ContactEmailsTab
+            contactUuid={contactUuid}
+            contactEmail={contact.email}
+            onOpenEmail={onOpenEmail}
+          />
         </TabsContent>
       </Tabs>
     </div>

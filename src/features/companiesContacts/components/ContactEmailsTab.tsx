@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useContactEmailMessages } from "../hooks/useContactEmailMessages";
 import { usePullContactEmails } from "../hooks/usePullContactEmails";
 import type { ActivityEmail } from "../logic/emailActivity";
-import { EmailViewModal } from "./EmailViewModal";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -52,14 +50,15 @@ function EmailRow({ email, onOpen }: { email: ActivityEmail; onOpen: () => void 
 export function ContactEmailsTab({
   contactUuid,
   contactEmail,
+  onOpenEmail,
 }: {
   contactUuid: string;
   contactEmail: string | null;
+  /** Called with the clicked email's EmailMessages.id (an ActivityEmail's key). */
+  onOpenEmail: (emailMessageUuid: string) => void;
 }) {
   const { emails, isLoading } = useContactEmailMessages(contactUuid);
   const { state, pull } = usePullContactEmails();
-  // The email being read, by EmailMessages.id (an ActivityEmail's key).
-  const [openEmail, setOpenEmail] = useState<string | null>(null);
 
   const busy = state.status === "searching" || state.status === "saving";
   const pullFromGmail = () => {
@@ -75,12 +74,9 @@ export function ContactEmailsTab({
       <div>
         <ul className="divide-y divide-gray-100">
           {emails.map((email) => (
-            <EmailRow key={email.key} email={email} onOpen={() => setOpenEmail(email.key)} />
+            <EmailRow key={email.key} email={email} onOpen={() => onOpenEmail(email.key)} />
           ))}
         </ul>
-        {openEmail && (
-          <EmailViewModal emailMessageUuid={openEmail} onClose={() => setOpenEmail(null)} />
-        )}
 
         <div className="mt-2 flex items-center justify-between gap-3 text-xs text-gray-400">
           <span>
