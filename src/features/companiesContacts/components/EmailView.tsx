@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useEmailMessage } from "../hooks/useEmailMessage";
 import { useLoadEmailDetails } from "../hooks/useLoadEmailDetails";
@@ -19,15 +21,17 @@ function HeaderLine({ label, value }: { label: string; value: string }) {
 /**
  * One whole email, across the whole page. Its body comes from the local database; the first time an
  * email is opened it is read from Gmail and saved there, and this fills in by itself when that
- * finishes. Back (or Escape) returns to the list.
+ * finishes. Back (or Escape) returns to the contact's emails.
  */
 export function EmailView({
+  contactUuid,
   emailMessageUuid,
-  onBack,
 }: {
+  contactUuid: string;
   emailMessageUuid: string;
-  onBack: () => void;
 }) {
+  const router = useRouter();
+  const backHref = `/contacts/${contactUuid}`;
   const { email, isLoading } = useEmailMessage(emailMessageUuid);
   const { state, load } = useLoadEmailDetails();
 
@@ -42,33 +46,26 @@ export function EmailView({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onBack();
+      if (event.key === "Escape") router.push(backHref);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onBack]);
-
-  // The list may have been scrolled; start the email at the top.
-  const top = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    top.current?.scrollIntoView({ block: "start" });
-  }, []);
+  }, [router, backHref]);
 
   const date = email?.date
     ? new Date(email.date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
     : "";
 
   return (
-    <div ref={top} className="flex flex-col bg-white">
-      <div className="space-y-3 border-b border-gray-200 pb-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
+    <div className="flex min-h-full flex-col bg-white">
+      <div className="space-y-3 border-b border-gray-200 px-6 py-4">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to emails
-        </button>
+        </Link>
         <h1 className="text-xl font-semibold text-gray-900">{email?.subject ?? "Email"}</h1>
         {email && (
           <div className="space-y-0.5">
@@ -80,7 +77,8 @@ export function EmailView({
         )}
       </div>
 
-      <div className="min-h-[200px]">
+      {/* Takes the rest of the page; the frame fills it, so the email scrolls inside it. */}
+      <div className="relative min-h-96 flex-1">
         {isLoading ? (
           <p className="py-12 text-center text-sm text-gray-400">Loading...</p>
         ) : !email ? (
@@ -92,10 +90,10 @@ export function EmailView({
               sandbox={EMAIL_FRAME_SANDBOX}
               referrerPolicy="no-referrer"
               srcDoc={buildEmailFrameDocument(email.bodyHtml)}
-              className="h-[calc(100vh-16rem)] min-h-96 w-full border-0"
+              className="absolute inset-0 size-full border-0"
             />
           ) : email.bodyText ? (
-            <pre className="max-w-4xl whitespace-pre-wrap break-words py-4 font-sans text-sm text-gray-800">
+            <pre className="max-w-4xl whitespace-pre-wrap break-words px-6 py-4 font-sans text-sm text-gray-800">
               {email.bodyText}
             </pre>
           ) : (

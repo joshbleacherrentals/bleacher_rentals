@@ -3,8 +3,10 @@ import { ContactsTab } from "@/features/companiesContacts/components/ContactsTab
 
 export default function ContactsPage() {
   return (
-    <CompaniesContactsTabs active="contacts">
-      <ContactsTab />
-    </CompaniesContactsTabs>
+    <div className="p-4">
+      <CompaniesContactsTabs active="contacts">
+        <ContactsTab />
+      </CompaniesContactsTabs>
+    </div>
   );
 }

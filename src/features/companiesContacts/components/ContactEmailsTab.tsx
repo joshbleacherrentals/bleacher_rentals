@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useContactEmailMessages } from "../hooks/useContactEmailMessages";
 import { usePullContactEmails } from "../hooks/usePullContactEmails";
@@ -14,14 +15,13 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function EmailRow({ email, onOpen }: { email: ActivityEmail; onOpen: () => void }) {
+function EmailRow({ email, href }: { email: ActivityEmail; href: string }) {
   return (
     <li>
-      <button
-        type="button"
-        onClick={onOpen}
+      <Link
+        href={href}
         title="Open this email"
-        className="-mx-2 flex w-[calc(100%+1rem)] cursor-pointer gap-3 rounded px-2 py-3 text-left transition-colors hover:bg-gray-50"
+        className="-mx-2 flex w-[calc(100%+1rem)] gap-3 rounded px-2 py-3 transition-colors hover:bg-gray-50"
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
@@ -37,7 +37,7 @@ function EmailRow({ email, onOpen }: { email: ActivityEmail; onOpen: () => void 
             <p className="mt-1 line-clamp-2 text-sm text-gray-600">{email.snippet}</p>
           )}
         </div>
-      </button>
+      </Link>
     </li>
   );
 }
@@ -50,12 +50,9 @@ function EmailRow({ email, onOpen }: { email: ActivityEmail; onOpen: () => void 
 export function ContactEmailsTab({
   contactUuid,
   contactEmail,
-  onOpenEmail,
 }: {
   contactUuid: string;
   contactEmail: string | null;
-  /** Called with the clicked email's EmailMessages.id (an ActivityEmail's key). */
-  onOpenEmail: (emailMessageUuid: string) => void;
 }) {
   const { emails, isLoading } = useContactEmailMessages(contactUuid);
   const { state, pull } = usePullContactEmails();
@@ -74,7 +71,11 @@ export function ContactEmailsTab({
       <div>
         <ul className="divide-y divide-gray-100">
           {emails.map((email) => (
-            <EmailRow key={email.key} email={email} onOpen={() => onOpenEmail(email.key)} />
+            <EmailRow
+              key={email.key}
+              email={email}
+              href={`/contacts/${contactUuid}/email-message/${email.key}`}
+            />
           ))}
         </ul>
 
