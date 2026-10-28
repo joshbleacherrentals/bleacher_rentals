@@ -1,6 +1,8 @@
 -- EmailMessages: the headers and snippet of emails pulled from Gmail, one row per mailbox copy.
 -- ContactEmailMessages: which contacts an email message involves.
 -- EmailMessageDetails: the body of an email, saved the first time someone opens it.
+-- BlockedCustomerEmails: customer addresses the team has chosen to block. Everyone can see the list;
+-- each row can only be changed or removed by the person who added it.
 --
 -- Starting small: no attachments. An email's body is not kept on EmailMessages: it is fetched from
 -- Gmail the first time someone opens the email and saved in EmailMessageDetails.
@@ -181,3 +183,62 @@ create policy "email_message_details_select" on public."EmailMessageDetails"
 create policy "email_message_details_insert" on public."EmailMessageDetails"
   as permissive for insert to authenticated
   with check (true);
+
+-- A customer email address the team has blocked. Hard deletes only: remove the row to unblock.
+create table public."BlockedCustomerEmails" (
+  id uuid not null default gen_random_uuid(),
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+
+  -- Who blocked it, and so the only person who can edit or remove the row. Filled in by the server
+  -- when left out. No cascade: deleting a user should not quietly unblock their addresses.
+  created_by_user_uuid uuid not null default public.get_current_user_uuid(),
+
+  email text not null,
+
+  constraint BlockedCustomerEmails_pkey primary key (id),
+  constraint BlockedCustomerEmails_created_by_user_uuid_fkey foreign key (created_by_user_uuid)
+    references public."Users"(id),
+  constraint BlockedCustomerEmails_email_not_blank check (btrim(email) <> '')
+);
+
+-- An address is blocked once, whoever added it and however it is capitalized. Also serves "is this
+-- address blocked".
+create unique index "BlockedCustomerEmails_email_lower_idx"
+  on public."BlockedCustomerEmails" using btree (lower(email));
+
+create function public.blocked_customer_emails_touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger blocked_customer_emails_touch_updated_at
+  before update on public."BlockedCustomerEmails"
+  for each row execute function public.blocked_customer_emails_touch_updated_at();
+
+alter table public."BlockedCustomerEmails" enable row level security;
+
+-- Everyone signed in can read and add. Editing or removing is limited to the row's creator.
+-- get_current_user_uuid() is null for an inactive user, so they match no row and cannot write.
+-- The update check also stops a creator from handing a row to someone else.
+create policy "blocked_customer_emails_select" on public."BlockedCustomerEmails"
+  as permissive for select to authenticated
+  using (true);
+
+create policy "blocked_customer_emails_insert" on public."BlockedCustomerEmails"
+  as permissive for insert to authenticated
+  with check (created_by_user_uuid = public.get_current_user_uuid());
+
+create policy "blocked_customer_emails_update" on public."BlockedCustomerEmails"
+  as permissive for update to authenticated
+  using (created_by_user_uuid = public.get_current_user_uuid())
+  with check (created_by_user_uuid = public.get_current_user_uuid());
+
+create policy "blocked_customer_emails_delete" on public."BlockedCustomerEmails"
+  as permissive for delete to authenticated
+  using (created_by_user_uuid = public.get_current_user_uuid());

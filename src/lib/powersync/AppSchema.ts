@@ -992,6 +992,14 @@ const EmailMessageDetails = new Table(EmailMessageDetailsCols, {
   indexes: { email_message_uuid: ["email_message_uuid"] },
 });
 
+const BlockedCustomerEmailsCols = {
+  created_at: column.text,
+  updated_at: column.text,
+  created_by_user_uuid: column.text,
+  email: column.text,
+} satisfies PowerSyncColsFor<"BlockedCustomerEmails">;
+const BlockedCustomerEmails = new Table(BlockedCustomerEmailsCols);
+
 const EventAttachmentsCols = {
   created_at: column.text,
   event_uuid: column.text,
@@ -1437,6 +1445,7 @@ export const AppSchema = new Schema({
   EmailMessages,
   ContactEmailMessages,
   EmailMessageDetails,
+  BlockedCustomerEmails,
   EventAttachments,
   EventChangeLog,
   EventLineItems,

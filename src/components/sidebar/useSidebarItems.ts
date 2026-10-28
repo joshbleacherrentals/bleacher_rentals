@@ -29,6 +29,7 @@ import {
   ImageIcon,
   Receipt,
   MailCheck,
+  MailX,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -255,6 +256,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Storage Locations",
         href: "/storage-locations",
         icon: Warehouse,
+      },
+      {
+        type: "button",
+        key: "blocked-emails",
+        label: "Blocked Emails",
+        href: "/blocked-emails",
+        icon: MailX,
       },
     ],
   },

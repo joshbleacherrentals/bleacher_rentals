@@ -48,6 +48,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/messages",
       "/stripe-connections",
       "/automatic-emails",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,

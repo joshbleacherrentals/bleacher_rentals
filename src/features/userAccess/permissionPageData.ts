@@ -588,6 +588,25 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Blocked Customer Emails",
+    description:
+      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, such as the owner's, so adding a colleague as a contact cannot expose their mail. A customer who writes to a blocked person can still be searched. The list is shared, but each address can only be edited or removed by the person who added it.",
+    category: "Configuration",
+    roles: {
+      admin: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not another administrator's. Enforced in the database by row-level security.",
+      ),
+      account_manager: none("Account managers can't see this page, even on the sidebar."),
+      developer: none(
+        "Unable to even access this page, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Viewers do not have access to the web configuration pages."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
     label: "Work Tracker Types",
     description:
       "This applies to the Work Tracker Types page under Configuration, where each of the 3 fixed work tracker types (Trip, Repair / Maintenance, Site Visit / Cleaning / Other) is assigned a QuickBooks account per connection. The 3 types themselves cannot be renamed, added, or removed — only their QuickBooks account assignment is editable, here and nowhere else.",

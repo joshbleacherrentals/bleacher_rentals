@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { canAccessPath, mergeRoleConfigs } from "./accessConfig";
 
+describe("the Blocked Emails page", () => {
+  it("is open to an admin and to no other role", () => {
+    expect(canAccessPath(["admin"], "/blocked-emails")).toBe(true);
+    for (const role of [
+      "account_manager",
+      "viewer",
+      "accountant",
+      "maintainer",
+      "developer",
+    ] as const) {
+      expect(canAccessPath([role], "/blocked-emails")).toBe(false);
+    }
+  });
+});
+
 describe("mergeRoleConfigs — the maintainer role", () => {
   it("lets a maintainer open the annual inspections queue", () => {
     const config = mergeRoleConfigs(["maintainer"]);

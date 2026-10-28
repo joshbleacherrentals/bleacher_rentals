@@ -1,3 +1,4 @@
+import { checkBlockedCustomerEmail } from "@/features/gmail-integration/server/blockedEmails";
 import {
   clampLimit,
   isSafeSearchAddress,
@@ -9,12 +10,16 @@ import {
   resolveDomainMailboxes,
 } from "@/features/gmail-integration/server/domainMailboxes";
 import { requireAdmin } from "@/features/userAccess/logic/requireAdmin";
+import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Development-only: every email involving an address, searched in every mailbox of a Workspace
  * domain (listed by Google's Directory API; see /api/dev/gmail-mailboxes) and merged. Nothing is
  * stored. The mailboxes come from the domain, never the request. 404 on any deployed build.
+ *
+ * An address on the BlockedCustomerEmails list (the Blocked Emails page) is refused with a 403
+ * before Google is asked anything, so a colleague's mail cannot be read by adding them as a contact.
  *
  *   /api/dev/gmail-contact-emails?email=customer@xyz.com
  *     &limit=50             newest N per mailbox (1-500, default 50)
@@ -35,6 +40,23 @@ export async function GET(req: NextRequest) {
     const address = params.get("email")?.trim() ?? "";
     if (!isSafeSearchAddress(address)) {
       return NextResponse.json({ error: "Pass a plain email address as ?email=" }, { status: 400 });
+    }
+
+    // Before anything is asked of Google, including the list of mailboxes.
+    const blocked = await checkBlockedCustomerEmail(await createServiceRoleClient(), address);
+    if (blocked.status === "blocked") {
+      return NextResponse.json(
+        {
+          error: `${address} is on the Blocked Emails list, so its emails cannot be pulled from Gmail.`,
+        },
+        { status: 403 },
+      );
+    }
+    if (blocked.status === "unreadable") {
+      return NextResponse.json(
+        { error: "Could not check the Blocked Emails list, so nothing was searched." },
+        { status: 500 },
+      );
     }
 
     const after = params.get("after") ?? undefined;

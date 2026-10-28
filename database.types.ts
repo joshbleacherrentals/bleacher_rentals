@@ -299,6 +299,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"BlockedCustomerEmails": {
+                  Row: {
+                    "created_at": string,"created_by_user_uuid": string,"email": string,"id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by_user_uuid"?: string,"email": string,"id"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by_user_uuid"?: string,"email"?: string,"id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "blockedcustomeremails_created_by_user_uuid_fkey"
+      columns: ["created_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"Blocks": {
                   Row: {
                     "bleacher_uuid": string | null,"created_at": string,"created_by_user_uuid": string | null,"date": string | null,"id": string,"text": string | null
