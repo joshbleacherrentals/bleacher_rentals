@@ -25,7 +25,7 @@ export default function BlockedEmailsPage() {
     <div className="mx-auto max-w-3xl p-6">
       <PageHeaderWithBreadCrumbs
         crumbs={[{ label: "Blocked Emails" }]}
-        description="Emails to and from these addresses cannot be pulled from Gmail onto a contact. Add the address of anyone whose mail should stay private, like the owner's. A customer who writes to them can still be searched. You can only edit or remove the addresses you added."
+        description="Emails to and from these addresses cannot be pulled from Gmail onto a contact. Anything at bleacherrentals.com is always blocked, so only add other addresses whose mail should stay private. A customer who writes to a blocked person can still be searched. You can only edit or remove the addresses you added."
       />
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">

@@ -45,17 +45,31 @@ beforeEach(() => {
 });
 
 describe("GET /api/dev/gmail-contact-emails", () => {
-  it("refuses a blocked address before anything is asked of Google", async () => {
-    checkBlockedCustomerEmail.mockResolvedValue({ status: "blocked" });
+  it("refuses a listed address before anything is asked of Google", async () => {
+    checkBlockedCustomerEmail.mockResolvedValue({ status: "blocked", reason: "listed" });
+
+    const res = await call("email=pat@xyz.com");
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toContain("Blocked Emails list");
+    expect(checkBlockedCustomerEmail).toHaveBeenCalledWith(expect.anything(), "pat@xyz.com");
+    expect(resolveDomainMailboxes).not.toHaveBeenCalled();
+    expect(pullContactEmails).not.toHaveBeenCalled();
+  });
+
+  it("refuses a company address, naming the domain, before anything is asked of Google", async () => {
+    checkBlockedCustomerEmail.mockResolvedValue({
+      status: "blocked",
+      reason: "company-domain",
+      domain: "bleacherrentals.com",
+    });
 
     const res = await call("email=mike@bleacherrentals.com");
 
     expect(res.status).toBe(403);
-    expect((await res.json()).error).toContain("mike@bleacherrentals.com");
-    expect(checkBlockedCustomerEmail).toHaveBeenCalledWith(
-      expect.anything(),
-      "mike@bleacherrentals.com",
-    );
+    const { error } = await res.json();
+    expect(error).toContain("mike@bleacherrentals.com");
+    expect(error).toContain("bleacherrentals.com");
     expect(resolveDomainMailboxes).not.toHaveBeenCalled();
     expect(pullContactEmails).not.toHaveBeenCalled();
   });

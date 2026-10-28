@@ -590,7 +590,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Blocked Customer Emails",
     description:
-      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, such as the owner's, so adding a colleague as a contact cannot expose their mail. A customer who writes to a blocked person can still be searched. The list is shared, but each address can only be edited or removed by the person who added it.",
+      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, so adding someone as a contact cannot expose their mail. Every address at bleacherrentals.com or tpi-3.ca is always blocked without being listed. A customer who writes to a blocked person can still be searched. The list is shared, but each address can only be edited or removed by the person who added it.",
     category: "Configuration",
     roles: {
       admin: custom(

@@ -18,8 +18,9 @@ import { NextRequest, NextResponse } from "next/server";
  * domain (listed by Google's Directory API; see /api/dev/gmail-mailboxes) and merged. Nothing is
  * stored. The mailboxes come from the domain, never the request. 404 on any deployed build.
  *
- * An address on the BlockedCustomerEmails list (the Blocked Emails page) is refused with a 403
- * before Google is asked anything, so a colleague's mail cannot be read by adding them as a contact.
+ * An address at a company domain (bleacherrentals.com, tpi-3.ca), or on the BlockedCustomerEmails
+ * list (the Blocked Emails page), is refused with a 403 before Google is asked anything, so a
+ * colleague's mail cannot be read by adding them as a contact.
  *
  *   /api/dev/gmail-contact-emails?email=customer@xyz.com
  *     &limit=50             newest N per mailbox (1-500, default 50)
@@ -45,12 +46,11 @@ export async function GET(req: NextRequest) {
     // Before anything is asked of Google, including the list of mailboxes.
     const blocked = await checkBlockedCustomerEmail(await createServiceRoleClient(), address);
     if (blocked.status === "blocked") {
-      return NextResponse.json(
-        {
-          error: `${address} is on the Blocked Emails list, so its emails cannot be pulled from Gmail.`,
-        },
-        { status: 403 },
-      );
+      const error =
+        blocked.reason === "company-domain"
+          ? `${address} is a company address (${blocked.domain}), so its emails cannot be pulled from Gmail.`
+          : `${address} is on the Blocked Emails list, so its emails cannot be pulled from Gmail.`;
+      return NextResponse.json({ error }, { status: 403 });
     }
     if (blocked.status === "unreadable") {
       return NextResponse.json(
