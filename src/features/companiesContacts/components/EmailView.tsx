@@ -28,8 +28,10 @@ export function EmailView({
   const backHref = `/contacts/${contactUuid}`;
   const { messages, isLoading } = useEmailThread(emailMessageUuid);
 
-  // Whether the footer shows the reply box instead of its buttons.
+  // Whether the footer shows the reply box instead of its buttons, and whether that box is
+  // minimized to a small card.
   const [replying, setReplying] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   // The footer's buttons, in order. Only Reply does anything so far.
   const footerActions = [
     { label: "Reply", Icon: Reply, onClick: () => setReplying(true) },
@@ -102,13 +104,23 @@ export function EmailView({
         Both stick to the bottom of the scrolling page, and mt-auto keeps them at the bottom of a
         short one. The footer's buttons are replaced by the reply box once Reply is pressed: a
         square card at the bottom right (ml-auto): w-170 by h-170 (42.5rem), but never wider than the
-        page nor taller than the window (the max- limits), so it can always be seen whole.
+        page nor taller than the window (the max- limits), so it can always be seen whole. Minimized,
+        it is a w-64 card.
         pl-18 is where the sender's name and the email's text start (see EmailMessageBody).
       */}
       {messages.length > 0 &&
         (replying ? (
-          <div className="sticky bottom-4 z-10 ml-auto mr-6 mt-auto h-170 max-h-[calc(100vh-8rem)] w-170 max-w-[calc(100%-3rem)]">
-            <ReplyBox replyingTo={messages[messages.length - 1]} />
+          <div
+            className={`sticky bottom-4 z-10 ml-auto mr-6 mt-auto max-w-[calc(100%-3rem)] ${
+              minimized ? "w-64" : "h-170 max-h-[calc(100vh-8rem)] w-170"
+            }`}
+          >
+            <ReplyBox
+              replyingTo={messages[messages.length - 1]}
+              minimized={minimized}
+              onMinimize={() => setMinimized(true)}
+              onRestore={() => setMinimized(false)}
+            />
           </div>
         ) : (
           <div className="sticky bottom-0 z-10 mt-auto flex flex-wrap gap-2 border-t border-gray-200 bg-white pb-5 pl-18 pr-6 pt-3">

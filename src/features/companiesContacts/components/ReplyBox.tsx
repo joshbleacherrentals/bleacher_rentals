@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Maximize2, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/db/useCurrentUser";
 import { useContactDirectory } from "../hooks/useContactDirectory";
 import type { ThreadMessage } from "../hooks/useEmailThread";
@@ -24,13 +26,23 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
  * by name, anyone else by address). Clicking it opens "From" (the signed-in user, as "Josh
  * Redgrift (josh@bleacherrentals.com)") and To, Cc and Bcc lines, where who the reply goes to can
  * be changed (see ReplyRecipients). Clicking the header again does nothing: only clicking into the
- * text area folds it back. Nothing is sent yet. The text area takes focus when the box appears.
+ * text area folds it back. A minus at the top right of the header minimizes the box to a small
+ * card (the page sizes it), and clicking that card restores it as it was: the draft, the
+ * recipients and the header's state live here and survive being minimized. A footer with a Send
+ * button stays at the bottom of the box however far the text has scrolled; it is not wired up, so
+ * nothing is sent yet. The text area takes focus when the box appears and when it is restored.
  */
 export function ReplyBox({
   replyingTo,
+  minimized,
+  onMinimize,
+  onRestore,
 }: {
   /** The email being answered: the newest of the thread. */
   replyingTo: ThreadMessage;
+  minimized: boolean;
+  onMinimize: () => void;
+  onRestore: () => void;
 }) {
   const { data: currentUser, isLoading } = useCurrentUser();
   const user = currentUser?.[0];
@@ -71,9 +83,27 @@ export function ReplyBox({
   const [text, setText] = useState("");
   const textarea = useRef<HTMLTextAreaElement>(null);
 
+  // On appearing, and again on being restored from minimized.
   useEffect(() => {
-    textarea.current?.focus();
-  }, []);
+    if (!minimized) textarea.current?.focus();
+  }, [minimized]);
+
+  if (minimized) {
+    return (
+      <button
+        type="button"
+        onClick={onRestore}
+        aria-label="Restore the reply"
+        title="Restore"
+        className="flex w-full cursor-pointer items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm shadow-lg transition-colors hover:bg-gray-50"
+      >
+        <span className="min-w-0 flex-1 truncate text-gray-800">
+          {summary ? `Reply to ${summary}` : "Reply"}
+        </span>
+        <Maximize2 className="size-3.5 shrink-0 text-gray-500" />
+      </button>
+    );
+  }
 
   return (
     // A card floating over the page, so it brings its own background and shadow; the page places
@@ -85,23 +115,36 @@ export function ReplyBox({
         over the text area, inside the box, so the box is never cut off by the bottom of the screen.
         ReplyRecipients caps their height (max-h-52) to fit in what is left under the open header.
       */}
-      <div className="shrink-0 border-b border-gray-200">
+      <div className="relative shrink-0 border-b border-gray-200">
         <button
           type="button"
           // The header only opens. Once open, clicking in the text area is what folds it.
           onClick={() => setShowAddresses(true)}
           aria-expanded={showAddresses}
+          // px-4 is the same side padding as the To, Cc and Bcc rows below, so the lines start
+          // together. The pr-8 inside keeps the text clear of the minimize button at the top right.
           className={`block w-full rounded-t px-4 py-2 text-left text-sm transition-colors ${
             showAddresses ? "cursor-default" : "cursor-pointer hover:bg-gray-50"
           }`}
         >
           {showAddresses ? (
-            <Line label="From">{from}</Line>
+            <span className="block pr-8">
+              <Line label="From">{from}</Line>
+            </span>
           ) : (
-            <span className="block truncate text-gray-800">
+            <span className="block truncate pr-8 text-gray-800">
               {summary || <span className="text-gray-400">No recipients</span>}
             </span>
           )}
+        </button>
+        <button
+          type="button"
+          onClick={onMinimize}
+          aria-label="Minimize the reply"
+          title="Minimize"
+          className="absolute right-2 top-1.5 inline-flex size-6 cursor-pointer items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+        >
+          <Minus className="size-4" />
         </button>
         {showAddresses &&
           recipientRows.map((row) => (
@@ -124,8 +167,15 @@ export function ReplyBox({
         onFocus={() => setShowAddresses(false)}
         aria-label="Reply"
         placeholder="Write your reply..."
-        className="block min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-b p-4 text-sm text-gray-900 outline-none placeholder:text-gray-400"
+        className="block min-h-0 w-full flex-1 resize-none overflow-y-auto p-4 text-sm text-gray-900 outline-none placeholder:text-gray-400"
       />
+      {/* The text area scrolls on its own, so this stays at the bottom of the box in view. */}
+      <div className="shrink-0 border-t border-gray-200 px-4 py-3">
+        {/* bg-darkBlue is the brand's dark blue (see globals.css); px-8 is 32px each side. */}
+        <Button type="button" className="rounded-full bg-darkBlue px-8 hover:bg-darkBlue/90">
+          Send
+        </Button>
+      </div>
     </div>
   );
 }
