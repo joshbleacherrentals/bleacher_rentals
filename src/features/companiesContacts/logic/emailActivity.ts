@@ -94,6 +94,33 @@ export function addressLines(header: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+/** "Name (address)", or just the address when there is no name. */
+export function personWithAddress(person: Address): string {
+  return person.name ? `${person.name} (${person.address})` : person.address;
+}
+
+/**
+ * Who a reply to this email goes to: the sender of an email that came in, or, for one a colleague
+ * wrote, the people it went to, so the reply reaches the other side. The user's own address is left
+ * out unless it is the only one, and each address is listed once.
+ */
+export function replyRecipients(
+  email: { direction: "sent" | "received"; fromHeader: string; toHeader: string },
+  ownAddress: string | null,
+): Address[] {
+  const people = parseAddressList(
+    email.direction === "sent" ? email.toHeader : email.fromHeader,
+  ).filter((person) => person.address);
+  const unique = people.filter(
+    (person, i) =>
+      people.findIndex((p) => p.address.toLowerCase() === person.address.toLowerCase()) === i,
+  );
+
+  const own = ownAddress?.trim().toLowerCase();
+  const others = unique.filter((person) => person.address.toLowerCase() !== own);
+  return others.length > 0 ? others : unique;
+}
+
 // "Acme, Inc." is a company, not "Last, First".
 const COMPANY_SUFFIX = /^\s*(inc|llc|ltd|limited|corp|corporation|co|incorporated)\b/i;
 

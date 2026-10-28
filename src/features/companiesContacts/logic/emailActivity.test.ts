@@ -3,7 +3,9 @@ import {
   addressLines,
   parseAddressList,
   personNameParts,
+  personWithAddress,
   pulledEmailDate,
+  replyRecipients,
   decodeSnippet,
   storedToActivityEmail,
   summarizeAddresses,
@@ -186,5 +188,57 @@ describe("addressLines", () => {
     expect(addressLines("undisclosed-recipients:")).toEqual(["undisclosed-recipients:"]);
     expect(addressLines(null)).toEqual([]);
     expect(addressLines("  ")).toEqual([]);
+  });
+});
+
+describe("personWithAddress", () => {
+  it("writes 'Name (address)', or just the address when there is no name", () => {
+    expect(personWithAddress({ name: "Josh Redgrift", address: "josh@co.com" })).toBe(
+      "Josh Redgrift (josh@co.com)",
+    );
+    expect(personWithAddress({ name: null, address: "josh@co.com" })).toBe("josh@co.com");
+  });
+});
+
+describe("replyRecipients", () => {
+  const received = {
+    direction: "received" as const,
+    fromHeader: "Pat Smith <pat@xyz.com>",
+    toHeader: "Josh <josh@co.com>, Paul <paul@co.com>",
+  };
+
+  it("answers the sender of an email that was received", () => {
+    expect(replyRecipients(received, "josh@co.com")).toEqual([
+      { name: "Pat Smith", address: "pat@xyz.com" },
+    ]);
+  });
+
+  it("answers whoever an email we sent went to, leaving out the user's own address", () => {
+    const sent = {
+      direction: "sent" as const,
+      fromHeader: "Josh <josh@co.com>",
+      toHeader: "Pat Smith <pat@xyz.com>, Josh <JOSH@co.com>, sam@xyz.com",
+    };
+
+    expect(replyRecipients(sent, "josh@co.com")).toEqual([
+      { name: "Pat Smith", address: "pat@xyz.com" },
+      { name: null, address: "sam@xyz.com" },
+    ]);
+  });
+
+  it("keeps the user's own address when it is the only one, and lists each address once", () => {
+    const toSelf = { direction: "sent" as const, fromHeader: "", toHeader: "Josh <josh@co.com>" };
+    const twice = { ...received, fromHeader: "Pat <pat@xyz.com>, PAT <Pat@xyz.com>" };
+
+    expect(replyRecipients(toSelf, "josh@co.com")).toEqual([
+      { name: "Josh", address: "josh@co.com" },
+    ]);
+    expect(replyRecipients(twice, null)).toEqual([{ name: "Pat", address: "pat@xyz.com" }]);
+  });
+
+  it("gives nobody when there is no one to answer", () => {
+    expect(replyRecipients({ direction: "received", fromHeader: "", toHeader: "" }, null)).toEqual(
+      [],
+    );
   });
 });
