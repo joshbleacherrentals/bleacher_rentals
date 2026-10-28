@@ -19,6 +19,7 @@ const threadRows = () =>
       "google_references",
       "from_address",
       "to_addresses",
+      "cc_addresses",
       "subject",
       "date",
       "snippet",
@@ -26,12 +27,22 @@ const threadRows = () =>
     ]);
 
 /**
+ * An email of a thread: what a row shows, plus the address headers as saved, for the details that
+ * drop down from its "To" line. Bcc is not among them: it is not saved.
+ */
+export type ThreadMessage = ActivityEmail & {
+  fromHeader: string;
+  toHeader: string;
+  ccHeader: string;
+};
+
+/**
  * The saved emails in the same conversation as `emailMessageUuid` (itself included), oldest first.
  * Only emails already in the local database are listed. Reactive, so a newly saved email joins the
  * thread by itself. Bodies are not read here: each email loads its own when it is opened.
  */
 export function useEmailThread(emailMessageUuid: string): {
-  messages: ActivityEmail[];
+  messages: ThreadMessage[];
   isLoading: boolean;
 } {
   // First the opened email, to learn what its thread is called.
@@ -76,7 +87,13 @@ export function useEmailThread(emailMessageUuid: string): {
   const { data, isLoading } = useTypedQuery(threadCompiled, expect<ThreadRow>());
 
   const messages = useMemo(
-    () => selectThread(emailMessageUuid, data ?? []).map(storedToActivityEmail),
+    () =>
+      selectThread(emailMessageUuid, data ?? []).map((row) => ({
+        ...storedToActivityEmail(row),
+        fromHeader: row.from_address ?? "",
+        toHeader: row.to_addresses ?? "",
+        ccHeader: row.cc_addresses ?? "",
+      })),
     [data, emailMessageUuid],
   );
   return { messages, isLoading: openedLoading || isLoading };

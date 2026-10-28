@@ -9,6 +9,7 @@ const row = (over: Partial<ThreadRow> & { id: string }): ThreadRow => ({
   google_references: null,
   from_address: "Pat <pat@xyz.com>",
   to_addresses: "paul@co.com",
+  cc_addresses: null,
   subject: "Quote",
   date: null,
   snippet: "",

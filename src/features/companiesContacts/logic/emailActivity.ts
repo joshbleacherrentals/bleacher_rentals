@@ -87,6 +87,13 @@ export function summarizeAddresses(header: string | null | undefined, max = 2): 
   return `${people.slice(0, max).join(", ")} +${people.length - max}`;
 }
 
+/** An address header as one line per person, "Name <address>" or just the address, for a list. */
+export function addressLines(header: string | null | undefined): string[] {
+  return parseAddressList(header)
+    .map((a) => (a.name && a.address ? `${a.name} <${a.address}>` : a.address || a.name || ""))
+    .filter(Boolean);
+}
+
 // "Acme, Inc." is a company, not "Last, First".
 const COMPANY_SUFFIX = /^\s*(inc|llc|ltd|limited|corp|corporation|co|incorporated)\b/i;
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addressLines,
   parseAddressList,
   personNameParts,
   pulledEmailDate,
@@ -169,5 +170,21 @@ describe("personNameParts", () => {
   it("gives nothing for nothing", () => {
     expect(personNameParts("")).toEqual({ firstName: "", lastName: "" });
     expect(personNameParts("  ")).toEqual({ firstName: "", lastName: "" });
+  });
+});
+
+describe("addressLines", () => {
+  it("gives each person as 'Name <address>', or just the address when there is no name", () => {
+    expect(addressLines('Pat Smith <pat@xyz.com>, "Smith, Jo" <jo@x.com>, plain@y.com')).toEqual([
+      "Pat Smith <pat@xyz.com>",
+      "Smith, Jo <jo@x.com>",
+      "plain@y.com",
+    ]);
+  });
+
+  it("gives a name that has no address as it is, and nothing for an empty header", () => {
+    expect(addressLines("undisclosed-recipients:")).toEqual(["undisclosed-recipients:"]);
+    expect(addressLines(null)).toEqual([]);
+    expect(addressLines("  ")).toEqual([]);
   });
 });

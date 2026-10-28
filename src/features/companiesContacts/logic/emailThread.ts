@@ -16,6 +16,7 @@ export type ThreadRow = {
   google_references: string | null;
   from_address: string | null;
   to_addresses: string | null;
+  cc_addresses: string | null;
   subject: string | null;
   date: string | null;
   snippet: string | null;

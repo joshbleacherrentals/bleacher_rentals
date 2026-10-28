@@ -18,16 +18,6 @@ const MAX_FRAME_HEIGHT = 40_000;
 // handful.
 const MAX_HEIGHT_REPORTS = 40;
 
-function HeaderLine({ label, value }: { label: string; value: string }) {
-  if (!value) return null;
-  return (
-    <div className="flex gap-3 text-sm">
-      <span className="w-12 shrink-0 text-gray-400">{label}</span>
-      <span className="min-w-0 break-words text-gray-700">{value}</span>
-    </div>
-  );
-}
-
 /** An email's HTML in its sandboxed frame, as tall as the email so the page scrolls, not the frame. */
 function EmailHtmlFrame({ title, html }: { title: string; html: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -68,12 +58,13 @@ function EmailHtmlFrame({ title, html }: { title: string; html: string }) {
 }
 
 /**
- * One email's addresses and body. The body comes from the local database; the first time an email
- * is shown it is read from Gmail and saved there, and this fills in by itself when that finishes.
+ * One email's body (its addresses are in the header above it). The body comes from the local
+ * database; the first time an email is shown it is read from Gmail and saved there, and this fills
+ * in by itself when that finishes.
  * Mount it only when the email is open: that is what keeps a thread's closed emails from loading.
  *
- * Everything here is indented 4.5rem (pl-18, or pl-15 plus the frame's 12px margin) so it lines up
- * under the sender's name in the row above: px-6, the 2.25rem avatar and its 0.75rem gap.
+ * The body is indented 4.5rem (pl-18, or pl-15 plus the frame's 12px margin) so it lines up under
+ * the sender's name in the header above: px-6, the 2.25rem avatar and its 0.75rem gap.
  */
 export function EmailMessageBody({ emailMessageUuid }: { emailMessageUuid: string }) {
   const { email, isLoading } = useEmailMessage(emailMessageUuid);
@@ -88,21 +79,8 @@ export function EmailMessageBody({ emailMessageUuid }: { emailMessageUuid: strin
     void load({ emailMessageUuid: email.id, mailbox: email.mailbox, googleId: email.googleId });
   }, [email, load]);
 
-  const date = email?.date
-    ? new Date(email.date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
-    : "";
-
   return (
     <div>
-      {email && (
-        <div className="space-y-0.5 px-6 pb-3 pl-18">
-          <HeaderLine label="From" value={email.from} />
-          <HeaderLine label="To" value={email.to} />
-          <HeaderLine label="Cc" value={email.cc} />
-          <HeaderLine label="Date" value={date} />
-        </div>
-      )}
-
       {isLoading ? (
         <p className="py-6 text-center text-sm text-gray-400">Loading...</p>
       ) : !email ? (
