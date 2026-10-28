@@ -31,7 +31,7 @@ import { splitLastWord } from "../logic/splitLastWord";
 import { ContactNameEditor } from "./ContactNameEditor";
 import { InlineTextEditor } from "./InlineTextEditor";
 
-const EMPTY = <span className="text-gray-300">—</span>;
+const empty = (what: string) => <span className="text-gray-400">No {what}</span>;
 
 type Editing =
   | { field: "name"; focus: "first" | "last" }
@@ -115,7 +115,7 @@ export function ContactOverview({ contactUuid }: { contactUuid: string }) {
 
   return (
     <div>
-      <div className="relative rounded border border-gray-100 shadow-sm bg-white p-4">
+      <div className="relative rounded border border-gray-200 bg-white p-4">
         {nameEdit ? (
           <ContactNameEditor
             initial={{ firstName: contact.firstName, lastName: contact.lastName ?? "" }}
@@ -203,7 +203,7 @@ export function ContactOverview({ contactUuid }: { contactUuid: string }) {
               onClick={() => setEditing({ field: "email" })}
               className="-mx-1 cursor-text break-all rounded px-1 hover:bg-gray-100"
             >
-              {contact.email || EMPTY}
+              {contact.email || empty("email")}
             </span>
             {contact.email && <CopyTextButton text={contact.email} label="email" />}
           </div>
@@ -230,7 +230,7 @@ export function ContactOverview({ contactUuid }: { contactUuid: string }) {
               onClick={() => setEditing({ field: "phone" })}
               className="-mx-1 cursor-text rounded px-1 hover:bg-gray-100"
             >
-              {contact.phone ? formatPhone(contact.phone) : EMPTY}
+              {contact.phone ? formatPhone(contact.phone) : empty("phone")}
             </span>
           </div>
         )}

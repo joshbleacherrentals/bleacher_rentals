@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useContactEmailMessages } from "../hooks/useContactEmailMessages";
 import { usePullContactEmails } from "../hooks/usePullContactEmails";
 import type { ActivityEmail } from "../logic/emailActivity";
@@ -17,7 +17,6 @@ function formatDate(iso: string | null): string {
 }
 
 function EmailRow({ email, onOpen }: { email: ActivityEmail; onOpen: () => void }) {
-  const sent = email.direction === "sent";
   return (
     <li>
       <button
@@ -26,14 +25,6 @@ function EmailRow({ email, onOpen }: { email: ActivityEmail; onOpen: () => void 
         title="Open this email"
         className="-mx-2 flex w-[calc(100%+1rem)] cursor-pointer gap-3 rounded px-2 py-3 text-left transition-colors hover:bg-gray-50"
       >
-        <span
-          title={sent ? "Sent" : "Received"}
-          className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ${
-            sent ? "bg-lightBlue/10 text-lightBlue" : "bg-greenAccent/10 text-greenAccent"
-          }`}
-        >
-          {sent ? <ArrowUpRight className="size-3.5" /> : <ArrowDownLeft className="size-3.5" />}
-        </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
             <p className="truncate text-sm font-semibold text-gray-900">{email.subject}</p>

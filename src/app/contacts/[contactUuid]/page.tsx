@@ -20,8 +20,12 @@ export default async function ContactPage({
         Contacts
       </Link>
 
-      {/* 25% / 50% / 25% of the width left after the gaps; stacked on narrow screens. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_2fr_1fr]">
+      {/*
+        25% / 50% / 25% of the width left after the gaps; stacked on narrow screens. The columns are
+        minmax(0, …) because a plain 1fr is minmax(auto, 1fr): a long address or subject inside a
+        column would widen its track and push the others around.
+      */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
         <ContactOverview contactUuid={contactUuid} />
         <ContactActivities contactUuid={contactUuid} />
         <div />

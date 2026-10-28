@@ -14,7 +14,7 @@ export function ContactActivities({ contactUuid }: { contactUuid: string }) {
   if (!contact) return null; // the overview next to it already says loading / not found
 
   return (
-    <div className="rounded border border-gray-100 shadow-sm bg-white p-4">
+    <div className="rounded border border-gray-200 bg-white p-4">
       <h2 className="mb-3 text-base font-semibold text-gray-900">Activities</h2>
 
       <Tabs defaultValue="emails">
