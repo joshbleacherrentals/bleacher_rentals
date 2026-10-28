@@ -30,6 +30,11 @@ create table public."EmailMessages" (
   google_message_id text,
   google_id text not null,
   google_thread_id text not null,
+  -- Copied from the In-Reply-To and References headers: the Message-ID of the email this one answers,
+  -- and the chain of Message-IDs before it. A reply sends both back so mail clients thread it. Null
+  -- for an email that replies to nothing.
+  google_in_reply_to text,
+  google_references text,
 
   from_address text,
   to_addresses text,

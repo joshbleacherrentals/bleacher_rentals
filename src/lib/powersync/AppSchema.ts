@@ -960,6 +960,8 @@ const EmailMessagesCols = {
   google_message_id: column.text,
   google_id: column.text,
   google_thread_id: column.text,
+  google_in_reply_to: column.text,
+  google_references: column.text,
   from_address: column.text,
   to_addresses: column.text,
   cc_addresses: column.text,

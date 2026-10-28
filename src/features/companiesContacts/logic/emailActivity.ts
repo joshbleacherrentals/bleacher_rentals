@@ -16,6 +16,8 @@ export type ActivityEmail = {
 /** The fields of /api/dev/gmail-contact-emails's `messages` that get saved. */
 export type PulledEmail = {
   messageId: string | null;
+  inReplyTo: string | null;
+  references: string | null;
   /** Every mailbox holding a copy, with that mailbox's Gmail id. The first is the primary copy. */
   copies: { mailbox: string; id: string; threadId: string }[];
   from: string | null;

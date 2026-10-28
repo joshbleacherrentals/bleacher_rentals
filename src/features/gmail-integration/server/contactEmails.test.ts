@@ -30,6 +30,8 @@ const message = (
   id: "g1",
   threadId: "t1",
   messageId: "<m1@x>",
+  inReplyTo: null,
+  references: null,
   from: "a@x.com",
   to: "b@x.com",
   cc: null,

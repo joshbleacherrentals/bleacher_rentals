@@ -51,6 +51,8 @@ import type { PulledEmail } from "../logic/emailActivity";
 
 const email = (over: Partial<PulledEmail> = {}): PulledEmail => ({
   messageId: "<m1@x>",
+  inReplyTo: null,
+  references: null,
   copies: [{ mailbox: "paul@co.com", id: "g1", threadId: "t1" }],
   from: "Pat <pat@xyz.com>",
   to: "me@co.com",
@@ -108,6 +110,23 @@ describe("planContactEmailSave", () => {
     });
     expect(out.newLinks).toEqual([
       { id: "new-3", created_at: base.now, contact_uuid: "contact-1", email_message_uuid: "new-1" },
+    ]);
+  });
+
+  it("saves the reply headers on every copy, and null when they are missing or blank", () => {
+    const reply = email({
+      inReplyTo: " <prev@x> ",
+      references: "<first@x> <prev@x>",
+      copies: twoCopies.copies,
+    });
+    const blank = email({ messageId: "<m2@x>", inReplyTo: "  ", references: null });
+
+    const out = planContactEmailSave({ ...base, emails: [reply, blank], newId });
+
+    expect(out.newEmails.map((r) => [r.google_in_reply_to, r.google_references])).toEqual([
+      ["<prev@x>", "<first@x> <prev@x>"],
+      ["<prev@x>", "<first@x> <prev@x>"],
+      [null, null],
     ]);
   });
 

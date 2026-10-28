@@ -4,7 +4,7 @@ import { pulledEmailDate, type PulledEmail } from "../logic/emailActivity";
 
 // Looking up and inserting in chunks keeps each statement under SQLite's bound-parameter limit.
 const LOOKUP_CHUNK = 400;
-const EMAIL_INSERT_CHUNK = 50; // 13 columns each
+const EMAIL_INSERT_CHUNK = 50; // 15 columns each
 const LINK_INSERT_CHUNK = 100; // 4 columns each
 
 type EmailMessageRow = {
@@ -14,6 +14,8 @@ type EmailMessageRow = {
   google_message_id: string | null;
   google_id: string;
   google_thread_id: string;
+  google_in_reply_to: string | null;
+  google_references: string | null;
   from_address: string | null;
   to_addresses: string | null;
   cc_addresses: string | null;
@@ -87,6 +89,8 @@ export function planContactEmailSave(params: {
         google_message_id: messageId,
         google_id: copy.id,
         google_thread_id: copy.threadId,
+        google_in_reply_to: email.inReplyTo?.trim() || null,
+        google_references: email.references?.trim() || null,
         from_address: email.from,
         to_addresses: email.to,
         cc_addresses: email.cc,

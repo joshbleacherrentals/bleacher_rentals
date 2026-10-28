@@ -8,6 +8,10 @@ export type GmailMessageSummary = {
   threadId: string;
   /** The `Message-ID` header: the same email in two mailboxes shares it, so it deduplicates. */
   messageId: string | null;
+  /** The `In-Reply-To` header: the Message-ID of the email this one answers. */
+  inReplyTo: string | null;
+  /** The `References` header: the Message-IDs of the whole conversation before this email. */
+  references: string | null;
   from: string | null;
   to: string | null;
   cc: string | null;
@@ -29,7 +33,16 @@ type GmailMessageResponse = {
   payload?: { headers?: { name: string; value: string }[] };
 };
 
-const METADATA_HEADERS = ["From", "To", "Cc", "Subject", "Date", "Message-ID"];
+const METADATA_HEADERS = [
+  "From",
+  "To",
+  "Cc",
+  "Subject",
+  "Date",
+  "Message-ID",
+  "In-Reply-To",
+  "References",
+];
 
 export function summarizeMessage(message: GmailMessageResponse): GmailMessageSummary {
   const header = (name: string) =>
@@ -40,6 +53,8 @@ export function summarizeMessage(message: GmailMessageResponse): GmailMessageSum
     id: message.id,
     threadId: message.threadId,
     messageId: header("Message-ID"),
+    inReplyTo: header("In-Reply-To"),
+    references: header("References"),
     from: header("From"),
     to: header("To"),
     cc: header("Cc"),

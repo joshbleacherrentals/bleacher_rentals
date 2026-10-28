@@ -909,14 +909,14 @@ isOneToOne: true
                   ]
                 },"EmailMessages": {
                   Row: {
-                    "cc_addresses": string | null,"created_at": string,"date": string | null,"direction": string,"email_message_details_uuid": string | null,"from_address": string | null,"google_id": string,"google_message_id": string | null,"google_thread_id": string,"id": string,"mailbox": string,"snippet": string | null,"subject": string | null,"to_addresses": string | null
+                    "cc_addresses": string | null,"created_at": string,"date": string | null,"direction": string,"email_message_details_uuid": string | null,"from_address": string | null,"google_id": string,"google_in_reply_to": string | null,"google_message_id": string | null,"google_references": string | null,"google_thread_id": string,"id": string,"mailbox": string,"snippet": string | null,"subject": string | null,"to_addresses": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction": string,"email_message_details_uuid"?: string | null,"from_address"?: string | null,"google_id": string,"google_message_id"?: string | null,"google_thread_id": string,"id"?: string,"mailbox": string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction": string,"email_message_details_uuid"?: string | null,"from_address"?: string | null,"google_id": string,"google_in_reply_to"?: string | null,"google_message_id"?: string | null,"google_references"?: string | null,"google_thread_id": string,"id"?: string,"mailbox": string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
                   }
                   Update: {
-                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction"?: string,"email_message_details_uuid"?: string | null,"from_address"?: string | null,"google_id"?: string,"google_message_id"?: string | null,"google_thread_id"?: string,"id"?: string,"mailbox"?: string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction"?: string,"email_message_details_uuid"?: string | null,"from_address"?: string | null,"google_id"?: string,"google_in_reply_to"?: string | null,"google_message_id"?: string | null,"google_references"?: string | null,"google_thread_id"?: string,"id"?: string,"mailbox"?: string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
                   }
                   Relationships: [
                     {

@@ -33,6 +33,8 @@ describe("summarizeMessage", () => {
             { name: "SUBJECT", value: "Quote" },
             { name: "Date", value: "Mon, 26 Oct 2026 09:00:00 -0600" },
             { name: "message-id", value: "<abc@mail.example.com>" },
+            { name: "IN-REPLY-TO", value: "<prev@mail.example.com>" },
+            { name: "References", value: "<first@mail.example.com> <prev@mail.example.com>" },
           ],
         },
       }),
@@ -40,6 +42,8 @@ describe("summarizeMessage", () => {
       id: "m1",
       threadId: "t1",
       messageId: "<abc@mail.example.com>",
+      inReplyTo: "<prev@mail.example.com>",
+      references: "<first@mail.example.com> <prev@mail.example.com>",
       from: "Pat <pat@example.com>",
       to: "me@example.com",
       cc: "boss@example.com",
@@ -56,6 +60,8 @@ describe("summarizeMessage", () => {
 
     expect(summary).toMatchObject({
       messageId: null,
+      inReplyTo: null,
+      references: null,
       from: null,
       to: null,
       cc: null,
@@ -134,6 +140,8 @@ describe("getMessageSummary", () => {
       "Subject",
       "Date",
       "Message-ID",
+      "In-Reply-To",
+      "References",
     ]);
   });
 });
