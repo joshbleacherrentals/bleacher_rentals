@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import {
+  getAttachmentData,
+  getFullMessage,
   getMessageSummary,
+  GmailApiError,
   listLatestMessages,
   listMessageIds,
   summarizeMessage,
@@ -181,5 +184,67 @@ describe("listLatestMessages", () => {
     await expect(listLatestMessages("t", 5)).rejects.toThrow(
       "Gmail API 403: Insufficient Permission",
     );
+  });
+});
+
+describe("getFullMessage", () => {
+  it("asks for the whole message and sends the bearer token", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "abc123", threadId: "t", payload: { mimeType: "text/plain" } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const message = await getFullMessage("ya29.token", "abc123");
+
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.pathname).toMatch(/\/messages\/abc123$/);
+    expect(url.searchParams.get("format")).toBe("full");
+    expect(fetchMock.mock.calls[0][1]).toEqual({ headers: { Authorization: "Bearer ya29.token" } });
+    expect(message.id).toBe("abc123");
+  });
+
+  it("throws an error that carries Gmail's status, so a missing email is told apart from a failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        json: async () => ({ error: { message: "Requested entity was not found." } }),
+      })),
+    );
+
+    const error = await getFullMessage("t", "nope").catch((e) => e);
+
+    expect(error).toBeInstanceOf(GmailApiError);
+    expect(error.status).toBe(404);
+    expect(error.message).toBe("Gmail API 404: Requested entity was not found.");
+  });
+});
+
+describe("getAttachmentData", () => {
+  it("fetches one attachment of one message and returns its base64url data", async () => {
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ size: 3, data: "SGkh" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await getAttachmentData("t", "msg1", "ATT/1")).toBe("SGkh");
+    expect(new URL(fetchMock.mock.calls[0][0]).pathname).toMatch(
+      /\/messages\/msg1\/attachments\/ATT%2F1$/,
+    );
+  });
+
+  it("returns an empty string when Gmail sends no data", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })),
+    );
+
+    expect(await getAttachmentData("t", "m", "a")).toBe("");
   });
 });

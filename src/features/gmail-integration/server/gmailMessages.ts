@@ -51,15 +51,62 @@ export function summarizeMessage(message: GmailMessageResponse): GmailMessageSum
   };
 }
 
+/** A Gmail API refusal, with its HTTP status so a caller can tell "not found" from a real failure. */
+export class GmailApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(`Gmail API ${status}: ${message}`);
+    this.name = "GmailApiError";
+  }
+}
+
 async function gmailGet<T>(accessToken: string, path: string): Promise<T> {
   const res = await fetch(`${GMAIL_API}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(`Gmail API ${res.status}: ${body?.error?.message ?? res.statusText}`);
+    throw new GmailApiError(res.status, body?.error?.message ?? res.statusText);
   }
   return res.json();
+}
+
+/** One part of a message's MIME tree, as `format=full` returns it. */
+export type GmailMessagePart = {
+  partId?: string;
+  mimeType?: string;
+  filename?: string;
+  headers?: { name: string; value: string }[];
+  body?: { size?: number; data?: string; attachmentId?: string };
+  parts?: GmailMessagePart[];
+};
+
+export type GmailFullMessage = {
+  id: string;
+  threadId: string;
+  internalDate?: string;
+  labelIds?: string[];
+  payload?: GmailMessagePart;
+};
+
+/** One whole message: headers, body and attachment list. The expensive call, so only on demand. */
+export async function getFullMessage(accessToken: string, id: string): Promise<GmailFullMessage> {
+  return gmailGet<GmailFullMessage>(accessToken, `/messages/${encodeURIComponent(id)}?format=full`);
+}
+
+/** The bytes of one attachment, or of a body part too big to come inline, as base64url. */
+export async function getAttachmentData(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<string> {
+  const attachment = await gmailGet<{ data?: string }>(
+    accessToken,
+    `/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
+  );
+  return attachment.data ?? "";
 }
 
 /**

@@ -867,19 +867,45 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"EmailMessages": {
+                },"EmailMessageDetails": {
                   Row: {
-                    "cc_addresses": string | null,"created_at": string,"date": string | null,"direction": string,"from_address": string | null,"google_id": string,"google_message_id": string | null,"google_thread_id": string,"id": string,"snippet": string | null,"subject": string | null,"to_addresses": string | null
+                    "body_html": string | null,"body_text": string | null,"created_at": string,"email_message_uuid": string,"id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction": string,"from_address"?: string | null,"google_id": string,"google_message_id"?: string | null,"google_thread_id": string,"id"?: string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                    "body_html"?: string | null,"body_text"?: string | null,"created_at"?: string,"email_message_uuid": string,"id"?: string
                   }
                   Update: {
-                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction"?: string,"from_address"?: string | null,"google_id"?: string,"google_message_id"?: string | null,"google_thread_id"?: string,"id"?: string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                    "body_html"?: string | null,"body_text"?: string | null,"created_at"?: string,"email_message_uuid"?: string,"id"?: string
                   }
                   Relationships: [
-                    
+                    {
+      foreignKeyName: "emailmessagedetails_email_message_uuid_fkey"
+      columns: ["email_message_uuid"]
+isOneToOne: true
+      referencedRelation: "EmailMessages"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"EmailMessages": {
+                  Row: {
+                    "cc_addresses": string | null,"created_at": string,"date": string | null,"direction": string,"email_message_details_uuid": string | null,"from_address": string | null,"google_id": string,"google_message_id": string | null,"google_thread_id": string,"id": string,"mailbox": string,"snippet": string | null,"subject": string | null,"to_addresses": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction": string,"email_message_details_uuid"?: string | null,"from_address"?: string | null,"google_id": string,"google_message_id"?: string | null,"google_thread_id": string,"id"?: string,"mailbox": string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                  }
+                  Update: {
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction"?: string,"email_message_details_uuid"?: string | null,"from_address"?: string | null,"google_id"?: string,"google_message_id"?: string | null,"google_thread_id"?: string,"id"?: string,"mailbox"?: string,"snippet"?: string | null,"subject"?: string | null,"to_addresses"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "emailmessages_email_message_details_uuid_fkey"
+      columns: ["email_message_details_uuid"]
+isOneToOne: false
+      referencedRelation: "EmailMessageDetails"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"EmailTemplateAttachments": {
                   Row: {

@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
 import { useContactEmailMessages } from "../hooks/useContactEmailMessages";
 import { usePullContactEmails } from "../hooks/usePullContactEmails";
 import type { ActivityEmail } from "../logic/emailActivity";
+import { EmailViewModal } from "./EmailViewModal";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -14,32 +16,39 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function EmailRow({ email }: { email: ActivityEmail }) {
+function EmailRow({ email, onOpen }: { email: ActivityEmail; onOpen: () => void }) {
   const sent = email.direction === "sent";
   return (
-    <li className="flex gap-3 py-3">
-      <span
-        title={sent ? "Sent" : "Received"}
-        className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ${
-          sent ? "bg-lightBlue/10 text-lightBlue" : "bg-greenAccent/10 text-greenAccent"
-        }`}
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        title="Open this email"
+        className="-mx-2 flex w-[calc(100%+1rem)] cursor-pointer gap-3 rounded px-2 py-3 text-left transition-colors hover:bg-gray-50"
       >
-        {sent ? <ArrowUpRight className="size-3.5" /> : <ArrowDownLeft className="size-3.5" />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="truncate text-sm font-semibold text-gray-900">{email.subject}</p>
-          <span className="shrink-0 text-xs text-gray-400">{formatDate(email.date)}</span>
+        <span
+          title={sent ? "Sent" : "Received"}
+          className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ${
+            sent ? "bg-lightBlue/10 text-lightBlue" : "bg-greenAccent/10 text-greenAccent"
+          }`}
+        >
+          {sent ? <ArrowUpRight className="size-3.5" /> : <ArrowDownLeft className="size-3.5" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="truncate text-sm font-semibold text-gray-900">{email.subject}</p>
+            <span className="shrink-0 text-xs text-gray-400">{formatDate(email.date)}</span>
+          </div>
+          <p className="truncate text-xs text-gray-500">
+            {email.from}
+            {email.to && <span className="text-gray-300"> → </span>}
+            {email.to}
+          </p>
+          {email.snippet && (
+            <p className="mt-1 line-clamp-2 text-sm text-gray-600">{email.snippet}</p>
+          )}
         </div>
-        <p className="truncate text-xs text-gray-500">
-          {email.from}
-          {email.to && <span className="text-gray-300"> → </span>}
-          {email.to}
-        </p>
-        {email.snippet && (
-          <p className="mt-1 line-clamp-2 text-sm text-gray-600">{email.snippet}</p>
-        )}
-      </div>
+      </button>
     </li>
   );
 }
@@ -58,6 +67,8 @@ export function ContactEmailsTab({
 }) {
   const { emails, isLoading } = useContactEmailMessages(contactUuid);
   const { state, pull } = usePullContactEmails();
+  // The email being read, by EmailMessages.id (an ActivityEmail's key).
+  const [openEmail, setOpenEmail] = useState<string | null>(null);
 
   const busy = state.status === "searching" || state.status === "saving";
   const pullFromGmail = () => {
@@ -73,9 +84,12 @@ export function ContactEmailsTab({
       <div>
         <ul className="divide-y divide-gray-100">
           {emails.map((email) => (
-            <EmailRow key={email.key} email={email} />
+            <EmailRow key={email.key} email={email} onOpen={() => setOpenEmail(email.key)} />
           ))}
         </ul>
+        {openEmail && (
+          <EmailViewModal emailMessageUuid={openEmail} onClose={() => setOpenEmail(null)} />
+        )}
 
         <div className="mt-2 flex items-center justify-between gap-3 text-xs text-gray-400">
           <span>

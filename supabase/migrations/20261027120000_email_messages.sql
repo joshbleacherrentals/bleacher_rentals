@@ -1,8 +1,9 @@
 -- EmailMessages: the headers and snippet of emails pulled from Gmail, one row per mailbox copy.
 -- ContactEmailMessages: which contacts an email message involves.
+-- EmailMessageDetails: the body of an email, saved the first time someone opens it.
 --
--- Starting small: no body and no attachments. Bodies and attachments are meant to be fetched from
--- Gmail on demand, not stored here.
+-- Starting small: no attachments. An email's body is not kept on EmailMessages: it is fetched from
+-- Gmail the first time someone opens the email and saved in EmailMessageDetails.
 --
 -- One email that sits in two mailboxes is two EmailMessages rows. They share google_message_id (the
 -- email's own Message-ID header) and differ in mailbox, google_id (Gmail's id for that mailbox's copy)
@@ -36,6 +37,11 @@ create table public."EmailMessages" (
   snippet text,
   -- Relative to us: 'sent' when someone at the company wrote it, otherwise 'received'.
   direction text not null,
+
+  -- This email's saved body (EmailMessageDetails points back at this row). Null until someone has
+  -- opened the email. Set once by the app; see the update policy at the bottom of this file. Its
+  -- foreign key is added below, once EmailMessageDetails exists.
+  email_message_details_uuid uuid,
 
   constraint EmailMessages_pkey primary key (id),
   -- A Gmail id is only unique within its mailbox, so a copy is identified by both.
@@ -72,6 +78,37 @@ create index "ContactEmailMessages_email_message_uuid_idx"
 
 alter table public."ContactEmailMessages" enable row level security;
 
+-- One row per EmailMessages row (a mailbox copy). No row means the body has not been loaded yet.
+-- Kept apart from EmailMessages so the email list stays small, and so loading a body is an insert
+-- that happens once: nobody can update a row. More columns come as they are needed.
+create table public."EmailMessageDetails" (
+  id uuid not null default gen_random_uuid(),
+  created_at timestamp with time zone not null default now(),
+
+  email_message_uuid uuid not null,
+
+  -- The plain-text version, if the email has one.
+  body_text text,
+  -- The HTML version exactly as sent. Untrusted: sanitize before rendering it.
+  body_html text,
+
+  constraint EmailMessageDetails_pkey primary key (id),
+  constraint EmailMessageDetails_email_message_uuid_fkey foreign key (email_message_uuid)
+    references public."EmailMessages"(id) on delete cascade,
+  -- One details row per email message. Also serves "the details of this message".
+  constraint EmailMessageDetails_email_message_uuid_unique unique (email_message_uuid)
+);
+
+alter table public."EmailMessageDetails" enable row level security;
+
+-- The two tables point at each other, so this side of the link can only be added now.
+alter table public."EmailMessages"
+  add constraint EmailMessages_email_message_details_uuid_fkey foreign key (email_message_details_uuid)
+    references public."EmailMessageDetails"(id) on delete set null;
+
+create index "EmailMessages_email_message_details_uuid_idx"
+  on public."EmailMessages" using btree (email_message_details_uuid);
+
 -- Access. Every signed-in user can read and insert. There are no update or delete policies, so
 -- nobody can change or remove a row through the API; the service role (the server) still can. Same
 -- pattern as ChangeLog (select: everyone) and EventChangeLog (insert: everyone, no update or delete).
@@ -88,10 +125,59 @@ create policy "email_messages_insert" on public."EmailMessages"
   as permissive for insert to authenticated
   with check (true);
 
+-- The one exception to "nobody updates". Opening an email saves its body in EmailMessageDetails and
+-- then sets email_message_details_uuid on the EmailMessages row. The policy lets a row be updated
+-- only while that pointer is still empty, and the trigger below refuses anything else a signed-in
+-- user tries to change (the service role is not held to it). So the pointer can be set once, to the
+-- email's own details row, and nothing else about a row can be edited.
+create policy "email_messages_link_details" on public."EmailMessages"
+  as permissive for update to authenticated
+  using (email_message_details_uuid is null)
+  with check (true);
+
+create function public.email_messages_guard_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user = 'authenticated' then
+    if (to_jsonb(new) - 'email_message_details_uuid') is distinct from
+       (to_jsonb(old) - 'email_message_details_uuid') then
+      raise exception 'Only email_message_details_uuid can be set on an EmailMessages row'
+        using errcode = '42501';
+    end if;
+
+    if new.email_message_details_uuid is not null and not exists (
+      select 1
+      from public."EmailMessageDetails" d
+      where d.id = new.email_message_details_uuid
+        and d.email_message_uuid = new.id
+    ) then
+      raise exception 'email_message_details_uuid must be this email''s own details row'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger email_messages_guard_update
+  before update on public."EmailMessages"
+  for each row execute function public.email_messages_guard_update();
+
 create policy "contact_email_messages_select" on public."ContactEmailMessages"
   as permissive for select to authenticated
   using (true);
 
 create policy "contact_email_messages_insert" on public."ContactEmailMessages"
+  as permissive for insert to authenticated
+  with check (true);
+
+create policy "email_message_details_select" on public."EmailMessageDetails"
+  as permissive for select to authenticated
+  using (true);
+
+create policy "email_message_details_insert" on public."EmailMessageDetails"
   as permissive for insert to authenticated
   with check (true);

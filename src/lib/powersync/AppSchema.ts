@@ -967,6 +967,7 @@ const EmailMessagesCols = {
   date: column.text,
   snippet: column.text,
   direction: column.text,
+  email_message_details_uuid: column.text,
 } satisfies PowerSyncColsFor<"EmailMessages">;
 const EmailMessages = new Table(EmailMessagesCols, {
   indexes: { google_message_id: ["google_message_id"], google_id: ["google_id"] },
@@ -979,6 +980,16 @@ const ContactEmailMessagesCols = {
 } satisfies PowerSyncColsFor<"ContactEmailMessages">;
 const ContactEmailMessages = new Table(ContactEmailMessagesCols, {
   indexes: { contact_uuid: ["contact_uuid"], email_message_uuid: ["email_message_uuid"] },
+});
+
+const EmailMessageDetailsCols = {
+  created_at: column.text,
+  email_message_uuid: column.text,
+  body_text: column.text,
+  body_html: column.text,
+} satisfies PowerSyncColsFor<"EmailMessageDetails">;
+const EmailMessageDetails = new Table(EmailMessageDetailsCols, {
+  indexes: { email_message_uuid: ["email_message_uuid"] },
 });
 
 const EventAttachmentsCols = {
@@ -1425,6 +1436,7 @@ export const AppSchema = new Schema({
   Contacts,
   EmailMessages,
   ContactEmailMessages,
+  EmailMessageDetails,
   EventAttachments,
   EventChangeLog,
   EventLineItems,
