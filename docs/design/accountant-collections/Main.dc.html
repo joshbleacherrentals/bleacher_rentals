@@ -27,16 +27,7 @@ body{margin:0;background:#ffffff}
     <button type="button" role="tab" aria-selected="false" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:none;font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">Need attention</button>
   </div>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 24px">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span id="col-status-label" style="font-size:14px;font-weight:500;color:#374151">Status</span>
-      <div role="group" aria-labelledby="col-status-label" style="display:flex;align-items:center;gap:8px">
-        <button type="button" aria-pressed="false" class="col-btn" style="display:inline-flex;align-items:center;height:32px;padding:0 14px;border:0;border-radius:6px;background:#dcede2;font-family:inherit;font-size:14px;font-weight:500;color:#2f6b4c;cursor:pointer">Paid</button>
-        <button type="button" aria-pressed="true" class="col-btn" style="display:inline-flex;align-items:center;height:32px;padding:0 14px;border:0;border-radius:6px;background:#fbe7e5;box-shadow:0 0 0 2px #a8403a;font-family:inherit;font-size:14px;font-weight:600;color:#a8403a;cursor:pointer">Collections</button>
-        <button type="button" aria-pressed="false" class="col-btn" style="display:inline-flex;align-items:center;height:32px;padding:0 14px;border:0;border-radius:6px;background:#eef1f6;font-family:inherit;font-size:14px;font-weight:500;color:#4f6178;cursor:pointer">Cancelled</button>
-      </div>
-    </div>
-
+  <div style="display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px 24px">
     <button type="button" role="switch" aria-checked="{{ showNotDue }}" onClick="{{ toggleNotDue }}" class="col-btn" style="display:flex;align-items:center;gap:8px;border:0;background:none;padding:0;font-family:inherit;font-size:14px;color:#4b5563;cursor:pointer">
       <span>Show Not Due Yet</span>
       <sc-if value="{{ showNotDue }}" hint-placeholder-val="{{ false }}">

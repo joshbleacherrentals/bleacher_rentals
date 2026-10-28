@@ -18,5 +18,5 @@ These are the canvas source files, copied from the published version. They open 
 ## Notes
 
 - Names, amounts and dates are made up. The Riverside Charity Run row and the invoice page agree (3 days overdue, C$1,735.75, "today" is Nov 10, 2026).
-- Not drawn because the sketch does not define it: the Paid and Cancelled lists, search and filters on the Collections tab.
+- The Status selector (Paid / Collections / Cancelled) from the sketch was removed on request, so the tab shows only the Collections list. Search and filters are not drawn either, because the sketch does not define them.
 - Copy kept as written in the sketch, for example "3 months after".
