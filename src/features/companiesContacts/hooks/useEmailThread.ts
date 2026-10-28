@@ -1,0 +1,83 @@
+"use client";
+
+import { useMemo } from "react";
+import type { Expression, SqlBool } from "kysely";
+import { db } from "@/components/providers/SystemProvider";
+import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
+import { storedToActivityEmail, type ActivityEmail } from "../logic/emailActivity";
+import { selectThread, threadRoot, type ThreadRow } from "../logic/emailThread";
+
+const threadRows = () =>
+  db
+    .selectFrom("EmailMessages")
+    .select([
+      "id",
+      "mailbox",
+      "google_message_id",
+      "google_thread_id",
+      "google_in_reply_to",
+      "google_references",
+      "from_address",
+      "to_addresses",
+      "subject",
+      "date",
+      "snippet",
+      "direction",
+    ]);
+
+/**
+ * The saved emails in the same conversation as `emailMessageUuid` (itself included), oldest first.
+ * Only emails already in the local database are listed. Reactive, so a newly saved email joins the
+ * thread by itself. Bodies are not read here: each email loads its own when it is opened.
+ */
+export function useEmailThread(emailMessageUuid: string): {
+  messages: ActivityEmail[];
+  isLoading: boolean;
+} {
+  // First the opened email, to learn what its thread is called.
+  const openedCompiled = useMemo(
+    () => threadRows().where("id", "=", emailMessageUuid).compile(),
+    [emailMessageUuid],
+  );
+  const { data: openedData, isLoading: openedLoading } = useTypedQuery(
+    openedCompiled,
+    expect<ThreadRow>(),
+  );
+  const opened = openedData?.[0] ?? null;
+  const root = opened ? threadRoot(opened) : null;
+  const mailbox = opened?.mailbox ?? null;
+  const gmailThread = opened?.google_thread_id ?? null;
+
+  // Then everything that could be in it. LIKE over-fetches (a `_` in an ID matches any character)
+  // and selectThread keeps only the exact matches.
+  const threadCompiled = useMemo(
+    () =>
+      threadRows()
+        .where((eb) => {
+          const conditions: Expression<SqlBool>[] = [eb("id", "=", emailMessageUuid)];
+          if (root) {
+            const pattern = `%${root}%`;
+            conditions.push(
+              eb("google_message_id", "like", pattern),
+              eb("google_in_reply_to", "like", pattern),
+              eb("google_references", "like", pattern),
+            );
+          }
+          if (mailbox && gmailThread) {
+            conditions.push(
+              eb.and([eb("mailbox", "=", mailbox), eb("google_thread_id", "=", gmailThread)]),
+            );
+          }
+          return eb.or(conditions);
+        })
+        .compile(),
+    [emailMessageUuid, root, mailbox, gmailThread],
+  );
+  const { data, isLoading } = useTypedQuery(threadCompiled, expect<ThreadRow>());
+
+  const messages = useMemo(
+    () => selectThread(emailMessageUuid, data ?? []).map(storedToActivityEmail),
+    [data, emailMessageUuid],
+  );
+  return { messages, isLoading: openedLoading || isLoading };
+}
