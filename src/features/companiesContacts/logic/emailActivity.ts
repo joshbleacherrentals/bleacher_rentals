@@ -99,6 +99,28 @@ export function pulledEmailDate(email: Pick<PulledEmail, "internalDate" | "date"
   return toIso(email.internalDate, email.date);
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+/**
+ * Gmail hands snippets back HTML-escaped (`isn&#39;t`), so they are saved that way. This turns the
+ * entities back into characters for display, in one pass so `&amp;lt;` shows as `&lt;`. Anything it
+ * does not recognize is left as it was.
+ */
+export function decodeSnippet(snippet: string): string {
+  return snippet.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (entity, dec, hex, name) => {
+    if (name) return NAMED_ENTITIES[name.toLowerCase()] ?? entity;
+    const code = dec ? parseInt(dec, 10) : parseInt(hex, 16);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+  });
+}
+
 /** A row of EmailMessages (our DB), shaped for the list. */
 export function storedToActivityEmail(row: {
   id: string;
@@ -115,7 +137,7 @@ export function storedToActivityEmail(row: {
     from: summarizeAddresses(row.from_address, 1) || "Unknown sender",
     to: summarizeAddresses(row.to_addresses),
     date: toIso(null, row.date),
-    snippet: row.snippet ?? "",
+    snippet: decodeSnippet(row.snippet ?? ""),
     direction: row.direction === "sent" ? "sent" : "received",
   };
 }

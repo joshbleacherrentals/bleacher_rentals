@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseAddressList,
   pulledEmailDate,
+  decodeSnippet,
   storedToActivityEmail,
   summarizeAddresses,
 } from "./emailActivity";
@@ -66,7 +67,43 @@ describe("pulledEmailDate", () => {
   });
 });
 
+describe("decodeSnippet", () => {
+  it("turns the entities Gmail escapes snippets with back into characters", () => {
+    expect(decodeSnippet("isn&#39;t &quot;ready&quot; &amp; Q&amp;A &lt;3 &gt; 2")).toBe(
+      'isn\'t "ready" & Q&A <3 > 2',
+    );
+  });
+
+  it("reads numeric entities in decimal and hex, and a few common names", () => {
+    expect(decodeSnippet("caf&#233; &#x2019;s&nbsp;x &apos;hi&apos;")).toBe("café ’s x 'hi'");
+  });
+
+  it("decodes once, so an escaped entity stays as typed", () => {
+    expect(decodeSnippet("&amp;lt; and &amp;#39;")).toBe("&lt; and &#39;");
+  });
+
+  it("leaves unknown entities, bare ampersands and out-of-range numbers alone", () => {
+    expect(decodeSnippet("AT&T &bogus; &#99999999999; fish & chips")).toBe(
+      "AT&T &bogus; &#99999999999; fish & chips",
+    );
+  });
+});
+
 describe("storedToActivityEmail", () => {
+  it("decodes the snippet's entities for display", () => {
+    expect(
+      storedToActivityEmail({
+        id: "u",
+        from_address: null,
+        to_addresses: null,
+        subject: "x",
+        date: null,
+        snippet: "It isn&#39;t late",
+        direction: "received",
+      }).snippet,
+    ).toBe("It isn't late");
+  });
+
   it("shapes a stored row, reading the stored date and treating unknown directions as received", () => {
     expect(
       storedToActivityEmail({
