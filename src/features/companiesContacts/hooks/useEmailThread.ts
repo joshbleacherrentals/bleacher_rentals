@@ -27,13 +27,22 @@ const threadRows = () =>
     ]);
 
 /**
- * An email of a thread: what a row shows, plus the address headers as saved, for the details that
- * drop down from its "To" line. Bcc is not among them: it is not saved.
+ * An email of a thread: what a row shows, plus the headers as saved: the addresses, for the details
+ * that drop down from its "To" line (Bcc is not among them: it is not saved), and what a reply to
+ * it needs to be threaded under it (see emailReply.ts). Empty strings when a header was not saved.
  */
 export type ThreadMessage = ActivityEmail & {
   fromHeader: string;
   toHeader: string;
   ccHeader: string;
+  /** The subject as saved: the row's `subject` says "(no subject)" when there is none. */
+  subjectHeader: string;
+  /** Its Message-ID, and the Message-IDs before it in the conversation. */
+  messageIdHeader: string;
+  referencesHeader: string;
+  /** The mailbox this copy is in and Gmail's thread id for it there. */
+  mailbox: string;
+  gmailThreadId: string;
 };
 
 /**
@@ -93,6 +102,11 @@ export function useEmailThread(emailMessageUuid: string): {
         fromHeader: row.from_address ?? "",
         toHeader: row.to_addresses ?? "",
         ccHeader: row.cc_addresses ?? "",
+        subjectHeader: row.subject ?? "",
+        messageIdHeader: row.google_message_id ?? "",
+        referencesHeader: row.google_references ?? "",
+        mailbox: row.mailbox ?? "",
+        gmailThreadId: row.google_thread_id ?? "",
       })),
     [data, emailMessageUuid],
   );

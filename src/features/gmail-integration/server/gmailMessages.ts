@@ -88,6 +88,32 @@ async function gmailGet<T>(accessToken: string, path: string): Promise<T> {
   return res.json();
 }
 
+async function gmailPost<T>(accessToken: string, path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${GMAIL_API}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const failure = await res.json().catch(() => ({}));
+    throw new GmailApiError(res.status, failure?.error?.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+/**
+ * Sends a message, as the mailbox the token acts as. `raw` is the whole message in base64url (see
+ * composeMessage.ts). With a `threadId` it joins that thread of the mailbox, which Gmail only
+ * allows when the headers match the thread; without one it starts a thread of its own there.
+ */
+export async function sendRawMessage(
+  accessToken: string,
+  raw: string,
+  threadId?: string,
+): Promise<{ id: string; threadId: string; labelIds?: string[] }> {
+  return gmailPost(accessToken, "/messages/send", threadId ? { raw, threadId } : { raw });
+}
+
 /** One part of a message's MIME tree, as `format=full` returns it. */
 export type GmailMessagePart = {
   partId?: string;

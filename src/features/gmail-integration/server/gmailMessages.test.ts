@@ -9,6 +9,7 @@ import {
   GmailApiError,
   listLatestMessages,
   listMessageIds,
+  sendRawMessage,
   summarizeMessage,
 } from "./gmailMessages";
 
@@ -254,5 +255,62 @@ describe("getAttachmentData", () => {
     );
 
     expect(await getAttachmentData("t", "m", "a")).toBe("");
+  });
+});
+
+describe("sendRawMessage", () => {
+  it("posts the message to Gmail as the mailbox the token acts as, and returns the new ids", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "sent1", threadId: "thread1", labelIds: ["SENT"] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const sent = await sendRawMessage("ya29.token", "cmF3");
+
+    expect(sent).toEqual({ id: "sent1", threadId: "thread1", labelIds: ["SENT"] });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(url).pathname).toMatch(/\/users\/me\/messages\/send$/);
+    expect(init?.method).toBe("POST");
+    expect(init?.headers).toEqual({
+      Authorization: "Bearer ya29.token",
+      "Content-Type": "application/json",
+    });
+    expect(JSON.parse(init?.body as string)).toEqual({ raw: "cmF3" });
+  });
+
+  it("puts the message in a thread only when it is given one", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "sent1", threadId: "t9" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendRawMessage("t", "cmF3", "t9");
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+      raw: "cmF3",
+      threadId: "t9",
+    });
+  });
+
+  it("surfaces Gmail's refusal with its status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: async () => ({ error: { message: "Insufficient Permission" } }),
+      })),
+    );
+
+    const error = await sendRawMessage("t", "cmF3").catch((e) => e);
+
+    expect(error).toBeInstanceOf(GmailApiError);
+    expect(error.status).toBe(403);
+    expect(error.message).toBe("Gmail API 403: Insufficient Permission");
   });
 });

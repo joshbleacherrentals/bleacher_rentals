@@ -308,6 +308,29 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Send Emails",
+    description:
+      "Replying to a contact's email from their page (the Reply button and its box; today only Reply sends, and Reply all and Forward do nothing yet). The email goes out from your own company mailbox, so it comes from you and nobody can send as someone else. The same rule is enforced on the server, not just by the page. In the development environment an email can only go to the addresses on the Allowed Emails list. This is separate from Send To Client, which sends a quote.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can send a reply to any contact's email, from their own mailbox."),
+      account_manager: full(
+        "Can send a reply to any contact's email, from their own mailbox — they are the ones speaking to the client.",
+      ),
+      developer: none(
+        "The Companies & Contacts page is hidden from this role, so there is nothing to reply to, and the server would refuse a send anyway.",
+      ),
+      viewer: none(
+        "Viewers can read a contact's emails, but the Reply, Reply all and Forward buttons are dimmed and say why when pointed at or clicked. The server refuses the send too.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can send a reply to any contact's email, from their own mailbox, the same as an account manager.",
+      ),
+    },
+  },
+  {
     label: "Work Trackers",
 
     description: "This applies to the Work Trackers Page and the Dashboard.",

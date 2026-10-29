@@ -8,6 +8,7 @@ import { GoogleAuth } from "google-auth-library";
 // No service account private key ever exists.
 
 export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const IAM_CREDENTIALS_URL = "https://iamcredentials.googleapis.com/v1";

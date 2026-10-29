@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Forward, Reply, ReplyAll } from "lucide-react";
+import { AppTooltip } from "@/components/AppTooltip";
+import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { Button } from "@/components/ui/button";
+import { canSendEmail, CANNOT_SEND_EMAIL_MESSAGE } from "@/features/userAccess/logic/canSendEmail";
+import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { useEmailThread } from "../hooks/useEmailThread";
 import { EmailThreadMessage } from "./EmailThreadMessage";
 import { ReplyBox } from "./ReplyBox";
@@ -27,6 +31,11 @@ export function EmailView({
   const router = useRouter();
   const backHref = `/contacts/${contactUuid}`;
   const { messages, isLoading } = useEmailThread(emailMessageUuid);
+
+  // Only an admin, account manager or accountant may send (the server checks it too).
+  const roles = usePermissionsStore((state) => state.roles);
+  const maySend = canSendEmail(roles);
+  const explainCannotSend = () => createErrorToastNoThrow([CANNOT_SEND_EMAIL_MESSAGE]);
 
   // Whether the footer shows the reply box instead of its buttons, and whether that box is
   // minimized to a small card.
@@ -116,27 +125,45 @@ export function EmailView({
             }`}
           >
             <ReplyBox
+              contactUuid={contactUuid}
               replyingTo={messages[messages.length - 1]}
               minimized={minimized}
               onMinimize={() => setMinimized(true)}
               onRestore={() => setMinimized(false)}
+              onSent={() => {
+                setReplying(false);
+                setMinimized(false);
+              }}
             />
           </div>
         ) : (
           <div className="sticky bottom-0 z-10 mt-auto flex flex-wrap gap-2 border-t border-gray-200 bg-white pb-5 pl-18 pr-6 pt-3">
-            {footerActions.map(({ label, Icon, onClick }) => (
+            {footerActions.map(({ label, Icon, onClick }) => {
               // has-[>svg]:px-4.5 replaces the button's own 12px (it has an icon) with 18px.
-              <Button
-                key={label}
-                type="button"
-                variant="outline"
-                onClick={onClick}
-                className="rounded-full border-black has-[>svg]:px-4.5"
-              >
-                <Icon />
-                {label}
-              </Button>
-            ))}
+              // Someone who cannot send sees the buttons dimmed, not hidden. They are not
+              // `disabled`, which would swallow the hover and the click that explain why.
+              const button = (
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-disabled={!maySend}
+                  onClick={maySend ? onClick : explainCannotSend}
+                  className={`rounded-full border-black has-[>svg]:px-4.5 ${
+                    maySend ? "" : "cursor-not-allowed opacity-50 hover:bg-background"
+                  }`}
+                >
+                  <Icon />
+                  {label}
+                </Button>
+              );
+              return maySend ? (
+                <Fragment key={label}>{button}</Fragment>
+              ) : (
+                <AppTooltip key={label} content={CANNOT_SEND_EMAIL_MESSAGE} className="max-w-xs">
+                  {button}
+                </AppTooltip>
+              );
+            })}
           </div>
         ))}
     </div>

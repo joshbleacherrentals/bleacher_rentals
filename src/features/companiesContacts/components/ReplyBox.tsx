@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Maximize2, Minus } from "lucide-react";
+import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/db/useCurrentUser";
+import { saveContactEmails } from "../db/saveContactEmails";
+import { sendReply } from "../db/sendReply";
 import { useContactDirectory } from "../hooks/useContactDirectory";
 import type { ThreadMessage } from "../hooks/useEmailThread";
 import { personWithAddress, replyRecipients } from "../logic/emailActivity";
+import { replyReferences, replySubject } from "../logic/emailReply";
 import { namesByAddress, recipientSummary } from "../logic/recipientList";
 import { ReplyRecipients } from "./ReplyRecipients";
 
@@ -29,20 +33,29 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
  * text area folds it back. A minus at the top right of the header minimizes the box to a small
  * card (the page sizes it), and clicking that card restores it as it was: the draft, the
  * recipients and the header's state live here and survive being minimized. A footer with a Send
- * button stays at the bottom of the box however far the text has scrolled; it is not wired up, so
- * nothing is sent yet. The text area takes focus when the box appears and when it is restored.
+ * button stays at the bottom of the box however far the text has scrolled. Send posts the reply to
+ * /api/gmail/send, saves the email it sends to the contact's thread, and calls `onSent`, which
+ * closes the box; if the server refuses (who may send, and in development to whom, is its call) the
+ * reason shows as an error toast and the draft stays. The text area takes focus when the box
+ * appears and when it is restored.
  */
 export function ReplyBox({
+  contactUuid,
   replyingTo,
   minimized,
   onMinimize,
   onRestore,
+  onSent,
 }: {
+  /** The contact whose thread this is: the sent email is saved to it. */
+  contactUuid: string;
   /** The email being answered: the newest of the thread. */
   replyingTo: ThreadMessage;
   minimized: boolean;
   onMinimize: () => void;
   onRestore: () => void;
+  /** Called once the reply is sent. */
+  onSent: () => void;
 }) {
   const { data: currentUser, isLoading } = useCurrentUser();
   const user = currentUser?.[0];
@@ -82,6 +95,45 @@ export function ReplyBox({
   const [showAddresses, setShowAddresses] = useState(false);
   const [text, setText] = useState("");
   const textarea = useRef<HTMLTextAreaElement>(null);
+
+  const [sending, setSending] = useState(false);
+  const canSend = !sending && text.trim() !== "" && recipients.length + cc.length + bcc.length > 0;
+
+  const send = async () => {
+    setSending(true);
+    try {
+      const sent = await sendReply({
+        to: recipients,
+        cc,
+        bcc,
+        subject: replySubject(replyingTo.subjectHeader),
+        text,
+        inReplyTo: replyingTo.messageIdHeader || null,
+        references: replyReferences({
+          messageId: replyingTo.messageIdHeader || null,
+          references: replyingTo.referencesHeader || null,
+        }),
+        thread:
+          replyingTo.mailbox && replyingTo.gmailThreadId
+            ? { mailbox: replyingTo.mailbox, threadId: replyingTo.gmailThreadId }
+            : null,
+      });
+
+      // It is sent now. Failing to save it must not look like failing to send: a second try would
+      // send it twice. A later pull from Gmail brings it into the thread.
+      if (sent) {
+        try {
+          await saveContactEmails(contactUuid, [sent]);
+        } catch (error) {
+          console.error("Reply sent, but it could not be saved to the thread:", error);
+        }
+      }
+      onSent();
+    } catch (error: any) {
+      createErrorToastNoThrow([error?.message ?? "Could not send the reply."]);
+      setSending(false);
+    }
+  };
 
   // On appearing, and again on being restored from minimized.
   useEffect(() => {
@@ -170,10 +222,15 @@ export function ReplyBox({
         className="block min-h-0 w-full flex-1 resize-none overflow-y-auto p-4 text-sm text-gray-900 outline-none placeholder:text-gray-400"
       />
       {/* The text area scrolls on its own, so this stays at the bottom of the box in view. */}
-      <div className="shrink-0 border-t border-gray-200 px-4 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-t border-gray-200 px-4 py-3">
         {/* bg-darkBlue is the brand's dark blue (see globals.css); px-8 is 32px each side. */}
-        <Button type="button" className="rounded-full bg-darkBlue px-8 hover:bg-darkBlue/90">
-          Send
+        <Button
+          type="button"
+          onClick={() => void send()}
+          disabled={!canSend}
+          className="rounded-full bg-darkBlue px-8 hover:bg-darkBlue/90"
+        >
+          {sending ? "Sending..." : "Send"}
         </Button>
       </div>
     </div>
