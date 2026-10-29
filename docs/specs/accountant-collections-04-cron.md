@@ -1,9 +1,36 @@
 # Accountant Collections 04: the daily job that creates tasks
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **04**. Needs: [01](accountant-collections-01-backend.md),
-[02](accountant-collections-02-sql-amount-due.md). Needed by: nothing else. Branch:
-`q4-sprint2-collections`.
+Status: **Implemented 2026-10-29.** Approved by the user (written 2026-10-28); the two readings
+in §1 were implemented as written. Build order: **04**. Needs:
+[01](accountant-collections-01-backend.md), [02](accountant-collections-02-sql-amount-due.md).
+Needed by: nothing else. Branch: `q4-sprint2-collections`.
+
+Deviations and findings (the approved function and schedule are unchanged):
+
+- **The mutation check of §4 holds only in part.** Dropping the `NOT EXISTS` alone turns no test
+  red, and dropping `ON CONFLICT` alone leaves the pgTAP test green too: each is covered by the
+  other when one session runs. Dropping `ON CONFLICT` makes the concurrency script fail (23505 in
+  session 2); dropping both fails the pgTAP test with 23505. So the `NOT EXISTS` is not a safety
+  clause, only an optimisation, and the header comment of the migration now says so.
+- **The `EXPLAIN` check of §3 shows the opposite of the claim.** `ar_event_amount_due` is applied
+  last among the `Events` filters (`COST 1000` works), but those filters run on the scan, before
+  the anti-join that is `NOT EXISTS`. So Amount Due is computed for every booked, non-deleted
+  event, also those that already have an open task. The result is correct; the cost is one
+  calculation per booked event per run: on the local data (688 booked events) a run takes about
+  60 ms. Left as approved; restructuring the query is a change to the approved text.
+- **`CREATE EXTENSION IF NOT EXISTS pg_cron`** is in the migration, as in
+  `20260918150000_schedule_delete_past_alerts.sql`; §3's block did not show it.
+- **Tests beyond §4's list:** an installment due today is overdue and is picked up; an event with
+  no status is skipped. "A null `deleted`" (§6) cannot be tested: `Events.deleted` is NOT NULL.
+- **The pgTAP test first gives every existing booked event an open `baseline` task**, so that the
+  count it checks is only that of its own probes (a development database holds hundreds of
+  bookings); on an empty CI database that step does nothing.
+- **The concurrency script** is not run by CI (`supabase test db` runs only `*.test.sql`). It
+  writes committed rows and, because the job looks at every booked event, also baseline tasks for
+  the existing ones, all removed in its cleanup; it must not be pointed at a database that
+  matters.
+- `database.types.ts` is not changed: the specs 02 and 04 functions are not exposed over
+  PostgREST (`REVOKE` from `anon` and `authenticated`), and spec 02 did not add its own.
 
 ## 0. The feature in brief (the same in all ten specs)
 
