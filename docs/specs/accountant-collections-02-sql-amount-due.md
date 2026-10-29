@@ -1,7 +1,11 @@
 # Accountant Collections 02: the Amount Due calculation in Postgres
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **02**. Needs: nothing (it only reads existing tables). Needed by:
+Status: **Implemented 2026-10-29.** Approved by the user; the readings in §1 were confirmed with
+the approval. Deviations: (1) the tax is `lineTotal * (percent / 100)`, the TypeScript order, not
+`lineTotal * percent / 100` (the two differ: 2000 at 9.975% is 199 vs 200); (2) §6 asks to check that
+`PaymentInstallments` and `EventLineItems` are read by an `event_uuid` index, but neither table has
+one (only `PaymentHistory` does); no index was added, it is outside this spec's Files. Measured:
+658 booked events, `ar_event_amount_due` twice each, 164 ms in total on the local data. Build order: **02**. Needs: nothing (it only reads existing tables). Needed by:
 03, 04, 05. Branch: `q4-sprint2-collections`.
 
 ## 0. The feature in brief (the same in all ten specs)
