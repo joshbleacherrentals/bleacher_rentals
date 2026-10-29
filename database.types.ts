@@ -119,6 +119,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"ArEventTasks": {
+                  Row: {
+                    "completed": boolean,"created_at": string,"due_date": string,"event_uuid": string,"id": string,"note": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "completed"?: boolean,"created_at"?: string,"due_date": string,"event_uuid": string,"id"?: string,"note": string
+                  }
+                  Update: {
+                    "completed"?: boolean,"created_at"?: string,"due_date"?: string,"event_uuid"?: string,"id"?: string,"note"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ar_event_tasks_event_fkey"
+      columns: ["event_uuid"]
+isOneToOne: false
+      referencedRelation: "Events"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"BleacherAnnualInspections": {
                   Row: {
                     "bleacher_uuid": string,"created_at": string,"created_by": string | null,"document_path": string | null,"id": string,"inspected_on": string | null,"next_due_on": string,"notes": string | null

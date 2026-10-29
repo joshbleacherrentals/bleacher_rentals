@@ -1,7 +1,10 @@
 # Accountant Collections 01: the table `ArEventTasks`, access and sync
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **01** (first). Needs: nothing. Needed by: every other spec of
+Status: **Implemented 2026-10-29** (approved by the user; written 2026-10-28). No deviation from
+the approved types, schema or contracts. Two notes: `database.types.ts` was edited by hand for
+the `ArEventTasks` block only (the local database has not applied the migration, so `npm run gtl`
+would have dropped the table); the sync rules are changed in `../br_powersync` but **not yet
+deployed**. The readings to confirm in §1 were implemented as written. Build order: **01** (first). Needs: nothing. Needed by: every other spec of
 the series. Branch: `q4-sprint2-collections`.
 
 ## 0. The feature in brief (the same in all ten specs)
