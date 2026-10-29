@@ -9,8 +9,10 @@ import { createPendingEmail } from "../db/createPendingEmail";
 import { sendPendingEmail } from "../db/sendPendingEmail";
 import { useContactDirectory } from "../hooks/useContactDirectory";
 import type { ThreadMessage } from "../hooks/useEmailThread";
+import { useForwardedText } from "../hooks/useForwardedText";
 import { personWithAddress, replyAllRecipients, replyRecipients } from "../logic/emailActivity";
-import { replyReferences, replySubject, type ReplyMode } from "../logic/emailReply";
+import { forwardedMessageText } from "../logic/emailForward";
+import { forwardSubject, replyReferences, replySubject, type ReplyMode } from "../logic/emailReply";
 import { namesByAddress, recipientSummary } from "../logic/recipientList";
 import { ReplyRecipients } from "./ReplyRecipients";
 
@@ -26,7 +28,9 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
 /**
  * Where a reply is written: a square box of a fixed size (the page sets it, see EmailView) that
  * takes the place of the footer's buttons, pinned to the bottom right of the page. It opens as a
- * Reply (to the sender) or a Reply all (to everyone on the email, with whoever it copied in Cc).
+ * Reply (to the sender), a Reply all (to everyone on the email, with whoever it copied in Cc) or a
+ * Forward (to nobody yet, with the email's text in the box below room for a note; it keeps the
+ * email's thread headers so it stays in this thread here).
  * Its header, folded, is one line of who the reply goes to, To and Cc ("Mike Timmermans,
  * no-contact@gmail.com": a contact by name, anyone else by address). Clicking it opens "From" (the signed-in user, as "Josh
  * Redgrift (josh@bleacherrentals.com)") and To, Cc and Bcc lines, where who the reply goes to can
@@ -55,7 +59,10 @@ export function ReplyBox({
   contactUuid: string;
   /** The email being answered: the newest of the thread that has been sent or received. */
   replyingTo: ThreadMessage;
-  /** Reply starts with the sender in To; Reply all with everyone on the email, To and Cc. */
+  /**
+   * Reply starts with the sender in To; Reply all with everyone on the email, To and Cc; Forward
+   * with nobody, and the email's text in the box.
+   */
   mode: ReplyMode;
   minimized: boolean;
   onMinimize: () => void;
@@ -73,12 +80,13 @@ export function ReplyBox({
       ? "..."
       : "No email address on your account";
 
-  // Who it goes to starts as whoever replyRecipients names (Reply) or replyAllRecipients names, To
-  // and Cc (Reply all), and follows it (the user's own address is only known once they load) until
-  // the user changes a list, which then stays as they left it.
+  // Who it goes to starts as whoever replyRecipients names (Reply), or replyAllRecipients names, To
+  // and Cc (Reply all), or nobody (Forward: the user picks), and follows it (the user's own address
+  // is only known once they load) until the user changes a list, which then stays as they left it.
   const defaults = useMemo(() => {
     const lower = (people: { address: string }[]) =>
       people.map((person) => person.address.toLowerCase());
+    if (mode === "forward") return { to: [], cc: [] };
     if (mode === "replyAll") {
       const everyone = replyAllRecipients(replyingTo, ownAddress);
       return { to: lower(everyone.to), cc: lower(everyone.cc) };
@@ -106,9 +114,42 @@ export function ReplyBox({
     { label: "Bcc", hint: "Add a Bcc recipient", recipients: bcc, onChange: setBcc },
   ];
 
-  const [showAddresses, setShowAddresses] = useState(false);
+  // A forward opens with the header unfolded, since the first thing to do is to pick who to send
+  // it to.
+  const [showAddresses, setShowAddresses] = useState(mode === "forward");
   const [text, setText] = useState("");
   const textarea = useRef<HTMLTextAreaElement>(null);
+
+  // A forward carries the email it forwards: its "Forwarded message" block and text go into the box
+  // once the body is there (it is loaded if it was not yet saved), below room for a note. Added to
+  // what has been typed meanwhile, once, and the cursor goes back to the top for the note.
+  const forwarded = useForwardedText(replyingTo.key, mode === "forward");
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (mode !== "forward" || forwarded.text === null || prefilled.current) return;
+    prefilled.current = true;
+    const block = forwardedMessageText({
+      from: replyingTo.fromHeader,
+      date: replyingTo.date,
+      subject: replyingTo.subjectHeader,
+      to: replyingTo.toHeader,
+      cc: replyingTo.ccHeader,
+      body: forwarded.text,
+    });
+    const wasEmpty = text === "";
+    setText(text + block);
+    if (wasEmpty) {
+      requestAnimationFrame(() => {
+        textarea.current?.setSelectionRange(0, 0);
+        if (textarea.current) textarea.current.scrollTop = 0;
+      });
+    }
+  }, [mode, forwarded.text, replyingTo, text]);
+  useEffect(() => {
+    if (forwarded.error) {
+      createErrorToastNoThrow(["Could not load the email to forward", forwarded.error]);
+    }
+  }, [forwarded.error]);
 
   const [sending, setSending] = useState(false);
   const canSend =
@@ -124,7 +165,10 @@ export function ReplyBox({
     if (ownAddress === null) return;
     setSending(true);
 
-    const subject = replySubject(replyingTo.subjectHeader);
+    const subject =
+      mode === "forward"
+        ? forwardSubject(replyingTo.subjectHeader)
+        : replySubject(replyingTo.subjectHeader);
     const inReplyTo = replyingTo.messageIdHeader || null;
     const references = replyReferences({
       messageId: replyingTo.messageIdHeader || null,
@@ -169,9 +213,12 @@ export function ReplyBox({
     }
   };
 
-  // On appearing, and again on being restored from minimized.
+  // On appearing, and again on being restored from minimized. A forward with nobody to send it to
+  // yet puts the cursor in To instead (see autoFocus below).
+  const needsRecipient = mode === "forward" && recipients.length === 0;
   useEffect(() => {
-    if (!minimized) textarea.current?.focus();
+    if (!minimized && !needsRecipient) textarea.current?.focus();
+    // Only when appearing or restored, not each time the first recipient is picked.
   }, [minimized]);
 
   if (minimized) {
@@ -184,7 +231,13 @@ export function ReplyBox({
         className="flex w-full cursor-pointer items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm shadow-lg transition-colors hover:bg-gray-50"
       >
         <span className="min-w-0 flex-1 truncate text-gray-800">
-          {summary ? `Reply to ${summary}` : "Reply"}
+          {mode === "forward"
+            ? summary
+              ? `Forward to ${summary}`
+              : "Forward"
+            : summary
+              ? `Reply to ${summary}`
+              : "Reply"}
         </span>
         <Maximize2 className="size-3.5 shrink-0 text-gray-500" />
       </button>
@@ -241,6 +294,7 @@ export function ReplyBox({
                 directory={directory}
                 recipients={row.recipients}
                 onChange={row.onChange}
+                autoFocus={needsRecipient && row.label === "To"}
               />
             </div>
           ))}

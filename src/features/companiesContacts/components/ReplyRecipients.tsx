@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
 import { validateAllowedEmail } from "@/features/devEmailAllowlist/logic/validateAllowedEmail";
 import {
@@ -25,6 +25,7 @@ export function ReplyRecipients({
   directory,
   recipients,
   onChange,
+  autoFocus = false,
 }: {
   /** What the text box is for ("Add a Cc recipient"): its accessible name and its empty hint. */
   label: string;
@@ -32,6 +33,8 @@ export function ReplyRecipients({
   directory: DirectoryContact[];
   recipients: string[];
   onChange: (next: string[]) => void;
+  /** Puts the cursor in the text box when the list appears, to start typing a recipient. */
+  autoFocus?: boolean;
 }) {
   const names = useMemo(() => namesByAddress(directory), [directory]);
 
@@ -43,6 +46,11 @@ export function ReplyRecipients({
   const [hiddenFor, setHiddenFor] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
+
+  // Only when it appears.
+  useEffect(() => {
+    if (autoFocus) input.current?.focus();
+  }, []);
 
   const suggestions = useMemo(
     () => suggestContacts(directory, query, recipients),

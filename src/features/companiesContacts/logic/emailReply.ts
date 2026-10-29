@@ -9,8 +9,11 @@ const idsIn = (header: string | null | undefined) => header?.match(/<[^<>\s]+>/g
 // its first email and the most recent ones.
 const MAX_REFERENCES = 30;
 
-/** Which button opened a reply: Reply (the sender) or Reply all (everyone on the email). */
-export type ReplyMode = "reply" | "replyAll";
+/**
+ * Which button opened the box: Reply (to the sender), Reply all (to everyone on the email) or
+ * Forward (a new email, to whoever the user picks, carrying the original).
+ */
+export type ReplyMode = "reply" | "replyAll" | "forward";
 
 /** "Re: Quote" for "Quote"; a subject that already starts with Re: is left as it is. */
 export function replySubject(subject: string): string {
@@ -34,4 +37,11 @@ export function replyReferences(parent: {
   const kept =
     unique.length > MAX_REFERENCES ? [unique[0], ...unique.slice(-(MAX_REFERENCES - 1))] : unique;
   return kept.join(" ");
+}
+
+/** "Fwd: Quote" for "Quote"; a subject that already starts with Fwd: or Fw: is left as it is. */
+export function forwardSubject(subject: string): string {
+  const trimmed = subject.trim();
+  if (/^fwd?:/i.test(trimmed)) return trimmed;
+  return trimmed ? `Fwd: ${trimmed}` : "Fwd:";
 }

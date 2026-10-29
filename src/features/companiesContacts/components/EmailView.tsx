@@ -20,11 +20,11 @@ import { ReplyBox } from "./ReplyBox";
  * An email and the rest of its thread, across the whole page: oldest at the top, newest at the
  * bottom, each as a row that opens and closes on its own. The email from the URL starts open.
  * Back (or Escape, unless typing) returns to the contact's emails. A footer of Reply, Reply all and
- * Forward stays in view at the bottom of the page while the thread scrolls; Reply and Reply all
- * swap the buttons for a box to write in, pinned to the bottom right (to the sender, or to
- * everyone on the email). Sending saves the reply into the thread at once, as an email that says it
- * is being sent, and the buttons come back (there is no other way to put them back yet). Forward
- * does nothing so far.
+ * Forward stays in view at the bottom of the page while the thread scrolls; each swaps the buttons
+ * for a box to write in, pinned to the bottom right (to the sender, to everyone on the email, or to
+ * whoever is picked, with the email's text in the box). Sending saves it into the thread at once,
+ * as an email that says it is being sent, and the buttons come back (there is no other way to put
+ * them back yet).
  */
 export function EmailView({
   contactUuid,
@@ -71,11 +71,11 @@ export function EmailView({
   // show), and whether that box is minimized to a small card.
   const [replyMode, setReplyMode] = useState<ReplyMode | null>(null);
   const [minimized, setMinimized] = useState(false);
-  // The footer's buttons, in order. Forward does nothing so far.
+  // The footer's buttons, in order.
   const footerActions = [
     { label: "Reply", Icon: Reply, onClick: () => setReplyMode("reply") },
     { label: "Reply all", Icon: ReplyAll, onClick: () => setReplyMode("replyAll") },
-    { label: "Forward", Icon: Forward, onClick: undefined },
+    { label: "Forward", Icon: Forward, onClick: () => setReplyMode("forward") },
   ];
 
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set([emailMessageUuid]));

@@ -310,7 +310,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Send Emails",
     description:
-      "Replying to a contact's email from their page (the Reply and Reply all buttons and their box; Forward does nothing yet). The email goes out from your own company mailbox, so it comes from you and nobody can send as someone else. That also means your account's email has to be a @bleacherrentals.com address, whatever your role: without one the buttons are dimmed and say so. Both rules are enforced on the server, not just by the page. In the development environment an email can only go to the addresses on the Allowed Emails list. This is separate from Send To Client, which sends a quote.",
+      "Replying to a contact's email from their page (the Reply, Reply all and Forward buttons and their box). The email goes out from your own company mailbox, so it comes from you and nobody can send as someone else. That also means your account's email has to be a @bleacherrentals.com address, whatever your role: without one the buttons are dimmed and say so. Both rules are enforced on the server, not just by the page. In the development environment an email can only go to the addresses on the Allowed Emails list. This is separate from Send To Client, which sends a quote.",
     category: "Day to Day Operations",
     roles: {
       admin: full("Can send a reply to any contact's email, from their own mailbox."),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { replyReferences, replySubject } from "./emailReply";
+import { forwardSubject, replyReferences, replySubject } from "./emailReply";
 
 describe("replySubject", () => {
   it("puts Re: in front of a subject that does not have it", () => {
@@ -51,5 +51,25 @@ describe("replyReferences", () => {
     expect(listed).toHaveLength(30);
     expect(listed[0]).toBe("<m0@x>");
     expect(listed[listed.length - 1]).toBe("<last@x>");
+  });
+});
+
+describe("forwardSubject", () => {
+  it("puts Fwd: in front of a subject that does not have it", () => {
+    expect(forwardSubject("Quote")).toBe("Fwd: Quote");
+    expect(forwardSubject("  Quote  ")).toBe("Fwd: Quote");
+    expect(forwardSubject("Re: Quote")).toBe("Fwd: Re: Quote");
+  });
+
+  it("leaves a subject that already starts with Fwd: or Fw: alone, whatever its case", () => {
+    expect(forwardSubject("Fwd: Quote")).toBe("Fwd: Quote");
+    expect(forwardSubject("FWD: Quote")).toBe("FWD: Quote");
+    expect(forwardSubject("Fw: Quote")).toBe("Fw: Quote");
+    expect(forwardSubject("fwd:Quote")).toBe("fwd:Quote");
+  });
+
+  it("is just Fwd: for an email with no subject", () => {
+    expect(forwardSubject("")).toBe("Fwd:");
+    expect(forwardSubject("   ")).toBe("Fwd:");
   });
 });

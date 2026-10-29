@@ -34,16 +34,9 @@ export async function saveEmailDetails(params: {
   return id;
 }
 
-/**
- * Loads an email's body from Gmail the first time it is opened and saves it. `mailbox` and
- * `googleId` say which mailbox's copy to read (EmailMessages.mailbox and .google_id). Does nothing
- * when the details are already saved, so two quick opens cannot save them twice.
- */
-export async function loadEmailDetails(params: {
-  emailMessageUuid: string;
-  mailbox: string;
-  googleId: string;
-}): Promise<void> {
+type LoadParams = { emailMessageUuid: string; mailbox: string; googleId: string };
+
+async function fetchAndSaveDetails(params: LoadParams): Promise<void> {
   const existing = await typedGetAll(
     db
       .selectFrom("EmailMessageDetails")
@@ -67,4 +60,26 @@ export async function loadEmailDetails(params: {
     bodyText: body?.text ?? null,
     bodyHtml: body?.html ?? null,
   });
+}
+
+// Loads in progress, by email. The open email and a forward of it can both ask for its body at the
+// same moment; the second asks the first rather than fetching and saving it again, which would
+// leave two bodies for one email.
+const inFlight = new Map<string, Promise<void>>();
+
+/**
+ * Loads an email's body from Gmail the first time it is needed and saves it. `mailbox` and
+ * `googleId` say which mailbox's copy to read (EmailMessages.mailbox and .google_id). Does nothing
+ * when the details are already saved, and a second call while the first is still running waits for
+ * it instead of loading again, so the body is never saved twice.
+ */
+export function loadEmailDetails(params: LoadParams): Promise<void> {
+  const running = inFlight.get(params.emailMessageUuid);
+  if (running) return running;
+
+  const load = fetchAndSaveDetails(params).finally(() => {
+    inFlight.delete(params.emailMessageUuid);
+  });
+  inFlight.set(params.emailMessageUuid, load);
+  return load;
 }

@@ -147,4 +147,26 @@ describe("loadEmailDetails", () => {
 
     expect(batches).toHaveLength(1);
   });
+
+  it("loads an email once when it is asked for twice at the same time", async () => {
+    const fetchMock = fetchReturning(200, { text: "Hi", html: null });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await Promise.all([loadEmailDetails(params), loadEmailDetails(params)]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(batches).toHaveLength(1);
+  });
+
+  it("can load again once the first load is over, and after one that failed", async () => {
+    vi.stubGlobal("fetch", fetchReturning(500, { error: "boom" }));
+    await expect(loadEmailDetails(params)).rejects.toThrow("boom");
+
+    const fetchMock = fetchReturning(200, { text: "Hi", html: null });
+    vi.stubGlobal("fetch", fetchMock);
+    await loadEmailDetails(params);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(batches).toHaveLength(1);
+  });
 });
