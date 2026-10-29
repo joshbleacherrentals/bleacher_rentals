@@ -168,6 +168,7 @@ INSERT INTO "public"."UserStatuses" ("created_at", "status", "id") VALUES
 --
 
 INSERT INTO "public"."Users" ("created_at", "first_name", "last_name", "email", "phone", "clerk_user_id", "role", "avatar_image_url", "is_admin", "status_uuid", "id", "expo_push_token", "is_viewer", "changelog_last_read_at", "inspection_queue_last_seen_at") VALUES
+	('2026-10-29 12:00:00.000000+00', 'Josh', 'Redgrift', 'josh@bleacherrentals.com', NULL, 'user_3COnMJPaCrpWMNet2dnreN6Hdko', 2, NULL, true, '5d314da7-0a1e-4294-b012-ab74f6e07cd6', '53faaa50-1c97-46e9-8d28-8b06f9918b19', NULL, false, NULL, NULL),
 	('2026-05-20 11:43:22.060262+00', 'John', 'Sonneveld ', 'dutchpowertrucking@gmail.com', NULL, 'user_3DzRkQQMzr7jEUtaku72LLNFqBk', 1, NULL, false, '5d314da7-0a1e-4294-b012-ab74f6e07cd6', '25d5d81b-db0f-48be-9a68-9f1680c0ac56', 'ExponentPushToken[F8rFUBDj9COcKb6KiulG9A]', false, NULL, NULL),
 	('2026-05-12 14:41:34.273571+00', 'Juan', 'Arechiga', 'juanarechiga0212@gmail.com', NULL, NULL, 1, NULL, false, '7b65d5a1-8ee0-4b7a-816d-d3ec1ed123c5', 'df49b5ec-5185-43de-a9de-e769770307f9', NULL, false, NULL, NULL),
 	('2026-07-15 16:49:13.04606+00', 'josh', 'Redgriftwrong', 'redgrifttjosh@gmail.com', NULL, NULL, 1, NULL, false, '75dfeb9e-6c28-4839-a91c-a7333b0921c6', 'bb96b136-4407-4f0d-a118-58b757c45d2c', NULL, false, NULL, NULL),
