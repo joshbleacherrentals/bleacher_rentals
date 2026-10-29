@@ -185,7 +185,22 @@ body{margin:0;background:#ffffff}
           <section aria-label="Payment History" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
               <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Payment History</h3>
-              <button type="button" class="iv-btn" style="height:32px;padding:0 12px;border:1px solid #10365a;border-radius:6px;background:#ffffff;font-family:inherit;font-size:14px;font-weight:500;color:#10365a;cursor:pointer">Record payment</button>
+              <div style="display:flex;align-items:center;gap:16px">
+                <button type="button" role="switch" aria-checked="{{ showDeleted }}" onClick="{{ toggleDeleted }}" class="iv-btn" style="display:flex;align-items:center;gap:8px;border:0;background:none;padding:0;font-family:inherit;font-size:14px;color:#4b5563;cursor:pointer">
+                  <span>Show Deleted</span>
+                  <sc-if value="{{ showDeleted }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:relative;display:inline-flex;flex-shrink:0;width:40px;height:22px;border-radius:999px;background:#10365a">
+                      <span style="display:inline-block;width:18px;height:18px;margin-top:2px;border-radius:999px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translateX(20px)"></span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{ hideDeleted }}" hint-placeholder-val="{{ true }}">
+                    <span style="position:relative;display:inline-flex;flex-shrink:0;width:40px;height:22px;border-radius:999px;background:#d1d5db">
+                      <span style="display:inline-block;width:18px;height:18px;margin-top:2px;border-radius:999px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translateX(2px)"></span>
+                    </span>
+                  </sc-if>
+                </button>
+                <button type="button" class="iv-btn" style="height:32px;padding:0 12px;border:1px solid #10365a;border-radius:6px;background:#ffffff;font-family:inherit;font-size:14px;font-weight:500;color:#10365a;cursor:pointer">Record payment</button>
+              </div>
             </div>
             <div style="overflow-x:auto">
               <table style="width:100%;min-width:560px;border-collapse:collapse;font-size:14px;line-height:20px">
@@ -212,6 +227,13 @@ body{margin:0;background:#ffffff}
                     <td style="padding:12px 8px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums">C$1,500.00</td>
                     <td style="padding:12px 8px">Check</td>
                     <td style="padding:12px 0 12px 8px">Priya Raman</td>
+                  </tr>
+                  <tr style="display:{{ deletedRowDisplay }}">
+                    <td style="padding:12px 8px 12px 0;border-top:1px solid #f3f4f6;color:#6b7280">&mdash;</td>
+                    <td style="padding:12px 8px;border-top:1px solid #f3f4f6;color:#6b7280">Nov 5, 2026, 09:40 AM<span style="margin-left:8px;padding:1px 6px;border-radius:4px;background:#fbe7e5;font-size:12px;line-height:16px;font-weight:500;color:#a8403a">Deleted</span></td>
+                    <td style="padding:12px 8px;border-top:1px solid #f3f4f6;text-align:right;color:#6b7280;text-decoration:line-through;font-variant-numeric:tabular-nums">C$500.00</td>
+                    <td style="padding:12px 8px;border-top:1px solid #f3f4f6;color:#6b7280">Check</td>
+                    <td style="padding:12px 0 12px 8px;border-top:1px solid #f3f4f6;color:#6b7280">Priya Raman</td>
                   </tr>
                 </tbody>
               </table>
@@ -310,7 +332,7 @@ body{margin:0;background:#ffffff}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { tab: null, modal: null, picker: null, day: 12 };
+    this.state = { tab: null, modal: null, picker: null, day: 12, deleted: false };
   }
 
   renderVals() {
@@ -364,6 +386,10 @@ class Component extends DCLogic {
       togglePicker: () => this.setState({ picker: !pickerOpen }),
       dueLabel,
       days,
+      showDeleted: s.deleted,
+      hideDeleted: !s.deleted,
+      toggleDeleted: () => this.setState({ deleted: !s.deleted }),
+      deletedRowDisplay: s.deleted ? 'table-row' : 'none',
     };
   }
 }
