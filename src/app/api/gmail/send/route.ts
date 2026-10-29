@@ -13,6 +13,8 @@ import {
   sendRawMessage,
 } from "@/features/gmail-integration/server/gmailMessages";
 import { parseSendRequest } from "@/features/gmail-integration/server/sendRequest";
+import { isCompanyEmail } from "@/features/quotesAndBookings/utils/companyEmail";
+import { NOT_COMPANY_EMAIL_MESSAGE } from "@/features/userAccess/logic/canSendEmail";
 import { requireEmailSender } from "@/features/userAccess/logic/requireEmailSender";
 import { createServerSupabaseClient } from "@/utils/supabase/getClerkSupabaseServerClient";
 import { createServiceRoleClient } from "@/utils/supabase/server";
@@ -22,9 +24,9 @@ import { NextRequest, NextResponse } from "next/server";
  * Sends an email from the signed-in user's own mailbox, through domain-wide delegation, and returns
  * the sent email in the form the contact page saves (see usePullContactEmails, saveContactEmails).
  *
- * Who may call it: an admin, an account manager or an accountant (requireEmailSender). The sender
- * is read from the signed-in user's row, never from the request, so nobody can send as someone
- * else.
+ * Who may call it: an admin, an account manager or an accountant (requireEmailSender), whose
+ * account email is on the company domain. The sender is read from the signed-in user's row, never
+ * from the request, so nobody can send as someone else.
  *
  * In the development environment (NEXT_PUBLIC_ENVIRONMENT=development, the one behind the green
  * banner) every recipient, To, Cc and Bcc, must be on the DevAllowedEmails list, or nothing is
@@ -61,6 +63,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Only a company mailbox can be sent from: Google has no such mailbox for a personal address.
+    if (!isCompanyEmail(sender)) {
+      return NextResponse.json({ error: NOT_COMPANY_EMAIL_MESSAGE }, { status: 403 });
+    }
+
     // Before anything is asked of Google. A blocked address stops the whole send, not just itself.
     const guarded = await guardEmailRecipients(await createServiceRoleClient(), {
       to: request.to.join(", "),
@@ -86,8 +93,15 @@ export async function POST(req: NextRequest) {
         scopes: [GMAIL_SEND_SCOPE, GMAIL_READONLY_SCOPE],
       });
     } catch (error: any) {
+      // Google's wording is for whoever sets the service account up, so it goes to the log; the
+      // person at the screen is told what it means for them.
+      console.error(`Gmail send: no delegated token for ${sender}:`, error);
       return NextResponse.json(
-        { error: `Could not send as ${sender}: ${error.message}` },
+        {
+          error:
+            `Couldn't send as ${sender}: Google did not allow the app to send from that mailbox. ` +
+            "That is a setup problem, not something you did wrong. Ask a developer to check it.",
+        },
         { status: 502 },
       );
     }

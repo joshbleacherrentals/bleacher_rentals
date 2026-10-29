@@ -7,8 +7,9 @@ import { ArrowLeft, Forward, Reply, ReplyAll } from "lucide-react";
 import { AppTooltip } from "@/components/AppTooltip";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { Button } from "@/components/ui/button";
-import { canSendEmail, CANNOT_SEND_EMAIL_MESSAGE } from "@/features/userAccess/logic/canSendEmail";
+import { emailSendBlock } from "@/features/userAccess/logic/canSendEmail";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import { useCurrentUser } from "@/hooks/db/useCurrentUser";
 import { useEmailThread } from "../hooks/useEmailThread";
 import { EmailThreadMessage } from "./EmailThreadMessage";
 import { ReplyBox } from "./ReplyBox";
@@ -32,10 +33,15 @@ export function EmailView({
   const backHref = `/contacts/${contactUuid}`;
   const { messages, isLoading } = useEmailThread(emailMessageUuid);
 
-  // Only an admin, account manager or accountant may send (the server checks it too).
+  // Only an admin, account manager or accountant with a company email may send (the server checks
+  // both too). `sendBlock` is why this person cannot, or null when they can.
   const roles = usePermissionsStore((state) => state.roles);
-  const maySend = canSendEmail(roles);
-  const explainCannotSend = () => createErrorToastNoThrow([CANNOT_SEND_EMAIL_MESSAGE]);
+  const { data: currentUser, isLoading: loadingUser } = useCurrentUser();
+  const sendBlock = emailSendBlock({
+    roles,
+    email: loadingUser ? undefined : (currentUser?.[0]?.email ?? null),
+  });
+  const explainCannotSend = () => sendBlock && createErrorToastNoThrow([sendBlock]);
 
   // Whether the footer shows the reply box instead of its buttons, and whether that box is
   // minimized to a small card.
@@ -146,22 +152,22 @@ export function EmailView({
                 <Button
                   type="button"
                   variant="outline"
-                  aria-disabled={!maySend}
-                  onClick={maySend ? onClick : explainCannotSend}
+                  aria-disabled={sendBlock !== null}
+                  onClick={sendBlock ? explainCannotSend : onClick}
                   className={`rounded-full border-black has-[>svg]:px-4.5 ${
-                    maySend ? "" : "cursor-not-allowed opacity-50 hover:bg-background"
+                    sendBlock ? "cursor-not-allowed opacity-50 hover:bg-background" : ""
                   }`}
                 >
                   <Icon />
                   {label}
                 </Button>
               );
-              return maySend ? (
-                <Fragment key={label}>{button}</Fragment>
-              ) : (
-                <AppTooltip key={label} content={CANNOT_SEND_EMAIL_MESSAGE} className="max-w-xs">
+              return sendBlock ? (
+                <AppTooltip key={label} content={sendBlock} className="max-w-xs">
                   {button}
                 </AppTooltip>
+              ) : (
+                <Fragment key={label}>{button}</Fragment>
               );
             })}
           </div>

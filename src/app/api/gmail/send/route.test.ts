@@ -40,6 +40,7 @@ vi.mock("@/features/gmail-integration/server/gmailMessages", async (importOrigin
 }));
 
 import { GmailApiError } from "@/features/gmail-integration/server/gmailMessages";
+import { NOT_COMPANY_EMAIL_MESSAGE } from "@/features/userAccess/logic/canSendEmail";
 import { POST } from "./route";
 
 const valid = {
@@ -68,7 +69,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requireEmailSender.mockResolvedValue("user_clerk");
   userResult = {
-    data: { email: "Josh@Co.com", first_name: "Josh", last_name: "Redgrift" },
+    data: { email: "Josh@BleacherRentals.com", first_name: "Josh", last_name: "Redgrift" },
     error: null,
   };
   guardEmailRecipients.mockResolvedValue({ to: "pat@xyz.com", cc: null, bcc: null, blocked: [] });
@@ -80,7 +81,7 @@ beforeEach(() => {
     messageId: "<sent@co.com>",
     inReplyTo: "<b@x>",
     references: "<a@x> <b@x>",
-    from: "Josh Redgrift <josh@co.com>",
+    from: "Josh Redgrift <josh@bleacherrentals.com>",
     to: "pat@xyz.com",
     cc: "sam@xyz.com",
     subject: "Re: Quote",
@@ -131,6 +132,22 @@ describe("POST /api/gmail/send", () => {
     expect(sendRawMessage).not.toHaveBeenCalled();
   });
 
+  it("refuses an account that is not on the company domain, before asking Google anything", async () => {
+    for (const email of ["redgriftjosh@gmail.com", "josh@example.com"]) {
+      userResult = { data: { email, first_name: "Josh", last_name: null }, error: null };
+
+      const res = await post(valid);
+
+      expect(res.status, email).toBe(403);
+      const { error } = await res.json();
+      expect(error).toBe(NOT_COMPANY_EMAIL_MESSAGE);
+      expect(error).not.toMatch(/domain-wide|unauthorized_client/i);
+    }
+    expect(guardEmailRecipients).not.toHaveBeenCalled();
+    expect(getDelegatedAccessToken).not.toHaveBeenCalled();
+    expect(sendRawMessage).not.toHaveBeenCalled();
+  });
+
   it("refuses the whole send when the development guard blocks an address, naming it", async () => {
     guardEmailRecipients.mockResolvedValue({
       to: "pat@xyz.com",
@@ -164,14 +181,14 @@ describe("POST /api/gmail/send", () => {
 
     expect(res.status).toBe(200);
     expect(getDelegatedAccessToken).toHaveBeenCalledWith({
-      subject: "josh@co.com",
+      subject: "josh@bleacherrentals.com",
       scopes: ["scope-send", "scope-read"],
     });
     const [token, raw, threadId] = sendRawMessage.mock.calls[0];
     expect(token).toBe("ya29.token");
     expect(threadId).toBeUndefined();
     const message = decode(raw);
-    expect(message).toContain('From: "Josh Redgrift" <josh@co.com>');
+    expect(message).toContain('From: "Josh Redgrift" <josh@bleacherrentals.com>');
     expect(message).toContain("To: pat@xyz.com");
     expect(message).toContain("Cc: sam@xyz.com");
     expect(message).toContain("In-Reply-To: <b@x>");
@@ -190,30 +207,35 @@ describe("POST /api/gmail/send", () => {
       inReplyTo: "<b@x>",
       subject: "Re: Quote",
       direction: "sent",
-      copies: [{ mailbox: "josh@co.com", id: "sent1", threadId: "t-sent" }],
+      copies: [{ mailbox: "josh@bleacherrentals.com", id: "sent1", threadId: "t-sent" }],
     });
   });
 
   it("puts the reply in the thread only when the thread is the sender's own mailbox's", async () => {
-    await post({ ...valid, thread: { mailbox: "Josh@Co.com", threadId: "19abc" } });
+    await post({ ...valid, thread: { mailbox: "Josh@BleacherRentals.com", threadId: "19abc" } });
     await post({ ...valid, thread: { mailbox: "paul@co.com", threadId: "19abc" } });
 
     expect(sendRawMessage.mock.calls[0][2]).toBe("19abc");
     expect(sendRawMessage.mock.calls[1][2]).toBeUndefined();
   });
 
-  it("says so when Google will not give a token for the sender, and sends nothing", async () => {
+  it("tells the user plainly when Google will not give a token for the sender, and sends nothing", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     getDelegatedAccessToken.mockRejectedValue(
-      new Error("Google refused the delegated token request"),
+      new Error("Google refused the delegated token request: unauthorized_client (details)."),
     );
 
     const res = await post(valid);
 
     expect(res.status).toBe(502);
     const { error } = await res.json();
-    expect(error).toContain("josh@co.com");
-    expect(error).toContain("Google refused");
+    expect(error).toContain("josh@bleacherrentals.com");
+    expect(error).toMatch(/ask a developer/i);
+    // Google's own wording is for the log, not for the person sending.
+    expect(error).not.toMatch(/unauthorized_client|domain-wide|admin console/i);
+    expect(consoleError).toHaveBeenCalled();
     expect(sendRawMessage).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("reports Gmail's refusal", async () => {
