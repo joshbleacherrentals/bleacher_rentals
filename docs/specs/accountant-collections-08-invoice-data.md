@@ -1,7 +1,13 @@
 # Accountant Collections 08: the invoice page data and its five statuses
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **08**. Needs: [01](accountant-collections-01-backend.md),
+Status: **Implemented 2026-10-29** (Approved by the user). Decisions taken during the build, both
+written into §3: `isLoading` includes the currency (no `currencyResolved` field), and
+`buildMoney(balances, lineTotalCents, taxPercent)` takes the Contract Subtotal as its second
+parameter. Noted in the code, not in the contract: `notFound` is also true when the quote could not
+be read (the output has no `error` field); a venue without an address shows no address (the
+event's own address is used only when the event has no venue); a deleted contact is shown like any
+other (the quote card does not mark it); the query-count test counts distinct queries (15), because
+`useQuoteDetail` renders twice in a server render. Build order: **08**. Needs: [01](accountant-collections-01-backend.md),
 [03](accountant-collections-03-ts-twin-and-parity.md),
 [07](accountant-collections-07-collections-list.md) (date wording). Needed by: 09. Branch:
 `q4-sprint2-collections`.
@@ -177,7 +183,9 @@ All under `src/features/accountantCollections/`.
   Rules in §1. Spec 09 maps each status to its label and colours.
 
 - **`utils/invoiceView.ts`** (new): pure builders that turn the data into display rows, so the
-  hook stays thin: `buildMoney(balances, taxPercent)`, `buildScheduleRows(allocation, currency,
+  hook stays thin: `buildMoney(balances, lineTotalCents, taxPercent)` (`lineTotalCents` is the
+  Contract Subtotal, the sum of the line items that the hook reads; `CollectionsBalances` has no
+  such figure, and spec 03 stays as it is), `buildScheduleRows(allocation, currency,
 timezone)` (status `Paid`, `Partial` with `X of Y`, `Unpaid`; `Paid at` only when paid),
   `buildPaymentRows(payments, showDeleted, ...)` (number, date and time, amount, method, payer,
   `isManual`, `isDeleted`, and the payment row itself for the dialog; deleted rows only when
@@ -201,6 +209,18 @@ timezone)` (status `Paid`, `Partial` with `X of Y`, `Unpaid`; `Paid at` only whe
   installments, payments of the event), then calls `collectionsBalances` and `invoiceStatus`.
   `notFound` is true for a missing event. Use `useTypedQuery` and `expect<T>()`.
 
+  **`isLoading` includes the currency** (user's decision, 2026-10-29): it stays true until
+  `useEventCurrencyState(eventId).isResolved`, so the page (spec 09) is not drawn with the USD
+  fallback. The output type has no `currencyResolved` field. `isResolved` turns true when the
+  online QuickBooks currency fetch ends, with an error too (the office's province is the fallback
+  then), so a slow or hanging connection means a longer wait.
+
+  **Queries.** `useQuoteDetail` (6) plus: the contacts' companies (one query on `Contacts` joined
+  to `Companies`), the venue's address, the tasks of the event, the line total, and the reused
+  `usePaymentInstallments`, `usePaymentHistory`, `useEventCurrencyState`, `useUserNames`,
+  `useEventTypeName` (`eventInfo.type` is the event type's name): 15 in all, plus the office
+  currencies that `useEventCurrencyState` reads.
+
 ## 4. Tests
 
 Red first.
@@ -217,7 +237,8 @@ C$3,235.75`, `Paid at`, payment rows (Stripe first, then check), a deleted payme
   with `showDeleted` off and listed, flagged and numbered with it on, completed tasks newest due
   date first, the open task apart, contact cards with and without a company, with and without a
   finance contact.
-- **`useInvoiceData.test.tsx`:** `notFound`; the query count stays small; a deleted event is
+- **`useInvoiceData.test.tsx`:** `notFound`; `isLoading` is true while the currency is not
+  resolved; the query count stays small (at most the 15 of §3); a deleted event is
   still shown; the open task is the newest if two exist; `payments` includes a deleted
   payment while the money and Amount Due ignore it.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check`. E2E: SKIPPED here (spec 09).
@@ -231,8 +252,9 @@ C$3,235.75`, `Paid at`, payment rows (Stripe first, then check), a deleted payme
 
 - **A missing event** (`notFound`): spec 09 shows "Invoice not found" with a link back.
 - **A deleted event** still opens, with its status; nothing hides it.
-- **Currency not yet known.** Until the office currency has loaded the currency is USD (as on the
-  AR tabs); money is shown once `currencyResolved`.
+- **Currency not yet known.** `isLoading` stays true until the office currency is resolved (see §3),
+  so nothing is drawn in the USD fallback. If the QuickBooks currency fetch fails, the province
+  decides and the page opens.
 - **A contact without a name or a deleted contact.** The card shows what it has; a deleted
   contact is shown as on the quote card.
 - **No account manager.** A dash.
