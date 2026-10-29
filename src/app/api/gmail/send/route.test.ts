@@ -281,6 +281,23 @@ describe("POST /api/gmail/send", () => {
     expect(recordFailedEmail).not.toHaveBeenCalled();
   });
 
+  it("sends a new email, one that answers nothing, with no thread headers and no Gmail thread", async () => {
+    const res = await post({
+      emailMessageUuid: EMAIL_ID,
+      to: ["pat@xyz.com"],
+      subject: "Your quote",
+      text: "Here it is.",
+    });
+
+    expect(res.status).toBe(200);
+    const [, raw, threadId] = sendRawMessage.mock.calls[0];
+    const message = decode(raw);
+    expect(message).toContain("Subject: Your quote");
+    expect(message).not.toContain("In-Reply-To:");
+    expect(message).not.toContain("References:");
+    expect(threadId).toBeUndefined();
+  });
+
   it("puts the reply in the thread only when the thread is the sender's own mailbox's", async () => {
     await post({ ...valid, thread: { mailbox: "Josh@BleacherRentals.com", threadId: "19abc" } });
     await post({ ...valid, thread: { mailbox: "paul@co.com", threadId: "19abc" } });

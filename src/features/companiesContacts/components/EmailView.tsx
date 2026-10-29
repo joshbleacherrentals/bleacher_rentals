@@ -1,18 +1,15 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Forward, Reply, ReplyAll } from "lucide-react";
-import { AppTooltip } from "@/components/AppTooltip";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
-import { Button } from "@/components/ui/button";
-import { emailSendBlock } from "@/features/userAccess/logic/canSendEmail";
-import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
-import { useCurrentUser } from "@/hooks/db/useCurrentUser";
 import { discardUnsentEmail } from "../db/unsentEmail";
+import { useEmailSendBlock } from "../hooks/useEmailSendBlock";
 import { useEmailThread } from "../hooks/useEmailThread";
 import type { ReplyMode } from "../logic/emailReply";
+import { EmailActionButton } from "./EmailActionButton";
 import { EmailThreadMessage } from "./EmailThreadMessage";
 import { ReplyBox } from "./ReplyBox";
 
@@ -59,13 +56,7 @@ export function EmailView({
 
   // Only an admin, account manager or accountant with a company email may send (the server checks
   // both too). `sendBlock` is why this person cannot, or null when they can.
-  const roles = usePermissionsStore((state) => state.roles);
-  const { data: currentUser, isLoading: loadingUser } = useCurrentUser();
-  const sendBlock = emailSendBlock({
-    roles,
-    email: loadingUser ? undefined : (currentUser?.[0]?.email ?? null),
-  });
-  const explainCannotSend = () => sendBlock && createErrorToastNoThrow([sendBlock]);
+  const sendBlock = useEmailSendBlock();
 
   // Which button opened the reply box that replaces the footer's buttons (null while the buttons
   // show), and whether that box is minimized to a small card.
@@ -170,32 +161,15 @@ export function EmailView({
           </div>
         ) : (
           <div className="sticky bottom-0 z-10 mt-auto flex flex-wrap gap-2 border-t border-gray-200 bg-white pb-5 pl-18 pr-6 pt-3">
-            {footerActions.map(({ label, Icon, onClick }) => {
-              // has-[>svg]:px-4.5 replaces the button's own 12px (it has an icon) with 18px.
-              // Someone who cannot send sees the buttons dimmed, not hidden. They are not
-              // `disabled`, which would swallow the hover and the click that explain why.
-              const button = (
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-disabled={sendBlock !== null}
-                  onClick={sendBlock ? explainCannotSend : onClick}
-                  className={`rounded-full border-black has-[>svg]:px-4.5 ${
-                    sendBlock ? "cursor-not-allowed opacity-50 hover:bg-background" : ""
-                  }`}
-                >
-                  <Icon />
-                  {label}
-                </Button>
-              );
-              return sendBlock ? (
-                <AppTooltip key={label} content={sendBlock} className="max-w-xs">
-                  {button}
-                </AppTooltip>
-              ) : (
-                <Fragment key={label}>{button}</Fragment>
-              );
-            })}
+            {footerActions.map(({ label, Icon, onClick }) => (
+              <EmailActionButton
+                key={label}
+                label={label}
+                Icon={Icon}
+                onClick={onClick}
+                sendBlock={sendBlock}
+              />
+            ))}
           </div>
         ))}
     </div>

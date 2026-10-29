@@ -171,4 +171,19 @@ describe("selectThread", () => {
     expect(ids(selectThread("p", [sending, alsoSending, parent]))).toEqual(["p", "s", "t"]);
     expect(ids(selectThread("s", [parent, sending, alsoSending]))).toEqual(["p", "s", "t"]);
   });
+
+  it("opens a new email still being sent, with no headers and no Google ids, as a thread of its own", () => {
+    const composed = row({
+      id: "n",
+      mailbox: "josh@co.com",
+      google_message_id: null,
+      google_thread_id: null,
+      direction: "sent",
+      status: "sending",
+      date: "2026-10-26T10:00:00.000Z",
+    });
+    const other = row({ id: "o", google_message_id: "<a@x>", date: "2026-10-26T09:00:00.000Z" });
+
+    expect(ids(selectThread("n", [other, composed]))).toEqual(["n"]);
+  });
 });

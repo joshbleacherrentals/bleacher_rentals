@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, SquarePen } from "lucide-react";
 import { useContactEmailMessages } from "../hooks/useContactEmailMessages";
+import { useEmailSendBlock } from "../hooks/useEmailSendBlock";
 import { usePullContactEmails } from "../hooks/usePullContactEmails";
 import type { ActivityEmail } from "../logic/emailActivity";
+import { ComposeEmail } from "./ComposeEmail";
+import { EmailActionButton } from "./EmailActionButton";
 import { EmailStatusBadge } from "./EmailStatusBadge";
 
 function formatDate(iso: string | null): string {
@@ -51,7 +55,7 @@ function EmailRow({ email, href }: { email: ActivityEmail; href: string }) {
  * Gmail (every company mailbox is searched for their address); the pull saves them to the database
  * and the list fills in by itself.
  */
-export function ContactEmailsTab({
+function ContactEmailsList({
   contactUuid,
   contactEmail,
 }: {
@@ -154,6 +158,46 @@ export function ContactEmailsTab({
       >
         {state.status === "idle" ? "No emails. Pull from Gmail?" : "Pull from Gmail again?"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * A contact's emails, with a Compose button above them to write a new one to the contact. Compose
+ * opens the box that floats at the bottom right of the page (see ComposeEmail); the email appears
+ * at the top of the list at once, saying it is being sent. Who may send is the same as for a reply
+ * (see useEmailSendBlock): anyone else sees the button dimmed, with the reason.
+ */
+export function ContactEmailsTab({
+  contactUuid,
+  contactEmail,
+}: {
+  contactUuid: string;
+  contactEmail: string | null;
+}) {
+  const sendBlock = useEmailSendBlock();
+  const [composing, setComposing] = useState(false);
+
+  return (
+    <div>
+      <div className="mb-3 flex justify-end">
+        <EmailActionButton
+          label="Compose"
+          Icon={SquarePen}
+          onClick={() => setComposing(true)}
+          sendBlock={sendBlock}
+        />
+      </div>
+
+      <ContactEmailsList contactUuid={contactUuid} contactEmail={contactEmail} />
+
+      {composing && (
+        <ComposeEmail
+          contactUuid={contactUuid}
+          contactEmail={contactEmail}
+          onClose={() => setComposing(false)}
+        />
+      )}
     </div>
   );
 }

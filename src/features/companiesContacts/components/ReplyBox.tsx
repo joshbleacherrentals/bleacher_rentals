@@ -16,6 +16,17 @@ import { forwardSubject, replyReferences, replySubject, type ReplyMode } from ".
 import { namesByAddress, recipientSummary } from "../logic/recipientList";
 import { ReplyRecipients } from "./ReplyRecipients";
 
+/** What the minimized card says: what it is, and to whom once that is known. */
+function minimizedLabel(mode: ReplyMode, summary: string): string {
+  const [name, to] =
+    mode === "forward"
+      ? ["Forward", "Forward to"]
+      : mode === "compose"
+        ? ["New email", "New email to"]
+        : ["Reply", "Reply to"];
+  return summary ? `${to} ${summary}` : name;
+}
+
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <span className="flex gap-3">
@@ -26,28 +37,33 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Where a reply is written: a square box of a fixed size (the page sets it, see EmailView) that
- * takes the place of the footer's buttons, pinned to the bottom right of the page. It opens as a
- * Reply (to the sender), a Reply all (to everyone on the email, with whoever it copied in Cc) or a
- * Forward (to nobody yet, with the email's text in the box below room for a note; it keeps the
- * email's thread headers so it stays in this thread here).
- * Its header, folded, is one line of who the reply goes to, To and Cc ("Mike Timmermans,
- * no-contact@gmail.com": a contact by name, anyone else by address). Clicking it opens "From" (the signed-in user, as "Josh
- * Redgrift (josh@bleacherrentals.com)") and To, Cc and Bcc lines, where who the reply goes to can
- * be changed (see ReplyRecipients). Clicking the header again does nothing: only clicking into the
- * text area folds it back. A minus at the top right of the header minimizes the box to a small
- * card (the page sizes it), and clicking that card restores it as it was: the draft, the
- * recipients and the header's state live here and survive being minimized. A footer with a Send
- * button stays at the bottom of the box however far the text has scrolled. Send saves the reply at
- * once as an email being sent, in the contact's thread (body included, so it is complete to open),
- * and calls `onSent`, which closes the box. The send itself then happens in the background through
- * /api/gmail/send, which updates that email when it is sent. If it cannot be sent (who may send,
- * and in development to whom, is the server's call) the email is marked failed with the reason, and
- * the reason shows as an error toast too. If the reply could not even be saved, the box stays open
- * with the draft. The text area takes focus when the box appears and when it is restored.
+ * Where an email is written: a square box of a fixed size (the page sets it) pinned to the bottom
+ * right of the page. It opens as a Reply (to the sender), a Reply all (to everyone on the email,
+ * with whoever it copied in Cc), a Forward (to nobody yet, with the email's text in the box below
+ * room for a note; it keeps the email's thread headers so it stays in this thread here) or a
+ * Compose (a new email to the contact, with a subject line of its own and no thread).
+ *
+ * Its header, folded, is one line of who it goes to, To and Cc ("Mike Timmermans,
+ * no-contact@gmail.com": a contact by name, anyone else by address). Clicking it opens "From" (the
+ * signed-in user, as "Josh Redgrift (josh@bleacherrentals.com)") and To, Cc and Bcc lines, where
+ * who it goes to can be changed (see ReplyRecipients). Clicking the header again does nothing:
+ * only clicking into the text area folds it back. A minus at the top right of the header minimizes
+ * the box to a small card (the page sizes it), and clicking that card restores it as it was: the
+ * draft, the recipients and the header's state live here and survive being minimized. A footer with
+ * a Send button stays at the bottom of the box however far the text has scrolled.
+ *
+ * Send saves the email at once as an email being sent, in the contact's list (body included, so it
+ * is complete to open), and calls `onSent`, which closes the box. The send itself then happens in
+ * the background through /api/gmail/send, which updates that email when it is sent. If it cannot be
+ * sent (who may send, and in development to whom, is the server's call) the email is marked failed
+ * with the reason, and the reason shows as an error toast too. If it could not even be saved, the
+ * box stays open with the draft. The text area takes focus when the box appears and when it is
+ * restored (a Compose goes to the subject line, and a Forward or Compose with nobody to send to
+ * yet to To).
  */
 export function ReplyBox({
   contactUuid,
+  contactEmail = null,
   replyingTo,
   mode,
   minimized,
@@ -55,13 +71,18 @@ export function ReplyBox({
   onRestore,
   onSent,
 }: {
-  /** The contact whose thread this is: the reply is saved to it. */
+  /** The contact the email is saved to. */
   contactUuid: string;
-  /** The email being answered: the newest of the thread that has been sent or received. */
-  replyingTo: ThreadMessage;
+  /** The contact's own address: who a Compose starts out addressed to. */
+  contactEmail?: string | null;
+  /**
+   * The email being answered or forwarded: the newest of the thread that has been sent or
+   * received. Null for a Compose, which answers nothing.
+   */
+  replyingTo: ThreadMessage | null;
   /**
    * Reply starts with the sender in To; Reply all with everyone on the email, To and Cc; Forward
-   * with nobody, and the email's text in the box.
+   * with nobody, and the email's text in the box; Compose with the contact, and a subject to write.
    */
   mode: ReplyMode;
   minimized: boolean;
@@ -81,18 +102,21 @@ export function ReplyBox({
       : "No email address on your account";
 
   // Who it goes to starts as whoever replyRecipients names (Reply), or replyAllRecipients names, To
-  // and Cc (Reply all), or nobody (Forward: the user picks), and follows it (the user's own address
+  // and Cc (Reply all), or nobody (Forward: the user picks), or the contact (Compose), and follows it (the user's own address
   // is only known once they load) until the user changes a list, which then stays as they left it.
   const defaults = useMemo(() => {
     const lower = (people: { address: string }[]) =>
       people.map((person) => person.address.toLowerCase());
-    if (mode === "forward") return { to: [], cc: [] };
+    if (mode === "compose") {
+      return { to: contactEmail?.trim() ? [contactEmail.trim().toLowerCase()] : [], cc: [] };
+    }
+    if (mode === "forward" || !replyingTo) return { to: [], cc: [] };
     if (mode === "replyAll") {
       const everyone = replyAllRecipients(replyingTo, ownAddress);
       return { to: lower(everyone.to), cc: lower(everyone.cc) };
     }
     return { to: lower(replyRecipients(replyingTo, ownAddress)), cc: [] };
-  }, [mode, replyingTo, ownAddress]);
+  }, [mode, replyingTo, ownAddress, contactEmail]);
   const [editedTo, setEditedTo] = useState<string[] | null>(null);
   const [editedCc, setEditedCc] = useState<string[] | null>(null);
   const recipients = editedTo ?? defaults.to;
@@ -114,19 +138,25 @@ export function ReplyBox({
     { label: "Bcc", hint: "Add a Bcc recipient", recipients: bcc, onChange: setBcc },
   ];
 
-  // A forward opens with the header unfolded, since the first thing to do is to pick who to send
-  // it to.
-  const [showAddresses, setShowAddresses] = useState(mode === "forward");
+  // A forward, or a compose to a contact with no address, opens with the header unfolded, since the
+  // first thing to do is to pick who to send it to.
+  const [showAddresses, setShowAddresses] = useState(
+    (mode === "forward" || mode === "compose") && defaults.to.length === 0,
+  );
   const [text, setText] = useState("");
   const textarea = useRef<HTMLTextAreaElement>(null);
+
+  // A Compose has a subject of its own to write; a reply's is made from the email it answers.
+  const [subjectText, setSubjectText] = useState("");
+  const subjectInput = useRef<HTMLInputElement>(null);
 
   // A forward carries the email it forwards: its "Forwarded message" block and text go into the box
   // once the body is there (it is loaded if it was not yet saved), below room for a note. Added to
   // what has been typed meanwhile, once, and the cursor goes back to the top for the note.
-  const forwarded = useForwardedText(replyingTo.key, mode === "forward");
+  const forwarded = useForwardedText(replyingTo?.key ?? "", mode === "forward" && !!replyingTo);
   const prefilled = useRef(false);
   useEffect(() => {
-    if (mode !== "forward" || forwarded.text === null || prefilled.current) return;
+    if (mode !== "forward" || !replyingTo || forwarded.text === null || prefilled.current) return;
     prefilled.current = true;
     const block = forwardedMessageText({
       from: replyingTo.fromHeader,
@@ -156,6 +186,7 @@ export function ReplyBox({
     !sending &&
     ownAddress !== null &&
     text.trim() !== "" &&
+    (mode !== "compose" || subjectText.trim() !== "") &&
     recipients.length + cc.length + bcc.length > 0;
 
   // The reply is saved on this device first, as an email being sent, so it is in the thread the
@@ -165,15 +196,24 @@ export function ReplyBox({
     if (ownAddress === null) return;
     setSending(true);
 
-    const subject =
-      mode === "forward"
+    // A new email starts a conversation of its own: no subject to follow, nothing to thread under.
+    // Anything else follows the email it answers or forwards.
+    const subject = replyingTo
+      ? mode === "forward"
         ? forwardSubject(replyingTo.subjectHeader)
-        : replySubject(replyingTo.subjectHeader);
-    const inReplyTo = replyingTo.messageIdHeader || null;
-    const references = replyReferences({
-      messageId: replyingTo.messageIdHeader || null,
-      references: replyingTo.referencesHeader || null,
-    });
+        : replySubject(replyingTo.subjectHeader)
+      : subjectText.trim();
+    const inReplyTo = replyingTo?.messageIdHeader || null;
+    const references = replyingTo
+      ? replyReferences({
+          messageId: replyingTo.messageIdHeader || null,
+          references: replyingTo.referencesHeader || null,
+        })
+      : null;
+    const thread =
+      replyingTo?.mailbox && replyingTo.gmailThreadId
+        ? { mailbox: replyingTo.mailbox, threadId: replyingTo.gmailThreadId }
+        : null;
 
     try {
       const emailMessageUuid = await createPendingEmail({
@@ -199,10 +239,7 @@ export function ReplyBox({
         text,
         inReplyTo,
         references,
-        thread:
-          replyingTo.mailbox && replyingTo.gmailThreadId
-            ? { mailbox: replyingTo.mailbox, threadId: replyingTo.gmailThreadId }
-            : null,
+        thread,
       }).then((result) => {
         if (!result.ok) createErrorToastNoThrow([result.message]);
       });
@@ -213,11 +250,13 @@ export function ReplyBox({
     }
   };
 
-  // On appearing, and again on being restored from minimized. A forward with nobody to send it to
-  // yet puts the cursor in To instead (see autoFocus below).
-  const needsRecipient = mode === "forward" && recipients.length === 0;
+  // On appearing, and again on being restored from minimized: the text area, or the subject line of
+  // a compose. A forward or compose with nobody to send it to yet puts the cursor in To instead
+  // (see autoFocus below).
+  const needsRecipient = (mode === "forward" || mode === "compose") && recipients.length === 0;
   useEffect(() => {
-    if (!minimized && !needsRecipient) textarea.current?.focus();
+    if (minimized || needsRecipient) return;
+    (mode === "compose" ? subjectInput : textarea).current?.focus();
     // Only when appearing or restored, not each time the first recipient is picked.
   }, [minimized]);
 
@@ -231,13 +270,7 @@ export function ReplyBox({
         className="flex w-full cursor-pointer items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm shadow-lg transition-colors hover:bg-gray-50"
       >
         <span className="min-w-0 flex-1 truncate text-gray-800">
-          {mode === "forward"
-            ? summary
-              ? `Forward to ${summary}`
-              : "Forward"
-            : summary
-              ? `Reply to ${summary}`
-              : "Reply"}
+          {minimizedLabel(mode, summary)}
         </span>
         <Maximize2 className="size-3.5 shrink-0 text-gray-500" />
       </button>
@@ -299,14 +332,27 @@ export function ReplyBox({
             </div>
           ))}
       </div>
+      {mode === "compose" && (
+        <input
+          ref={subjectInput}
+          value={subjectText}
+          onChange={(event) => setSubjectText(event.target.value)}
+          // Going to type folds the header back to the one line.
+          onFocus={() => setShowAddresses(false)}
+          aria-label="Subject"
+          placeholder="Subject"
+          maxLength={500}
+          className="block w-full shrink-0 border-b border-gray-200 px-4 py-2 text-sm font-medium text-gray-900 outline-none placeholder:font-normal placeholder:text-gray-400"
+        />
+      )}
       <textarea
         ref={textarea}
         value={text}
         onChange={(event) => setText(event.target.value)}
         // Going to type folds the header back to the one line.
         onFocus={() => setShowAddresses(false)}
-        aria-label="Reply"
-        placeholder="Write your reply..."
+        aria-label={mode === "compose" ? "Message" : "Reply"}
+        placeholder={mode === "compose" ? "Write your email..." : "Write your reply..."}
         className="block min-h-0 w-full flex-1 resize-none overflow-y-auto p-4 text-sm text-gray-900 outline-none placeholder:text-gray-400"
       />
       {/* The text area scrolls on its own, so this stays at the bottom of the box in view. */}

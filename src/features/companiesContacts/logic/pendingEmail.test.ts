@@ -106,4 +106,17 @@ describe("buildPendingEmail", () => {
       body_html: null,
     });
   });
+
+  it("saves a new email, one that answers nothing, with no thread headers", () => {
+    const { message } = buildPendingEmail({
+      ...input,
+      subject: "Your quote",
+      inReplyTo: null,
+      references: null,
+    });
+
+    expect(message.subject).toBe("Your quote");
+    expect(message.google_in_reply_to).toBeNull();
+    expect(message.google_references).toBeNull();
+  });
 });

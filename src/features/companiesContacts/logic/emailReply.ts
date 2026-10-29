@@ -10,10 +10,11 @@ const idsIn = (header: string | null | undefined) => header?.match(/<[^<>\s]+>/g
 const MAX_REFERENCES = 30;
 
 /**
- * Which button opened the box: Reply (to the sender), Reply all (to everyone on the email) or
- * Forward (a new email, to whoever the user picks, carrying the original).
+ * What the box is for: Reply (to the sender), Reply all (to everyone on the email), Forward (a new
+ * email, to whoever the user picks, carrying the original) or Compose (a new email to the contact,
+ * answering nothing).
  */
-export type ReplyMode = "reply" | "replyAll" | "forward";
+export type ReplyMode = "reply" | "replyAll" | "forward" | "compose";
 
 /** "Re: Quote" for "Quote"; a subject that already starts with Re: is left as it is. */
 export function replySubject(subject: string): string {
