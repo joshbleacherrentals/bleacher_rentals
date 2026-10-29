@@ -15,8 +15,9 @@ vi.mock("@/utils/supabase/getClerkSupabaseServerClient", () => ({
   }),
 }));
 
+const admin = { fake: "admin" };
 vi.mock("@/utils/supabase/server", () => ({
-  createServiceRoleClient: async () => ({ fake: "admin" }),
+  createServiceRoleClient: async () => admin,
 }));
 
 const guardEmailRecipients = vi.fn();
@@ -32,21 +33,32 @@ vi.mock("@/features/gmail-integration/server/delegatedAuth", () => ({
 }));
 
 const sendRawMessage = vi.fn();
+const getMessageSummary = vi.fn();
 vi.mock("@/features/gmail-integration/server/gmailMessages", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/gmail-integration/server/gmailMessages")>()),
   sendRawMessage: (...args: unknown[]) => sendRawMessage(...args),
+  getMessageSummary: (...args: unknown[]) => getMessageSummary(...args),
 }));
 
-const readEmailContent = vi.fn();
-vi.mock("@/features/gmail-integration/server/emailContent", () => ({
-  readEmailContent: (...args: unknown[]) => readEmailContent(...args),
+// The database half is tested in unsentEmail.test.ts; here only the calls the route makes to it.
+const findEmailRow = vi.fn();
+const recordSentEmail = vi.fn();
+const recordFailedEmail = vi.fn();
+vi.mock("@/features/gmail-integration/server/unsentEmail", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/gmail-integration/server/unsentEmail")>()),
+  findEmailRow: (...args: unknown[]) => findEmailRow(...args),
+  recordSentEmail: (...args: unknown[]) => recordSentEmail(...args),
+  recordFailedEmail: (...args: unknown[]) => recordFailedEmail(...args),
 }));
 
 import { GmailApiError } from "@/features/gmail-integration/server/gmailMessages";
 import { NOT_COMPANY_EMAIL_MESSAGE } from "@/features/userAccess/logic/canSendEmail";
 import { POST } from "./route";
 
+const EMAIL_ID = "9b2f6c1e-3d4a-4f5b-8c7d-1e2f3a4b5c6d";
+
 const valid = {
+  emailMessageUuid: EMAIL_ID,
   to: ["pat@xyz.com"],
   cc: ["sam@xyz.com"],
   bcc: [],
@@ -68,6 +80,14 @@ const post = (body: unknown) =>
 
 const decode = (raw: string) => Buffer.from(raw, "base64url").toString("utf8");
 
+const pendingRow = {
+  id: EMAIL_ID,
+  mailbox: "josh@bleacherrentals.com",
+  direction: "sent",
+  status: "sending",
+  google_id: null,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   requireEmailSender.mockResolvedValue("user_clerk");
@@ -78,35 +98,30 @@ beforeEach(() => {
   guardEmailRecipients.mockResolvedValue({ to: "pat@xyz.com", cc: null, bcc: null, blocked: [] });
   getDelegatedAccessToken.mockResolvedValue("ya29.token");
   sendRawMessage.mockResolvedValue({ id: "sent1", threadId: "t-sent", labelIds: ["SENT"] });
-  // The email as Gmail hands it back (format=full), and the body read out of it.
-  readEmailContent.mockResolvedValue({
-    message: {
-      id: "sent1",
-      threadId: "t-sent",
-      snippet: "Sounds good.",
-      internalDate: "1761494400000",
-      labelIds: ["SENT"],
-      payload: {
-        headers: [
-          { name: "Message-ID", value: "<sent@co.com>" },
-          { name: "In-Reply-To", value: "<b@x>" },
-          { name: "References", value: "<a@x> <b@x>" },
-          { name: "From", value: "Josh Redgrift <josh@bleacherrentals.com>" },
-          { name: "To", value: "pat@xyz.com" },
-          { name: "Cc", value: "sam@xyz.com" },
-          { name: "Subject", value: "Re: Quote" },
-          { name: "Date", value: "Mon, 26 Oct 2026 10:00:00 -0600" },
-        ],
-      },
-    },
-    content: { text: "Sounds good.", html: null },
+  getMessageSummary.mockResolvedValue({
+    id: "sent1",
+    threadId: "t-sent",
+    messageId: "<sent@co.com>",
+    inReplyTo: "<b@x>",
+    references: "<a@x> <b@x>",
+    from: "Josh Redgrift <josh@bleacherrentals.com>",
+    to: "pat@xyz.com",
+    cc: "sam@xyz.com",
+    subject: "Re: Quote",
+    date: "Mon, 26 Oct 2026 10:00:00 -0600",
+    snippet: "Sounds good.",
+    internalDate: 1761494400000,
+    labelIds: ["SENT"],
   });
+  findEmailRow.mockResolvedValue(pendingRow);
+  recordSentEmail.mockResolvedValue("updated");
+  recordFailedEmail.mockResolvedValue(undefined);
 });
 
 describe("POST /api/gmail/send", () => {
   it("refuses someone who may not send, before anything else happens", async () => {
     requireEmailSender.mockRejectedValue(
-      new Response(JSON.stringify({ error: "You can't send emails with your permission level." }), {
+      new Response(JSON.stringify({ error: "You don't have permission to send emails." }), {
         status: 403,
       }),
     );
@@ -114,21 +129,24 @@ describe("POST /api/gmail/send", () => {
     const res = await post(valid);
 
     expect(res.status).toBe(403);
-    expect((await res.json()).error).toMatch(/permission level/i);
+    expect((await res.json()).error).toMatch(/permission/i);
     expect(guardEmailRecipients).not.toHaveBeenCalled();
     expect(getDelegatedAccessToken).not.toHaveBeenCalled();
     expect(sendRawMessage).not.toHaveBeenCalled();
+    expect(recordFailedEmail).not.toHaveBeenCalled();
   });
 
   it("refuses a body that is not JSON, or not a valid request, without asking Google anything", async () => {
     const notJson = await post("{nope");
     const noRecipient = await post({ ...valid, to: [], cc: [], bcc: [] });
     const badAddress = await post({ ...valid, to: ["not-an-email"] });
+    const noEmailId = await post({ ...valid, emailMessageUuid: "nope" });
 
     expect(notJson.status).toBe(400);
     expect(noRecipient.status).toBe(400);
     expect((await noRecipient.json()).error).toMatch(/recipient/i);
     expect(badAddress.status).toBe(400);
+    expect(noEmailId.status).toBe(400);
     expect(getDelegatedAccessToken).not.toHaveBeenCalled();
     expect(sendRawMessage).not.toHaveBeenCalled();
   });
@@ -159,7 +177,33 @@ describe("POST /api/gmail/send", () => {
     expect(sendRawMessage).not.toHaveBeenCalled();
   });
 
-  it("refuses the whole send when the development guard blocks an address, naming it", async () => {
+  it("refuses a request for an email that was already sent, or is not the sender's, and sends nothing", async () => {
+    for (const row of [
+      { ...pendingRow, status: "success", google_id: "18c0ffee" },
+      { ...pendingRow, mailbox: "mike@bleacherrentals.com" },
+    ]) {
+      findEmailRow.mockResolvedValue(row);
+
+      const res = await post(valid);
+
+      expect(res.status).toBe(409);
+      expect(sendRawMessage).not.toHaveBeenCalled();
+      // It is not this request's email to mark failed.
+      expect(recordFailedEmail).not.toHaveBeenCalled();
+    }
+  });
+
+  it("goes ahead when the saved email has not been uploaded yet, and looks for it afterwards", async () => {
+    findEmailRow.mockResolvedValue(null);
+
+    const res = await post(valid);
+
+    expect(res.status).toBe(200);
+    expect(sendRawMessage).toHaveBeenCalledTimes(1);
+    expect(recordSentEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses the whole send when the development guard blocks an address, naming it, and marks the email failed", async () => {
     guardEmailRecipients.mockResolvedValue({
       to: "pat@xyz.com",
       cc: null,
@@ -176,15 +220,24 @@ describe("POST /api/gmail/send", () => {
     expect(error).toContain("/dev-tools/allowed-emails");
     expect(getDelegatedAccessToken).not.toHaveBeenCalled();
     expect(sendRawMessage).not.toHaveBeenCalled();
+    expect(recordFailedEmail).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({
+        id: EMAIL_ID,
+        sender: "josh@bleacherrentals.com",
+        reason: error,
+      }),
+    );
   });
 
   it("checks every recipient, To, Cc and Bcc, with the development guard", async () => {
     await post({ ...valid, to: ["a@x.com", "b@x.com"], cc: ["c@x.com"], bcc: ["d@x.com"] });
 
-    expect(guardEmailRecipients).toHaveBeenCalledWith(
-      { fake: "admin" },
-      { to: "a@x.com, b@x.com", cc: "c@x.com", bcc: "d@x.com" },
-    );
+    expect(guardEmailRecipients).toHaveBeenCalledWith(admin, {
+      to: "a@x.com, b@x.com",
+      cc: "c@x.com",
+      bcc: "d@x.com",
+    });
   });
 
   it("sends as the signed-in user, never as anyone named in the request", async () => {
@@ -207,23 +260,25 @@ describe("POST /api/gmail/send", () => {
     expect(message).not.toContain("ceo@co.com");
   });
 
-  it("returns the sent email in the form the contact page saves, with its body", async () => {
+  it("updates the saved email with what Gmail says instead of creating one", async () => {
     const res = await post(valid);
 
     expect(res.status).toBe(200);
-    // One read, with the token that sent it, gives both the summary and the body.
-    expect(readEmailContent).toHaveBeenCalledTimes(1);
-    expect(readEmailContent).toHaveBeenCalledWith("ya29.token", "sent1");
-    const { message, details } = await res.json();
-    expect(message).toMatchObject({
-      messageId: "<sent@co.com>",
-      inReplyTo: "<b@x>",
+    expect(await res.json()).toEqual({ ok: true, recorded: true });
+    expect(getMessageSummary).toHaveBeenCalledWith("ya29.token", "sent1");
+    expect(recordSentEmail).toHaveBeenCalledTimes(1);
+    const [client, params] = recordSentEmail.mock.calls[0];
+    expect(client).toBe(admin);
+    expect(params).toMatchObject({ id: EMAIL_ID, sender: "josh@bleacherrentals.com" });
+    expect(params.columns).toMatchObject({
+      google_message_id: "<sent@co.com>",
+      google_id: "sent1",
+      google_thread_id: "t-sent",
+      google_in_reply_to: "<b@x>",
       subject: "Re: Quote",
       snippet: "Sounds good.",
-      direction: "sent",
-      copies: [{ mailbox: "josh@bleacherrentals.com", id: "sent1", threadId: "t-sent" }],
     });
-    expect(details).toEqual({ text: "Sounds good.", html: null });
+    expect(recordFailedEmail).not.toHaveBeenCalled();
   });
 
   it("puts the reply in the thread only when the thread is the sender's own mailbox's", async () => {
@@ -234,7 +289,7 @@ describe("POST /api/gmail/send", () => {
     expect(sendRawMessage.mock.calls[1][2]).toBeUndefined();
   });
 
-  it("tells the user plainly when Google will not give a token for the sender, and sends nothing", async () => {
+  it("tells the user plainly when Google will not give a token for the sender, sends nothing, and marks the email failed", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     getDelegatedAccessToken.mockRejectedValue(
       new Error("Google refused the delegated token request: unauthorized_client (details)."),
@@ -250,26 +305,76 @@ describe("POST /api/gmail/send", () => {
     expect(error).not.toMatch(/unauthorized_client|domain-wide|admin console/i);
     expect(consoleError).toHaveBeenCalled();
     expect(sendRawMessage).not.toHaveBeenCalled();
+    expect(recordFailedEmail).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({ id: EMAIL_ID, reason: error }),
+    );
     consoleError.mockRestore();
   });
 
-  it("reports Gmail's refusal", async () => {
+  it("reports Gmail's refusal and marks the email failed with it", async () => {
     sendRawMessage.mockRejectedValue(new GmailApiError(400, "Invalid To header"));
 
     const res = await post(valid);
 
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toContain("Invalid To header");
+    const { error } = await res.json();
+    expect(error).toContain("Invalid To header");
+    expect(recordFailedEmail).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({ id: EMAIL_ID, sender: "josh@bleacherrentals.com", reason: error }),
+    );
+    expect(recordSentEmail).not.toHaveBeenCalled();
   });
 
-  it("still reports the send as done when the sent email cannot be read back", async () => {
+  it("still answers with the reason when the failed email cannot be marked", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    readEmailContent.mockRejectedValue(new GmailApiError(500, "backend error"));
+    sendRawMessage.mockRejectedValue(new GmailApiError(400, "Invalid To header"));
+    recordFailedEmail.mockRejectedValue(new Error("database is down"));
+
+    const res = await post(valid);
+
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toContain("Invalid To header");
+    consoleError.mockRestore();
+  });
+
+  it("still fills in the saved email's Google ids when the sent email cannot be read back", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    getMessageSummary.mockRejectedValue(new GmailApiError(500, "backend error"));
 
     const res = await post(valid);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ message: null, details: null });
+    expect(await res.json()).toEqual({ ok: true, recorded: true });
+    expect(recordSentEmail.mock.calls[0][1].columns).toEqual({
+      google_id: "sent1",
+      google_thread_id: "t-sent",
+    });
+    consoleError.mockRestore();
+  });
+
+  it("says the row was not updated when it could not be found, but never calls a sent email failed", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    recordSentEmail.mockResolvedValue("missing");
+
+    const res = await post(valid);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, recorded: false });
+    expect(recordFailedEmail).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("still reports the send as done when the row cannot be updated, and never marks it failed", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    recordSentEmail.mockRejectedValue(new Error("database is down"));
+
+    const res = await post(valid);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, recorded: false });
+    expect(recordFailedEmail).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
 });

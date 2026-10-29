@@ -1,3 +1,5 @@
+import { toEmailStatus, type EmailStatus } from "./emailStatus";
+
 /** One email as the Activities list shows it, whether it came from our DB or straight from Gmail. */
 export type ActivityEmail = {
   /** Stable key for the list. */
@@ -11,6 +13,10 @@ export type ActivityEmail = {
   date: string | null;
   snippet: string;
   direction: "sent" | "received";
+  /** 'success' for every email but one the app is still writing or sending, or could not send. */
+  status: EmailStatus;
+  /** Why sending failed, when status is 'error'. */
+  errorText: string | null;
 };
 
 /** The fields of /api/dev/gmail-contact-emails's `messages` that get saved. */
@@ -194,6 +200,8 @@ export function storedToActivityEmail(row: {
   date: string | null;
   snippet: string | null;
   direction: string | null;
+  status?: string | null;
+  error_text?: string | null;
 }): ActivityEmail {
   return {
     key: row.id,
@@ -203,5 +211,7 @@ export function storedToActivityEmail(row: {
     date: toIso(null, row.date),
     snippet: decodeSnippet(row.snippet ?? ""),
     direction: row.direction === "sent" ? "sent" : "received",
+    status: toEmailStatus(row.status),
+    errorText: row.error_text ?? null,
   };
 }

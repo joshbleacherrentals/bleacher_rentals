@@ -969,6 +969,8 @@ const EmailMessagesCols = {
   date: column.text,
   snippet: column.text,
   direction: column.text,
+  status: column.text,
+  error_text: column.text,
   email_message_details_uuid: column.text,
 } satisfies PowerSyncColsFor<"EmailMessages">;
 const EmailMessages = new Table(EmailMessagesCols, {

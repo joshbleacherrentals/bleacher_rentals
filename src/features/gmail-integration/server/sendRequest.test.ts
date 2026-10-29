@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { MAX_RECIPIENTS, MAX_TEXT_LENGTH, parseSendRequest } from "./sendRequest";
 
+const ID = "9b2f6c1e-3d4a-4f5b-8c7d-1e2f3a4b5c6d";
+
 const valid = {
+  emailMessageUuid: ID,
   to: ["Pat@XYZ.com"],
   cc: ["sam@xyz.com"],
   bcc: [],
@@ -12,13 +15,19 @@ const valid = {
   thread: { mailbox: "Josh@Co.com", threadId: "19abc123def" },
 };
 
+// Most tests are about something else, so they are given a valid id unless they bring their own.
+const withId = (body: unknown) =>
+  typeof body === "object" && body !== null && !Array.isArray(body) && !("emailMessageUuid" in body)
+    ? { emailMessageUuid: ID, ...body }
+    : body;
+
 const ok = (body: unknown) => {
-  const result = parseSendRequest(body);
+  const result = parseSendRequest(withId(body));
   if (!result.ok) throw new Error(`expected ok, got: ${result.error}`);
   return result.value;
 };
 const error = (body: unknown) => {
-  const result = parseSendRequest(body);
+  const result = parseSendRequest(withId(body));
   if (result.ok) throw new Error("expected an error");
   return result.error;
 };
@@ -26,6 +35,7 @@ const error = (body: unknown) => {
 describe("parseSendRequest", () => {
   it("accepts a whole request and returns it with addresses in lower case", () => {
     expect(ok(valid)).toEqual({
+      emailMessageUuid: ID,
       to: ["pat@xyz.com"],
       cc: ["sam@xyz.com"],
       bcc: [],
@@ -37,8 +47,20 @@ describe("parseSendRequest", () => {
     });
   });
 
+  it("needs the id of the saved email, a UUID, which it returns in lower case", () => {
+    const rest = { to: ["a@x.com"], subject: "Hi", text: "Hello" };
+
+    for (const emailMessageUuid of [undefined, null, "", "nope", 42, `${ID}0`]) {
+      const result = parseSendRequest({ ...rest, emailMessageUuid });
+      expect(result.ok, String(emailMessageUuid)).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/email to send/i);
+    }
+    expect(ok({ ...rest, emailMessageUuid: ID.toUpperCase() }).emailMessageUuid).toBe(ID);
+  });
+
   it("makes Cc, Bcc and the reply details optional", () => {
     expect(ok({ to: ["a@x.com"], subject: "Hi", text: "Hello" })).toEqual({
+      emailMessageUuid: ID,
       to: ["a@x.com"],
       cc: [],
       bcc: [],

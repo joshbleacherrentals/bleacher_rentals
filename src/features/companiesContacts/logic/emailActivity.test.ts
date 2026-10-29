@@ -127,6 +127,8 @@ describe("storedToActivityEmail", () => {
       date: "2026-10-21T16:30:25.000Z",
       snippet: "",
       direction: "sent",
+      status: "success",
+      errorText: null,
     });
 
     expect(
@@ -140,6 +142,34 @@ describe("storedToActivityEmail", () => {
         direction: "weird",
       }).direction,
     ).toBe("received");
+  });
+});
+
+describe("storedToActivityEmail status", () => {
+  const stored = (over: { status?: string | null; error_text?: string | null }) =>
+    storedToActivityEmail({
+      id: "u",
+      from_address: null,
+      to_addresses: null,
+      subject: "x",
+      date: null,
+      snippet: "s",
+      direction: "sent",
+      ...over,
+    });
+
+  it("carries the status and the reason it failed", () => {
+    expect(stored({ status: "sending" })).toMatchObject({ status: "sending", errorText: null });
+    expect(stored({ status: "error", error_text: "Gmail could not send it" })).toMatchObject({
+      status: "error",
+      errorText: "Gmail could not send it",
+    });
+    expect(stored({ status: "draft" }).status).toBe("draft");
+  });
+
+  it("treats a row with no status, as a pull saves it on this device, as a normal email", () => {
+    expect(stored({ status: null }).status).toBe("success");
+    expect(stored({}).status).toBe("success");
   });
 });
 

@@ -5,6 +5,7 @@ import type { ThreadMessage } from "../hooks/useEmailThread";
 import { personNameParts } from "../logic/emailActivity";
 import { EmailMessageBody } from "./EmailMessageBody";
 import { EmailRecipients } from "./EmailRecipients";
+import { EmailStatusBadge } from "./EmailStatusBadge";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -17,16 +18,21 @@ function formatDate(iso: string | null): string {
  * it. Each email opens and closes on its own. An open email swaps the snippet for "To ..." (who it
  * went to, with the full addresses a click away), since the email itself is right below. The avatar
  * is the team lists' one, given the sender's initials: only a team member signed in as themselves
- * gets a photo, and an email's sender has none.
+ * gets a photo, and an email's sender has none. An email the app is still sending, or could not
+ * send, shows its status beside the date (see EmailStatusBadge); a failed one also says why under
+ * its header when open, with a Discard button.
  */
 export function EmailThreadMessage({
   message,
   open,
   onToggle,
+  onDiscard,
 }: {
   message: ThreadMessage;
   open: boolean;
   onToggle: () => void;
+  /** Throws away an email that could not be sent. Without it the banner has no Discard button. */
+  onDiscard?: () => void;
 }) {
   const { firstName, lastName } = personNameParts(message.from);
   const dateText = formatDate(message.date);
@@ -50,7 +56,10 @@ export function EmailThreadMessage({
             >
               {message.from}
             </span>
-            <span className="shrink-0 text-xs text-gray-400">{dateText}</span>
+            <span className="flex shrink-0 items-center gap-2">
+              <EmailStatusBadge status={message.status} errorText={message.errorText} />
+              <span className="text-xs text-gray-400">{dateText}</span>
+            </span>
           </div>
           {open ? (
             <EmailRecipients message={message} dateText={dateText} />
@@ -59,6 +68,27 @@ export function EmailThreadMessage({
           )}
         </div>
       </div>
+
+      {open && message.status === "error" && (
+        // Lined up under the sender's name, like the body below it.
+        <div
+          role="alert"
+          className="mb-3 ml-18 mr-6 flex items-start justify-between gap-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+        >
+          <p className="min-w-0 break-words">
+            This email was not sent{message.errorText ? `: ${message.errorText}` : "."}
+          </p>
+          {onDiscard && (
+            <button
+              type="button"
+              onClick={onDiscard}
+              className="shrink-0 cursor-pointer font-medium underline transition-colors hover:text-red-950"
+            >
+              Discard
+            </button>
+          )}
+        </div>
+      )}
 
       {open && <EmailMessageBody emailMessageUuid={message.key} />}
     </section>

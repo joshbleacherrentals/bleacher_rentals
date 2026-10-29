@@ -8,7 +8,11 @@ export const MAX_TEXT_LENGTH = 100_000;
 const MAX_SUBJECT_LENGTH = 500;
 const MAX_REFERENCES = 100;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export type SendRequest = {
+  /** The EmailMessages row saved for this reply when Send was pressed: the server updates it. */
+  emailMessageUuid: string;
   to: string[];
   cc: string[];
   bcc: string[];
@@ -62,6 +66,10 @@ export function parseSendRequest(body: unknown): ParsedSendRequest {
   }
   const input = body as Record<string, unknown>;
 
+  if (typeof input.emailMessageUuid !== "string" || !UUID.test(input.emailMessageUuid)) {
+    return { ok: false, error: "The email to send is missing." };
+  }
+
   const to = addressList("To", input.to);
   if (!to.ok) return to;
   const cc = addressList("Cc", input.cc);
@@ -92,6 +100,7 @@ export function parseSendRequest(body: unknown): ParsedSendRequest {
   return {
     ok: true,
     value: {
+      emailMessageUuid: input.emailMessageUuid.toLowerCase(),
       to: to.addresses,
       cc: cc.addresses,
       bcc: bcc.addresses,

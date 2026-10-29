@@ -6,6 +6,7 @@ afterEach(() => {
 });
 
 const payload: SendReplyPayload = {
+  emailMessageUuid: "m-1",
   to: ["pat@xyz.com"],
   cc: [],
   bcc: [],
@@ -24,33 +25,17 @@ const respond = (ok: boolean, status: number, body: unknown) =>
   }));
 
 describe("sendReply", () => {
-  it("posts the reply as JSON to the send route and returns the sent email with its body", async () => {
-    const message = { messageId: "<sent@co.com>", direction: "sent" };
-    const details = { text: "Sounds good.", html: null };
-    const fetchMock = respond(true, 200, { message, details });
+  it("posts the reply, with the id of its saved row, as JSON to the send route", async () => {
+    const fetchMock = respond(true, 200, { ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
-    const sent = await sendReply(payload);
+    await expect(sendReply(payload)).resolves.toBeUndefined();
 
-    expect(sent).toEqual({ message, details });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/gmail/send");
     expect(init?.method).toBe("POST");
     expect(init?.headers).toEqual({ "Content-Type": "application/json" });
     expect(JSON.parse(init?.body as string)).toEqual(payload);
-  });
-
-  it("returns nothing to save when the server sent it but could not read it back", async () => {
-    vi.stubGlobal("fetch", respond(true, 200, { message: null, details: null }));
-
-    expect(await sendReply(payload)).toEqual({ message: null, details: null });
-  });
-
-  it("copes with a server that sends no body", async () => {
-    const message = { messageId: "<sent@co.com>", direction: "sent" };
-    vi.stubGlobal("fetch", respond(true, 200, { message }));
-
-    expect(await sendReply(payload)).toEqual({ message, details: null });
   });
 
   it("throws with the server's own explanation when it refuses", async () => {

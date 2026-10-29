@@ -24,6 +24,8 @@ const threadRows = () =>
       "date",
       "snippet",
       "direction",
+      "status",
+      "error_text",
     ]);
 
 /**

@@ -19,6 +19,15 @@
 -- The `powersync` publication is FOR ALL TABLES, so nothing has to be added to it here. The sync
 -- rules (br_powersync) decide who receives these rows.
 
+-- Where an email is in its life. 'success' is the normal state: an email pulled from Gmail (received
+-- or sent) and an email the app has sent. The other three are an email the app is writing or sending:
+--   draft    saved but not sent
+--   sending  the app has created the row at once, and the server is sending it
+--   error    sending failed; error_text says why
+-- An unsent email exists only in its writer's mailbox and has no Google ids until the server has sent
+-- it and filled them in.
+create type public.email_message_status as enum ('draft', 'sending', 'success', 'error');
+
 create table public."EmailMessages" (
   id uuid not null default gen_random_uuid(),
   created_at timestamp with time zone not null default now(),
@@ -26,10 +35,10 @@ create table public."EmailMessages" (
   -- The company mailbox this copy lives in, e.g. 'paul@bleacherrentals.com'.
   mailbox text not null,
 
-  -- Google's ids
+  -- Google's ids. google_id and google_thread_id are null while an email has not been sent yet.
   google_message_id text,
-  google_id text not null,
-  google_thread_id text not null,
+  google_id text,
+  google_thread_id text,
   -- Copied from the In-Reply-To and References headers: the Message-ID of the email this one answers,
   -- and the chain of Message-IDs before it. A reply sends both back so mail clients thread it. Null
   -- for an email that replies to nothing.
@@ -45,13 +54,18 @@ create table public."EmailMessages" (
   -- Relative to us: 'sent' when someone at the company wrote it, otherwise 'received'.
   direction text not null,
 
+  status public.email_message_status not null default 'success',
+  -- Why sending failed, shown on the email. Null unless status is 'error'.
+  error_text text,
+
   -- This email's saved body (EmailMessageDetails points back at this row). Null until someone has
   -- opened the email. Set once by the app; see the update policy at the bottom of this file. Its
   -- foreign key is added below, once EmailMessageDetails exists.
   email_message_details_uuid uuid,
 
   constraint EmailMessages_pkey primary key (id),
-  -- A Gmail id is only unique within its mailbox, so a copy is identified by both.
+  -- A Gmail id is only unique within its mailbox, so a copy is identified by both. Unsent emails
+  -- have no google_id, and nulls do not clash.
   constraint EmailMessages_mailbox_google_id_unique unique (mailbox, google_id),
   constraint EmailMessages_direction_check check (direction in ('sent', 'received'))
 );
@@ -116,13 +130,34 @@ alter table public."EmailMessages"
 create index "EmailMessages_email_message_details_uuid_idx"
   on public."EmailMessages" using btree (email_message_details_uuid);
 
--- Access. Every signed-in user can read and insert. There are no update or delete policies, so
--- nobody can change or remove a row through the API; the service role (the server) still can. Same
--- pattern as ChangeLog (select: everyone) and EventChangeLog (insert: everyone, no update or delete).
+-- The signed-in user's email address, lowercased (null for an inactive or unknown user). A mailbox
+-- is a company email address, so this is how a row is known to be someone's own.
+create or replace function public.get_current_user_email()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select lower(u.email)
+  from "Users" u
+  where u.id = public.get_current_user_uuid()
+  limit 1;
+$$;
+
+-- Access. Every signed-in user can read. A sent or received email ('success') can be inserted by
+-- anyone (that is how a pull saves them) and afterwards never changed or removed through the API;
+-- the service role (the server) still can. Same pattern as ChangeLog (select: everyone) and
+-- EventChangeLog (insert: everyone, no update or delete).
+--
+-- An unsent email (draft, sending, error) is the exception, because the person writing it has to be
+-- able to create, change and discard it from their own device: a user can insert one, update it and
+-- delete it, but only in their own mailbox. The server is what marks an email 'success' and fills in
+-- its Google ids, so a user can never make one look sent.
 --
 -- One thing to know about inserts: PowerSync uploads a new row as an upsert. For a row that does not
 -- exist yet that is a plain insert and passes. Uploading the same row a second time (a retry after a
--- half-finished upload) hits the update path and is refused, because there is no update policy.
+-- half-finished upload) hits the update path, which a 'success' row refuses.
 
 create policy "email_messages_select" on public."EmailMessages"
   as permissive for select to authenticated
@@ -130,17 +165,30 @@ create policy "email_messages_select" on public."EmailMessages"
 
 create policy "email_messages_insert" on public."EmailMessages"
   as permissive for insert to authenticated
-  with check (true);
+  with check (
+    status = 'success'
+    or (status in ('draft', 'sending') and lower(mailbox) = public.get_current_user_email())
+  );
 
--- The one exception to "nobody updates". Opening an email saves its body in EmailMessageDetails and
--- then sets email_message_details_uuid on the EmailMessages row. The policy lets a row be updated
--- only while that pointer is still empty, and the trigger below refuses anything else a signed-in
--- user tries to change (the service role is not held to it). So the pointer can be set once, to the
--- email's own details row, and nothing else about a row can be edited.
+-- Opening an email saves its body in EmailMessageDetails and then sets email_message_details_uuid on
+-- the EmailMessages row. The policy lets a row be updated only while that pointer is still empty,
+-- and the trigger below refuses anything else a signed-in user tries to change on a 'success' row
+-- (the service role is not held to it). So the pointer can be set once, to the email's own details
+-- row, and nothing else about a received or sent email can be edited.
 create policy "email_messages_link_details" on public."EmailMessages"
   as permissive for update to authenticated
   using (email_message_details_uuid is null)
   with check (true);
+
+-- The owner of an unsent email can change it (the trigger below limits what) and discard it.
+create policy "email_messages_edit_own_unsent" on public."EmailMessages"
+  as permissive for update to authenticated
+  using (status <> 'success' and lower(mailbox) = public.get_current_user_email())
+  with check (status <> 'success' and lower(mailbox) = public.get_current_user_email());
+
+create policy "email_messages_delete_own_unsent" on public."EmailMessages"
+  as permissive for delete to authenticated
+  using (status <> 'success' and lower(mailbox) = public.get_current_user_email());
 
 create function public.email_messages_guard_update()
 returns trigger
@@ -148,10 +196,29 @@ language plpgsql
 as $$
 begin
   if current_user = 'authenticated' then
-    if (to_jsonb(new) - 'email_message_details_uuid') is distinct from
-       (to_jsonb(old) - 'email_message_details_uuid') then
-      raise exception 'Only email_message_details_uuid can be set on an EmailMessages row'
-        using errcode = '42501';
+    if old.status = 'success' then
+      if (to_jsonb(new) - 'email_message_details_uuid') is distinct from
+         (to_jsonb(old) - 'email_message_details_uuid') then
+        raise exception 'Only email_message_details_uuid can be set on an EmailMessages row'
+          using errcode = '42501';
+      end if;
+    else
+      -- An unsent email: its owner's to edit, but it stays in their mailbox, and only the server
+      -- can say it was sent or give it Google's ids.
+      if lower(old.mailbox) is distinct from public.get_current_user_email() then
+        raise exception 'You can only change your own unsent emails'
+          using errcode = '42501';
+      end if;
+      if new.status = 'success' then
+        raise exception 'Only the server can mark an email as sent'
+          using errcode = '42501';
+      end if;
+      if (new.mailbox, new.direction, new.google_id, new.google_thread_id, new.google_message_id)
+         is distinct from
+         (old.mailbox, old.direction, old.google_id, old.google_thread_id, old.google_message_id) then
+        raise exception 'The mailbox, direction and Google ids of an unsent email cannot be changed'
+          using errcode = '42501';
+      end if;
     end if;
 
     if new.email_message_details_uuid is not null and not exists (

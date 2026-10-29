@@ -13,6 +13,8 @@ type Row = {
   date: string | null;
   snippet: string | null;
   direction: string | null;
+  status: string | null;
+  error_text: string | null;
 };
 
 /** The emails already saved for a contact (EmailMessages linked through ContactEmailMessages), newest first. */
@@ -33,6 +35,8 @@ export function useContactEmailMessages(contactUuid: string): {
           "em.date as date",
           "em.snippet as snippet",
           "em.direction as direction",
+          "em.status as status",
+          "em.error_text as error_text",
         ])
         .where("cem.contact_uuid", "=", contactUuid)
         .orderBy("em.date", "desc")

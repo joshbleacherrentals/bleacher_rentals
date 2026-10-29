@@ -5,8 +5,8 @@ import { Maximize2, Minus } from "lucide-react";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/db/useCurrentUser";
-import { saveSentEmail } from "../db/saveSentEmail";
-import { sendReply } from "../db/sendReply";
+import { createPendingEmail } from "../db/createPendingEmail";
+import { sendPendingEmail } from "../db/sendPendingEmail";
 import { useContactDirectory } from "../hooks/useContactDirectory";
 import type { ThreadMessage } from "../hooks/useEmailThread";
 import { personWithAddress, replyRecipients } from "../logic/emailActivity";
@@ -33,12 +33,13 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
  * text area folds it back. A minus at the top right of the header minimizes the box to a small
  * card (the page sizes it), and clicking that card restores it as it was: the draft, the
  * recipients and the header's state live here and survive being minimized. A footer with a Send
- * button stays at the bottom of the box however far the text has scrolled. Send posts the reply to
- * /api/gmail/send, saves the email it sends to the contact's thread (body included, so it opens
- * with nothing to load), and calls `onSent`, which
- * closes the box; if the server refuses (who may send, and in development to whom, is its call) the
- * reason shows as an error toast and the draft stays. The text area takes focus when the box
- * appears and when it is restored.
+ * button stays at the bottom of the box however far the text has scrolled. Send saves the reply at
+ * once as an email being sent, in the contact's thread (body included, so it is complete to open),
+ * and calls `onSent`, which closes the box. The send itself then happens in the background through
+ * /api/gmail/send, which updates that email when it is sent. If it cannot be sent (who may send,
+ * and in development to whom, is the server's call) the email is marked failed with the reason, and
+ * the reason shows as an error toast too. If the reply could not even be saved, the box stays open
+ * with the draft. The text area takes focus when the box appears and when it is restored.
  */
 export function ReplyBox({
   contactUuid,
@@ -48,14 +49,14 @@ export function ReplyBox({
   onRestore,
   onSent,
 }: {
-  /** The contact whose thread this is: the sent email is saved to it. */
+  /** The contact whose thread this is: the reply is saved to it. */
   contactUuid: string;
-  /** The email being answered: the newest of the thread. */
+  /** The email being answered: the newest of the thread that has been sent or received. */
   replyingTo: ThreadMessage;
   minimized: boolean;
   onMinimize: () => void;
   onRestore: () => void;
-  /** Called once the reply is sent. */
+  /** Called once the reply is saved and on its way, so the box can close. */
   onSent: () => void;
 }) {
   const { data: currentUser, isLoading } = useCurrentUser();
@@ -98,38 +99,59 @@ export function ReplyBox({
   const textarea = useRef<HTMLTextAreaElement>(null);
 
   const [sending, setSending] = useState(false);
-  const canSend = !sending && text.trim() !== "" && recipients.length + cc.length + bcc.length > 0;
+  const canSend =
+    !sending &&
+    ownAddress !== null &&
+    text.trim() !== "" &&
+    recipients.length + cc.length + bcc.length > 0;
 
+  // The reply is saved on this device first, as an email being sent, so it is in the thread the
+  // moment Send is pressed and the box can close at once; the server sends it in the background and
+  // updates that email, or marks it failed with the reason (see sendPendingEmail).
   const send = async () => {
+    if (ownAddress === null) return;
     setSending(true);
+
+    const subject = replySubject(replyingTo.subjectHeader);
+    const inReplyTo = replyingTo.messageIdHeader || null;
+    const references = replyReferences({
+      messageId: replyingTo.messageIdHeader || null,
+      references: replyingTo.referencesHeader || null,
+    });
+
     try {
-      const sent = await sendReply({
+      const emailMessageUuid = await createPendingEmail({
+        contactUuid,
+        sender: { address: ownAddress, name: fullName || null },
+        to: recipients,
+        cc,
+        subject,
+        text,
+        inReplyTo,
+        references,
+      });
+      onSent();
+
+      // Not awaited: the box is gone by now. The email itself shows how it went; the toast makes
+      // sure the reason is seen too.
+      void sendPendingEmail({
+        emailMessageUuid,
         to: recipients,
         cc,
         bcc,
-        subject: replySubject(replyingTo.subjectHeader),
+        subject,
         text,
-        inReplyTo: replyingTo.messageIdHeader || null,
-        references: replyReferences({
-          messageId: replyingTo.messageIdHeader || null,
-          references: replyingTo.referencesHeader || null,
-        }),
+        inReplyTo,
+        references,
         thread:
           replyingTo.mailbox && replyingTo.gmailThreadId
             ? { mailbox: replyingTo.mailbox, threadId: replyingTo.gmailThreadId }
             : null,
+      }).then((result) => {
+        if (!result.ok) createErrorToastNoThrow([result.message]);
       });
-
-      // It is sent now. Failing to save it must not look like failing to send: a second try would
-      // send it twice. A later pull from Gmail brings it into the thread, and opening it loads its
-      // body.
-      try {
-        await saveSentEmail(contactUuid, sent);
-      } catch (error) {
-        console.error("Reply sent, but it could not be saved to the thread:", error);
-      }
-      onSent();
     } catch (error: any) {
+      // Nothing was saved or sent, so the draft stays for another try.
       createErrorToastNoThrow([error?.message ?? "Could not send the reply."]);
       setSending(false);
     }

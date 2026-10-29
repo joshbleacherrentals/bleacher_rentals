@@ -21,6 +21,9 @@ export type ThreadRow = {
   date: string | null;
   snippet: string | null;
   direction: string | null;
+  /** Null on a row a pull saved on this device, until the server's default syncs back: a normal email. */
+  status: string | null;
+  error_text: string | null;
 };
 
 type HeaderIds = Pick<ThreadRow, "google_message_id" | "google_in_reply_to" | "google_references">;

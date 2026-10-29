@@ -1,7 +1,10 @@
-import type { PulledEmail } from "../logic/emailActivity";
-
-/** What the send route takes (see parseSendRequest). The sender is not in it: the server knows. */
+/**
+ * What the send route takes (see parseSendRequest). The sender is not in it: the server knows.
+ * `emailMessageUuid` is the EmailMessages row already saved for this reply (see createPendingEmail),
+ * which the server updates once the email is sent.
+ */
 export type SendReplyPayload = {
+  emailMessageUuid: string;
   to: string[];
   cc: string[];
   bcc: string[];
@@ -12,21 +15,11 @@ export type SendReplyPayload = {
   thread: { mailbox: string; threadId: string } | null;
 };
 
-/** The sent email's body, as saveEmailDetails takes it. */
-export type SentEmailDetails = { text: string | null; html: string | null };
-
 /**
- * What the server hands back once an email is sent: the email in the form saveContactEmails takes,
- * and its body. Both are null when it was sent but the server could not read it back (a later pull
- * finds it).
+ * Asks the server to send a reply. Resolves once it is sent and its row updated. Throws, with the
+ * server's own explanation, when it was not sent.
  */
-export type SentReply = { message: PulledEmail | null; details: SentEmailDetails | null };
-
-/**
- * Sends a reply through the server. Resolves with the sent email and its body (see SentReply).
- * Throws, with the server's own explanation, when it was not sent.
- */
-export async function sendReply(payload: SendReplyPayload): Promise<SentReply> {
+export async function sendReply(payload: SendReplyPayload): Promise<void> {
   let res: Response;
   try {
     res = await fetch("/api/gmail/send", {
@@ -38,11 +31,8 @@ export async function sendReply(payload: SendReplyPayload): Promise<SentReply> {
     throw new Error("Could not reach the server, so the reply was not sent. Try again.");
   }
 
-  const body: {
-    error?: string;
-    message?: PulledEmail | null;
-    details?: SentEmailDetails | null;
-  } | null = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error ?? `Could not send the reply (${res.status}).`);
-  return { message: body?.message ?? null, details: body?.details ?? null };
+  if (!res.ok) {
+    const body: { error?: string } | null = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Could not send the reply (${res.status}).`);
+  }
 }

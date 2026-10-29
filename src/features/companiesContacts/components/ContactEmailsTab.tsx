@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useContactEmailMessages } from "../hooks/useContactEmailMessages";
 import { usePullContactEmails } from "../hooks/usePullContactEmails";
 import type { ActivityEmail } from "../logic/emailActivity";
+import { EmailStatusBadge } from "./EmailStatusBadge";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -26,7 +27,10 @@ function EmailRow({ email, href }: { email: ActivityEmail; href: string }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
             <p className="truncate text-sm font-semibold text-gray-900">{email.subject}</p>
-            <span className="shrink-0 text-xs text-gray-400">{formatDate(email.date)}</span>
+            <span className="flex shrink-0 items-center gap-2">
+              <EmailStatusBadge status={email.status} errorText={email.errorText} />
+              <span className="text-xs text-gray-400">{formatDate(email.date)}</span>
+            </span>
           </div>
           <p className="truncate text-xs text-gray-500">
             {email.from}

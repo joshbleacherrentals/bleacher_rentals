@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { emailSendBlock } from "@/features/userAccess/logic/canSendEmail";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { useCurrentUser } from "@/hooks/db/useCurrentUser";
+import { discardUnsentEmail } from "../db/unsentEmail";
 import { useEmailThread } from "../hooks/useEmailThread";
 import { EmailThreadMessage } from "./EmailThreadMessage";
 import { ReplyBox } from "./ReplyBox";
@@ -19,8 +20,9 @@ import { ReplyBox } from "./ReplyBox";
  * bottom, each as a row that opens and closes on its own. The email from the URL starts open.
  * Back (or Escape, unless typing) returns to the contact's emails. A footer of Reply, Reply all and
  * Forward stays in view at the bottom of the page while the thread scrolls; Reply swaps the buttons
- * for a box to write in, pinned to the bottom right (nothing is sent yet, and there is no way to
- * put the buttons back yet). Reply all and Forward do nothing so far.
+ * for a box to write in, pinned to the bottom right. Sending saves the reply into the thread at
+ * once, as an email that says it is being sent, and the buttons come back (there is no other way to
+ * put them back yet). Reply all and Forward do nothing so far.
  */
 export function EmailView({
   contactUuid,
@@ -32,6 +34,26 @@ export function EmailView({
   const router = useRouter();
   const backHref = `/contacts/${contactUuid}`;
   const { messages, isLoading } = useEmailThread(emailMessageUuid);
+
+  // A reply answers the newest email that was really sent or received. One still being sent, or
+  // that failed, has no Message-ID yet to thread a reply under.
+  const replyTarget =
+    [...messages].reverse().find((message) => message.status === "success") ??
+    messages[messages.length - 1];
+
+  // Throws away an email that could not be sent. Discarding the one this page was opened on leaves
+  // nothing to show, so it goes back to the contact.
+  const discard = async (key: string) => {
+    try {
+      await discardUnsentEmail(key);
+    } catch (error: any) {
+      createErrorToastNoThrow([
+        `Could not discard the email: ${error?.message ?? "unknown error"}`,
+      ]);
+      return;
+    }
+    if (key === emailMessageUuid) router.push(backHref);
+  };
 
   // Only an admin, account manager or accountant with a company email may send (the server checks
   // both too). `sendBlock` is why this person cannot, or null when they can.
@@ -110,6 +132,7 @@ export function EmailView({
               message={message}
               open={open.has(message.key)}
               onToggle={() => toggle(message.key)}
+              onDiscard={() => void discard(message.key)}
             />
           </div>
         ))
@@ -132,7 +155,7 @@ export function EmailView({
           >
             <ReplyBox
               contactUuid={contactUuid}
-              replyingTo={messages[messages.length - 1]}
+              replyingTo={replyTarget}
               minimized={minimized}
               onMinimize={() => setMinimized(true)}
               onRestore={() => setMinimized(false)}

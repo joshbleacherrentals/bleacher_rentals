@@ -14,6 +14,8 @@ const row = (over: Partial<ThreadRow> & { id: string }): ThreadRow => ({
   date: null,
   snippet: "",
   direction: "received",
+  status: "success",
+  error_text: null,
   ...over,
 });
 
@@ -134,5 +136,39 @@ describe("selectThread", () => {
     // Same Message-ID in the same mailbox twice: one is kept, and it is the one opened.
     expect(ids(selectThread("b", [dated, alsoUndated, undated]))).toEqual(["b", "c"]);
     expect(ids(selectThread("zzz", [first]))).toEqual([]); // not saved: nothing to show
+  });
+
+  it("lists an email still being sent, which has no Google ids, under the email it answers", () => {
+    const parent = row({
+      id: "p",
+      google_message_id: "<a@x>",
+      date: "2026-10-26T09:00:00.000Z",
+    });
+    const sending = row({
+      id: "s",
+      mailbox: "josh@co.com",
+      google_message_id: null,
+      google_thread_id: null,
+      google_in_reply_to: "<a@x>",
+      google_references: "<a@x>",
+      direction: "sent",
+      status: "sending",
+      date: "2026-10-26T10:00:00.000Z",
+    });
+    const alsoSending = row({
+      id: "t",
+      mailbox: "josh@co.com",
+      google_message_id: null,
+      google_thread_id: null,
+      google_in_reply_to: "<a@x>",
+      google_references: "<a@x>",
+      direction: "sent",
+      status: "error",
+      date: "2026-10-26T10:05:00.000Z",
+    });
+
+    // Two unsent emails with no Message-ID are two emails, not one.
+    expect(ids(selectThread("p", [sending, alsoSending, parent]))).toEqual(["p", "s", "t"]);
+    expect(ids(selectThread("s", [parent, sending, alsoSending]))).toEqual(["p", "s", "t"]);
   });
 });
