@@ -5,6 +5,7 @@ import {
   personNameParts,
   personWithAddress,
   pulledEmailDate,
+  replyAllRecipients,
   replyRecipients,
   decodeSnippet,
   storedToActivityEmail,
@@ -270,5 +271,100 @@ describe("replyRecipients", () => {
     expect(replyRecipients({ direction: "received", fromHeader: "", toHeader: "" }, null)).toEqual(
       [],
     );
+  });
+});
+
+describe("replyAllRecipients", () => {
+  const received = {
+    direction: "received" as const,
+    fromHeader: "Pat Smith <pat@xyz.com>",
+    toHeader: "Josh <josh@co.com>, Paul <paul@co.com>",
+    ccHeader: "Sam <sam@xyz.com>, Josh <josh@co.com>",
+  };
+
+  it("answers the sender and everyone else the email went to, and copies whoever was copied", () => {
+    expect(replyAllRecipients(received, "josh@co.com")).toEqual({
+      to: [
+        { name: "Pat Smith", address: "pat@xyz.com" },
+        { name: "Paul", address: "paul@co.com" },
+      ],
+      cc: [{ name: "Sam", address: "sam@xyz.com" }],
+    });
+  });
+
+  it("leaves the user's own address out of both lists, whatever its case", () => {
+    const { to, cc } = replyAllRecipients(received, "JOSH@co.com");
+
+    expect([...to, ...cc].some((person) => person.address.toLowerCase() === "josh@co.com")).toBe(
+      false,
+    );
+  });
+
+  it("answers whoever an email we sent went to, and copies whoever we copied", () => {
+    const sent = {
+      direction: "sent" as const,
+      fromHeader: "Josh <josh@co.com>",
+      toHeader: "Pat Smith <pat@xyz.com>, alex@xyz.com",
+      ccHeader: "Sam <sam@xyz.com>",
+    };
+
+    expect(replyAllRecipients(sent, "josh@co.com")).toEqual({
+      to: [
+        { name: "Pat Smith", address: "pat@xyz.com" },
+        { name: null, address: "alex@xyz.com" },
+      ],
+      cc: [{ name: "Sam", address: "sam@xyz.com" }],
+    });
+  });
+
+  it("lists each address once, and not in Cc when it is already in To", () => {
+    const messy = {
+      direction: "received" as const,
+      fromHeader: "Pat <pat@xyz.com>",
+      toHeader: "PAT <Pat@xyz.com>, Paul <paul@co.com>",
+      ccHeader: "paul@co.com, Sam <sam@xyz.com>, SAM <sam@XYZ.com>",
+    };
+
+    expect(replyAllRecipients(messy, null)).toEqual({
+      to: [
+        { name: "Pat", address: "pat@xyz.com" },
+        { name: "Paul", address: "paul@co.com" },
+      ],
+      cc: [{ name: "Sam", address: "sam@xyz.com" }],
+    });
+  });
+
+  it("keeps the user's own address in To when it is the only one, and has no Cc then", () => {
+    const toSelf = {
+      direction: "sent" as const,
+      fromHeader: "Josh <josh@co.com>",
+      toHeader: "Josh <josh@co.com>",
+      ccHeader: "",
+    };
+
+    expect(replyAllRecipients(toSelf, "josh@co.com")).toEqual({
+      to: [{ name: "Josh", address: "josh@co.com" }],
+      cc: [],
+    });
+  });
+
+  it("removes nobody while the user's own address is not known yet", () => {
+    const { to, cc } = replyAllRecipients(received, null);
+
+    expect(to.map((person) => person.address)).toEqual([
+      "pat@xyz.com",
+      "josh@co.com",
+      "paul@co.com",
+    ]);
+    expect(cc.map((person) => person.address)).toEqual(["sam@xyz.com"]);
+  });
+
+  it("ignores entries with no address and gives nobody for an email with no recipients", () => {
+    expect(
+      replyAllRecipients(
+        { direction: "received", fromHeader: "", toHeader: "undisclosed-recipients", ccHeader: "" },
+        null,
+      ),
+    ).toEqual({ to: [], cc: [] });
   });
 });

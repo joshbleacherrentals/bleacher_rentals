@@ -127,6 +127,42 @@ export function replyRecipients(
   return others.length > 0 ? others : unique;
 }
 
+/**
+ * Who a reply to everyone goes to. To is whoever a plain reply goes to (see replyRecipients) plus
+ * everyone else the email went to; Cc is whoever it copied. The user's own address is left out of
+ * both unless it is the only one in To, and each address is listed once, an address in To not
+ * being repeated in Cc. People who were blind-copied are not known to the recipients, so they are
+ * not here.
+ */
+export function replyAllRecipients(
+  email: {
+    direction: "sent" | "received";
+    fromHeader: string;
+    toHeader: string;
+    ccHeader: string;
+  },
+  ownAddress: string | null,
+): { to: Address[]; cc: Address[] } {
+  const own = ownAddress?.trim().toLowerCase();
+  const withAddress = (header: string) => parseAddressList(header).filter((p) => p.address);
+  const notOwn = (people: Address[]) => people.filter((p) => p.address.toLowerCase() !== own);
+  const unique = (people: Address[]) =>
+    people.filter(
+      (person, i) =>
+        people.findIndex((p) => p.address.toLowerCase() === person.address.toLowerCase()) === i,
+    );
+
+  const to = unique([
+    ...replyRecipients(email, ownAddress),
+    ...notOwn(withAddress(email.toHeader)),
+  ]);
+  const inTo = new Set(to.map((person) => person.address.toLowerCase()));
+  const cc = unique(notOwn(withAddress(email.ccHeader))).filter(
+    (person) => !inTo.has(person.address.toLowerCase()),
+  );
+  return { to, cc };
+}
+
 // "Acme, Inc." is a company, not "Last, First".
 const COMPANY_SUFFIX = /^\s*(inc|llc|ltd|limited|corp|corporation|co|incorporated)\b/i;
 

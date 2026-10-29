@@ -9,6 +9,9 @@ const idsIn = (header: string | null | undefined) => header?.match(/<[^<>\s]+>/g
 // its first email and the most recent ones.
 const MAX_REFERENCES = 30;
 
+/** Which button opened a reply: Reply (the sender) or Reply all (everyone on the email). */
+export type ReplyMode = "reply" | "replyAll";
+
 /** "Re: Quote" for "Quote"; a subject that already starts with Re: is left as it is. */
 export function replySubject(subject: string): string {
   const trimmed = subject.trim();

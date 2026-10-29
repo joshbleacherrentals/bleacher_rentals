@@ -9,8 +9,8 @@ import { createPendingEmail } from "../db/createPendingEmail";
 import { sendPendingEmail } from "../db/sendPendingEmail";
 import { useContactDirectory } from "../hooks/useContactDirectory";
 import type { ThreadMessage } from "../hooks/useEmailThread";
-import { personWithAddress, replyRecipients } from "../logic/emailActivity";
-import { replyReferences, replySubject } from "../logic/emailReply";
+import { personWithAddress, replyAllRecipients, replyRecipients } from "../logic/emailActivity";
+import { replyReferences, replySubject, type ReplyMode } from "../logic/emailReply";
 import { namesByAddress, recipientSummary } from "../logic/recipientList";
 import { ReplyRecipients } from "./ReplyRecipients";
 
@@ -25,9 +25,10 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
 
 /**
  * Where a reply is written: a square box of a fixed size (the page sets it, see EmailView) that
- * takes the place of the footer's buttons, pinned to the bottom right of the page. Its header,
- * folded, is one line of who the reply goes to ("Mike Timmermans, no-contact@gmail.com": a contact
- * by name, anyone else by address). Clicking it opens "From" (the signed-in user, as "Josh
+ * takes the place of the footer's buttons, pinned to the bottom right of the page. It opens as a
+ * Reply (to the sender) or a Reply all (to everyone on the email, with whoever it copied in Cc).
+ * Its header, folded, is one line of who the reply goes to, To and Cc ("Mike Timmermans,
+ * no-contact@gmail.com": a contact by name, anyone else by address). Clicking it opens "From" (the signed-in user, as "Josh
  * Redgrift (josh@bleacherrentals.com)") and To, Cc and Bcc lines, where who the reply goes to can
  * be changed (see ReplyRecipients). Clicking the header again does nothing: only clicking into the
  * text area folds it back. A minus at the top right of the header minimizes the box to a small
@@ -44,6 +45,7 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
 export function ReplyBox({
   contactUuid,
   replyingTo,
+  mode,
   minimized,
   onMinimize,
   onRestore,
@@ -53,6 +55,8 @@ export function ReplyBox({
   contactUuid: string;
   /** The email being answered: the newest of the thread that has been sent or received. */
   replyingTo: ThreadMessage;
+  /** Reply starts with the sender in To; Reply all with everyone on the email, To and Cc. */
+  mode: ReplyMode;
   minimized: boolean;
   onMinimize: () => void;
   onRestore: () => void;
@@ -69,28 +73,36 @@ export function ReplyBox({
       ? "..."
       : "No email address on your account";
 
-  // Who it goes to starts as whoever replyRecipients names, and follows it (the user's own address
-  // is only known once they load) until the user changes the list, which then stays as they left it.
-  const defaultRecipients = useMemo(
-    () => replyRecipients(replyingTo, ownAddress).map((person) => person.address.toLowerCase()),
-    [replyingTo, ownAddress],
-  );
-  const [edited, setEdited] = useState<string[] | null>(null);
-  const recipients = edited ?? defaultRecipients;
+  // Who it goes to starts as whoever replyRecipients names (Reply) or replyAllRecipients names, To
+  // and Cc (Reply all), and follows it (the user's own address is only known once they load) until
+  // the user changes a list, which then stays as they left it.
+  const defaults = useMemo(() => {
+    const lower = (people: { address: string }[]) =>
+      people.map((person) => person.address.toLowerCase());
+    if (mode === "replyAll") {
+      const everyone = replyAllRecipients(replyingTo, ownAddress);
+      return { to: lower(everyone.to), cc: lower(everyone.cc) };
+    }
+    return { to: lower(replyRecipients(replyingTo, ownAddress)), cc: [] };
+  }, [mode, replyingTo, ownAddress]);
+  const [editedTo, setEditedTo] = useState<string[] | null>(null);
+  const [editedCc, setEditedCc] = useState<string[] | null>(null);
+  const recipients = editedTo ?? defaults.to;
+  const cc = editedCc ?? defaults.cc;
 
-  // One read of the contacts, for the folded line's names and the editor's suggestions.
+  // One read of the contacts, for the folded line's names and the editor's suggestions. The folded
+  // line names everyone it will be seen by, so Cc is on it too; Bcc is not, being hidden by nature.
   const directory = useContactDirectory();
   const summary = useMemo(
-    () => recipientSummary(recipients, namesByAddress(directory)),
-    [recipients, directory],
+    () => recipientSummary([...recipients, ...cc], namesByAddress(directory)),
+    [recipients, cc, directory],
   );
 
-  // Cc and Bcc start empty; each list is edited the same way as To.
-  const [cc, setCc] = useState<string[]>([]);
+  // Bcc starts empty; each list is edited the same way.
   const [bcc, setBcc] = useState<string[]>([]);
   const recipientRows = [
-    { label: "To", hint: "Add a recipient", recipients, onChange: setEdited },
-    { label: "Cc", hint: "Add a Cc recipient", recipients: cc, onChange: setCc },
+    { label: "To", hint: "Add a recipient", recipients, onChange: setEditedTo },
+    { label: "Cc", hint: "Add a Cc recipient", recipients: cc, onChange: setEditedCc },
     { label: "Bcc", hint: "Add a Bcc recipient", recipients: bcc, onChange: setBcc },
   ];
 

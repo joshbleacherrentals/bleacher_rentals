@@ -12,6 +12,7 @@ import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsS
 import { useCurrentUser } from "@/hooks/db/useCurrentUser";
 import { discardUnsentEmail } from "../db/unsentEmail";
 import { useEmailThread } from "../hooks/useEmailThread";
+import type { ReplyMode } from "../logic/emailReply";
 import { EmailThreadMessage } from "./EmailThreadMessage";
 import { ReplyBox } from "./ReplyBox";
 
@@ -19,10 +20,11 @@ import { ReplyBox } from "./ReplyBox";
  * An email and the rest of its thread, across the whole page: oldest at the top, newest at the
  * bottom, each as a row that opens and closes on its own. The email from the URL starts open.
  * Back (or Escape, unless typing) returns to the contact's emails. A footer of Reply, Reply all and
- * Forward stays in view at the bottom of the page while the thread scrolls; Reply swaps the buttons
- * for a box to write in, pinned to the bottom right. Sending saves the reply into the thread at
- * once, as an email that says it is being sent, and the buttons come back (there is no other way to
- * put them back yet). Reply all and Forward do nothing so far.
+ * Forward stays in view at the bottom of the page while the thread scrolls; Reply and Reply all
+ * swap the buttons for a box to write in, pinned to the bottom right (to the sender, or to
+ * everyone on the email). Sending saves the reply into the thread at once, as an email that says it
+ * is being sent, and the buttons come back (there is no other way to put them back yet). Forward
+ * does nothing so far.
  */
 export function EmailView({
   contactUuid,
@@ -65,14 +67,14 @@ export function EmailView({
   });
   const explainCannotSend = () => sendBlock && createErrorToastNoThrow([sendBlock]);
 
-  // Whether the footer shows the reply box instead of its buttons, and whether that box is
-  // minimized to a small card.
-  const [replying, setReplying] = useState(false);
+  // Which button opened the reply box that replaces the footer's buttons (null while the buttons
+  // show), and whether that box is minimized to a small card.
+  const [replyMode, setReplyMode] = useState<ReplyMode | null>(null);
   const [minimized, setMinimized] = useState(false);
-  // The footer's buttons, in order. Only Reply does anything so far.
+  // The footer's buttons, in order. Forward does nothing so far.
   const footerActions = [
-    { label: "Reply", Icon: Reply, onClick: () => setReplying(true) },
-    { label: "Reply all", Icon: ReplyAll, onClick: undefined },
+    { label: "Reply", Icon: Reply, onClick: () => setReplyMode("reply") },
+    { label: "Reply all", Icon: ReplyAll, onClick: () => setReplyMode("replyAll") },
     { label: "Forward", Icon: Forward, onClick: undefined },
   ];
 
@@ -147,7 +149,7 @@ export function EmailView({
         pl-18 is where the sender's name and the email's text start (see EmailMessageBody).
       */}
       {messages.length > 0 &&
-        (replying ? (
+        (replyMode ? (
           <div
             className={`sticky bottom-4 z-10 ml-auto mr-6 mt-auto max-w-[calc(100%-3rem)] ${
               minimized ? "w-64" : "h-170 max-h-[calc(100vh-8rem)] w-170"
@@ -156,11 +158,12 @@ export function EmailView({
             <ReplyBox
               contactUuid={contactUuid}
               replyingTo={replyTarget}
+              mode={replyMode}
               minimized={minimized}
               onMinimize={() => setMinimized(true)}
               onRestore={() => setMinimized(false)}
               onSent={() => {
-                setReplying(false);
+                setReplyMode(null);
                 setMinimized(false);
               }}
             />
