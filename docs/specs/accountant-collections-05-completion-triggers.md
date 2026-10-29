@@ -1,9 +1,31 @@
 # Accountant Collections 05: triggers that complete tasks
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **05**. Needs: [01](accountant-collections-01-backend.md),
+Status: **Implemented 2026-10-29.** Approved by the user (written 2026-10-28); the readings in §1
+were implemented as written. Build order: **05**. Needs: [01](accountant-collections-01-backend.md),
 [02](accountant-collections-02-sql-amount-due.md). Needed by: nothing else. Branch:
 `q4-sprint2-collections`.
+
+Deviations and findings (the approved triggers and their behaviour are unchanged):
+
+- **The open-task guard needed a spy to be tested.** The guard only spares the calculation, so
+  removing it changes no result a payment test can see. The test replaces `ar_event_amount_due` with
+  a function that counts its calls and asserts zero calls for an event with no open task and one for
+  an event with an open task. With that, the three mutations of §4 each turn the matching tests red:
+  guard removed: 1 test; both exception blocks removed: 4 tests; `WHEN` clause removed: 5 tests.
+- **The WARNING is not a pgTAP result.** The test proves the write survives; the warning text
+  (`complete_ar_tasks_when_paid failed ...`, `complete_ar_tasks_when_lost failed ...`) is seen in
+  the psql output, as the test header says.
+- **Tests beyond §4:** the lost trigger's exception block (a temporary `BEFORE UPDATE` trigger on
+  `ArEventTasks` that raises), `lost` written over `lost` completes nothing, the "already 0" reading
+  of §1, a payment on an event whose other event keeps owing, and the shape of both functions and
+  triggers (SECURITY DEFINER, pinned `search_path`, EXECUTE revoked, AFTER / FOR EACH ROW / WHEN).
+- **Trigger names** are not in the spec; they are `complete_ar_tasks_when_paid` and
+  `complete_ar_tasks_when_lost`, the names of their functions.
+- **Moving a payment to another event** is tested as the table owner: the guard of
+  accountant-quotes-07 refuses an app user to change `event_uuid`, so only the service role or the
+  owner can do it.
+- **Permissions matrix not touched:** the triggers are system behaviour and give no role a new
+  ability. The matrix is spec 09's.
 
 ## 0. The feature in brief (the same in all ten specs)
 
