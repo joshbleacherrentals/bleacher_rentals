@@ -1,8 +1,33 @@
 # Accountant Collections 03: the TypeScript twin and the parity tests
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **03**. Needs: [02](accountant-collections-02-sql-amount-due.md).
-Needed by: 07 and 08 (they call the twin); CI keeps 02 honest. Branch: `q4-sprint2-collections`.
+Status: **Implemented 2026-10-29.** Approved by the user. Build order: **03**. Needs:
+[02](accountant-collections-02-sql-amount-due.md). Needed by: 07 and 08 (they call the twin); CI
+keeps 02 honest. Branch: `q4-sprint2-collections`.
+
+Deviations and choices the spec left open:
+
+- The twin's function is named `computeCollectionsBalances` (§3 names the types, not the function).
+- `toAllocatablePayment` (the mapping from a payment row to `allocatePayments`' input) is private in
+  `accountsReceivable.ts`, which is not in §5's Files. The twin keeps its own copy of the five-line
+  mapping; the invariant "with a schedule the figure equals the AR chain" in
+  `amountDueParity.test.ts` catches a drift between the two.
+- Without a schedule and with `event_start` null the Amount Due is 0, as in the SQL (a null date
+  never compares true). The column is NOT NULL, so this only guards the type.
+- "The date of `booked_at`" is the first ten characters of the stored string, with no timezone
+  conversion (the twin's contract has no timezone). For an event booked in the 7-day window a
+  `booked_at` near midnight UTC can therefore differ by one day from Toronto's calendar.
+- A refund is a negative `amountCents`; the case type has no separate `refund` field.
+- `amountDueCases.ts` also exports what the two readers share: `caseId`, `caseCurrency`,
+  `toTwinInput`, `runTwin`, `HAND_CASES`, `FUZZ_SEED`, `FUZZ_COUNT`, `allAmountDueCases`.
+- The generated file holds 354 cases (54 hand, 300 fuzz), 7216 lines. Prettier does not format
+  `.sql`, so it was not run on it.
+
+Mutation check (to record in the pull request), 2026-10-29: `clamp(targetedNet[idx], 0, ...)` →
+`1` in `allocatePayments.ts` turned vitest red (11 tests, including the drift test); `v_start - 7`
+→ `6` in a copy of the migration turned 3 pgTAP cases red (two hand, one fuzz) and
+`greatest(r.net, 0::bigint)` → `1` in the allocation 80 cases. So each side turns a different
+runner red. Each mutation was reverted (the SQL ones were only ever applied inside a rolled-back
+transaction).
 
 ## 0. The feature in brief (the same in all ten specs)
 
