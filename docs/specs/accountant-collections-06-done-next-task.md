@@ -1,7 +1,7 @@
 # Accountant Collections 06: Done / Next Task, the client write
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **06**. Needs: [01](accountant-collections-01-backend.md) and
+Status: **Implemented 2026-10-29** (Approved; no deviations from the spec). Readings in §1
+confirmed by the approval. Build order: **06**. Needs: [01](accountant-collections-01-backend.md) and
 [03](accountant-collections-03-ts-twin-and-parity.md) (the date helpers). Needed by: 09 (the
 modal calls it). Branch: `q4-sprint2-collections`.
 
