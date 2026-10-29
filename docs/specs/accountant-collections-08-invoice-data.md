@@ -107,14 +107,18 @@ Stack and rules: `CLAUDE.md`, `docs/POWERSYNC_ARCHITECTURE.md`.
   **Venue** (name, address); **Event** (start, end, type); **Money** (Contract Subtotal, Taxes,
   Total, Already paid, Remaining Payment, Current Overdue amount); the **Payment Schedule**
   (#, Due Date, Amount, Status, Paid at); the **Payment History** (#, Date, Amount, Method,
-  Payer); and on the Tasks tab the list of completed tasks and the current task.
+  Payer), with the Show deleted switch beside Record Payment; and on the Tasks tab the list of
+  completed tasks and the current task.
 - **Money definitions** (the sketch's tooltips): Contract Subtotal = total after discounts, no
   taxes; Total = after discounts and taxes; Already paid = funds credited as of now; Remaining
   Payment = Total - Already paid; **Current Overdue amount = Amount Due of the twin** (spec 03).
 - No Finance Contact: the card is left out. A contact with no company: the company lines are left
   out (the sketch's two variants).
-- Record Payment, and Edit and Delete of a manual payment, reuse the Billing tab; Stripe payments
-  cannot be edited or deleted. No Send Email.
+- **Payment History works as on the Billing tab** (user's words): the **Show deleted** switch sits
+  next to Record Payment, off to begin with, and brings the deleted payments back into the table in
+  place. Edit and Delete are **not buttons in the rows**: a click on a row opens the Billing tab's
+  payment detail dialog (`PaymentDetailDialog`), and Edit and Delete are in that dialog. Stripe
+  payments cannot be edited or deleted. No Send Email.
 - An event with no open task still opens. A status is shown for every event.
 
 **Readings to confirm at review:**
@@ -130,8 +134,8 @@ Stack and rules: `CLAUDE.md`, `docs/POWERSYNC_ARCHITECTURE.md`.
 - Taxes = Total - Contract Subtotal; the label shows the rate, `Taxes (15%)`, when
   `Events.tax_percent` is set, otherwise `Taxes`.
 - "N days overdue" is the twin's `daysOverdue`; shown in the header only for Collections.
-- Payment History hides deleted payments (no Show deleted switch on this page) and counts rows
-  from 1 in date order, oldest first.
+- Payment History numbers the rows listed from 1 in date order, oldest first. With Show deleted on,
+  a deleted row is listed and numbered like the others, so the numbers have no gaps.
 - Each completed task shows its **due date** in words (`3 days ago`): the table has no
   completion date. The list runs newest due date first.
 
@@ -148,6 +152,10 @@ Stack and rules: `CLAUDE.md`, `docs/POWERSYNC_ARCHITECTURE.md`.
   accountant) for Record Payment, Edit and Delete.
 - **Payment method text and the manual / Stripe split** live in the Billing tab and its dialogs
   (`PaymentDetailDialog`, `RecordPaymentDialog`, `DeletePaymentDialog`).
+- **The deleted-payment rules** are in `quotesAndBookings/utils/deletedPayments.ts`
+  (`isDeletedPayment`, `withoutDeleted`); `allocatePayments` already leaves a deleted payment out
+  of every figure. `PaymentDetailDialog` needs the payment row, the `allocation`, the currency, who
+  recorded it and who deleted it (`BillingTab.tsx` resolves both names).
 - **Watchers:** the project keeps the number of live queries per screen low
   (`docs/specs/slow-local-db-step1-split-watchers.md`, `quote-detail-reactive-plan.md`).
 
@@ -171,7 +179,9 @@ All under `src/features/accountantCollections/`.
 - **`utils/invoiceView.ts`** (new): pure builders that turn the data into display rows, so the
   hook stays thin: `buildMoney(balances, taxPercent)`, `buildScheduleRows(allocation, currency,
 timezone)` (status `Paid`, `Partial` with `X of Y`, `Unpaid`; `Paid at` only when paid),
-  `buildPaymentRows(payments, ...)` (number, date and time, amount, method, payer, `isManual`),
+  `buildPaymentRows(payments, showDeleted, ...)` (number, date and time, amount, method, payer,
+  `isManual`, `isDeleted`, and the payment row itself for the dialog; deleted rows only when
+  `showDeleted`),
   `buildTaskLists(tasks, today)` (the open task, the completed ones newest due date first, each
   with `followUpLabel`), `buildContactCard(contact, company)`.
 - **`hooks/useInvoiceData.ts`** (new): reactive; input `eventId`; output
@@ -179,8 +189,12 @@ timezone)` (status `Paid`, `Partial` with `X of Y`, `Unpaid`; `Paid at` only whe
   ```ts
   { isLoading, notFound, event: { name, invoiceNumber, status, daysOverdue, accountManager },
     contacts: { contact, financeContact }, venue, eventInfo: { start, end, type },
-    money, schedule, payments, tasks: { open, completed }, currency, today }
+    money, schedule, payments, allocation, staffNames, tasks: { open, completed }, currency, today }
   ```
+
+  `payments` holds **every** payment row, deleted ones too; the page filters them with its
+  Show deleted switch (spec 09), through `buildPaymentRows`. `allocation` and `staffNames` are what
+  `PaymentDetailDialog` needs. The money, the schedule and the twin never count a deleted payment.
 
   It composes `useQuoteDetail(eventId)` with narrow queries for the companies of the two
   contacts, the venue's address, the tasks of the event, and the sums the twin needs (line total,
@@ -199,11 +213,13 @@ Red first.
   Schedule.
 - **`invoiceView.test.ts`**, with the sketch's numbers (four installments of 3,235.75, the first
   paid, the second part-paid with 1,500.00): money lines, `Partial` text `C$1,500.00 of
-C$3,235.75`, `Paid at`, payment rows (Stripe first, then check), deleted payments hidden,
-  completed tasks newest due date first, the open task apart, contact cards with and without a
-  company, with and without a finance contact.
+C$3,235.75`, `Paid at`, payment rows (Stripe first, then check), a deleted payment hidden
+  with `showDeleted` off and listed, flagged and numbered with it on, completed tasks newest due
+  date first, the open task apart, contact cards with and without a company, with and without a
+  finance contact.
 - **`useInvoiceData.test.tsx`:** `notFound`; the query count stays small; a deleted event is
-  still shown; the open task is the newest if two exist.
+  still shown; the open task is the newest if two exist; `payments` includes a deleted
+  payment while the money and Amount Due ignore it.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check`. E2E: SKIPPED here (spec 09).
 
 ## 5. Files

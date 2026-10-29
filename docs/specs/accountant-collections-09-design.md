@@ -103,8 +103,10 @@ Stack and rules: `CLAUDE.md`, `docs/POWERSYNC_ARCHITECTURE.md`.
   2. The header of the invoice shows one of **five statuses** (spec 08), in the colours below. The
      Collections list has no Status selector.
   3. **There is no Send Email button.** The design draws one; it is not built.
-  4. The Payment History section shows **Edit and Delete on manual rows** and Record payment, as
-     the Billing tab does. The design draws no row actions; draw them in the Billing tab's style.
+  4. The Payment History section works as on the Billing tab: the **Show deleted** switch beside
+     Record Payment; a click on a row (any row) opens the Billing tab's payment detail dialog, and
+     **Edit and Delete are in that dialog**, not in the rows. The design draws none of this; draw
+     it in the Billing tab's style.
   5. The modal opens with **today + 2 days** and the note **`Follow-up needed`** (spec 06).
   6. The Tasks tab of an event with no open task says **"No open task"** and has no Done / Next
      Task button.
@@ -180,8 +182,9 @@ All under `src/features/accountantCollections/components/` unless stated.
   variants of `Contacts.dc.html`), **`MoneyCard.tsx`** (the six lines, the (i) tooltips with the
   sketch's wording, the red Current Overdue box), the Venue and Event cards,
   **`PaymentScheduleTable.tsx`** (status chips Paid, Partial with "X of Y", Unpaid),
-  **`PaymentHistoryTable.tsx`** (Record payment, Edit and Delete on manual rows, the line
-  "Stripe payments cannot be edited or deleted.").
+  **`PaymentHistoryTable.tsx`** (Show deleted switch and Record Payment in the section header,
+  clickable rows that open `PaymentDetailDialog` with Edit and Delete, deleted rows struck through
+  with a Deleted tag, the line "Stripe payments cannot be edited or deleted.").
 - **`InvoiceTasks.tsx`:** "Task list" (completed tasks, newest due date first, relative date and
   note), "Current task due now" with **Done / Next Task**, or "No open task".
 - **`DoneNextTaskDialog.tsx`:** title "Done / Next Task", "Next Task Due:" button with the date
@@ -232,8 +235,9 @@ payments and `ArEventTasks`.
   dated later leaves it.
 - **S7** Record Payment for the whole overdue amount: the payment appears; after the sync the
   status changes and the tasks are completed ("No open task").
-- **S8** a manual payment can be edited and deleted from the page; a Stripe payment has no such
-  controls.
+- **S8** Payment History: Show deleted is off and sits beside Record Payment; a click on a row opens the
+  payment detail dialog; a manual payment offers Edit and Delete there, a Stripe payment neither;
+  Show deleted on brings the deleted payments back, tagged Deleted.
 - **S9** an event with no open task opens; Tasks says "No open task".
 - **S10** a contact with no company, and an event with no finance contact, render the variants.
 - **S11** account manager and viewer cannot open `/accountant` or `/accountant/invoice`.
@@ -247,7 +251,9 @@ Red first. Component tests with mocked hooks:
   states, the row links with the list's parameters;
 - the status badge: five texts and classes;
 - the invoice page: sections present, no Send Email, Record Payment shown only with the
-  capability, Edit and Delete only on manual rows, the Stripe line;
+  capability, Show deleted off to begin with and bringing the deleted rows back, a row click
+  opening the dialog, Edit and Delete only in the dialog and only for a manual payment that is not
+  deleted, the Stripe line;
 - the Tasks tab with and without an open task;
 - the dialog: defaults, Save disabled for a blank note, an invalid date and while saving, the call
   to `saveNextTask` with the typed values, the date label (`Today`, `1 Day`, `N Days`);
