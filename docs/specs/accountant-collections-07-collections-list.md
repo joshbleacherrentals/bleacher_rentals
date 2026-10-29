@@ -1,9 +1,38 @@
 # Accountant Collections 07: the Collections list
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **07**. Needs: [01](accountant-collections-01-backend.md),
-[03](accountant-collections-03-ts-twin-and-parity.md). Needed by: 08 (date wording), 09 (the
-screen), 10 (the order). Branch: `q4-sprint2-collections`.
+Status: **Implemented 2026-10-29.** Approved by the user. Build order: **07**. Needs:
+[01](accountant-collections-01-backend.md), [03](accountant-collections-03-ts-twin-and-parity.md).
+Needed by: 08 (date wording), 09 (the screen), 10 (the order). Branch: `q4-sprint2-collections`.
+
+Deviations and choices the spec left open:
+
+- The twin's function is `computeCollectionsBalances` (spec 03's deviation); §3 calls it
+  `collectionsBalances`. The event name column is `Events.event_name`.
+- The task query also selects `ArEventTasks.created_at`. §1 says "two open tasks of one event: the
+  one created last", which cannot be decided without it; §3's column list did not name it.
+  Equal `created_at`: the larger task id.
+- `buildCollectionsRows(sources, today, currencyOf)`: `currencyOf` takes the task source row (it
+  carries `sales_office_uuid`), as the AR tabs' `currencyOf` takes the event. `sources` is
+  `{ tasks, lineTotals, installments, payments }`. The task source row uses the snake_case column
+  names, like `ReceivableInstallmentRow`.
+- A row with no event name gets the dash `—` in `eventName` (§6), so the screen draws it as is.
+- `collectionsListStateToParams` returns a plain `Record<string, string>` of the non-default
+  parameters; `parseCollectionsListState` takes anything with `get(key)`, so it reads a
+  `URLSearchParams` or Next's `ReadonlyURLSearchParams`. `cnotdue` is on only for the value `1`.
+- `useCollectionsData` does **not** wait for `useOfficeCurrencies`: it includes an online-only
+  fetch (QBO connections) and the list is local-first. Until that lands an event is priced on its
+  office's province, then USD, as on the AR tabs. `isLoading` is the four local queries.
+- Existing tests changed because a bare `/accountant` no longer opens AR: `page.test.tsx`
+  (four tests now ask for `tab=ar`, and a bare URL is checked to select none of the three
+  existing tabs), `filterUrlSync.test.ts` (one test), `listPageEffects.test.ts` and
+  `listTabs.test.ts` (new cases).
+- **Until spec 09 lands, a bare `/accountant` opens an empty body:** the opening tab is
+  `collections` but the page has no Collections trigger or content yet. `?tab=ar` works as before.
+  Do not release this branch before 09. The Playwright specs that call `page.goto("/accountant")`
+  (`companiesContactsAccess.accountant.spec.ts`, `roleAccess.accountant.spec.ts`) only check the
+  URL and the sidebar; they were not run (E2E skipped).
+- No migration, no `AppSchema.ts` change, no sync-rule change, and no change to
+  `permissionPageData.ts`: this spec adds no screen and no access (the matrix is spec 09's).
 
 ## 0. The feature in brief (the same in all ten specs)
 

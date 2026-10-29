@@ -279,12 +279,13 @@ describe("tab in the URL — /accountant (AR and AR Deposits, always written)", 
     });
   });
 
-  it("opens AR for a missing, unknown or old ?tab and ignores a status in the URL", () => {
+  // docs/specs/accountant-collections-07-collections-list.md §3: Collections is the opening tab.
+  it("opens Collections for a missing, unknown or old ?tab and ignores a status in the URL", () => {
     for (const raw of [undefined, "bogus", "all"]) {
       const params = new URLSearchParams({ statuses: "quoted", am: "am-1" });
       if (raw) params.set("tab", raw);
       const parsed = searchParamsToFilters(params, ACCT);
-      expect(parsed.tab).toBe("ar");
+      expect(parsed.tab).toBe("collections");
       expect(parsed.filters.statuses).toEqual([]);
       expect(parsed.filters.accountManagerUserUuid).toBe("am-1");
     }

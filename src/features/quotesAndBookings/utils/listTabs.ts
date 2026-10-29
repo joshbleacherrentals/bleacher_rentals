@@ -43,9 +43,15 @@ export const QUOTES_BOOKINGS_TABS: ListTabDeclaration = {
  * Need attention is the third tab: the quotes whose QuickBooks invoice no longer matches the quote,
  * newest event first, whatever their status — so Status is not offered there either.
  * Spec: docs/specs/qbo-invoice-10-need-attention-tab.md §4
+ *
+ * Collections is the first tab and the one a bare /accountant opens: the open payment-chasing tasks
+ * of booked events. It keeps its own order and Show Not Due Yet in the URL (`csort`, `cdir`,
+ * `cnotdue`), so the `startingSort` here, which sorts events, is never used.
+ * Spec: docs/specs/accountant-collections-07-collections-list.md §3
  */
 export const ACCOUNTANT_TABS: ListTabDeclaration = {
   tabs: [
+    { id: "collections", startingSort: DEFAULT_SORT, offersStatus: false },
     { id: "ar", startingSort: { key: "start_date", direction: "desc" }, offersStatus: false },
     {
       id: "ar_deposits",
@@ -58,7 +64,7 @@ export const ACCOUNTANT_TABS: ListTabDeclaration = {
       offersStatus: false,
     },
   ],
-  openingTab: "ar",
+  openingTab: "collections",
   writeTabToUrl: true,
 };
 

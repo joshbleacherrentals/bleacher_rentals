@@ -69,6 +69,22 @@ describe("queryStringToWrite", () => {
     expect(queryStringToWrite(state, "tab=ar&template=x", QB)).toBe("template=x");
   });
 
+  // docs/specs/accountant-collections-07-collections-list.md §2: the Collections list keeps its
+  // state in csort / cdir / cnotdue, names the list hook does not know.
+  it("keeps the Collections list parameters when the list rewrites the URL", () => {
+    const collectionsState: UrlSyncedListState = { ...state, tab: "collections" };
+    const url = "tab=collections&csort=amount&cdir=desc&cnotdue=1";
+
+    expect(queryStringToWrite(collectionsState, url, ACCT)).toBeNull();
+    expect(queryStringToWrite({ ...collectionsState, searchQuery: "acme" }, url, ACCT)).toBe(
+      `${url}&q=acme`,
+    );
+    // From a URL with no tab yet the first sync adds it and leaves the Collections parameters.
+    expect(queryStringToWrite(collectionsState, "csort=amount&cdir=desc&cnotdue=1", ACCT)).toBe(
+      "csort=amount&cdir=desc&cnotdue=1&tab=collections",
+    );
+  });
+
   it("writes ?tab=ar on /accountant when the URL has none — the first sync rewrites it", () => {
     const arState: UrlSyncedListState = {
       ...state,
@@ -103,6 +119,9 @@ describe("pageAfterChange", () => {
 
 describe("tabSwitchOutcome", () => {
   it("starts the new tab on its own sort", () => {
+    expect(tabSwitchOutcome("collections", false, ACCT).sort).toEqual(
+      defaultSortForTab("collections", ACCT),
+    );
     expect(tabSwitchOutcome("ar", false, ACCT).sort).toEqual(defaultSortForTab("ar", ACCT));
     expect(tabSwitchOutcome("ar_deposits", false, ACCT).sort).toEqual(
       defaultSortForTab("ar_deposits", ACCT),

@@ -29,14 +29,21 @@ describe("the /quotes-bookings declaration", () => {
 });
 
 describe("the /accountant declaration", () => {
-  it("has the AR, AR Deposits and Need attention tabs, opens on AR, and writes the tab to the URL", () => {
+  // docs/specs/accountant-collections-07-collections-list.md §3.
+  it("has Collections first, then AR, AR Deposits and Need attention; opens on Collections; writes the tab to the URL", () => {
     expect(ACCOUNTANT_TABS.tabs.map((tab) => tab.id)).toEqual([
+      "collections",
       "ar",
       "ar_deposits",
       "need_attention",
     ]);
-    expect(ACCOUNTANT_TABS.openingTab).toBe("ar");
+    expect(ACCOUNTANT_TABS.openingTab).toBe("collections");
     expect(ACCOUNTANT_TABS.writeTabToUrl).toBe(true);
+  });
+
+  it("gives Collections the default sort (it owns its own order) and no Status filter", () => {
+    expect(defaultSortForTab("collections", ACCOUNTANT_TABS)).toEqual(DEFAULT_SORT);
+    expect(tabUsesStatusFilter("collections", ACCOUNTANT_TABS)).toBe(false);
   });
 
   it("starts AR from the most recent event and walks back into the past", () => {
@@ -68,15 +75,20 @@ describe("the /accountant declaration", () => {
   });
 
   it("reads the tabs back from the URL", () => {
+    expect(parseListTab("collections", ACCOUNTANT_TABS)).toBe("collections");
     expect(parseListTab("ar", ACCOUNTANT_TABS)).toBe("ar");
     expect(parseListTab("ar_deposits", ACCOUNTANT_TABS)).toBe("ar_deposits");
     expect(parseListTab("need_attention", ACCOUNTANT_TABS)).toBe("need_attention");
   });
 
-  it("opens AR for a missing or unknown value, including the old All Events", () => {
-    expect(parseListTab(null, ACCOUNTANT_TABS)).toBe("ar");
-    expect(parseListTab("all", ACCOUNTANT_TABS)).toBe("ar");
-    expect(parseListTab("receivables", ACCOUNTANT_TABS)).toBe("ar");
-    expect(parseListTab("need-attention", ACCOUNTANT_TABS)).toBe("ar");
+  it("opens Collections for a missing or unknown value, including the old All Events", () => {
+    expect(parseListTab(null, ACCOUNTANT_TABS)).toBe("collections");
+    expect(parseListTab("all", ACCOUNTANT_TABS)).toBe("collections");
+    expect(parseListTab("receivables", ACCOUNTANT_TABS)).toBe("collections");
+    expect(parseListTab("need-attention", ACCOUNTANT_TABS)).toBe("collections");
+  });
+
+  it("still opens AR from a bookmarked ?tab=ar", () => {
+    expect(parseListTab("ar", ACCOUNTANT_TABS)).toBe("ar");
   });
 });

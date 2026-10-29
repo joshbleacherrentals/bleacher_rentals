@@ -207,9 +207,12 @@ describe("/accountant tabs", () => {
     );
   });
 
-  it("opens AR when ?tab is missing, unknown, or the old All Events", () => {
+  it("opens AR from ?tab=ar, and no longer from a missing, unknown or old ?tab", () => {
+    expect(renderAt("tab=ar")).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
+    // Those open Collections (docs/specs/accountant-collections-07-collections-list.md §6); its tab
+    // and screen arrive with spec 09, so for now none of the three is selected.
     for (const query of ["", "tab=bogus", "tab=all"]) {
-      expect(renderAt(query)).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
+      expect(renderAt(query)).not.toMatch(/role="tab"[^>]*aria-selected="true"/);
     }
   });
 
@@ -258,9 +261,9 @@ describe("/accountant receivables", () => {
   });
 
   it("searches AR balances", () => {
-    expect(renderAt("q=1%2C000")).toContain("Fall Classic");
-    expect(renderAt("q=2000.00")).toContain("Fall Classic");
-    expect(renderAt("q=9%2C999")).not.toContain("Fall Classic");
+    expect(renderAt("tab=ar&q=1%2C000")).toContain("Fall Classic");
+    expect(renderAt("tab=ar&q=2000.00")).toContain("Fall Classic");
+    expect(renderAt("tab=ar&q=9%2C999")).not.toContain("Fall Classic");
   });
 
   it("uses the search placeholder the AR tabs have always had", () => {
@@ -438,8 +441,8 @@ describe("/accountant Need attention count", () => {
     );
   });
 
-  it("leaves the tab names and the opening tab as they were", () => {
-    const html = renderAt("");
+  it("leaves the tab names as they were", () => {
+    const html = renderAt("tab=ar");
 
     expect(html.match(/role="tab"/g)).toHaveLength(3);
     expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
@@ -474,7 +477,7 @@ describe("/accountant Need attention count", () => {
   });
 
   it("does not follow the search box: the number stays while the table narrows", () => {
-    const html = renderAt("q=zzz");
+    const html = renderAt("tab=ar&q=zzz");
 
     expect(html).toContain("Nothing is due on past events");
     expect(countOnNeedAttention(html)).toBe(1);
