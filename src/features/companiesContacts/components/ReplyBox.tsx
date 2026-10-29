@@ -5,7 +5,7 @@ import { Maximize2, Minus } from "lucide-react";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/db/useCurrentUser";
-import { saveContactEmails } from "../db/saveContactEmails";
+import { saveSentEmail } from "../db/saveSentEmail";
 import { sendReply } from "../db/sendReply";
 import { useContactDirectory } from "../hooks/useContactDirectory";
 import type { ThreadMessage } from "../hooks/useEmailThread";
@@ -34,7 +34,8 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
  * card (the page sizes it), and clicking that card restores it as it was: the draft, the
  * recipients and the header's state live here and survive being minimized. A footer with a Send
  * button stays at the bottom of the box however far the text has scrolled. Send posts the reply to
- * /api/gmail/send, saves the email it sends to the contact's thread, and calls `onSent`, which
+ * /api/gmail/send, saves the email it sends to the contact's thread (body included, so it opens
+ * with nothing to load), and calls `onSent`, which
  * closes the box; if the server refuses (who may send, and in development to whom, is its call) the
  * reason shows as an error toast and the draft stays. The text area takes focus when the box
  * appears and when it is restored.
@@ -120,13 +121,12 @@ export function ReplyBox({
       });
 
       // It is sent now. Failing to save it must not look like failing to send: a second try would
-      // send it twice. A later pull from Gmail brings it into the thread.
-      if (sent) {
-        try {
-          await saveContactEmails(contactUuid, [sent]);
-        } catch (error) {
-          console.error("Reply sent, but it could not be saved to the thread:", error);
-        }
+      // send it twice. A later pull from Gmail brings it into the thread, and opening it loads its
+      // body.
+      try {
+        await saveSentEmail(contactUuid, sent);
+      } catch (error) {
+        console.error("Reply sent, but it could not be saved to the thread:", error);
       }
       onSent();
     } catch (error: any) {

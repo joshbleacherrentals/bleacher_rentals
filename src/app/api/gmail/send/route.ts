@@ -7,10 +7,11 @@ import {
   GMAIL_READONLY_SCOPE,
   GMAIL_SEND_SCOPE,
 } from "@/features/gmail-integration/server/delegatedAuth";
+import { readEmailContent } from "@/features/gmail-integration/server/emailContent";
 import {
-  getMessageSummary,
   GmailApiError,
   sendRawMessage,
+  summarizeMessage,
 } from "@/features/gmail-integration/server/gmailMessages";
 import { parseSendRequest } from "@/features/gmail-integration/server/sendRequest";
 import { isCompanyEmail } from "@/features/quotesAndBookings/utils/companyEmail";
@@ -22,7 +23,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Sends an email from the signed-in user's own mailbox, through domain-wide delegation, and returns
- * the sent email in the form the contact page saves (see usePullContactEmails, saveContactEmails).
+ * the sent email in the form the contact page saves (see usePullContactEmails, saveContactEmails)
+ * together with its body (`details`: text and html, as saveEmailDetails takes them), so the page
+ * can save both and the email opens without a trip to Gmail.
  *
  * Who may call it: an admin, an account manager or an accountant (requireEmailSender), whose
  * account email is on the company domain. The sender is read from the signed-in user's row, never
@@ -124,14 +127,17 @@ export async function POST(req: NextRequest) {
     const sent = await sendRawMessage(accessToken, raw, threadId);
 
     // The email is sent whatever happens next. If it cannot be read back it is simply not saved to
-    // the thread now, and the next pull finds it.
+    // the thread now, and the next pull finds it. One read gives both the summary the thread row
+    // needs and the body, so opening the email later has nothing left to wait for.
     try {
-      const summary = await getMessageSummary(accessToken, sent.id);
-      const [message] = mergeMailboxMessages([{ mailbox: sender, messages: [summary] }]);
-      return NextResponse.json({ message });
+      const { message: sentEmail, content } = await readEmailContent(accessToken, sent.id);
+      const [message] = mergeMailboxMessages([
+        { mailbox: sender, messages: [summarizeMessage(sentEmail)] },
+      ]);
+      return NextResponse.json({ message, details: { text: content.text, html: content.html } });
     } catch (error) {
       console.error("Gmail send: sent, but could not read the email back:", error);
-      return NextResponse.json({ message: null });
+      return NextResponse.json({ message: null, details: null });
     }
   } catch (error: any) {
     if (error instanceof Response) return error;

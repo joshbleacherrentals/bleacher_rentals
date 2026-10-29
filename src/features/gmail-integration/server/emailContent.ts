@@ -159,6 +159,25 @@ export function extractEmailContent(
   };
 }
 
+/**
+ * One email in full, read with a token that already acts as the mailbox holding it. Gives back
+ * Gmail's own message too (its snippet and headers), for a caller that needs more than the content.
+ */
+export async function readEmailContent(
+  accessToken: string,
+  id: string,
+): Promise<{ message: GmailFullMessage; content: EmailContent }> {
+  const message = await getFullMessage(accessToken, id);
+
+  // A very long body comes as an attachment-style reference instead of inline data.
+  const fetched = new Map<string, string>();
+  for (const attachmentId of neededBodyAttachmentIds(message)) {
+    fetched.set(attachmentId, await getAttachmentData(accessToken, id, attachmentId));
+  }
+
+  return { message, content: extractEmailContent(message, fetched) };
+}
+
 /** One email in full, read as `mailbox`. `id` is Gmail's id for that mailbox's copy (google_id). */
 export async function getEmailContent(params: {
   mailbox: string;
@@ -168,13 +187,5 @@ export async function getEmailContent(params: {
     subject: params.mailbox,
     scopes: [GMAIL_READONLY_SCOPE],
   });
-  const message = await getFullMessage(accessToken, params.id);
-
-  // A very long body comes as an attachment-style reference instead of inline data.
-  const fetched = new Map<string, string>();
-  for (const attachmentId of neededBodyAttachmentIds(message)) {
-    fetched.set(attachmentId, await getAttachmentData(accessToken, params.id, attachmentId));
-  }
-
-  return extractEmailContent(message, fetched);
+  return (await readEmailContent(accessToken, params.id)).content;
 }

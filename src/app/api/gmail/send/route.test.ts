@@ -32,11 +32,14 @@ vi.mock("@/features/gmail-integration/server/delegatedAuth", () => ({
 }));
 
 const sendRawMessage = vi.fn();
-const getMessageSummary = vi.fn();
 vi.mock("@/features/gmail-integration/server/gmailMessages", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/gmail-integration/server/gmailMessages")>()),
   sendRawMessage: (...args: unknown[]) => sendRawMessage(...args),
-  getMessageSummary: (...args: unknown[]) => getMessageSummary(...args),
+}));
+
+const readEmailContent = vi.fn();
+vi.mock("@/features/gmail-integration/server/emailContent", () => ({
+  readEmailContent: (...args: unknown[]) => readEmailContent(...args),
 }));
 
 import { GmailApiError } from "@/features/gmail-integration/server/gmailMessages";
@@ -75,20 +78,28 @@ beforeEach(() => {
   guardEmailRecipients.mockResolvedValue({ to: "pat@xyz.com", cc: null, bcc: null, blocked: [] });
   getDelegatedAccessToken.mockResolvedValue("ya29.token");
   sendRawMessage.mockResolvedValue({ id: "sent1", threadId: "t-sent", labelIds: ["SENT"] });
-  getMessageSummary.mockResolvedValue({
-    id: "sent1",
-    threadId: "t-sent",
-    messageId: "<sent@co.com>",
-    inReplyTo: "<b@x>",
-    references: "<a@x> <b@x>",
-    from: "Josh Redgrift <josh@bleacherrentals.com>",
-    to: "pat@xyz.com",
-    cc: "sam@xyz.com",
-    subject: "Re: Quote",
-    date: "Mon, 26 Oct 2026 10:00:00 -0600",
-    snippet: "Sounds good.",
-    internalDate: 1761494400000,
-    labelIds: ["SENT"],
+  // The email as Gmail hands it back (format=full), and the body read out of it.
+  readEmailContent.mockResolvedValue({
+    message: {
+      id: "sent1",
+      threadId: "t-sent",
+      snippet: "Sounds good.",
+      internalDate: "1761494400000",
+      labelIds: ["SENT"],
+      payload: {
+        headers: [
+          { name: "Message-ID", value: "<sent@co.com>" },
+          { name: "In-Reply-To", value: "<b@x>" },
+          { name: "References", value: "<a@x> <b@x>" },
+          { name: "From", value: "Josh Redgrift <josh@bleacherrentals.com>" },
+          { name: "To", value: "pat@xyz.com" },
+          { name: "Cc", value: "sam@xyz.com" },
+          { name: "Subject", value: "Re: Quote" },
+          { name: "Date", value: "Mon, 26 Oct 2026 10:00:00 -0600" },
+        ],
+      },
+    },
+    content: { text: "Sounds good.", html: null },
   });
 });
 
@@ -196,19 +207,23 @@ describe("POST /api/gmail/send", () => {
     expect(message).not.toContain("ceo@co.com");
   });
 
-  it("returns the sent email in the form the contact page saves", async () => {
+  it("returns the sent email in the form the contact page saves, with its body", async () => {
     const res = await post(valid);
 
     expect(res.status).toBe(200);
-    expect(getMessageSummary).toHaveBeenCalledWith("ya29.token", "sent1");
-    const { message } = await res.json();
+    // One read, with the token that sent it, gives both the summary and the body.
+    expect(readEmailContent).toHaveBeenCalledTimes(1);
+    expect(readEmailContent).toHaveBeenCalledWith("ya29.token", "sent1");
+    const { message, details } = await res.json();
     expect(message).toMatchObject({
       messageId: "<sent@co.com>",
       inReplyTo: "<b@x>",
       subject: "Re: Quote",
+      snippet: "Sounds good.",
       direction: "sent",
       copies: [{ mailbox: "josh@bleacherrentals.com", id: "sent1", threadId: "t-sent" }],
     });
+    expect(details).toEqual({ text: "Sounds good.", html: null });
   });
 
   it("puts the reply in the thread only when the thread is the sender's own mailbox's", async () => {
@@ -248,11 +263,13 @@ describe("POST /api/gmail/send", () => {
   });
 
   it("still reports the send as done when the sent email cannot be read back", async () => {
-    getMessageSummary.mockRejectedValue(new GmailApiError(500, "backend error"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    readEmailContent.mockRejectedValue(new GmailApiError(500, "backend error"));
 
     const res = await post(valid);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ message: null });
+    expect(await res.json()).toEqual({ message: null, details: null });
+    consoleError.mockRestore();
   });
 });

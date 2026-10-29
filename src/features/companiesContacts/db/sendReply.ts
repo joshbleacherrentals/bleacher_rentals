@@ -12,12 +12,21 @@ export type SendReplyPayload = {
   thread: { mailbox: string; threadId: string } | null;
 };
 
+/** The sent email's body, as saveEmailDetails takes it. */
+export type SentEmailDetails = { text: string | null; html: string | null };
+
 /**
- * Sends a reply through the server. Resolves with the sent email, in the form saveContactEmails
- * takes, or null when it was sent but the server could not read it back (a later pull finds it).
+ * What the server hands back once an email is sent: the email in the form saveContactEmails takes,
+ * and its body. Both are null when it was sent but the server could not read it back (a later pull
+ * finds it).
+ */
+export type SentReply = { message: PulledEmail | null; details: SentEmailDetails | null };
+
+/**
+ * Sends a reply through the server. Resolves with the sent email and its body (see SentReply).
  * Throws, with the server's own explanation, when it was not sent.
  */
-export async function sendReply(payload: SendReplyPayload): Promise<PulledEmail | null> {
+export async function sendReply(payload: SendReplyPayload): Promise<SentReply> {
   let res: Response;
   try {
     res = await fetch("/api/gmail/send", {
@@ -29,9 +38,11 @@ export async function sendReply(payload: SendReplyPayload): Promise<PulledEmail 
     throw new Error("Could not reach the server, so the reply was not sent. Try again.");
   }
 
-  const body: { error?: string; message?: PulledEmail | null } | null = await res
-    .json()
-    .catch(() => null);
+  const body: {
+    error?: string;
+    message?: PulledEmail | null;
+    details?: SentEmailDetails | null;
+  } | null = await res.json().catch(() => null);
   if (!res.ok) throw new Error(body?.error ?? `Could not send the reply (${res.status}).`);
-  return body?.message ?? null;
+  return { message: body?.message ?? null, details: body?.details ?? null };
 }

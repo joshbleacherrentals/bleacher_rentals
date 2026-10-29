@@ -127,6 +127,7 @@ export type GmailMessagePart = {
 export type GmailFullMessage = {
   id: string;
   threadId: string;
+  snippet?: string;
   internalDate?: string;
   labelIds?: string[];
   payload?: GmailMessagePart;

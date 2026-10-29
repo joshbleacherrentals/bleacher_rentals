@@ -20,6 +20,7 @@ import {
   extractEmailContent,
   getEmailContent,
   neededBodyAttachmentIds,
+  readEmailContent,
 } from "./emailContent";
 
 const b64 = (text: string, encoding: BufferEncoding = "utf8") =>
@@ -227,6 +228,43 @@ describe("extractEmailContent", () => {
     expect(extractEmailContent(message, new Map([["BIG-1", b64("a very long body")]])).text).toBe(
       "a very long body",
     );
+  });
+});
+
+describe("readEmailContent", () => {
+  beforeEach(() => {
+    getDelegatedAccessToken.mockReset();
+    getFullMessage.mockReset();
+    getAttachmentData.mockReset();
+  });
+
+  it("reads with the token it is given and returns Gmail's message beside the content", async () => {
+    const message = {
+      ...base,
+      snippet: "Hi",
+      payload: { mimeType: "text/plain", body: { data: b64("Hi") } },
+    };
+    getFullMessage.mockResolvedValue(message);
+
+    const out = await readEmailContent("ya29.given", base.id);
+
+    expect(getFullMessage).toHaveBeenCalledWith("ya29.given", base.id);
+    expect(getDelegatedAccessToken).not.toHaveBeenCalled();
+    expect(out.message).toBe(message);
+    expect(out.content.text).toBe("Hi");
+  });
+
+  it("fetches a body part that did not come inline, with the same token", async () => {
+    getFullMessage.mockResolvedValue({
+      ...base,
+      payload: { mimeType: "text/plain", body: { size: 9_000_000, attachmentId: "BIG-1" } },
+    });
+    getAttachmentData.mockResolvedValue(b64("long body"));
+
+    const out = await readEmailContent("ya29.given", base.id);
+
+    expect(getAttachmentData).toHaveBeenCalledWith("ya29.given", base.id, "BIG-1");
+    expect(out.content.text).toBe("long body");
   });
 });
 
