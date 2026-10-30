@@ -299,6 +299,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"BlockedCustomerEmails": {
+                  Row: {
+                    "created_at": string,"created_by_user_uuid": string,"email": string,"id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by_user_uuid"?: string,"email": string,"id"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by_user_uuid"?: string,"email"?: string,"id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "blockedcustomeremails_created_by_user_uuid_fkey"
+      columns: ["created_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"Blocks": {
                   Row: {
                     "bleacher_uuid": string | null,"created_at": string,"created_by_user_uuid": string | null,"date": string | null,"id": string,"text": string | null
@@ -382,6 +402,58 @@ isOneToOne: false
       columns: ["shipping_address_uuid"]
 isOneToOne: false
       referencedRelation: "Addresses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ContactEmailMessages": {
+                  Row: {
+                    "contact_uuid": string,"created_at": string,"email_message_uuid": string,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contact_uuid": string,"created_at"?: string,"email_message_uuid": string,"id"?: string
+                  }
+                  Update: {
+                    "contact_uuid"?: string,"created_at"?: string,"email_message_uuid"?: string,"id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "contactemailmessages_contact_uuid_fkey"
+      columns: ["contact_uuid"]
+isOneToOne: false
+      referencedRelation: "Contacts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "contactemailmessages_email_message_uuid_fkey"
+      columns: ["email_message_uuid"]
+isOneToOne: false
+      referencedRelation: "EmailMessages"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ContactQboCustomers": {
+                  Row: {
+                    "contact_uuid": string,"created_at": string,"id": string,"qbo_connection_uuid": string,"qbo_customer_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contact_uuid": string,"created_at"?: string,"id"?: string,"qbo_connection_uuid": string,"qbo_customer_id": string
+                  }
+                  Update: {
+                    "contact_uuid"?: string,"created_at"?: string,"id"?: string,"qbo_connection_uuid"?: string,"qbo_customer_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ContactQboCustomers_contact_uuid_fkey"
+      columns: ["contact_uuid"]
+isOneToOne: false
+      referencedRelation: "Contacts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ContactQboCustomers_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
       referencedColumns: ["id"]
     }
                   ]
@@ -841,6 +913,46 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"EmailMessageDetails": {
+                  Row: {
+                    "body_html": string | null,"body_text": string | null,"created_at": string,"email_message_uuid": string,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body_html"?: string | null,"body_text"?: string | null,"created_at"?: string,"email_message_uuid": string,"id"?: string
+                  }
+                  Update: {
+                    "body_html"?: string | null,"body_text"?: string | null,"created_at"?: string,"email_message_uuid"?: string,"id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "emailmessagedetails_email_message_uuid_fkey"
+      columns: ["email_message_uuid"]
+isOneToOne: true
+      referencedRelation: "EmailMessages"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"EmailMessages": {
+                  Row: {
+                    "cc_addresses": string | null,"created_at": string,"date": string | null,"direction": string,"email_message_details_uuid": string | null,"error_text": string | null,"from_address": string | null,"google_id": string | null,"google_in_reply_to": string | null,"google_message_id": string | null,"google_references": string | null,"google_thread_id": string | null,"id": string,"mailbox": string,"snippet": string | null,"status": Database["public"]['Enums']["email_message_status"],"subject": string | null,"to_addresses": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction": string,"email_message_details_uuid"?: string | null,"error_text"?: string | null,"from_address"?: string | null,"google_id"?: string | null,"google_in_reply_to"?: string | null,"google_message_id"?: string | null,"google_references"?: string | null,"google_thread_id"?: string | null,"id"?: string,"mailbox": string,"snippet"?: string | null,"status"?: Database["public"]['Enums']["email_message_status"],"subject"?: string | null,"to_addresses"?: string | null
+                  }
+                  Update: {
+                    "cc_addresses"?: string | null,"created_at"?: string,"date"?: string | null,"direction"?: string,"email_message_details_uuid"?: string | null,"error_text"?: string | null,"from_address"?: string | null,"google_id"?: string | null,"google_in_reply_to"?: string | null,"google_message_id"?: string | null,"google_references"?: string | null,"google_thread_id"?: string | null,"id"?: string,"mailbox"?: string,"snippet"?: string | null,"status"?: Database["public"]['Enums']["email_message_status"],"subject"?: string | null,"to_addresses"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "emailmessages_email_message_details_uuid_fkey"
+      columns: ["email_message_details_uuid"]
+isOneToOne: false
+      referencedRelation: "EmailMessageDetails"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"EmailTemplateAttachments": {
                   Row: {
                     "created_at": string,"created_by_user_uuid": string | null,"file_name": string,"file_size_bytes": number | null,"id": string,"mime_type": string | null,"storage_path": string,"template_id": string
@@ -1135,14 +1247,14 @@ isOneToOne: false
                   ]
                 },"Events": {
                   Row: {
-                    "address_uuid": string | null,"booked_at": string | null,"contact_uuid": string | null,"content_hash": string | null,"contract_hash": string | null,"contract_revenue_cents": number | null,"created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"dropoff_instructions": string | null,"event_end": string,"event_name": string,"event_start": string,"event_status": Database["public"]['Enums']["event_status"] | null,"event_type_uuid": string | null,"external_notes": string | null,"fifteen_row": number | null,"finance_contact_uuid": string | null,"goodshuffle_url": string | null,"hide_lead_alert": boolean,"hsl_hue": number | null,"id": string,"internal_notes": string | null,"invoice_number": number | null,"is_qbo": boolean,"is_tax_overridden": boolean,"lead_submission": Json | null,"lenient": boolean,"lost_reason": Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note": string | null,"must_be_clean": boolean,"notes": string | null,"pickup_instructions": string | null,"po_number": string | null,"quote_sent_at": string | null,"quote_valid_till": string | null,"sales_office_uuid": string | null,"setup_start": string | null,"seven_row": number | null,"tax_amount_cents": number | null,"tax_percent": number | null,"teardown_end": string | null,"ten_row": number | null,"terms_and_conditions_uuid": string | null,"total_seats": number | null,"venue_uuid": string | null
+                    "address_uuid": string | null,"booked_at": string | null,"contact_uuid": string | null,"content_hash": string | null,"contract_hash": string | null,"contract_revenue_cents": number | null,"created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"dropoff_instructions": string | null,"event_end": string,"event_name": string,"event_start": string,"event_status": Database["public"]['Enums']["event_status"] | null,"event_type_uuid": string | null,"external_notes": string | null,"fifteen_row": number | null,"finance_contact_uuid": string | null,"goodshuffle_url": string | null,"hide_lead_alert": boolean,"hsl_hue": number | null,"id": string,"internal_notes": string | null,"invoice_number": number | null,"is_qbo": boolean,"is_tax_overridden": boolean,"lead_submission": Json | null,"lenient": boolean,"lost_reason": Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note": string | null,"must_be_clean": boolean,"notes": string | null,"pickup_instructions": string | null,"po_number": string | null,"qbo_invoice_check_failed_at": string | null,"qbo_invoice_checked_at": string | null,"qbo_invoice_id": string | null,"qbo_invoice_mismatch": boolean,"qbo_invoice_mismatch_reasons": string | null,"quote_sent_at": string | null,"quote_valid_till": string | null,"sales_office_uuid": string | null,"setup_start": string | null,"seven_row": number | null,"tax_amount_cents": number | null,"tax_percent": number | null,"teardown_end": string | null,"ten_row": number | null,"terms_and_conditions_uuid": string | null,"total_seats": number | null,"venue_uuid": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end": string,"event_name": string,"event_start": string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient": boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
+                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end": string,"event_name": string,"event_start": string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient": boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"qbo_invoice_check_failed_at"?: string | null,"qbo_invoice_checked_at"?: string | null,"qbo_invoice_id"?: string | null,"qbo_invoice_mismatch"?: boolean,"qbo_invoice_mismatch_reasons"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
                   }
                   Update: {
-                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end"?: string,"event_name"?: string,"event_start"?: string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient"?: boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
+                    "address_uuid"?: string | null,"booked_at"?: string | null,"contact_uuid"?: string | null,"content_hash"?: string | null,"contract_hash"?: string | null,"contract_revenue_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"dropoff_instructions"?: string | null,"event_end"?: string,"event_name"?: string,"event_start"?: string,"event_status"?: Database["public"]['Enums']["event_status"] | null,"event_type_uuid"?: string | null,"external_notes"?: string | null,"fifteen_row"?: number | null,"finance_contact_uuid"?: string | null,"goodshuffle_url"?: string | null,"hide_lead_alert"?: boolean,"hsl_hue"?: number | null,"id"?: string,"internal_notes"?: string | null,"invoice_number"?: number | null,"is_qbo"?: boolean,"is_tax_overridden"?: boolean,"lead_submission"?: Json | null,"lenient"?: boolean,"lost_reason"?: Database["public"]['Enums']["event_lost_reason"] | null,"lost_reason_note"?: string | null,"must_be_clean"?: boolean,"notes"?: string | null,"pickup_instructions"?: string | null,"po_number"?: string | null,"qbo_invoice_check_failed_at"?: string | null,"qbo_invoice_checked_at"?: string | null,"qbo_invoice_id"?: string | null,"qbo_invoice_mismatch"?: boolean,"qbo_invoice_mismatch_reasons"?: string | null,"quote_sent_at"?: string | null,"quote_valid_till"?: string | null,"sales_office_uuid"?: string | null,"setup_start"?: string | null,"seven_row"?: number | null,"tax_amount_cents"?: number | null,"tax_percent"?: number | null,"teardown_end"?: string | null,"ten_row"?: number | null,"terms_and_conditions_uuid"?: string | null,"total_seats"?: number | null,"venue_uuid"?: string | null
                   }
                   Relationships: [
                     {
@@ -1221,6 +1333,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"EventTypeQboServices": {
+                  Row: {
+                    "created_at": string,"event_type_uuid": string,"id": string,"qbo_connection_uuid": string,"qbo_service_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"event_type_uuid": string,"id"?: string,"qbo_connection_uuid": string,"qbo_service_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"event_type_uuid"?: string,"id"?: string,"qbo_connection_uuid"?: string,"qbo_service_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "EventTypeQboServices_event_type_uuid_fkey"
+      columns: ["event_type_uuid"]
+isOneToOne: false
+      referencedRelation: "EventTypes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "EventTypeQboServices_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"EventTypes": {
                   Row: {
                     "created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"id": string,"name": string
@@ -1266,6 +1404,20 @@ isOneToOne: false
       referencedRelation: "Users"
       referencedColumns: ["id"]
     }
+                  ]
+                },"GmailMailboxSync": {
+                  Row: {
+                    "created_at": string,"history_id": string | null,"id": string,"last_error": string | null,"last_synced_at": string | null,"mailbox": string,"watch_expires_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"history_id"?: string | null,"id"?: string,"last_error"?: string | null,"last_synced_at"?: string | null,"mailbox": string,"watch_expires_at"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"history_id"?: string | null,"id"?: string,"last_error"?: string | null,"last_synced_at"?: string | null,"mailbox"?: string,"watch_expires_at"?: string | null
+                  }
+                  Relationships: [
+                    
                   ]
                 },"HomeBases": {
                   Row: {
@@ -1543,16 +1695,36 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"QboConnections": {
+                },"ProvinceQboTaxCodes": {
                   Row: {
-                    "currency": string | null,"display_name": string,"encrypted_token_value": string,"id": string,"qbo_tax_code_id": string | null,"realm_id": string | null
+                    "created_at": string,"id": string,"province": string,"qbo_connection_uuid": string,"qbo_tax_code_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "currency"?: string | null,"display_name": string,"encrypted_token_value": string,"id"?: string,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                    "created_at"?: string,"id"?: string,"province": string,"qbo_connection_uuid": string,"qbo_tax_code_id": string
                   }
                   Update: {
-                    "currency"?: string | null,"display_name"?: string,"encrypted_token_value"?: string,"id"?: string,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                    "created_at"?: string,"id"?: string,"province"?: string,"qbo_connection_uuid"?: string,"qbo_tax_code_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ProvinceQboTaxCodes_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"QboConnections": {
+                  Row: {
+                    "currency": string | null,"display_name": string,"encrypted_token_value": string,"id": string,"qbo_no_tax_code_id": string | null,"qbo_tax_code_id": string | null,"realm_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "currency"?: string | null,"display_name": string,"encrypted_token_value": string,"id"?: string,"qbo_no_tax_code_id"?: string | null,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
+                  }
+                  Update: {
+                    "currency"?: string | null,"display_name"?: string,"encrypted_token_value"?: string,"id"?: string,"qbo_no_tax_code_id"?: string | null,"qbo_tax_code_id"?: string | null,"realm_id"?: string | null
                   }
                   Relationships: [
                     
@@ -2423,6 +2595,9 @@ isOneToOne: false
 "get_current_driver_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"get_current_user_email":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
 "get_current_user_uuid":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
@@ -2520,7 +2695,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "alert_entity_type": "event"|"bleacher_event"|"work_tracker","bleacher_opening_dir": "driver"|"passenger","bleacher_subrental_status": "pending"|"accepted"|"denied","bluebook_region": "CAN"|"US"|"Both","contract_signature_status": "active"|"invalidated","currency": "USD"|"CAD","damage_severity": "none"|"minor"|"major","email_send_status": "sent"|"failed","event_lost_reason": "out_of_service_area"|"sold_out"|"size_does_not_work"|"price_too_high"|"other","event_status": "quoted"|"booked"|"lost"|"draft"|"unsigned_changes","pay_currency_type": "CAD"|"USD","pay_per_unit_type": "KM"|"MI"|"HR","payment_installment_status": "unpaid"|"paid","preferred_language": "english"|"french","question_type": "text"|"checkbox"|"photo","roadmap_attachment_parent_type": "task"|"feature","roadmap_feature_status": "draft"|"locked_in"|"in_progress"|"completed","roadmap_task_status": "to_do"|"in_progress"|"completed","roof_type": "canopy"|"none","task_status": "in_progress"|"backlog"|"complete"|"approved"|"in_staging"|"paused","task_type": "feature"|"bug","work_tracker_line_item_type": "hauling"|"deadhead"|"setup"|"teardown"|"maintenance"|"per_diem"|"custom","work_tracker_time_mode": "exact"|"flexible"|"any_time","work_tracker_type_code": "trip"|"repair_maintenance"|"site_visit_cleaning_other","worktracker_group_status": "draft"|"qbo_bill_creating"|"qbo_bill_created"|"qbo_bill_error"|"no_bill_ready_for_payment","worktracker_status": "draft"|"released"|"accepted"|"dest_pickup"|"pickup_inspection"|"dest_dropoff"|"dropoff_inspection"|"completed"|"cancelled"|"declined"|"abandoned"
+            "alert_entity_type": "event"|"bleacher_event"|"work_tracker","bleacher_opening_dir": "driver"|"passenger","bleacher_subrental_status": "pending"|"accepted"|"denied","bluebook_region": "CAN"|"US"|"Both","contract_signature_status": "active"|"invalidated","currency": "USD"|"CAD","damage_severity": "none"|"minor"|"major","email_message_status": "draft"|"sending"|"success"|"error","email_send_status": "sent"|"failed","event_lost_reason": "out_of_service_area"|"sold_out"|"size_does_not_work"|"price_too_high"|"other","event_status": "quoted"|"booked"|"lost"|"draft"|"unsigned_changes","pay_currency_type": "CAD"|"USD","pay_per_unit_type": "KM"|"MI"|"HR","payment_installment_status": "unpaid"|"paid","preferred_language": "english"|"french","question_type": "text"|"checkbox"|"photo","roadmap_attachment_parent_type": "task"|"feature","roadmap_feature_status": "draft"|"locked_in"|"in_progress"|"completed","roadmap_task_status": "to_do"|"in_progress"|"completed","roof_type": "canopy"|"none","task_status": "in_progress"|"backlog"|"complete"|"approved"|"in_staging"|"paused","task_type": "feature"|"bug","work_tracker_line_item_type": "hauling"|"deadhead"|"setup"|"teardown"|"maintenance"|"per_diem"|"custom","work_tracker_time_mode": "exact"|"flexible"|"any_time","work_tracker_type_code": "trip"|"repair_maintenance"|"site_visit_cleaning_other","worktracker_group_status": "draft"|"qbo_bill_creating"|"qbo_bill_created"|"qbo_bill_error"|"no_bill_ready_for_payment","worktracker_status": "draft"|"released"|"accepted"|"dest_pickup"|"pickup_inspection"|"dest_dropoff"|"dropoff_inspection"|"completed"|"cancelled"|"declined"|"abandoned"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -2636,7 +2811,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "alert_entity_type": ["event", "bleacher_event", "work_tracker"],"bleacher_opening_dir": ["driver", "passenger"],"bleacher_subrental_status": ["pending", "accepted", "denied"],"bluebook_region": ["CAN", "US", "Both"],"contract_signature_status": ["active", "invalidated"],"currency": ["USD", "CAD"],"damage_severity": ["none", "minor", "major"],"email_send_status": ["sent", "failed"],"event_lost_reason": ["out_of_service_area", "sold_out", "size_does_not_work", "price_too_high", "other"],"event_status": ["quoted", "booked", "lost", "draft", "unsigned_changes"],"pay_currency_type": ["CAD", "USD"],"pay_per_unit_type": ["KM", "MI", "HR"],"payment_installment_status": ["unpaid", "paid"],"preferred_language": ["english", "french"],"question_type": ["text", "checkbox", "photo"],"roadmap_attachment_parent_type": ["task", "feature"],"roadmap_feature_status": ["draft", "locked_in", "in_progress", "completed"],"roadmap_task_status": ["to_do", "in_progress", "completed"],"roof_type": ["canopy", "none"],"task_status": ["in_progress", "backlog", "complete", "approved", "in_staging", "paused"],"task_type": ["feature", "bug"],"work_tracker_line_item_type": ["hauling", "deadhead", "setup", "teardown", "maintenance", "per_diem", "custom"],"work_tracker_time_mode": ["exact", "flexible", "any_time"],"work_tracker_type_code": ["trip", "repair_maintenance", "site_visit_cleaning_other"],"worktracker_group_status": ["draft", "qbo_bill_creating", "qbo_bill_created", "qbo_bill_error", "no_bill_ready_for_payment"],"worktracker_status": ["draft", "released", "accepted", "dest_pickup", "pickup_inspection", "dest_dropoff", "dropoff_inspection", "completed", "cancelled", "declined", "abandoned"]
+            "alert_entity_type": ["event", "bleacher_event", "work_tracker"],"bleacher_opening_dir": ["driver", "passenger"],"bleacher_subrental_status": ["pending", "accepted", "denied"],"bluebook_region": ["CAN", "US", "Both"],"contract_signature_status": ["active", "invalidated"],"currency": ["USD", "CAD"],"damage_severity": ["none", "minor", "major"],"email_message_status": ["draft", "sending", "success", "error"],"email_send_status": ["sent", "failed"],"event_lost_reason": ["out_of_service_area", "sold_out", "size_does_not_work", "price_too_high", "other"],"event_status": ["quoted", "booked", "lost", "draft", "unsigned_changes"],"pay_currency_type": ["CAD", "USD"],"pay_per_unit_type": ["KM", "MI", "HR"],"payment_installment_status": ["unpaid", "paid"],"preferred_language": ["english", "french"],"question_type": ["text", "checkbox", "photo"],"roadmap_attachment_parent_type": ["task", "feature"],"roadmap_feature_status": ["draft", "locked_in", "in_progress", "completed"],"roadmap_task_status": ["to_do", "in_progress", "completed"],"roof_type": ["canopy", "none"],"task_status": ["in_progress", "backlog", "complete", "approved", "in_staging", "paused"],"task_type": ["feature", "bug"],"work_tracker_line_item_type": ["hauling", "deadhead", "setup", "teardown", "maintenance", "per_diem", "custom"],"work_tracker_time_mode": ["exact", "flexible", "any_time"],"work_tracker_type_code": ["trip", "repair_maintenance", "site_visit_cleaning_other"],"worktracker_group_status": ["draft", "qbo_bill_creating", "qbo_bill_created", "qbo_bill_error", "no_bill_ready_for_payment"],"worktracker_status": ["draft", "released", "accepted", "dest_pickup", "pickup_inspection", "dest_dropoff", "dropoff_inspection", "completed", "cancelled", "declined", "abandoned"]
           }
         }
 } as const

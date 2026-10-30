@@ -24,6 +24,12 @@ vi.mock("../../../hooks/useEventCurrency", () => ({
 vi.mock("../../../hooks/useEventIsQbo", () => ({ useEventIsQbo: () => false }));
 vi.mock("../../../db/setEventIsQbo", () => ({ setEventIsQbo: vi.fn() }));
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToast: vi.fn() }));
+// The buttons are their own component with their own tests; here only whether the tab draws them.
+vi.mock("../invoice/InvoiceButtons", () => ({
+  InvoiceButtons: ({ eventId }: { eventId: string }) => (
+    <div data-testid="invoice-buttons" data-event-id={eventId} />
+  ),
+}));
 vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
   usePermissionsStore: () => mockPerms(),
 }));
@@ -114,15 +120,23 @@ function paymentsReceivedRow(html: string): string {
  */
 type Can = Parameters<typeof BillingTab>[0]["can"];
 
-/** An admin: Record Payment drawn, the QuickBooks flag settable. */
-const ADMIN: Can = { recordPayment: true, setQuickBooksFlag: true };
+/** An admin: Record Payment drawn, the QuickBooks flag settable, the invoice buttons drawn. */
+const ADMIN: Can = { recordPayment: true, setQuickBooksFlag: true, manageQuickBooksInvoice: true };
 /**
  * An account manager, lead or junior (docs/specs/accountant-quotes-06-am-read-only-payments.md):
  * no Record Payment, whatever the quote; the QuickBooks flag is theirs.
  */
-const ACCOUNT_MANAGER: Can = { recordPayment: false, setQuickBooksFlag: true };
+const ACCOUNT_MANAGER: Can = {
+  recordPayment: false,
+  setQuickBooksFlag: true,
+  manageQuickBooksInvoice: false,
+};
 /** A viewer: no button, and the flag is read-only. */
-const VIEWER: Can = { recordPayment: false, setQuickBooksFlag: false };
+const VIEWER: Can = {
+  recordPayment: false,
+  setQuickBooksFlag: false,
+  manageQuickBooksInvoice: false,
+};
 
 const USER = { userId: "user-7" };
 
@@ -491,8 +505,58 @@ describe("BillingTab", () => {
     });
 
     it("follows setQuickBooksFlag alone, not the Record Payment answers", () => {
-      const html = render(500000, { recordPayment: true, setQuickBooksFlag: false });
+      const html = render(500000, { ...ADMIN, setQuickBooksFlag: false });
       expect(qboCheckbox(html)).toContain("disabled");
+    });
+  });
+
+  // docs/specs/qbo-invoice-07-card-buttons.md §4: the QuickBooks section draws the Create / Update
+  // buttons under the checkbox, for whoever the page says may — and for nobody else.
+  describe("the QuickBooks invoice buttons", () => {
+    const buttons = (html: string) =>
+      html.match(/<div[^>]*data-testid="invoice-buttons"[^>]*>/)?.[0];
+
+    it("S1: are drawn for an admin, for this quote, under the checkbox and before the payment schedule", () => {
+      const html = render(500000, ADMIN);
+
+      expect(buttons(html)).toContain('data-event-id="evt-1"');
+      expect(html.indexOf('data-testid="invoice-buttons"')).toBeGreaterThan(
+        html.indexOf("QuickBooks Invoice</span>"),
+      );
+      expect(html.indexOf('data-testid="invoice-buttons"')).toBeLessThan(
+        html.indexOf("Payment Schedule"),
+      );
+    });
+
+    it("S4: are not drawn for an account manager or a viewer, and the flag is as before", () => {
+      const am = render(500000, ACCOUNT_MANAGER);
+      expect(buttons(am)).toBeUndefined();
+      expect(qboCheckbox(am)).not.toContain("disabled");
+
+      const viewer = render(500000, VIEWER);
+      expect(buttons(viewer)).toBeUndefined();
+      expect(qboCheckbox(viewer)).toContain("disabled");
+    });
+
+    it("S3: follow manageQuickBooksInvoice alone, not the flag and not Record Payment", () => {
+      expect(
+        buttons(
+          render(500000, {
+            recordPayment: false,
+            setQuickBooksFlag: false,
+            manageQuickBooksInvoice: true,
+          }),
+        ),
+      ).toBeDefined();
+      expect(
+        buttons(
+          render(500000, {
+            recordPayment: true,
+            setQuickBooksFlag: true,
+            manageQuickBooksInvoice: false,
+          }),
+        ),
+      ).toBeUndefined();
     });
   });
 

@@ -20,6 +20,30 @@ describe("useSidebarItems", () => {
     expect(keys).toContain("configuration");
   });
 
+  it("every web role finds Blocked Emails as its own button, straight after Companies & Contacts", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "accountant",
+      "maintainer",
+      "developer",
+    ] as const) {
+      const items = useSidebarItems([role]);
+      expect(items).toContainEqual(
+        expect.objectContaining({ key: "blocked-emails", href: "/blocked-emails" }),
+      );
+    }
+    const keys = useSidebarItems(["admin"]).map((i) => i.key);
+    expect(keys.indexOf("blocked-emails")).toBe(keys.indexOf("companies-contacts") + 1);
+  });
+
+  it("no one else gets the configuration section", () => {
+    for (const role of ["account_manager", "viewer", "maintainer"] as const) {
+      expect(useSidebarItems([role]).map((i) => i.key)).not.toContain("configuration");
+    }
+  });
+
   it("admin lists Accountant immediately before Work Trackers", () => {
     const keys = useSidebarItems(["admin"]).map((i) => i.key);
     expect(keys.indexOf("accountant")).toBe(keys.indexOf("work-trackers") - 1);
@@ -148,7 +172,7 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, Blocked Emails, the Configuration section and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
@@ -157,6 +181,8 @@ describe("useSidebarItems", () => {
       "work-trackers",
       "messages",
       "companies-contacts",
+      "blocked-emails",
+      "configuration",
       "documentation",
     ]);
 
@@ -189,14 +215,95 @@ describe("useSidebarItems", () => {
     const companiesContacts = items[5];
     expect(companiesContacts.type).toBe("button");
     expect("label" in companiesContacts && companiesContacts.label).toBe("Companies & Contacts");
-    expect("href" in companiesContacts && companiesContacts.href).toBe("/companies-contacts");
+    // Two pages (/contacts, /companies); the button opens the first and stays lit on both.
+    expect("href" in companiesContacts && companiesContacts.href).toBe("/contacts");
+    expect("activePrefixes" in companiesContacts && companiesContacts.activePrefixes).toEqual([
+      "/companies",
+    ]);
 
-    const docs = items[6];
+    // docs/specs/qbo-invoice-12a-quote-types-page.md §4: Configuration, with Quote Types only.
+    const configuration = items[7];
+    expect(configuration.type).toBe("section");
+
+    const docs = items[8];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",
     );
     expect(hrefs).toEqual(["/permissions", "/changelog"]);
+  });
+
+  // ═══ Configuration: Quote Types (docs/specs/qbo-invoice-12a-quote-types-page.md) ═══
+
+  const configurationChildren = (roles: Parameters<typeof useSidebarItems>[0]) => {
+    const item = useSidebarItems(roles).find((i) => i.key === "configuration");
+    if (!item || item.type !== "section") return undefined;
+    return item.children.map((c) => ({
+      key: c.key,
+      label: c.label,
+      href: "href" in c ? c.href : "",
+    }));
+  };
+
+  it("accountant's Configuration section holds Quote Types and nothing else", () => {
+    expect(configurationChildren(["accountant"])).toEqual([
+      { key: "quote-types", label: "Quote Types", href: "/qbo-quote-types" },
+    ]);
+  });
+
+  it("admin's Configuration section keeps every earlier page and adds Quote Types after Work Tracker Types", () => {
+    const keys = configurationChildren(["admin"])!.map((c) => c.key);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "zones",
+        "inspection-questions",
+        "quickbooks",
+        "work-tracker-types",
+        "stripe-connections",
+        "pricing-matrix",
+        "terms-and-conditions",
+        "sales-offices",
+      ]),
+    );
+    expect(keys.indexOf("quote-types")).toBe(keys.indexOf("work-tracker-types") + 1);
+  });
+
+  it("a user who is both admin and accountant sees what the admin sees", () => {
+    expect(configurationChildren(["admin", "accountant"])).toEqual(
+      configurationChildren(["admin"]),
+    );
+  });
+
+  it("account manager, viewer, maintainer, developer and driver have no Configuration section", () => {
+    for (const role of [
+      "account_manager",
+      "viewer",
+      "maintainer",
+      "developer",
+      "driver",
+    ] as const) {
+      expect(configurationChildren([role]), role).toBeUndefined();
+    }
+  });
+
+  it("every button of the Configuration section says which roles see it (a new one without roles would appear for the accountant)", () => {
+    const item = useSidebarItems(["admin"]).find((i) => i.key === "configuration");
+    const children = (item as Extract<typeof item, { type: "section" }>).children;
+    for (const child of children) {
+      expect(child.type, child.key).toBe("button");
+      expect("roles" in child && child.roles, child.key).toEqual(expect.any(Array));
+    }
+  });
+
+  it("only Quote Types is offered to the accountant: every other Configuration button is admin-only", () => {
+    const item = useSidebarItems(["admin"]).find((i) => i.key === "configuration");
+    const children = (item as Extract<typeof item, { type: "section" }>).children;
+    for (const child of children) {
+      const roles = "roles" in child ? child.roles : undefined;
+      expect(roles, child.key).toEqual(
+        child.key === "quote-types" ? ["admin", "accountant"] : ["admin"],
+      );
+    }
   });
 
   // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4 and D4: the accountant gets the
@@ -232,11 +339,15 @@ describe("useSidebarItems", () => {
     expect(keys).not.toContain("quality-assurance");
   });
 
-  it("an account manager who is also an accountant sees what an account manager sees, plus Accountant", () => {
+  it("an account manager who is also an accountant sees what an account manager sees, plus Accountant and Configuration", () => {
     const keys = useSidebarItems(["account_manager", "accountant"]).map((i) => i.key);
     const amKeys = useSidebarItems(["account_manager"]).map((i) => i.key);
     expect(keys).toEqual(
-      amKeys.flatMap((key) => (key === "work-trackers" ? ["accountant", key] : [key])),
+      amKeys.flatMap((key) => {
+        if (key === "work-trackers") return ["accountant", key];
+        if (key === "documentation") return ["configuration", key];
+        return [key];
+      }),
     );
   });
 

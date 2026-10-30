@@ -29,6 +29,8 @@ import {
   ImageIcon,
   Receipt,
   MailCheck,
+  MailX,
+  Tags,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -38,7 +40,15 @@ type SidebarButtonItem = {
   key: string;
   label: string;
   href: string;
+  /** Other path prefixes that keep this item highlighted, for a section spread over several pages. */
+  activePrefixes?: string[];
   icon: React.ComponentType<any>;
+  /**
+   * Which roles may see this button when it sits inside a section. Absent means everyone who can
+   * see the section. Every button of the Configuration section must say, because the accountant
+   * sees that section too (docs/specs/qbo-invoice-12a-quote-types-page.md).
+   */
+  roles?: WebRole[];
 };
 
 export type SidebarDropdownChild = {
@@ -181,8 +191,16 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     type: "button",
     key: "companies-contacts",
     label: "Companies & Contacts",
-    href: "/companies-contacts",
+    href: "/contacts",
+    activePrefixes: ["/companies"],
     icon: BookUser,
+  },
+  {
+    type: "button",
+    key: "blocked-emails",
+    label: "Blocked Emails",
+    href: "/blocked-emails",
+    icon: MailX,
   },
   {
     type: "section",
@@ -196,6 +214,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Zone Manager",
         href: "/zones",
         icon: MapPinned,
+        roles: ["admin"],
       },
       {
         type: "button",
@@ -203,6 +222,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Inspection Form",
         href: "/inspection-questions",
         icon: ClipboardCheck,
+        roles: ["admin"],
       },
       {
         type: "button",
@@ -210,6 +230,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "QuickBooks",
         href: "/quickbooks",
         icon: QuickBooksIcon,
+        roles: ["admin"],
       },
       {
         type: "button",
@@ -217,6 +238,15 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Work Tracker Types",
         href: "/work-tracker-types",
         icon: Layers,
+        roles: ["admin"],
+      },
+      {
+        type: "button",
+        key: "quote-types",
+        label: "Quote Types",
+        href: "/qbo-quote-types",
+        icon: Tags,
+        roles: ["admin", "accountant"],
       },
       {
         type: "button",
@@ -224,6 +254,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Stripe",
         href: "/stripe-connections",
         icon: CreditCard,
+        roles: ["admin"],
       },
       {
         type: "button",
@@ -231,6 +262,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Pricing Matrix",
         href: "/pricing-matrix",
         icon: DollarSign,
+        roles: ["admin"],
       },
       {
         type: "button",
@@ -238,6 +270,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Terms & Conditions",
         href: "/terms-and-conditions",
         icon: ScrollText,
+        roles: ["admin"],
       },
       {
         type: "button",
@@ -245,6 +278,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Sales Offices",
         href: "/sales-offices",
         icon: Building2,
+        roles: ["admin"],
       },
       {
         type: "button",
@@ -252,6 +286,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Storage Locations",
         href: "/storage-locations",
         icon: Warehouse,
+        roles: ["admin"],
       },
     ],
   },
@@ -335,6 +370,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -352,6 +388,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -362,10 +399,11 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "driver-calendar",
     "documentation",
   ],
-  developer: ["roadmap", "dev-tools"],
+  developer: ["roadmap", "dev-tools", "blocked-emails"],
   viewer: [
     "dashboard",
     "quotes-bookings",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -377,9 +415,10 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "documentation",
   ],
   driver: [],
-  maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
+  maintainer: ["dashboard", "quality-assurance", "documentation", "assets", "blocked-emails"],
   // docs/specs/accountant-address-book.md: Companies & Contacts, after Messages (ALL_ITEMS sets the order).
   // docs/specs/accountant-team.md: Team, after Quotes & Bookings.
+  // docs/specs/qbo-invoice-12a-quote-types-page.md: Configuration, which holds only Quote Types for them.
   accountant: [
     "quotes-bookings",
     "team",
@@ -387,6 +426,8 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "work-trackers",
     "messages",
     "companies-contacts",
+    "blocked-emails",
+    "configuration",
     "documentation",
   ],
 };
@@ -401,12 +442,22 @@ export function useSidebarItems(roles: WebRole[]): SidebarItemConfig[] {
 
   const visible = ALL_ITEMS.filter((item) => keySet.has(item.key));
 
-  return visible.flatMap((item): SidebarItemConfig[] => {
-    if (item.type !== "dropdown") return [item];
+  const mayBeSeen = (itemRoles: WebRole[] | undefined) =>
+    !itemRoles || itemRoles.some((role) => roles.includes(role));
 
-    const children = item.children.filter(
-      (child) => !child.roles || child.roles.some((role) => roles.includes(role)),
-    );
+  return visible.flatMap((item): SidebarItemConfig[] => {
+    if (item.type === "button") return [item];
+
+    if (item.type === "section") {
+      // Only a button can name its roles; a section's own children of another kind stay.
+      const children = item.children.filter(
+        (child) => child.type !== "button" || mayBeSeen(child.roles),
+      );
+      if (children.length === 0) return [];
+      return [{ ...item, children }];
+    }
+
+    const children = item.children.filter((child) => mayBeSeen(child.roles));
 
     // A dropdown whose every child was filtered out is a menu that opens onto
     // nothing, so it does not belong in the sidebar at all.

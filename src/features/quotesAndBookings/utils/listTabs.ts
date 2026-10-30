@@ -39,6 +39,10 @@ export const QUOTES_BOOKINGS_TABS: ListTabDeclaration = {
  * the event has started (see `accountsReceivable.ts`). Each opens on the event closest to today:
  * AR walks back from today into the past, AR Deposits walks forward from tomorrow. They hold
  * booked events by definition, so Status is not offered.
+ *
+ * Need attention is the third tab: the quotes whose QuickBooks invoice no longer matches the quote,
+ * newest event first, whatever their status — so Status is not offered there either.
+ * Spec: docs/specs/qbo-invoice-10-need-attention-tab.md §4
  */
 export const ACCOUNTANT_TABS: ListTabDeclaration = {
   tabs: [
@@ -46,6 +50,11 @@ export const ACCOUNTANT_TABS: ListTabDeclaration = {
     {
       id: "ar_deposits",
       startingSort: { key: "start_date", direction: "asc" },
+      offersStatus: false,
+    },
+    {
+      id: "need_attention",
+      startingSort: { key: "start_date", direction: "desc" },
       offersStatus: false,
     },
   ],

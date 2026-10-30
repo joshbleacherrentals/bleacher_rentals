@@ -17,6 +17,7 @@ import { typedExecute, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { shouldReuseExistingAddressRow } from "@/features/venues/logic/shouldReuseExistingAddressRow";
 import { syncEventLineItems } from "./eventLineItems";
 import { postFinanceBookedNotice, shouldNotifyFinanceBooked } from "../utils/notifyFinanceBooked";
+import { requestInvoiceCheck } from "../utils/requestInvoiceCheck";
 import { taxOverrideFlag } from "../utils/taxOverride";
 
 type OldEventRow = {
@@ -285,4 +286,8 @@ export async function updateQuoteEvent(
   if (shouldNotifyFinanceBooked(oldEvent?.event_status, state.status || "draft")) {
     postFinanceBookedNotice(eventId);
   }
+
+  // ...and compare the quote with its QuickBooks invoice, if it has one (docs/specs/qbo-invoice-06a).
+  // Fire-and-forget: it waits for the upload by itself, never rejects and shows nothing.
+  void requestInvoiceCheck(eventId);
 }
