@@ -10,8 +10,9 @@ import { requireContactEmailPuller } from "@/features/userAccess/logic/requireCo
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-// Every mailbox of the domain is searched, each as its own token, so give it room.
-export const maxDuration = 120;
+// Every mailbox of the domain is searched, each as its own token, so give it room: 60 seconds is
+// the most the Hobby plan allows (a longer value fails the deploy).
+export const maxDuration = 60;
 
 /**
  * Every email involving an address, searched in every mailbox of the company domain (listed by
