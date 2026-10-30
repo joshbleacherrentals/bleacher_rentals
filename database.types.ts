@@ -1353,6 +1353,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"GmailMailboxSync": {
+                  Row: {
+                    "created_at": string,"history_id": string | null,"id": string,"last_error": string | null,"last_synced_at": string | null,"mailbox": string,"watch_expires_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"history_id"?: string | null,"id"?: string,"last_error"?: string | null,"last_synced_at"?: string | null,"mailbox": string,"watch_expires_at"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"history_id"?: string | null,"id"?: string,"last_error"?: string | null,"last_synced_at"?: string | null,"mailbox"?: string,"watch_expires_at"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"HomeBases": {
                   Row: {
                     "created_at": string,"home_base_name": string,"id": string

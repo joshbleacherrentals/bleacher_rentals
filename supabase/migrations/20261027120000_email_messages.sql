@@ -314,3 +314,40 @@ create policy "blocked_customer_emails_update" on public."BlockedCustomerEmails"
 create policy "blocked_customer_emails_delete" on public."BlockedCustomerEmails"
   as permissive for delete to authenticated
   using (created_by_user_uuid = public.get_current_user_uuid());
+
+-- GmailMailboxSync: one row per company mailbox that the server keeps up to date from Gmail, whether
+-- or not anyone in the app owns it (a shared inbox like sales@ has no Users row, and its mail with a
+-- customer matters just as much). Gmail tells us a mailbox changed (a Pub/Sub push, see
+-- /api/gmail/push) and the server asks what was added since `history_id`, matches each new email's
+-- addresses to contacts, and saves the matches into EmailMessages and ContactEmailMessages. The rows
+-- are made and kept by the server from Google's directory of the domain's mailboxes (the daily
+-- /api/cron/gmail-watch), so a new mailbox is picked up without anyone adding it here.
+--
+-- Used only by the server, which reads and writes it with the service role: row-level security is on
+-- and no policy gives anyone else access. It is not synced to devices.
+create table public."GmailMailboxSync" (
+  id uuid not null default gen_random_uuid(),
+  created_at timestamp with time zone not null default now(),
+
+  -- The mailbox address, lowercase, e.g. 'sales@bleacherrentals.com'.
+  mailbox text not null,
+
+  -- Gmail's history id of the last change this server has handled: where the next sync starts. Null
+  -- until the mailbox is first watched or synced, which sets it to "now" (nothing before is fetched;
+  -- "Pull from Gmail" on a contact backfills).
+  history_id text,
+
+  -- When Gmail stops pushing for this mailbox unless it is watched again (about 7 days out; the
+  -- daily job renews it).
+  watch_expires_at timestamp with time zone,
+
+  last_synced_at timestamp with time zone,
+  -- Why the last watch or sync failed (a suspended account, say). Null after a success.
+  last_error text,
+
+  constraint GmailMailboxSync_pkey primary key (id),
+  constraint GmailMailboxSync_mailbox_unique unique (mailbox),
+  constraint GmailMailboxSync_mailbox_lowercase check (mailbox = lower(mailbox))
+);
+
+alter table public."GmailMailboxSync" enable row level security;

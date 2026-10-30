@@ -29,7 +29,7 @@ export type BlockedCheck =
 const normalize = (email: string) => email.trim().toLowerCase();
 
 /** The company domain an address is at, or null. `mail.tpi-3.ca` counts; `nottpi-3.ca` does not. */
-function companyDomainOf(address: string): string | null {
+export function companyDomainOf(address: string): string | null {
   const host = address.slice(address.lastIndexOf("@") + 1);
   return COMPANY_DOMAINS.find((domain) => host === domain || host.endsWith(`.${domain}`)) ?? null;
 }

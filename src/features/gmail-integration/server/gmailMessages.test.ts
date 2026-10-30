@@ -7,10 +7,13 @@ import {
   getFullMessage,
   getMessageSummary,
   GmailApiError,
+  getProfileHistoryId,
+  listHistory,
   listLatestMessages,
   listMessageIds,
   sendRawMessage,
   summarizeMessage,
+  watchMailbox,
 } from "./gmailMessages";
 
 afterEach(() => {
@@ -312,5 +315,119 @@ describe("sendRawMessage", () => {
     expect(error).toBeInstanceOf(GmailApiError);
     expect(error.status).toBe(403);
     expect(error.message).toBe("Gmail API 403: Insufficient Permission");
+  });
+});
+
+describe("listHistory", () => {
+  const okJson = (body: unknown) =>
+    vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => body,
+    }));
+
+  it("asks for what was added since a history id and lists the messages with their labels", async () => {
+    const fetchMock = okJson({
+      history: [
+        { id: "101", messagesAdded: [{ message: { id: "a1", labelIds: ["INBOX"] } }] },
+        { id: "102", messagesAdded: [{ message: { id: "b2" } }, { message: { id: "c3" } }] },
+        { id: "103" },
+      ],
+      historyId: "150",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const page = await listHistory("ya29.token", "100");
+
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.pathname).toMatch(/\/users\/me\/history$/);
+    expect(url.searchParams.get("startHistoryId")).toBe("100");
+    expect(url.searchParams.get("historyTypes")).toBe("messageAdded");
+    expect(fetchMock.mock.calls[0][1]).toEqual({ headers: { Authorization: "Bearer ya29.token" } });
+    expect(page).toEqual({
+      added: [
+        { id: "a1", labelIds: ["INBOX"] },
+        { id: "b2", labelIds: [] },
+        { id: "c3", labelIds: [] },
+      ],
+      lastRecordId: "103",
+      historyId: "150",
+      nextPageToken: null,
+    });
+  });
+
+  it("passes on a page token and reports the next one", async () => {
+    const fetchMock = okJson({ history: [], nextPageToken: "next-1", historyId: "9" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const page = await listHistory("t", "5", "page-2");
+
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get("pageToken")).toBe("page-2");
+    expect(page).toMatchObject({ added: [], lastRecordId: null, nextPageToken: "next-1" });
+  });
+
+  it("is empty, with the current history id, when nothing changed", async () => {
+    vi.stubGlobal("fetch", okJson({ historyId: "77" }));
+
+    expect(await listHistory("t", "77")).toEqual({
+      added: [],
+      lastRecordId: null,
+      historyId: "77",
+      nextPageToken: null,
+    });
+  });
+
+  it("throws a 404 GmailApiError for a history id Gmail no longer keeps", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        json: async () => ({ error: { message: "Requested entity was not found." } }),
+      })),
+    );
+
+    const error = await listHistory("t", "1").catch((e) => e);
+
+    expect(error).toBeInstanceOf(GmailApiError);
+    expect(error.status).toBe(404);
+  });
+});
+
+describe("getProfileHistoryId", () => {
+  it("reads the mailbox's current history id", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ emailAddress: "a@b.com", historyId: "4242" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await getProfileHistoryId("t")).toBe("4242");
+    expect(new URL(fetchMock.mock.calls[0][0]).pathname).toMatch(/\/users\/me\/profile$/);
+  });
+});
+
+describe("watchMailbox", () => {
+  it("asks Gmail to publish Inbox and Sent changes to the topic, and returns the history id and expiry", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ historyId: "900", expiration: "1762000000000" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const watch = await watchMailbox("ya29.token", "projects/p/topics/gmail-mailbox-changes");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(url).pathname).toMatch(/\/users\/me\/watch$/);
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(init?.body as string)).toEqual({
+      topicName: "projects/p/topics/gmail-mailbox-changes",
+      labelIds: ["INBOX", "SENT"],
+      labelFilterBehavior: "INCLUDE",
+    });
+    expect(watch).toEqual({ historyId: "900", expiresAt: new Date(1762000000000) });
   });
 });

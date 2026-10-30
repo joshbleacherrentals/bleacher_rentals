@@ -186,6 +186,81 @@ export async function getMessageSummary(
   );
 }
 
+/** One page of what was added to a mailbox since a history id (see listHistory). */
+export type GmailHistoryPage = {
+  /** The messages added in this page, with their labels, oldest change first. */
+  added: { id: string; labelIds: string[] }[];
+  /** The id of the last change on this page: where to carry on from if the pages are cut short. */
+  lastRecordId: string | null;
+  /** The mailbox's current history id: where the next sync starts once every page is read. */
+  historyId: string | null;
+  nextPageToken: string | null;
+};
+
+/**
+ * What was added to the mailbox the token acts as since `startHistoryId`. Gmail keeps a history id
+ * for about a week: an older one is answered with a 404 (a GmailApiError), which means the changes
+ * can no longer be listed and the mailbox has to be caught up another way.
+ */
+export async function listHistory(
+  accessToken: string,
+  startHistoryId: string,
+  pageToken?: string,
+): Promise<GmailHistoryPage> {
+  const params = new URLSearchParams({
+    startHistoryId,
+    historyTypes: "messageAdded",
+    maxResults: "500",
+  });
+  if (pageToken) params.set("pageToken", pageToken);
+
+  const page = await gmailGet<{
+    history?: {
+      id: string;
+      messagesAdded?: { message: { id: string; labelIds?: string[] } }[];
+    }[];
+    nextPageToken?: string;
+    historyId?: string;
+  }>(accessToken, `/history?${params}`);
+
+  const records = page.history ?? [];
+  return {
+    added: records.flatMap((record) =>
+      (record.messagesAdded ?? []).map(({ message }) => ({
+        id: message.id,
+        labelIds: message.labelIds ?? [],
+      })),
+    ),
+    lastRecordId: records.length > 0 ? records[records.length - 1].id : null,
+    historyId: page.historyId ?? null,
+    nextPageToken: page.nextPageToken ?? null,
+  };
+}
+
+/** The mailbox's current history id: "now", for starting to follow it from here. */
+export async function getProfileHistoryId(accessToken: string): Promise<string> {
+  const profile = await gmailGet<{ historyId: string }>(accessToken, "/profile");
+  return profile.historyId;
+}
+
+/**
+ * Asks Gmail to publish to the Pub/Sub topic whenever the mailbox changes, for the Inbox and Sent
+ * only. Lasts about a week, so it is called again before then (watching again simply renews it).
+ * Gives back the mailbox's current history id and when the watch ends. A mailbox has one watch at a
+ * time for the whole Cloud project: a second caller replaces the first.
+ */
+export async function watchMailbox(
+  accessToken: string,
+  topicName: string,
+): Promise<{ historyId: string; expiresAt: Date }> {
+  const watch = await gmailPost<{ historyId: string; expiration: string }>(accessToken, "/watch", {
+    topicName,
+    labelIds: ["INBOX", "SENT"],
+    labelFilterBehavior: "INCLUDE",
+  });
+  return { historyId: watch.historyId, expiresAt: new Date(Number(watch.expiration)) };
+}
+
 /** The newest `count` messages in the mailbox the token acts as, headers and snippet only. */
 export async function listLatestMessages(
   accessToken: string,
