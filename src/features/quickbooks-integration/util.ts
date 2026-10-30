@@ -7,7 +7,6 @@ const ENCRYPTION_KEY = process.env.QBO_TOKEN_ENCRYPTION_KEY!; // Generate random
 const IV_LENGTH = 16; // AES block size
 
 function encrypt(text: string): string {
-  console.log("ENCRYPTION_KEY", ENCRYPTION_KEY);
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.from(ENCRYPTION_KEY, "base64"), iv);
   let encrypted = cipher.update(text, "utf8", "base64");
@@ -36,10 +35,8 @@ export async function saveTokens(connectionId: string, token: any) {
 
 export async function loadTokens(connectionId: string) {
   const encrypted = await getQboTokens(connectionId);
-  console.log("encrypted: ", encrypted);
   if (!encrypted || encrypted === "__pending__") return null;
   const json = decrypt(encrypted);
-  console.log("json: ", json);
   return JSON.parse(json);
 }
 

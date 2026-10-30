@@ -9,6 +9,7 @@ import { SHOW_INBOUND_LEADS_EVENT } from "@/features/quotesAndBookings/utils/inb
 import { ListOptionsMenu } from "@/features/quotesAndBookings/components/ListOptionsMenu";
 import { useInboundLeadsRule } from "@/features/quotesAndBookings/hooks/useInboundLeadsRule";
 import { useInboundLeads } from "@/features/quotesAndBookings/hooks/useInboundLeads";
+import { useInvoiceAlerts } from "@/features/quotesAndBookings/hooks/useInvoiceAlerts";
 import { TemplatePill } from "@/features/quotesAndBookings/components/TemplatePill";
 import {
   FilterSidebar,
@@ -70,6 +71,8 @@ export default function QuotesBookingsPage() {
   const { scrollRef } = useLayoutContext();
   // On the list only `createQuote` is read.
   const can = useQuotesBookingsCapabilities();
+  // The red dot on the rows whose QuickBooks invoice needs attention; empty for all but accountants.
+  const { reasonsByEvent } = useInvoiceAlerts();
 
   const templateParam = searchParams.get("template");
   const timeRangeParam = searchParams.get("timeRange") as
@@ -205,7 +208,7 @@ export default function QuotesBookingsPage() {
       key: "event_name",
       header: `Event Name (${searchedData?.length ?? 0})`,
       sortKey: "event_name",
-      render: (event) => <EventNameCell event={event} />,
+      render: (event) => <EventNameCell event={event} attention={reasonsByEvent.get(event.id)} />,
     },
     {
       key: "status",

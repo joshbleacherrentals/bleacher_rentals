@@ -29,7 +29,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the internal chat, Companies & Contacts, and Edit Team Members", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Edit Team Members, and Quote Types", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -43,8 +43,11 @@ describe("permission matrix", () => {
         "Event Chat",
         "Events",
         "Payment History",
+        "QuickBooks Invoice (create and update)",
+        "QuickBooks Invoice Alerts",
         "QuickBooks Invoice Flag",
         "Quote Files",
+        "Quote Types",
         "Record a Payment",
         "Send Emails",
         "Work Trackers",
@@ -127,6 +130,50 @@ describe("permission matrix", () => {
       expect(row?.roles.account_manager.note).toMatch(/quote PDF always stays attached/i);
     });
 
+    // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose QuickBooks invoice needs
+    // attention. Only an accountant sees it; an admin who is not an accountant does not.
+    it("has a QuickBooks Invoice Alerts row: full for an accountant, none for everyone else", () => {
+      const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Alerts");
+      expect(row?.category).toBe("Day to Day Operations");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "none",
+        account_manager: "none",
+        accountant: "full",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+      expect(row?.description).toMatch(/no longer matches the quote/i);
+      expect(row?.roles.accountant.note).toMatch(/deleted quotes excepted/i);
+    });
+
+    // docs/specs/qbo-invoice-11-counts-and-marks.md §5: the counts and marks join the notice.
+    it("says the alerts are also the red counts on the sidebar's Accountant item and the Need attention tab, and the red mark on a row", () => {
+      const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Alerts");
+      expect(row?.description).toBe(
+        "The red notice on a quote whose QuickBooks invoice needs attention, the red count on the Accountant entry of the sidebar and on the Need attention tab of the Accountant page, and the red mark on the quote's row in the lists. A quote needs attention when its invoice in QuickBooks no longer matches the quote.",
+      );
+      expect(row?.roles.accountant.level).toBe("full");
+      expect(row?.roles.accountant.note).toBe(
+        "Sees the notice on any quote with a QuickBooks invoice, and in the counts and marks, deleted quotes excepted.",
+      );
+    });
+
+    // docs/specs/qbo-invoice-10-need-attention-tab.md §5: the Need attention tab lists the same quotes,
+    // and an administrator can open it though they do not see the alerts.
+    it("tells an administrator that the Need attention tab lists the quotes the alerts are about", () => {
+      const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Alerts");
+      expect(row?.roles.admin.level).toBe("none");
+      expect(row?.roles.admin.note).toBe(
+        "Does not see the invoice alerts on the quote or in the counts and marks. The Need attention tab on the Accountant page lists the same quotes, and they can open it.",
+      );
+    });
+
     it("can neither create, edit, delete nor release a work tracker — and the matrix says so", () => {
       const note = accountant("Work Trackers")?.note ?? "";
       expect(accountant("Work Trackers")?.level).toBe("custom");
@@ -179,6 +226,13 @@ describe("permission matrix", () => {
       it("describes both tabs", () => {
         expect(row?.description).toMatch(/AR tab/);
         expect(row?.description).toMatch(/AR Deposits tab/);
+      });
+
+      // docs/specs/qbo-invoice-10-need-attention-tab.md §5.
+      it("describes the Need attention tab, which lists the quotes whose invoice no longer matches", () => {
+        expect(row?.description).toContain(
+          "A third tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
+        );
       });
 
       it("is no longer listed under Payment History, which only covers the Billing tab", () => {
@@ -586,6 +640,211 @@ describe("permission matrix", () => {
     it("only reads Events and Work Trackers — the dashboard shows them, nothing more", () => {
       expect(row("Events")?.level).toBe("read");
       expect(row("Work Trackers")?.level).toBe("read");
+    });
+  });
+
+  // docs/specs/qbo-invoice-03a-province-tax-codes.md §4: the QuickBooks page also holds the tax
+  // code of each Canadian province. Only an administrator maintains it; no role gains anything.
+  describe("Quickbooks Connections (province tax codes)", () => {
+    const connections = PERMISSIONS.find((p) => p.label === "Quickbooks Connections");
+
+    // docs/specs/qbo-invoice-03e-canadian-settings-cad-only.md §3: only a CAD connection has them.
+    it("tells an administrator they also set the tax code of every Canadian province, for each Canadian (CAD) connection", () => {
+      expect(connections?.roles.admin.level).toBe("full");
+      expect(connections?.roles.admin.note).toContain(
+        "also sets, for each Canadian (CAD) connection, the QuickBooks tax code to use for every Canadian province",
+      );
+    });
+
+    // docs/specs/qbo-invoice-03c-no-tax-code.md §4: and the code a Canadian invoice line carries
+    // when it has no tax.
+    it("tells an administrator they also set the 'no tax' code of a Canadian invoice", () => {
+      expect(connections?.roles.admin.note).toContain(
+        "the QuickBooks tax code that means 'no tax' on a Canadian invoice",
+      );
+    });
+
+    it("still keeps the page from every other role", () => {
+      for (const role of ROLE_ORDER.filter((r) => r !== "admin")) {
+        expect(connections?.roles[role].level, role).toBe("none");
+      }
+    });
+  });
+
+  // docs/specs/qbo-invoice-12a-quote-types-page.md §4: the Quote Types page assigns each quote type
+  // its QuickBooks Product/Service. An admin and an accountant open it; nobody else does.
+  describe("Quote Types (spec qbo-invoice-12a)", () => {
+    const row = PERMISSIONS.find((p) => p.label === "Quote Types");
+
+    it("is a Configuration row that answers for every role, right after Work Tracker Types", () => {
+      expect(row?.category).toBe("Configuration");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+      const labels = PERMISSIONS.map((p) => p.label);
+      expect(labels.indexOf("Quote Types")).toBe(labels.indexOf("Work Tracker Types") + 1);
+    });
+
+    // docs/specs/qbo-invoice-12c-manage-quote-types.md §4: an administrator also adds, renames and
+    // deletes the types, so the accountant, who only assigns Products/Services, is `custom`.
+    it("is full for an admin, custom for an accountant, and none for every other role", () => {
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "none",
+        accountant: "custom",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("describes the page: a Product/Service per quote type and QuickBooks connection, and that an administrator also adds, renames and deletes the types", () => {
+      expect(row?.description).toBe(
+        "This applies to the Quote Types page under Configuration, where each quote type (City, Corporate, Rural …) is assigned the QuickBooks Product/Service its invoice line is sold as, per QuickBooks connection. An administrator also adds, renames and deletes the types; a type that quotes or prices use cannot be deleted.",
+      );
+    });
+
+    it("tells an admin they can manage the types and assign, and an accountant they can only assign", () => {
+      expect(row?.roles.admin.note).toBe(
+        "Can add, rename and delete quote types (not one that quotes or prices use), and assign, change or clear the Product/Service of any quote type, per QuickBooks connection.",
+      );
+      expect(row?.roles.accountant.note).toBe(
+        "Can assign, change or clear the Product/Service of any quote type, per QuickBooks connection. Cannot add, rename or delete a quote type.",
+      );
+    });
+
+    it("tells every other role the page is hidden, in the wording of the neighbouring rows", () => {
+      const neighbour = PERMISSIONS.find((p) => p.label === "Work Tracker Types");
+      for (const role of [
+        "account_manager",
+        "developer",
+        "viewer",
+        "driver",
+        "maintainer",
+      ] as const) {
+        expect(row?.roles[role].level, role).toBe("none");
+        expect(row?.roles[role].note, role).toBeTruthy();
+      }
+      expect(row?.roles.maintainer.note).toBe(neighbour?.roles.maintainer.note);
+      expect(row?.roles.viewer.note).toBe(neighbour?.roles.viewer.note);
+      expect(row?.roles.driver.note).toBe(neighbour?.roles.driver.note);
+    });
+
+    it("names the page in the accountant's role description, and in the note that says what else is hidden", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).toContain(
+        "Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type.",
+      );
+      expect(
+        ROLE_DESCRIPTIONS.accountant.endsWith(
+          "Everything else on the web dashboard is hidden from this role.",
+        ),
+      ).toBe(true);
+      const hidden = PERMISSIONS.find((p) => p.label === "Quickbooks Connections");
+      expect(hidden?.roles.accountant.note).toMatch(/Quote Types page under Configuration/);
+    });
+  });
+
+  // docs/specs/qbo-invoice-07-card-buttons.md §5: the Create invoice and Update invoice buttons on
+  // the Billing tab are the first place a person can use the feature, so the matrix says who may.
+  describe("QuickBooks Invoice (create and update) (spec qbo-invoice-07)", () => {
+    const row = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice (create and update)");
+    const flagRow = PERMISSIONS.find((p) => p.label === "QuickBooks Invoice Flag");
+    const eventsRow = PERMISSIONS.find((p) => p.label === "Events");
+
+    it("is a Day to Day Operations row that answers for every role", () => {
+      expect(row?.category).toBe("Day to Day Operations");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+    });
+
+    it("is full for an admin and an accountant, and none for every other role", () => {
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "none",
+        accountant: "full",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("describes the buttons, and says the invoice is never sent to the client", () => {
+      expect(row?.description).toMatch(
+        /^The Create invoice and Update invoice buttons on the Billing tab of a quote or booking\. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data\. The invoice is saved in QuickBooks for the books and is never sent to the client\./,
+      );
+    });
+
+    // docs/specs/qbo-invoice-08-view-and-check.md §5: the description gains the two extra buttons and
+    // the check time; the levels do not change (the test of the levels above still holds).
+    it("spec 08: also describes View in QuickBooks, Check again and the check time", () => {
+      expect(row?.description).toMatch(
+        / A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked\./,
+      );
+    });
+
+    // docs/specs/qbo-invoice-12b-use-the-mapping.md §4: where the line's Product/Service comes from.
+    it("spec 12b: says the line's Product/Service is the one assigned on the Quote Types page, and that a type with none cannot be invoiced", () => {
+      expect(row?.description).toMatch(
+        / The line's Product\/Service is the one assigned to the quote's type on the Quote Types page; a quote whose type has none cannot be invoiced\.$/,
+      );
+    });
+
+    it("tells an admin and an accountant what they can do, and that Update asks first", () => {
+      expect(row?.roles.admin.note).toBe(
+        "Can create the invoice of any booked quote and update any invoice.",
+      );
+      expect(row?.roles.accountant.note).toBe(
+        "Can create the invoice of any booked quote, on a quote of any office, and update any invoice. Update always asks first.",
+      );
+    });
+
+    it("tells an account manager they cannot, and that they can still tick the flag", () => {
+      expect(row?.roles.account_manager.note).toBe(
+        "Cannot create or update a QuickBooks invoice. They can still tick the QuickBooks Invoice Flag.",
+      );
+      expect(row?.roles.viewer.note).toBe("Cannot create or update a QuickBooks invoice.");
+      expect(row?.roles.driver.note).toBe("Drivers only have access to the Driver Mobile App.");
+    });
+
+    it("keeps the developer note about quotes and the maintainer note of the other rows", () => {
+      expect(row?.roles.developer.note).toBe(flagRow?.roles.developer.note);
+      expect(row?.roles.maintainer.note).toBe(flagRow?.roles.maintainer.note);
+    });
+
+    it("no longer says the QuickBooks Invoice Flag pushes nothing to QuickBooks, and points to the new row", () => {
+      expect(flagRow?.description).not.toMatch(/does not push anything to QuickBooks/);
+      expect(flagRow?.description).toMatch(
+        /It is also ticked automatically when an invoice is created from the quote \(see QuickBooks Invoice \(create and update\)\)\.$/,
+      );
+    });
+
+    it("keeps the levels of the QuickBooks Invoice Flag row where they were", () => {
+      const levels = Object.fromEntries(
+        Object.entries(flagRow?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "full",
+        accountant: "full",
+        viewer: "read",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+    });
+
+    it("names the invoice in the accountant's role description and in their note on Events", () => {
+      expect(ROLE_DESCRIPTIONS.accountant).toMatch(
+        /and create or update a quote's QuickBooks invoice/,
+      );
+      expect(eventsRow?.roles.accountant.note).toMatch(
+        /and the QuickBooks invoice \(see those rows\)/,
+      );
     });
   });
 });

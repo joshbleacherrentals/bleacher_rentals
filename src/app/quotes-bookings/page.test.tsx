@@ -4,12 +4,13 @@ import type {
   AccountsReceivableEvent,
   QuotesBookingsEvent,
 } from "@/features/quotesAndBookings/types";
+import type { InvoiceAttentionReason } from "@/features/quotesAndBookings/utils/invoiceAttention";
 
 // The page is wired to Next routing, PowerSync and the office currencies.
 // Those are stubbed; what is under test is that the page is All Events only — no tab bar, and
 // the AR balances are never asked for (they live on /accountant).
-const { mockSearchParams, mockArData, mockFilterPanel, mockListData, mockPermissions } = vi.hoisted(
-  () => ({
+const { mockSearchParams, mockArData, mockFilterPanel, mockListData, mockPermissions, mockAlerts } =
+  vi.hoisted(() => ({
     mockSearchParams: { current: new URLSearchParams() },
     // zustand reads its initial state under a static server render, so the store is replaced
     // rather than set; the page's hook reads it through selectors.
@@ -24,8 +25,9 @@ const { mockSearchParams, mockArData, mockFilterPanel, mockListData, mockPermiss
     mockArData: vi.fn(),
     mockFilterPanel: vi.fn(),
     mockListData: vi.fn(),
-  }),
-);
+    // What `useInvoiceAlerts` answers: the events that need attention and their reasons.
+    mockAlerts: vi.fn(),
+  }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -35,6 +37,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
   usePermissionsStore: (selector: (state: typeof mockPermissions.current) => unknown) =>
     selector(mockPermissions.current),
+}));
+vi.mock("@/features/quotesAndBookings/hooks/useInvoiceAlerts", () => ({
+  useInvoiceAlerts: () => mockAlerts(),
 }));
 vi.mock("@/features/quotesAndBookings/hooks/useQuotesAndBookingsData", () => ({
   useQuotesAndBookingsData: (...args: unknown[]) => {
@@ -104,8 +109,14 @@ function renderAt(query: string) {
   return renderToStaticMarkup(<QuotesBookingsPage />);
 }
 
+const alertsOf = (entries: [string, InvoiceAttentionReason[]][]) => ({
+  reasonsByEvent: new Map(entries),
+  count: entries.length,
+});
+
 beforeEach(() => {
   mockPermissions.current = { ...mockPermissions.current, roles: ["account_manager"] };
+  mockAlerts.mockReturnValue(alertsOf([]));
   mockArData.mockReset();
   mockFilterPanel.mockReset();
   mockListData.mockReset();
@@ -215,5 +226,41 @@ describe("/quotes-bookings + Create Quote", () => {
   it("does not take the list with it: a viewer still sees every event", () => {
     mockPermissions.current = { ...mockPermissions.current, roles: ["viewer"] };
     expect(renderAt("")).toContain("Fall Classic");
+  });
+});
+
+// docs/specs/qbo-invoice-11-counts-and-marks.md §4 (marks), §6 (S5, S7) and §8.
+describe("/quotes-bookings row marks", () => {
+  it("S5: marks the row of a quote that needs attention, with the short text of each reason", () => {
+    mockAlerts.mockReturnValue(alertsOf([["evt-1", ["dates", "totals"]]]));
+
+    const html = renderAt("");
+
+    expect(html).toContain('data-testid="invoice-attention-mark"');
+    expect(html).toContain('title="Dates do not match, Totals do not match"');
+    expect(html.indexOf("invoice-attention-mark")).toBeLessThan(
+      html.indexOf('title="Fall Classic"'),
+    );
+  });
+
+  it("S7: marks no row when the quote is not in the alerts (it has no invoice, or nothing differs)", () => {
+    mockAlerts.mockReturnValue(alertsOf([["evt-other", ["dates"]]]));
+
+    expect(renderAt("")).not.toContain("invoice-attention-mark");
+  });
+
+  it("marks nothing for a role the alerts are not for: they answer with an empty map", () => {
+    expect(renderAt("")).not.toContain("invoice-attention-mark");
+  });
+
+  it("leaves the list as it was: the same rows, columns and totals", () => {
+    mockAlerts.mockReturnValue(alertsOf([["evt-1", ["amount"]]]));
+
+    const html = renderAt("");
+
+    expect(html).toContain("Fall Classic");
+    expect(html).toContain("Subtotal");
+    expect(html).toContain("Dana Whitfield");
+    expect(html).not.toContain("Amount Due");
   });
 });

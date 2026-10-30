@@ -167,16 +167,24 @@ export async function updateQboConnectionDisplayName(
 }
 
 /**
- * Fetches all QBO connections (id, display_name, realm_id, qbo_tax_code_id — no tokens).
+ * Fetches all QBO connections (id, display_name, realm_id, qbo_tax_code_id, qbo_no_tax_code_id —
+ * no tokens).
  */
 export async function getAllQboConnections(): Promise<
-  { id: string; display_name: string; realm_id: string | null; qbo_tax_code_id: string | null; currency: string | null }[]
+  {
+    id: string;
+    display_name: string;
+    realm_id: string | null;
+    qbo_tax_code_id: string | null;
+    qbo_no_tax_code_id: string | null;
+    currency: string | null;
+  }[]
 > {
   const supabase = createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("QboConnections")
-    .select("id, display_name, realm_id, qbo_tax_code_id, currency")
+    .select("id, display_name, realm_id, qbo_tax_code_id, qbo_no_tax_code_id, currency")
     .order("display_name");
 
   if (error) {
@@ -224,5 +232,80 @@ export async function updateQboConnectionTaxCode(
   if (error) {
     console.error("Failed to update QBO connection tax code:", error);
     throw new Error(`Failed to update tax code: ${error.message}`);
+  }
+}
+
+/**
+ * Sets the "no tax" code of a QBO connection: the tax code a Canadian invoice line carries when it
+ * has no tax (docs/specs/qbo-invoice-03c-no-tax-code.md). Uses the signed-in user's token, so the
+ * policies of QboConnections decide who may call it.
+ */
+export async function updateQboConnectionNoTaxCode(
+  connectionId: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const supabase = createServerSupabaseClient();
+
+  const { error } = await supabase
+    .from("QboConnections")
+    .update({ qbo_no_tax_code_id: taxCodeId })
+    .eq("id", connectionId);
+
+  if (error) {
+    console.error("Failed to update QBO connection no-tax code:", error);
+    throw new Error(`Failed to update no-tax code: ${error.message}`);
+  }
+}
+
+/**
+ * Reads the QuickBooks tax code of each Canadian province for a connection
+ * (docs/specs/qbo-invoice-03a-province-tax-codes.md). RLS lets only an admin read the table.
+ */
+export async function getProvinceTaxCodes(
+  connectionId: string,
+): Promise<{ province: string; qbo_tax_code_id: string }[]> {
+  const supabase = createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("ProvinceQboTaxCodes")
+    .select("province, qbo_tax_code_id")
+    .eq("qbo_connection_uuid", connectionId)
+    .order("province");
+
+  if (error) {
+    console.error("Failed to fetch province tax codes:", error);
+    throw new Error(`Failed to fetch province tax codes: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
+/**
+ * Sets the QuickBooks tax code of one province for a connection, or removes it when the id is null.
+ */
+export async function setProvinceTaxCode(
+  connectionId: string,
+  province: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const supabase = createServerSupabaseClient();
+
+  const { error } =
+    taxCodeId === null
+      ? await supabase
+          .from("ProvinceQboTaxCodes")
+          .delete()
+          .eq("qbo_connection_uuid", connectionId)
+          .eq("province", province)
+      : await supabase
+          .from("ProvinceQboTaxCodes")
+          .upsert(
+            { qbo_connection_uuid: connectionId, province, qbo_tax_code_id: taxCodeId },
+            { onConflict: "qbo_connection_uuid,province" },
+          );
+
+  if (error) {
+    console.error("Failed to set province tax code:", error);
+    throw new Error(`Failed to set province tax code: ${error.message}`);
   }
 }

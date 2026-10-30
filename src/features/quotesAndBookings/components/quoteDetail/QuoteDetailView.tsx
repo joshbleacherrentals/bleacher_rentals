@@ -20,6 +20,7 @@ import { useLeadSubmission } from "../../hooks/useLeadSubmission";
 import { QuoteActionBar } from "./QuoteActionBar";
 import { QuoteStatusButton } from "./QuoteStatusButton";
 import { QuoteTabBar } from "./QuoteTabBar";
+import { InvoiceAttentionBanner } from "./invoice/InvoiceAttentionBanner";
 import { useQuotesBookingsCapabilities } from "../../hooks/useQuotesBookingsCapabilities";
 import { useGoBackOrTo } from "../../hooks/useGoBackOrTo";
 import { useEventCurrency } from "../../hooks/useEventCurrency";
@@ -235,6 +236,8 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
           </span>
         </div>
       )}
+      {/* Accountants only, and not on a deleted quote, which has its own notice. */}
+      {can.seeInvoiceAlerts && !isDeleted && <InvoiceAttentionBanner eventId={eventId} />}
 
       {/* Header */}
       <div className="bg-linear-to-r from-gray-800 to-gray-600 text-white px-6 py-4">

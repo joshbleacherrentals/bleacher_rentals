@@ -87,6 +87,9 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     // /work-trackers, and /accountant stays first so that it stays the landing page.
     // docs/specs/accountant-address-book.md §4: Companies & Contacts (/companies, /contacts)
     // follows /messages. docs/specs/accountant-team.md §6: /team follows it.
+    // docs/specs/accountant-address-book.md §4: /companies-contacts follows /messages.
+    // docs/specs/accountant-team.md §6: /team follows /companies-contacts.
+    // docs/specs/qbo-invoice-12a-quote-types-page.md §4: /qbo-quote-types follows /team.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
@@ -95,6 +98,7 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/companies",
       "/contacts",
       "/team",
+      "/qbo-quote-types",
       "/permissions",
       "/changelog",
     ]);
@@ -163,8 +167,34 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/work-tracker-types",
       "/quickbooks",
       "/stripe-connections",
+      "/zones",
+      "/pricing-matrix",
+      "/sales-offices",
+      "/terms-and-conditions",
     ]) {
       expect(allowedPaths).not.toContain(path);
+    }
+  });
+
+  // docs/specs/qbo-invoice-12a-quote-types-page.md §1, §4: the Quote Types page under Configuration
+  // is the only Configuration page an accountant opens.
+  it("lets an admin and an accountant open Quote Types, and nobody else", () => {
+    expect(canAccessPath(["admin"], "/qbo-quote-types")).toBe(true);
+    expect(canAccessPath(["accountant"], "/qbo-quote-types")).toBe(true);
+    for (const role of [
+      "account_manager",
+      "viewer",
+      "maintainer",
+      "developer",
+      "driver",
+    ] as const) {
+      expect(canAccessPath([role], "/qbo-quote-types"), role).toBe(false);
+    }
+  });
+
+  it("keeps an accountant out of every other Configuration page by URL", () => {
+    for (const path of ["/quickbooks", "/work-tracker-types", "/zones", "/pricing-matrix"]) {
+      expect(canAccessPath(["accountant"], path), path).toBe(false);
     }
   });
 
@@ -176,10 +206,10 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     }
   });
 
-  it("takes nothing away from an account manager who is also an accountant, and adds the Accountant page", () => {
+  it("takes nothing away from an account manager who is also an accountant, and adds the Accountant page and Quote Types", () => {
     const am = mergeRoleConfigs(["account_manager"]);
     const both = mergeRoleConfigs(["account_manager", "accountant"]);
-    expect(both.allowedPaths).toEqual([...am.allowedPaths, "/accountant"]);
+    expect(both.allowedPaths).toEqual([...am.allowedPaths, "/accountant", "/qbo-quote-types"]);
     expect(both.defaultRedirect).toBe("/dashboard");
   });
 

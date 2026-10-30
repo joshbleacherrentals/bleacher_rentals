@@ -7,6 +7,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { AccountsReceivableEvent, QuotesBookingsEvent } from "../types";
 import type { Currency } from "../types/quoteTypes";
 import { useAccountsReceivableData } from "../hooks/useAccountsReceivableData";
+import type { InvoiceAttentionReason } from "../utils/invoiceAttention";
 import { searchReceivables } from "../utils/searchEvents";
 import { sortEvents, type EventSort, type SortKey } from "../utils/sortEvents";
 import { clampPage, getTotalPages, slicePage, type PageSize } from "../utils/pagination";
@@ -42,11 +43,14 @@ type ListControls = {
 export function AccountsReceivableTabs({
   events,
   eventsLoading,
+  attention,
   ...controls
 }: ListControls & {
   /** The page's list, already narrowed by the Filter Panel and Show Deleted. */
   events: QuotesBookingsEvent[] | undefined;
   eventsLoading: boolean;
+  /** The reasons each event's QuickBooks invoice needs attention, by event id; marks the rows (spec 11). */
+  attention: Map<string, InvoiceAttentionReason[]>;
 }) {
   const { data, isLoading, error } = useAccountsReceivableData(events, controls.currencyOf);
 
@@ -59,6 +63,7 @@ export function AccountsReceivableTabs({
           tab={tab}
           rows={data?.[tab]}
           isLoading={eventsLoading || isLoading}
+          attention={attention}
           {...controls}
         />
       )}
@@ -79,10 +84,12 @@ function ReceivablesTable({
   onPageSizeChange,
   currencyOf,
   onRowClick,
+  attention,
 }: ListControls & {
   tab: ReceivablesTab;
   rows: AccountsReceivableEvent[] | undefined;
   isLoading: boolean;
+  attention: Map<string, InvoiceAttentionReason[]>;
 }) {
   const shown = useMemo(
     () => (rows ? sortEvents(searchReceivables(rows, searchQuery, currencyOf), sort) : rows),
@@ -101,7 +108,7 @@ function ReceivablesTable({
       key: "event_name",
       header: `Event Name (${totalItems})`,
       sortKey: "event_name",
-      render: (event) => <EventNameCell event={event} />,
+      render: (event) => <EventNameCell event={event} attention={attention.get(event.id)} />,
     },
     {
       key: "account_manager",
