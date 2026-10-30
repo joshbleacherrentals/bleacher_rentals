@@ -9,7 +9,7 @@ import {
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 /**
  * Daily (see vercel.json): keeps every mailbox of the domain watched and synced.

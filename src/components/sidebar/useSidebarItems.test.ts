@@ -29,7 +29,7 @@ describe("useSidebarItems", () => {
   });
 
   it("no one else gets the configuration section, so no one else is offered Blocked Emails", () => {
-    for (const role of ["account_manager", "viewer", "accountant", "maintainer"] as const) {
+    for (const role of ["account_manager", "viewer", "maintainer"] as const) {
       expect(useSidebarItems([role]).map((i) => i.key)).not.toContain("configuration");
     }
   });

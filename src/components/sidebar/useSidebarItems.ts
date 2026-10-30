@@ -287,6 +287,7 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Blocked Emails",
         href: "/blocked-emails",
         icon: MailX,
+        roles: ["admin"],
       },
     ],
   },

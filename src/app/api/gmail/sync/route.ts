@@ -7,7 +7,7 @@ import { mapWithConcurrency } from "@/lib/mapWithConcurrency";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 const MAILBOX_CONCURRENCY = 3;
 
