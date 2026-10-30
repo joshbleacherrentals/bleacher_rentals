@@ -33,6 +33,7 @@ describe("permission matrix", () => {
       );
       expect(granted.sort()).toEqual([
         "Accounts Receivable",
+        "Collections",
         "Companies & Contacts",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
@@ -235,6 +236,61 @@ describe("permission matrix", () => {
         const payments = PERMISSIONS.find((p) => p.label === "Payment History");
         expect(payments?.description).not.toMatch(/AR Deposits/);
         expect(payments?.description).not.toMatch(/Quotes & Bookings/);
+      });
+    });
+
+    // docs/specs/accountant-collections-09-design.md §4: the Collections tab and the invoice page.
+    describe("Collections", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Collections");
+
+      it("sits in Day to Day Operations, right after Accounts Receivable", () => {
+        const index = PERMISSIONS.findIndex((p) => p.label === "Collections");
+        expect(PERMISSIONS[index - 1]?.label).toBe("Accounts Receivable");
+        expect(row?.category).toBe("Day to Day Operations");
+      });
+
+      it("is full for an admin and an accountant, and hidden from the other five roles", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "full",
+          accountant: "full",
+          account_manager: "none",
+          viewer: "none",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("answers for all seven roles, with a note for each", () => {
+        expect(Object.keys(row?.roles ?? {}).sort()).toEqual(Object.keys(ROLE_LABELS).sort());
+        for (const [role, access] of Object.entries(row?.roles ?? {})) {
+          expect(access.note, role).toBeTruthy();
+        }
+      });
+
+      it("describes the tab, the invoice page and the tasks", () => {
+        expect(row?.description).toMatch(/Collections tab of the Accountant page/);
+        expect(row?.description).toMatch(/Show Not Due Yet/);
+        expect(row?.description).toMatch(/invoice page/);
+        expect(row?.description).toMatch(/closes by itself when the payment arrives/);
+      });
+
+      it("tells the accountant what they can do there", () => {
+        expect(accountant("Collections")?.note).toBe(
+          "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there.",
+        );
+      });
+
+      it("is mentioned in the role description and in Accounts Receivable", () => {
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(
+          /Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks\./,
+        );
+        expect(PERMISSIONS.find((p) => p.label === "Accounts Receivable")?.description).toMatch(
+          /The Accountant page opens on the Collections tab\./,
+        );
       });
     });
 

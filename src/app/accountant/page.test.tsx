@@ -71,6 +71,10 @@ vi.mock("@/features/quotesAndBookings/components/FilterPanel", () => ({
     return null;
   },
 }));
+// The Collections tab has its own tests; here only whether the page draws it.
+vi.mock("@/features/accountantCollections/components/CollectionsTab", () => ({
+  CollectionsTab: () => <div data-testid="collections-tab" />,
+}));
 vi.mock("@/features/quotesAndBookings/hooks/useUserNames", () => ({
   useUserNames: () => new Map([["am-1", "Dana Whitfield"]]),
 }));
@@ -172,8 +176,8 @@ describe("/accountant", () => {
     expect(html).not.toContain("Create Quote");
   });
 
-  it("has the Show Deleted switch", () => {
-    expect(renderAt("")).toContain("Show Deleted");
+  it("has the Show Deleted switch on the AR tabs", () => {
+    expect(renderAt("tab=ar")).toContain("Show Deleted");
   });
 
   it("carries no scorecard banner, even from a scorecard link", () => {
@@ -182,12 +186,14 @@ describe("/accountant", () => {
 });
 
 describe("/accountant tabs", () => {
-  it("offers AR, AR Deposits and Need attention, in that order, and nothing else", () => {
+  it("offers Collections, AR, AR Deposits and Need attention, in that order, and nothing else", () => {
     const html = renderAt("");
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tab"/g)).toHaveLength(4);
+    expect(html).toContain(">Collections<");
     expect(html).toContain(">AR<");
     expect(html).toContain(">AR Deposits<");
     expect(html).toContain(">Need attention<");
+    expect(html.indexOf(">Collections<")).toBeLessThan(html.indexOf(">AR<"));
     expect(html.indexOf(">AR<")).toBeLessThan(html.indexOf(">AR Deposits<"));
     expect(html.indexOf(">AR Deposits<")).toBeLessThan(html.indexOf(">Need attention<"));
     expect(html).not.toContain(">All Events<");
@@ -207,12 +213,14 @@ describe("/accountant tabs", () => {
     );
   });
 
-  it("opens AR from ?tab=ar, and no longer from a missing, unknown or old ?tab", () => {
+  it("opens AR from ?tab=ar", () => {
     expect(renderAt("tab=ar")).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
-    // Those open Collections (docs/specs/accountant-collections-07-collections-list.md §6); its tab
-    // and screen arrive with spec 09, so for now none of the three is selected.
-    for (const query of ["", "tab=bogus", "tab=all"]) {
-      expect(renderAt(query)).not.toMatch(/role="tab"[^>]*aria-selected="true"/);
+  });
+
+  it("opens Collections from ?tab=collections, and from a missing, unknown or old ?tab", () => {
+    // docs/specs/accountant-collections-07-collections-list.md §6.
+    for (const query of ["tab=collections", "", "tab=bogus", "tab=all"]) {
+      expect(renderAt(query)).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Collections</);
     }
   });
 
@@ -227,6 +235,50 @@ describe("/accountant tabs", () => {
       /role="tab"[^>]*aria-selected="true"[^>]*>Need attention</,
     );
     expect(renderAt("")).not.toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Need attention</);
+  });
+});
+
+// docs/specs/accountant-collections-09-design.md §1, §3 and §5 (S1).
+describe("/accountant Collections tab", () => {
+  it("draws the Collections body and none of the AR bodies", () => {
+    const html = renderAt("tab=collections");
+    expect(html).toContain('data-testid="collections-tab"');
+    expect(html).not.toContain("Event Name (1)");
+    expect(html).not.toContain("No invoice needs attention");
+  });
+
+  it("opens on Collections for a bare /accountant", () => {
+    expect(renderAt("")).toContain('data-testid="collections-tab"');
+  });
+
+  it("hides the filter sidebar, the Filter button, the search box, Show Deleted and the chips", () => {
+    const html = renderAt("tab=collections&q=acme&am=am-1&showDeleted=1");
+    expect(mockFilterPanel).not.toHaveBeenCalled();
+    expect(html).not.toContain("Search by name, invoice #");
+    expect(html).not.toContain("Show Deleted");
+    expect(html).not.toContain("Clear all filters");
+    expect(html).not.toContain("Filter");
+  });
+
+  it("keeps the filter controls on the AR tabs", () => {
+    for (const query of ["tab=ar", "tab=ar_deposits", "tab=need_attention"]) {
+      mockFilterPanel.mockClear();
+      const html = renderAt(query);
+      expect(mockFilterPanel, query).toHaveBeenCalled();
+      expect(html, query).toContain("Search by name, invoice #");
+      expect(html, query).toContain("Show Deleted");
+    }
+  });
+
+  it("does not draw the Collections body on the other tabs", () => {
+    for (const query of ["tab=ar", "tab=ar_deposits", "tab=need_attention"]) {
+      expect(renderAt(query), query).not.toContain('data-testid="collections-tab"');
+    }
+  });
+
+  it("leaves the number on Need attention, whichever tab is open", () => {
+    signInAs("accountant");
+    expect(renderAt("tab=collections")).toContain("accountant-tab-count-need-attention");
   });
 });
 
@@ -267,7 +319,7 @@ describe("/accountant receivables", () => {
   });
 
   it("uses the search placeholder the AR tabs have always had", () => {
-    expect(renderAt("")).toContain(
+    expect(renderAt("tab=ar")).toContain(
       "Search by name, invoice #, manager, date, amount due, remaining balance, contact, company...",
     );
   });
@@ -360,7 +412,7 @@ describe("/accountant applied filters", () => {
   });
 
   it("lists each applied filter, including Deleted only from Show Deleted", () => {
-    const html = renderAt("q=acme&am=am-1&office=office-1&showDeleted=1");
+    const html = renderAt("tab=ar&q=acme&am=am-1&office=office-1&showDeleted=1");
     for (const label of [
       "Search: “acme”",
       "Account Manager: Dana Whitfield",
@@ -444,7 +496,7 @@ describe("/accountant Need attention count", () => {
   it("leaves the tab names as they were", () => {
     const html = renderAt("tab=ar");
 
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tab"/g)).toHaveLength(4);
     expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
     expect(renderAt("tab=need_attention")).toMatch(
       /role="tab"[^>]*aria-selected="true"[^>]*>Need attention</,

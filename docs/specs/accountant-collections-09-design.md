@@ -1,9 +1,11 @@
 # Accountant Collections 09: all the screens, page access and the permissions matrix
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **09**. Needs: [06](accountant-collections-06-done-next-task.md),
+Status: **Implemented 2026-10-29** (Approved by the user). Build order: **09**. Needs:
+[06](accountant-collections-06-done-next-task.md),
 [07](accountant-collections-07-collections-list.md),
 [08](accountant-collections-08-invoice-data.md). Needed by: 10. Branch: `q4-sprint2-collections`.
+Everything built as written; the points where the build chose something the spec left open are in
+§10.
 
 ## 0. The feature in brief (the same in all ten specs)
 
@@ -290,3 +292,44 @@ specs, nothing in the database, sync rules or `AppSchema.ts`.
 
 - Previous / Next logic (spec 10), Send Email, assigning tasks, search, filters, paging, a Paid or
   Cancelled list, editing the design files.
+
+## 10. Implementation notes (where the build chose)
+
+Nothing below changes a type, the schema or a contract. Each is a reading to confirm.
+
+- **Tooltip wording.** §3 says "the sketch's wording". The sketch's texts (`Total after discounts but
+not including Taxes`, a `Remaining Payment` formula that adds discounts, "he/his") were already
+  tidied in the built design, so `MoneyCard` uses the design's texts (`MONEY_HELP`).
+- **Show Deleted on Collections.** §2 names the filter sidebar, Filter button, search and chips.
+  The Show Deleted switch sits in the same header action and only filters the AR tabs, so it is
+  hidden on Collections too. The Show Not Due Yet switch replaces it there.
+- **`N days overdue`** counts days literally (`1 day overdue`, `3 days overdue`, `95 days overdue`)
+  and not in the list's months wording; a figure of `0` reads `0 days overdue`.
+- **Empty texts not given by the spec:** the Task list says `No completed tasks yet.`; a schedule
+  with no installments says `No payment schedule set.`. With no open task the current-task card
+  keeps its heading and says `No open task`.
+- **Row as a link.** The link is in the Name cell and is stretched over the row (`after:absolute
+after:inset-0`), so the table keeps valid table markup. Keyboard focus lands on the Name link.
+- **Payment History** is labelled `Show deleted` and `Record payment` (the Billing tab's wording
+  and the design's), the header button is `Record Payment`. The date and the time are two lines, as
+  on the Billing tab. Deleted rows are numbered like the others (spec 08 `buildPaymentRows`).
+- **Calendar:** the previous-month arrow is off in today's month (every day there before today is
+  already off). The grid starts on Sunday, as drawn.
+- **Tests under the node environment.** The project has no DOM test library, so component tests
+  render static markup. A click, a typed character or a month arrow therefore cannot be exercised
+  there; their logic is exported as pure functions (`dueLabel`, `canSaveNextTask`,
+  `submitNextTask`, `shiftMonth`, `monthCells`, `nextSortState`) and tested directly, and the
+  screens take the same test seams as `BillingTab` (`initiallyShowDeleted`,
+  `initiallyOpenPaymentId`). The clicks are covered by the Playwright specs (S4, S6, S8).
+  These helpers are exported from the component files; no file beyond the 17 of §7 was added to
+  `src`, apart from the test data `components/invoiceFixtures.ts`.
+- **Playwright specs, written and not run:** `src/features/accountantCollections/e2e/`
+  `collections.accountant.spec.ts` (S1–S10, S12), `collections.admin.spec.ts`,
+  `collectionsAccess.am.spec.ts`, `collectionsAccess.viewer.spec.ts` (S11) and
+  `helpers/collectionsFixtures.ts` (service-role seeding). **Existing specs now out of date**
+  because a bare `/accountant` opens Collections, not AR (already true after spec 07):
+  `accountantPage.{admin,accountant,am,viewer}.spec.ts`, `qboNeedAttention.{admin,accountant}.spec.ts`,
+  `qboInvoiceCounts.accountant.spec.ts`. They were not edited (outside §7); each needs
+  `?tab=ar` (or `?tab=need_attention`) in its first `goto`.
+- **No database, sync-rule or `AppSchema.ts` change** in this spec; nothing to deploy outside the
+  repository.

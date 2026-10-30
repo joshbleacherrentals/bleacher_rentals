@@ -123,6 +123,23 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
   });
 
+  // docs/specs/accountant-collections-09-design.md §1: the invoice page is reached through the
+  // /accountant prefix, so no role gains or loses a path.
+  it("lets an accountant and an admin open the Collections invoice page, and no one else", () => {
+    expect(canAccessPath(["accountant"], "/accountant/invoice")).toBe(true);
+    expect(canAccessPath(["admin"], "/accountant/invoice")).toBe(true);
+    for (const role of [
+      "account_manager",
+      "developer",
+      "viewer",
+      "maintainer",
+      "driver",
+    ] as const) {
+      expect(canAccessPath([role], "/accountant/invoice"), role).toBe(false);
+      expect(canAccessPath([role], "/accountant"), role).toBe(false);
+    }
+  });
+
   it("shows the sidebar to an accountant", () => {
     expect(mergeRoleConfigs(["accountant"]).showSidebar).toBe(true);
   });
