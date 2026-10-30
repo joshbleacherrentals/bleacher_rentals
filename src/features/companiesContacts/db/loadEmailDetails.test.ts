@@ -95,7 +95,7 @@ describe("loadEmailDetails", () => {
     await loadEmailDetails(params);
 
     const url = new URL(fetchMock.mock.calls[0][0], "http://localhost");
-    expect(url.pathname).toBe("/api/dev/gmail-email");
+    expect(url.pathname).toBe("/api/gmail/email");
     expect(url.searchParams.get("mailbox")).toBe("paul@co.com");
     expect(url.searchParams.get("id")).toBe("1a15f4ce83c6ef44");
     expect(batches[0][0].parameters).toContain("Hi");
