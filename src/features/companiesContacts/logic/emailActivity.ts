@@ -19,7 +19,7 @@ export type ActivityEmail = {
   errorText: string | null;
 };
 
-/** The fields of /api/dev/gmail-contact-emails's `messages` that get saved. */
+/** The fields of /api/gmail/contact-emails's `messages` that get saved. */
 export type PulledEmail = {
   messageId: string | null;
   inReplyTo: string | null;

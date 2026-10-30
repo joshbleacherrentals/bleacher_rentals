@@ -1,29 +1,29 @@
-import { getEmailContent } from "@/features/gmail-integration/server/emailContent";
-import { resolveDomainMailboxes } from "@/features/gmail-integration/server/domainMailboxes";
-import { GmailApiError } from "@/features/gmail-integration/server/gmailMessages";
 import { isSafeSearchAddress } from "@/features/gmail-integration/server/contactEmails";
-import { requireAdmin } from "@/features/userAccess/logic/requireAdmin";
+import { getEmailContent } from "@/features/gmail-integration/server/emailContent";
+import { GmailApiError } from "@/features/gmail-integration/server/gmailMessages";
+import { isSavedContactEmail } from "@/features/gmail-integration/server/savedContactEmail";
+import { requireContactEmailReader } from "@/features/userAccess/logic/requireContactEmailAccess";
+import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Development-only: one whole email, read as the mailbox that holds it. Nothing is stored. 404 on
- * any deployed build.
+ * One whole email, read as the mailbox that holds it. This is what opening an email on a contact's
+ * page asks for when it has not been opened before; the page saves what comes back, this route
+ * stores nothing.
  *
- *   /api/dev/gmail-email?mailbox=paul@tpi-3.ca&id=1a15f4ce83c6ef44
+ * Who may call it: an admin, an account manager, an accountant or a viewer
+ * (requireContactEmailReader).
+ *
+ *   /api/gmail/email?mailbox=paul@bleacherrentals.com&id=1a15f4ce83c6ef44
  *     mailbox  the mailbox the copy lives in (EmailMessages.mailbox)
  *     id       Gmail's id for that copy (EmailMessages.google_id) - not the Message-ID header
- *     source   "users" to check the mailbox against the Users table instead of Google's directory
  *
- * The mailbox comes from the request, so it is checked against the domain's real mailbox list
- * first: this cannot be pointed at an alias or an address outside the company.
+ * The mailbox and id come from the request, so they must name an email that was saved onto a
+ * contact (see isSavedContactEmail), and Google is not asked about anything else.
  */
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
   try {
-    await requireAdmin();
+    await requireContactEmailReader();
 
     const params = req.nextUrl.searchParams;
     const mailbox = params.get("mailbox")?.trim().toLowerCase() ?? "";
@@ -35,13 +35,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Pass Gmail's message id as ?id=" }, { status: 400 });
     }
 
-    const { mailboxes, domain } = await resolveDomainMailboxes({
-      domain: mailbox.split("@")[1],
-      source: params.get("source") === "users" ? "users" : "directory",
-    });
-    if (!mailboxes.includes(mailbox)) {
+    if (!(await isSavedContactEmail(await createServiceRoleClient(), { mailbox, googleId: id }))) {
       return NextResponse.json(
-        { error: `${mailbox} is not a mailbox in ${domain}` },
+        { error: "That mailbox has no email with that id on a contact" },
         { status: 404 },
       );
     }
@@ -57,7 +53,7 @@ export async function GET(req: NextRequest) {
         { status: 404 },
       );
     }
-    console.error("Gmail email dev error:", error);
+    console.error("Gmail email error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

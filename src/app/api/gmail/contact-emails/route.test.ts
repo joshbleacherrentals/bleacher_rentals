@@ -3,9 +3,9 @@ import { NextRequest } from "next/server";
 
 vi.mock("server-only", () => ({}));
 
-const requireAdmin = vi.fn();
-vi.mock("@/features/userAccess/logic/requireAdmin", () => ({
-  requireAdmin: () => requireAdmin(),
+const requireContactEmailPuller = vi.fn();
+vi.mock("@/features/userAccess/logic/requireContactEmailAccess", () => ({
+  requireContactEmailPuller: () => requireContactEmailPuller(),
 }));
 
 vi.mock("@/utils/supabase/server", () => ({
@@ -19,7 +19,6 @@ vi.mock("@/features/gmail-integration/server/blockedEmails", () => ({
 
 const resolveDomainMailboxes = vi.fn();
 vi.mock("@/features/gmail-integration/server/domainMailboxes", () => ({
-  parseMailboxSourceParams: () => ({ ok: true }),
   resolveDomainMailboxes: (...args: unknown[]) => resolveDomainMailboxes(...args),
 }));
 
@@ -32,11 +31,11 @@ vi.mock("@/features/gmail-integration/server/contactEmails", async (importOrigin
 import { GET } from "./route";
 
 const call = (query: string) =>
-  GET(new NextRequest(`http://localhost:3000/api/dev/gmail-contact-emails?${query}`));
+  GET(new NextRequest(`http://localhost:3000/api/gmail/contact-emails?${query}`));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  requireAdmin.mockResolvedValue(undefined);
+  requireContactEmailPuller.mockResolvedValue("clerk_1");
   resolveDomainMailboxes.mockResolvedValue({
     domain: "bleacherrentals.com",
     mailboxes: ["a@b.com"],
@@ -44,7 +43,20 @@ beforeEach(() => {
   pullContactEmails.mockResolvedValue({ messages: [], mailboxes: [] });
 });
 
-describe("GET /api/dev/gmail-contact-emails", () => {
+describe("GET /api/gmail/contact-emails", () => {
+  it("is refused to someone who may not pull, before anything is checked or searched", async () => {
+    requireContactEmailPuller.mockRejectedValue(
+      new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    );
+
+    const res = await call("email=customer@xyz.com");
+
+    expect(res.status).toBe(403);
+    expect(checkBlockedCustomerEmail).not.toHaveBeenCalled();
+    expect(resolveDomainMailboxes).not.toHaveBeenCalled();
+    expect(pullContactEmails).not.toHaveBeenCalled();
+  });
+
   it("refuses a listed address before anything is asked of Google", async () => {
     checkBlockedCustomerEmail.mockResolvedValue({ status: "blocked", reason: "listed" });
 
@@ -90,6 +102,7 @@ describe("GET /api/dev/gmail-contact-emails", () => {
     const res = await call("email=customer@xyz.com");
 
     expect(res.status).toBe(200);
+    expect(resolveDomainMailboxes).toHaveBeenCalledWith({ source: "directory" });
     expect(pullContactEmails).toHaveBeenCalledWith(
       expect.objectContaining({ address: "customer@xyz.com", mailboxes: ["a@b.com"] }),
     );
