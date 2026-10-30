@@ -78,6 +78,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/companies",
       "/contacts",
       "/messages",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,
@@ -85,7 +86,13 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
   developer: {
     // All of /dev-tools: the developer's Dev Tools sidebar section lists every
     // page under it. Sync Health keeps its own page gate on top of this.
-    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction", "/dev-tools"],
+    allowedPaths: [
+      "/roadmap",
+      "/blocked-emails",
+      "/changelog",
+      "/driver-satisfaction",
+      "/dev-tools",
+    ],
     showSidebar: true,
   },
   viewer: {
@@ -111,6 +118,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/permissions",
       "/companies",
       "/contacts",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,
@@ -129,6 +137,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/damage-reports",
       "/repairs",
       "/permissions",
+      "/blocked-emails",
       "/changelog",
       "/assets",
       "/roadmap/backlog",
@@ -163,6 +172,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/team",
       "/qbo-quote-types",
       "/permissions",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,

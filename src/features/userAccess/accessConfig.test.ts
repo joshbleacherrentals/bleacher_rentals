@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { canAccessPath, mergeRoleConfigs } from "./accessConfig";
 
 describe("the Blocked Emails page", () => {
-  it("is open to an admin and to no other role", () => {
-    expect(canAccessPath(["admin"], "/blocked-emails")).toBe(true);
+  it("is open to every web role", () => {
     for (const role of [
+      "admin",
       "account_manager",
       "viewer",
       "accountant",
       "maintainer",
       "developer",
     ] as const) {
-      expect(canAccessPath([role], "/blocked-emails")).toBe(false);
+      expect(canAccessPath([role], "/blocked-emails")).toBe(true);
     }
   });
 });
@@ -100,6 +100,7 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/team",
       "/qbo-quote-types",
       "/permissions",
+      "/blocked-emails",
       "/changelog",
     ]);
   });

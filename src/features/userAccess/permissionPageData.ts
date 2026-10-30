@@ -658,20 +658,28 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Blocked Customer Emails",
     description:
-      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, so adding someone as a contact cannot expose their mail. Every address at bleacherrentals.com or tpi-3.ca is always blocked without being listed. A customer who writes to a blocked person can still be searched. The list is shared, but each address can only be edited or removed by the person who added it.",
-    category: "Configuration",
+      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, so adding someone as a contact cannot expose their mail. Every address at bleacherrentals.com or tpi-3.ca is always blocked without being listed. A customer who writes to a blocked person can still be searched. The list is shared and open to every role that uses the web app, in the sidebar right after Companies & Contacts: everyone can read it and add an address, but each address can only be edited or removed by the person who added it.",
+    category: "Day to Day Operations",
     roles: {
       admin: custom(
-        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not another administrator's. Enforced in the database by row-level security.",
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
       ),
-      account_manager: none("Account managers can't see this page, even on the sidebar."),
-      developer: none(
-        "Unable to even access this page, and developer is only meant to work on the developer roadmap.",
+      account_manager: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
       ),
-      viewer: none("Viewers do not have access to the web configuration pages."),
+      developer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      viewer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security. Being a viewer does not stop them adding an address: the list is a shared safety list, not operational data.",
+      ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      maintainer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      accountant: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
     },
   },
   {

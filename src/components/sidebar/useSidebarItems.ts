@@ -196,6 +196,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     icon: BookUser,
   },
   {
+    type: "button",
+    key: "blocked-emails",
+    label: "Blocked Emails",
+    href: "/blocked-emails",
+    icon: MailX,
+  },
+  {
     type: "section",
     key: "configuration",
     label: "Configuration",
@@ -281,14 +288,6 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         icon: Warehouse,
         roles: ["admin"],
       },
-      {
-        type: "button",
-        key: "blocked-emails",
-        label: "Blocked Emails",
-        href: "/blocked-emails",
-        icon: MailX,
-        roles: ["admin"],
-      },
     ],
   },
   {
@@ -371,6 +370,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -388,6 +388,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -398,10 +399,11 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "driver-calendar",
     "documentation",
   ],
-  developer: ["roadmap", "dev-tools"],
+  developer: ["roadmap", "dev-tools", "blocked-emails"],
   viewer: [
     "dashboard",
     "quotes-bookings",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -413,7 +415,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "documentation",
   ],
   driver: [],
-  maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
+  maintainer: ["dashboard", "quality-assurance", "documentation", "assets", "blocked-emails"],
   // docs/specs/accountant-address-book.md: Companies & Contacts, after Messages (ALL_ITEMS sets the order).
   // docs/specs/accountant-team.md: Team, after Quotes & Bookings.
   // docs/specs/qbo-invoice-12a-quote-types-page.md: Configuration, which holds only Quote Types for them.
@@ -424,6 +426,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "work-trackers",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "configuration",
     "documentation",
   ],

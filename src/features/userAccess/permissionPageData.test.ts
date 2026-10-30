@@ -29,12 +29,13 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Edit Team Members, and Quote Types", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Blocked Emails, Edit Team Members, and Quote Types", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
       expect(granted.sort()).toEqual([
         "Accounts Receivable",
+        "Blocked Customer Emails",
         "Companies & Contacts",
         "Connect Your Gmail",
         "Driver Payments & QuickBooks Bills",

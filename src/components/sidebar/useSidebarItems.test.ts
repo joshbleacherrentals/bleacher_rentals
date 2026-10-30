@@ -20,15 +20,25 @@ describe("useSidebarItems", () => {
     expect(keys).toContain("configuration");
   });
 
-  it("admin finds Blocked Emails in the configuration section", () => {
-    const configuration = useSidebarItems(["admin"]).find((i) => i.key === "configuration");
-    const children = configuration?.type === "section" ? configuration.children : [];
-    expect(children).toContainEqual(
-      expect.objectContaining({ key: "blocked-emails", href: "/blocked-emails" }),
-    );
+  it("every web role finds Blocked Emails as its own button, straight after Companies & Contacts", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "accountant",
+      "maintainer",
+      "developer",
+    ] as const) {
+      const items = useSidebarItems([role]);
+      expect(items).toContainEqual(
+        expect.objectContaining({ key: "blocked-emails", href: "/blocked-emails" }),
+      );
+    }
+    const keys = useSidebarItems(["admin"]).map((i) => i.key);
+    expect(keys.indexOf("blocked-emails")).toBe(keys.indexOf("companies-contacts") + 1);
   });
 
-  it("no one else gets the configuration section, so no one else is offered Blocked Emails", () => {
+  it("no one else gets the configuration section", () => {
     for (const role of ["account_manager", "viewer", "maintainer"] as const) {
       expect(useSidebarItems([role]).map((i) => i.key)).not.toContain("configuration");
     }
@@ -162,7 +172,7 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, the Configuration section and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, Blocked Emails, the Configuration section and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
@@ -171,6 +181,7 @@ describe("useSidebarItems", () => {
       "work-trackers",
       "messages",
       "companies-contacts",
+      "blocked-emails",
       "configuration",
       "documentation",
     ]);
@@ -211,10 +222,10 @@ describe("useSidebarItems", () => {
     ]);
 
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: Configuration, with Quote Types only.
-    const configuration = items[6];
+    const configuration = items[7];
     expect(configuration.type).toBe("section");
 
-    const docs = items[7];
+    const docs = items[8];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",
