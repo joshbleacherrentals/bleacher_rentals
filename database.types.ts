@@ -431,6 +431,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ContactQboCustomers": {
+                  Row: {
+                    "contact_uuid": string,"created_at": string,"id": string,"qbo_connection_uuid": string,"qbo_customer_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contact_uuid": string,"created_at"?: string,"id"?: string,"qbo_connection_uuid": string,"qbo_customer_id": string
+                  }
+                  Update: {
+                    "contact_uuid"?: string,"created_at"?: string,"id"?: string,"qbo_connection_uuid"?: string,"qbo_customer_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ContactQboCustomers_contact_uuid_fkey"
+      columns: ["contact_uuid"]
+isOneToOne: false
+      referencedRelation: "Contacts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ContactQboCustomers_qbo_connection_uuid_fkey"
+      columns: ["qbo_connection_uuid"]
+isOneToOne: false
+      referencedRelation: "QboConnections"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"Contacts": {
                   Row: {
                     "company_uuid": string | null,"created_at": string,"created_by_user_uuid": string | null,"default_venue_uuid": string | null,"deleted": boolean,"email": string | null,"first_name": string,"id": string,"last_name": string | null,"notes": string | null,"phone": string | null,"preferred_language": Database["public"]['Enums']["preferred_language"]
