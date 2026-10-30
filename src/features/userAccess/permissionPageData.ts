@@ -343,7 +343,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Unable to even access the page, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: read(
-        "This user can see companies, contacts and venues and every detail, but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
+        "This user can see companies, contacts and venues and every detail (including opening a contact's emails), but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
@@ -373,6 +373,27 @@ export const PERMISSIONS: PermissionEntry[] = [
       accountant: full(
         "Can send a reply to any contact's email, from their own mailbox, the same as an account manager.",
       ),
+    },
+  },
+  {
+    label: "Pull Emails from Gmail",
+    description:
+      "The Pull from Gmail button on a contact's Emails tab. It searches every company mailbox for the contact's address and saves what it finds onto the contact, so the emails from before the app started following the mailboxes show up. New emails are added to a contact automatically; nobody has to press the button for those. It never pulls an address at a company domain or on the Blocked Emails list. Enforced on the server, not just by the page.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can pull any contact's emails from Gmail."),
+      account_manager: full(
+        "Can pull any contact's emails from Gmail — they are the ones speaking to the client.",
+      ),
+      developer: none(
+        "The Companies & Contacts page is hidden from this role, so there is nothing to pull, and the server would refuse it anyway.",
+      ),
+      viewer: none(
+        "Pulling saves emails onto the contact, and viewers are read-only on operational data, so the server refuses it. They can still read the emails already on a contact and open them.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full("Can pull any contact's emails from Gmail, the same as an account manager."),
     },
   },
   {

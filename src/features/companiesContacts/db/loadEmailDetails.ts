@@ -48,7 +48,7 @@ async function fetchAndSaveDetails(params: LoadParams): Promise<void> {
   if (existing.length > 0) return;
 
   const res = await fetch(
-    `/api/dev/gmail-email?mailbox=${encodeURIComponent(params.mailbox)}&id=${encodeURIComponent(params.googleId)}`,
+    `/api/gmail/email?mailbox=${encodeURIComponent(params.mailbox)}&id=${encodeURIComponent(params.googleId)}`,
   );
   const body: { error?: string; text?: string | null; html?: string | null } | null = await res
     .json()
