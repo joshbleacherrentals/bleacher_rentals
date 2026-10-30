@@ -353,6 +353,29 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Send Emails",
+    description:
+      "Replying to a contact's email from their page (the Compose button on their Emails tab, and the Reply, Reply all and Forward buttons on an email, with their box). The email goes out from your own company mailbox, so it comes from you and nobody can send as someone else. That also means your account's email has to be a @bleacherrentals.com address, whatever your role: without one the buttons are dimmed and say so. Both rules are enforced on the server, not just by the page. In the development environment an email can only go to the addresses on the Allowed Emails list. This is separate from Send To Client, which sends a quote.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can send a reply to any contact's email, from their own mailbox."),
+      account_manager: full(
+        "Can send a reply to any contact's email, from their own mailbox — they are the ones speaking to the client.",
+      ),
+      developer: none(
+        "The Companies & Contacts page is hidden from this role, so there is nothing to reply to, and the server would refuse a send anyway.",
+      ),
+      viewer: none(
+        "Viewers can read a contact's emails, but the Reply, Reply all and Forward buttons are dimmed and say why when pointed at or clicked. The server refuses the send too.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can send a reply to any contact's email, from their own mailbox, the same as an account manager.",
+      ),
+    },
+  },
+  {
     label: "Work Trackers",
 
     description: "This applies to the Work Trackers Page and the Dashboard.",
@@ -608,6 +631,42 @@ export const PERMISSIONS: PermissionEntry[] = [
       account_manager: none("Account managers can't even see this page even on sidebar"),
       developer: none(
         "Unable to even access the pages where they can see Quickbooks connections, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Viewers do not have access to the web configuration pages."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Connect Your Gmail",
+    description:
+      "Connecting your own Gmail account to the app. Everyone with access to the web app can connect their own, whatever their role. The Google account you pick must be the one you log in with, and nobody can see or use anyone else's connection.",
+    category: "Configuration",
+    roles: {
+      admin: full("Can connect their own Gmail account."),
+      account_manager: full("Can connect their own Gmail account."),
+      developer: full("Can connect their own Gmail account."),
+      viewer: full(
+        "Viewers are read-only on operational data, but can still connect their own Gmail account.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: full("Can connect their own Gmail account."),
+      accountant: full("Can connect their own Gmail account."),
+    },
+  },
+  {
+    label: "Blocked Customer Emails",
+    description:
+      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, so adding someone as a contact cannot expose their mail. Every address at bleacherrentals.com or tpi-3.ca is always blocked without being listed. A customer who writes to a blocked person can still be searched. The list is shared, but each address can only be edited or removed by the person who added it.",
+    category: "Configuration",
+    roles: {
+      admin: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not another administrator's. Enforced in the database by row-level security.",
+      ),
+      account_manager: none("Account managers can't see this page, even on the sidebar."),
+      developer: none(
+        "Unable to even access this page, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: none("Viewers do not have access to the web configuration pages."),
       driver: none("Drivers only have access to the Driver Mobile App."),

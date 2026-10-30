@@ -29,6 +29,7 @@ import {
   ImageIcon,
   Receipt,
   MailCheck,
+  MailX,
   Tags,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
@@ -39,6 +40,8 @@ type SidebarButtonItem = {
   key: string;
   label: string;
   href: string;
+  /** Other path prefixes that keep this item highlighted, for a section spread over several pages. */
+  activePrefixes?: string[];
   icon: React.ComponentType<any>;
   /**
    * Which roles may see this button when it sits inside a section. Absent means everyone who can
@@ -188,7 +191,8 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     type: "button",
     key: "companies-contacts",
     label: "Companies & Contacts",
-    href: "/companies-contacts",
+    href: "/contacts",
+    activePrefixes: ["/companies"],
     icon: BookUser,
   },
   {
@@ -276,6 +280,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         href: "/storage-locations",
         icon: Warehouse,
         roles: ["admin"],
+      },
+      {
+        type: "button",
+        key: "blocked-emails",
+        label: "Blocked Emails",
+        href: "/blocked-emails",
+        icon: MailX,
       },
     ],
   },

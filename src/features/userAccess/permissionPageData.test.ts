@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { canSendEmail } from "./logic/canSendEmail";
+import type { WebRole } from "./logic/determineAccess";
 import { PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_LABELS, ROLE_ORDER } from "./permissionPageData";
 
 describe("permission matrix", () => {
@@ -34,6 +36,7 @@ describe("permission matrix", () => {
       expect(granted.sort()).toEqual([
         "Accounts Receivable",
         "Companies & Contacts",
+        "Connect Your Gmail",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
         "Edit Team Members",
@@ -46,6 +49,7 @@ describe("permission matrix", () => {
         "Quote Files",
         "Quote Types",
         "Record a Payment",
+        "Send Emails",
         "Work Trackers",
       ]);
     });
@@ -597,6 +601,26 @@ describe("permission matrix", () => {
     });
   });
 
+  // The Gmail connect endpoints (/api/google/connect and /callback) accept any active web user.
+  describe("Connect Your Gmail", () => {
+    const row = PERMISSIONS.find((p) => p.label === "Connect Your Gmail");
+
+    it("is open to every web role, and closed to drivers, who only have the mobile app", () => {
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "full",
+        accountant: "full",
+        maintainer: "full",
+        viewer: "full",
+        developer: "full",
+        driver: "none",
+      });
+    });
+  });
+
   // docs/specs/maintainer-dashboard-cells.md: a maintainer writes notes in dashboard cells,
   // and only edits the ones they wrote.
   describe("maintainer on the dashboard", () => {
@@ -822,5 +846,23 @@ describe("permission matrix", () => {
         /and the QuickBooks invoice \(see those rows\)/,
       );
     });
+  });
+});
+
+// The page tells people what they may do and the code decides it; this keeps the two from drifting.
+describe("Send Emails", () => {
+  const row = PERMISSIONS.find((p) => p.label === "Send Emails");
+
+  it("is granted to exactly the roles canSendEmail allows: admin, account manager and accountant", () => {
+    for (const role of Object.keys(ROLE_LABELS) as WebRole[]) {
+      expect(row?.roles[role].level !== "none", role).toBe(canSendEmail([role]));
+    }
+    expect(
+      (Object.keys(ROLE_LABELS) as WebRole[]).filter((role) => row?.roles[role].level === "full"),
+    ).toEqual(expect.arrayContaining(["admin", "account_manager", "accountant"]));
+  });
+
+  it("tells a viewer why the buttons are dimmed", () => {
+    expect(row?.roles.viewer.note).toMatch(/dimmed/i);
   });
 });

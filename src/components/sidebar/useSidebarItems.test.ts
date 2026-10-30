@@ -20,6 +20,20 @@ describe("useSidebarItems", () => {
     expect(keys).toContain("configuration");
   });
 
+  it("admin finds Blocked Emails in the configuration section", () => {
+    const configuration = useSidebarItems(["admin"]).find((i) => i.key === "configuration");
+    const children = configuration?.type === "section" ? configuration.children : [];
+    expect(children).toContainEqual(
+      expect.objectContaining({ key: "blocked-emails", href: "/blocked-emails" }),
+    );
+  });
+
+  it("no one else gets the configuration section, so no one else is offered Blocked Emails", () => {
+    for (const role of ["account_manager", "viewer", "accountant", "maintainer"] as const) {
+      expect(useSidebarItems([role]).map((i) => i.key)).not.toContain("configuration");
+    }
+  });
+
   it("admin lists Accountant immediately before Work Trackers", () => {
     const keys = useSidebarItems(["admin"]).map((i) => i.key);
     expect(keys.indexOf("accountant")).toBe(keys.indexOf("work-trackers") - 1);
@@ -190,7 +204,11 @@ describe("useSidebarItems", () => {
     const companiesContacts = items[5];
     expect(companiesContacts.type).toBe("button");
     expect("label" in companiesContacts && companiesContacts.label).toBe("Companies & Contacts");
-    expect("href" in companiesContacts && companiesContacts.href).toBe("/companies-contacts");
+    // Two pages (/contacts, /companies); the button opens the first and stays lit on both.
+    expect("href" in companiesContacts && companiesContacts.href).toBe("/contacts");
+    expect("activePrefixes" in companiesContacts && companiesContacts.activePrefixes).toEqual([
+      "/companies",
+    ]);
 
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: Configuration, with Quote Types only.
     const configuration = items[6];
