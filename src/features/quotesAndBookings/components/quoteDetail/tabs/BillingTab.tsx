@@ -20,6 +20,7 @@ import { formatDate, formatDateTime, formatTime } from "../../../utils/formatDat
 import { describeAppliedTo } from "../../../utils/describeAppliedTo";
 import { paymentMethodLabel } from "../../../types/paymentTypes";
 import { useUserNames } from "../../../hooks/useUserNames";
+import { InvoiceButtons } from "../invoice/InvoiceButtons";
 import dynamic from "next/dynamic";
 
 // A modal most visits to this tab never open, carrying a date control and its
@@ -213,7 +214,10 @@ export function BillingTab({
    * What the page worked out for this user on this quote; the tab never asks who they are.
    * `recordPayment` also governs editing and deleting a payment (spec 09, D2).
    */
-  can: Pick<QuotesBookingsCapabilities, "recordPayment" | "setQuickBooksFlag">;
+  can: Pick<
+    QuotesBookingsCapabilities,
+    "recordPayment" | "setQuickBooksFlag" | "manageQuickBooksInvoice"
+  >;
   /** Where the Show deleted switch starts. Off, unless a test or a caller says otherwise. */
   initiallyShowDeleted?: boolean;
 }) {
@@ -371,6 +375,9 @@ export function BillingTab({
           />
           <span className={can.setQuickBooksFlag ? "" : "text-gray-400"}>QuickBooks Invoice</span>
         </label>
+        {/* Drawn when the page says this user may, not drawn otherwise — like Record Payment, there
+            is no disabled state (docs/specs/qbo-invoice-07-card-buttons.md §4). */}
+        {can.manageQuickBooksInvoice && <InvoiceButtons eventId={quote.id} currency={currency} />}
       </div>
 
       {/* Payment Schedule */}

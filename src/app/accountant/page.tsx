@@ -1,9 +1,10 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { CountBadge } from "@/components/CountBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination } from "@/components/Pagination";
 import { useLayoutContext } from "@/contexts/LayoutContexts";
@@ -14,18 +15,24 @@ import {
 } from "@/features/quotesAndBookings/components/FilterSidebar";
 import { AccountsReceivableTabs } from "@/features/quotesAndBookings/components/AccountsReceivableTabs";
 import { ActiveFilterChips } from "@/features/quotesAndBookings/components/ActiveFilterChips";
+import { NeedAttentionTab } from "@/features/quotesAndBookings/components/NeedAttentionTab";
+import { useInvoiceAlerts } from "@/features/quotesAndBookings/hooks/useInvoiceAlerts";
 import { useListPageState } from "@/features/quotesAndBookings/hooks/useListPageState";
+import { useNeedAttentionData } from "@/features/quotesAndBookings/hooks/useNeedAttentionData";
 import { useQuotesAndBookingsData } from "@/features/quotesAndBookings/hooks/useQuotesAndBookingsData";
+import { useQuotesBookingsCapabilities } from "@/features/quotesAndBookings/hooks/useQuotesBookingsCapabilities";
 import { useOfficeCurrencies } from "@/features/quotesAndBookings/hooks/useOfficeCurrencies";
 import type { QuotesBookingsEvent } from "@/features/quotesAndBookings/types";
 import { pickEventCurrency } from "@/features/quotesAndBookings/utils/eventCurrency";
+import { needAttentionRows } from "@/features/quotesAndBookings/utils/needAttentionRows";
 import {
   ACCOUNTANT_TABS,
   parseListTab,
   tabUsesStatusFilter,
 } from "@/features/quotesAndBookings/utils/listTabs";
 import { RECEIVABLES_HELP } from "@/features/quotesAndBookings/utils/receivablesHelp";
-import { nextSort } from "@/features/quotesAndBookings/utils/sortEvents";
+import type { PageSize } from "@/features/quotesAndBookings/utils/pagination";
+import { nextSort, type SortKey } from "@/features/quotesAndBookings/utils/sortEvents";
 
 /**
  * The Accountant page: the AR and AR Deposits tabs, taken out of /quotes-bookings.
@@ -95,6 +102,21 @@ export default function AccountantPage() {
     [currencyByOfficeId],
   );
 
+  // The red dot on the AR rows whose QuickBooks invoice needs attention; empty for all but accountants.
+  const { reasonsByEvent } = useInvoiceAlerts();
+
+  // The number on the Need attention label: the quotes in that tab, after the Filter Panel and Show
+  // Deleted but not the search box. Accountants only (`seeInvoiceAlerts`).
+  const can = useQuotesBookingsCapabilities();
+  const { data: attentionRows } = useNeedAttentionData();
+  const needAttentionCount = useMemo(
+    () =>
+      can.seeInvoiceAlerts && data && attentionRows
+        ? needAttentionRows(data, attentionRows).length
+        : 0,
+    [can.seeInvoiceAlerts, data, attentionRows],
+  );
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -102,6 +124,22 @@ export default function AccountantPage() {
       </div>
     );
   }
+
+  // What every tab of the list shares: search, sort and paging are the page's state, and a row opens
+  // the quote.
+  const listControls = {
+    searchQuery,
+    sort,
+    onSort: (key: SortKey) => setSort((current) => nextSort(current, key)),
+    page,
+    pageSize,
+    onPageChange: goToPage,
+    onPageSizeChange: (size: PageSize) => {
+      setPageSize(size);
+      setPage(1);
+    },
+    onRowClick: (event: QuotesBookingsEvent) => router.push(`/quotes-bookings/${event.id}`),
+  };
 
   // -m-4 cancels the accountant layout's p-4 so the filter sidebar sits flush against the app
   // sidebar, header and window edge; the content column puts its own padding back.
@@ -197,6 +235,22 @@ export default function AccountantPage() {
                   focusable={false}
                 />
               </TabsTrigger>
+              <TabsTrigger value="need_attention">
+                Need attention
+                {needAttentionCount > 0 && (
+                  <CountBadge
+                    count={needAttentionCount}
+                    label={`${needAttentionCount} QuickBooks invoices need your attention`}
+                    tone="red"
+                    testId="accountant-tab-count-need-attention"
+                  />
+                )}
+                <InfoTooltip
+                  label="About the Need attention tab"
+                  content={RECEIVABLES_HELP.needAttention}
+                  focusable={false}
+                />
+              </TabsTrigger>
             </TabsList>
             <ActiveFilterChips
               filters={filters}
@@ -212,19 +266,11 @@ export default function AccountantPage() {
           <AccountsReceivableTabs
             events={data}
             eventsLoading={isLoading}
-            searchQuery={searchQuery}
-            sort={sort}
-            onSort={(key) => setSort((current) => nextSort(current, key))}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={goToPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
+            attention={reasonsByEvent}
+            {...listControls}
             currencyOf={currencyOf}
-            onRowClick={(event) => router.push(`/quotes-bookings/${event.id}`)}
           />
+          <NeedAttentionTab events={data} eventsLoading={isLoading} {...listControls} />
         </Tabs>
       </main>
     </div>

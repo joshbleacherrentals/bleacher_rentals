@@ -10,8 +10,11 @@ import {
   renameQboConnectionApi,
   fetchQboTaxCodes,
   setQboConnectionTaxCodeApi,
+  setQboConnectionNoTaxCodeApi,
+  isCanadianConnection,
   type QboTaxCode,
 } from "@/features/quickbooks-integration/api";
+import { ProvinceTaxCodes } from "@/features/quickbooks-integration/components/ProvinceTaxCodes";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -164,6 +167,15 @@ export default function QuickBooksPage() {
       await queryClient.invalidateQueries({ queryKey: ["qbo-connections"] });
     } catch (error) {
       createErrorToast(["Failed to update tax code", String(error)]);
+    }
+  };
+
+  const handleNoTaxCodeChange = async (connectionId: string, taxCodeId: string) => {
+    try {
+      await setQboConnectionNoTaxCodeApi(connectionId, taxCodeId || null);
+      await queryClient.invalidateQueries({ queryKey: ["qbo-connections"] });
+    } catch (error) {
+      createErrorToast(["Failed to update no-tax code", String(error)]);
     }
   };
 
@@ -321,6 +333,39 @@ export default function QuickBooksPage() {
                   </span>
                 )}
               </div>
+              {/* The two Canadian settings are drawn for a CAD connection only (spec 03e). */}
+              {isCanadianConnection(conn.currency) && (
+                <>
+                  {/* No-tax code Row: the code a Canadian invoice line carries when it has no tax */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-28 shrink-0">No-tax code</span>
+                    {taxCodesMap[conn.id] ? (
+                      <select
+                        value={conn.qbo_no_tax_code_id ?? ""}
+                        onChange={(e) => handleNoTaxCodeChange(conn.id, e.target.value)}
+                        data-testid={`no-tax-code-${conn.id}`}
+                        className="rounded border border-gray-300 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-greenAccent"
+                      >
+                        <option value="">— none —</option>
+                        {taxCodesMap[conn.id].map((tc) => (
+                          <option key={tc.id} value={tc.id}>
+                            {tc.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">
+                        {conn.qbo_no_tax_code_id
+                          ? conn.qbo_no_tax_code_id
+                          : healthMap[conn.id]?.status === "healthy"
+                            ? "Loading…"
+                            : "Check connection to load tax codes"}
+                      </span>
+                    )}
+                  </div>
+                  <ProvinceTaxCodes connectionId={conn.id} taxCodes={taxCodesMap[conn.id]} />
+                </>
+              )}
             </div>
           ))}
 

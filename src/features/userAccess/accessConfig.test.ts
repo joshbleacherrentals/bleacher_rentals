@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { canAccessPath, mergeRoleConfigs } from "./accessConfig";
 
+describe("the Blocked Emails page", () => {
+  it("is open to every web role", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "accountant",
+      "maintainer",
+      "developer",
+    ] as const) {
+      expect(canAccessPath([role], "/blocked-emails")).toBe(true);
+    }
+  });
+});
+
 describe("mergeRoleConfigs — the maintainer role", () => {
   it("lets a maintainer open the annual inspections queue", () => {
     const config = mergeRoleConfigs(["maintainer"]);
@@ -70,24 +85,43 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     const config = mergeRoleConfigs(["accountant"]);
     // docs/specs/accountant-quotes-11-accountant-internal-chat.md §4: /messages comes after
     // /work-trackers, and /accountant stays first so that it stays the landing page.
+    // docs/specs/accountant-address-book.md §4: Companies & Contacts (/companies, /contacts)
+    // follows /messages. docs/specs/accountant-team.md §6: /team follows it.
     // docs/specs/accountant-address-book.md §4: /companies-contacts follows /messages.
     // docs/specs/accountant-team.md §6: /team follows /companies-contacts.
+    // docs/specs/qbo-invoice-12a-quote-types-page.md §4: /qbo-quote-types follows /team.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
       "/work-trackers",
       "/messages",
-      "/companies-contacts",
+      "/companies",
+      "/contacts",
       "/team",
+      "/qbo-quote-types",
       "/permissions",
+      "/blocked-emails",
       "/changelog",
     ]);
   });
 
+  // Companies & Contacts is /companies and /contacts, and the contact profile at /contacts/<uuid>
+  // opens from the Contacts tab: the same four roles get all of it, and no other role does.
+  it("lets exactly the roles that have Companies & Contacts open its pages and a contact profile", () => {
+    const paths = ["/companies", "/contacts", "/contacts/00000000-0000-0000-0000-000000000000"];
+    for (const role of ["admin", "account_manager", "viewer", "accountant"] as const) {
+      for (const path of paths) expect(canAccessPath([role], path), `${role} ${path}`).toBe(true);
+    }
+    for (const role of ["developer", "maintainer", "driver"] as const) {
+      for (const path of paths) expect(canAccessPath([role], path), `${role} ${path}`).toBe(false);
+    }
+  });
+
   // docs/specs/accountant-address-book.md: the accountant creates, edits and soft-deletes companies,
-  // contacts and venues on /companies-contacts. Prefix match, like every other path.
+  // contacts and venues on /companies and /contacts. Prefix match, like every other path.
   it("lets an accountant open Companies & Contacts", () => {
-    expect(canAccessPath(["accountant"], "/companies-contacts")).toBe(true);
+    expect(canAccessPath(["accountant"], "/companies")).toBe(true);
+    expect(canAccessPath(["accountant"], "/contacts")).toBe(true);
   });
 
   // docs/specs/accountant-team.md: the accountant opens /team, sees every user and edits a driver's
@@ -134,8 +168,34 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/work-tracker-types",
       "/quickbooks",
       "/stripe-connections",
+      "/zones",
+      "/pricing-matrix",
+      "/sales-offices",
+      "/terms-and-conditions",
     ]) {
       expect(allowedPaths).not.toContain(path);
+    }
+  });
+
+  // docs/specs/qbo-invoice-12a-quote-types-page.md §1, §4: the Quote Types page under Configuration
+  // is the only Configuration page an accountant opens.
+  it("lets an admin and an accountant open Quote Types, and nobody else", () => {
+    expect(canAccessPath(["admin"], "/qbo-quote-types")).toBe(true);
+    expect(canAccessPath(["accountant"], "/qbo-quote-types")).toBe(true);
+    for (const role of [
+      "account_manager",
+      "viewer",
+      "maintainer",
+      "developer",
+      "driver",
+    ] as const) {
+      expect(canAccessPath([role], "/qbo-quote-types"), role).toBe(false);
+    }
+  });
+
+  it("keeps an accountant out of every other Configuration page by URL", () => {
+    for (const path of ["/quickbooks", "/work-tracker-types", "/zones", "/pricing-matrix"]) {
+      expect(canAccessPath(["accountant"], path), path).toBe(false);
     }
   });
 
@@ -147,10 +207,10 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     }
   });
 
-  it("takes nothing away from an account manager who is also an accountant, and adds the Accountant page", () => {
+  it("takes nothing away from an account manager who is also an accountant, and adds the Accountant page and Quote Types", () => {
     const am = mergeRoleConfigs(["account_manager"]);
     const both = mergeRoleConfigs(["account_manager", "accountant"]);
-    expect(both.allowedPaths).toEqual([...am.allowedPaths, "/accountant"]);
+    expect(both.allowedPaths).toEqual([...am.allowedPaths, "/accountant", "/qbo-quote-types"]);
     expect(both.defaultRedirect).toBe("/dashboard");
   });
 

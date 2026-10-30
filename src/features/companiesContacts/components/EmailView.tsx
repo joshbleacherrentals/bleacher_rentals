@@ -1,0 +1,177 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Forward, Reply, ReplyAll } from "lucide-react";
+import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
+import { discardUnsentEmail } from "../db/unsentEmail";
+import { useEmailSendBlock } from "../hooks/useEmailSendBlock";
+import { useEmailThread } from "../hooks/useEmailThread";
+import type { ReplyMode } from "../logic/emailReply";
+import { EmailActionButton } from "./EmailActionButton";
+import { EmailThreadMessage } from "./EmailThreadMessage";
+import { ReplyBox } from "./ReplyBox";
+
+/**
+ * An email and the rest of its thread, across the whole page: oldest at the top, newest at the
+ * bottom, each as a row that opens and closes on its own. The email from the URL starts open.
+ * Back (or Escape, unless typing) returns to the contact's emails. A footer of Reply, Reply all and
+ * Forward stays in view at the bottom of the page while the thread scrolls; each swaps the buttons
+ * for a box to write in, pinned to the bottom right (to the sender, to everyone on the email, or to
+ * whoever is picked, with the email's text in the box). Sending saves it into the thread at once,
+ * as an email that says it is being sent, and the buttons come back (there is no other way to put
+ * them back yet).
+ */
+export function EmailView({
+  contactUuid,
+  emailMessageUuid,
+}: {
+  contactUuid: string;
+  emailMessageUuid: string;
+}) {
+  const router = useRouter();
+  const backHref = `/contacts/${contactUuid}`;
+  const { messages, isLoading } = useEmailThread(emailMessageUuid);
+
+  // A reply answers the newest email that was really sent or received. One still being sent, or
+  // that failed, has no Message-ID yet to thread a reply under.
+  const replyTarget =
+    [...messages].reverse().find((message) => message.status === "success") ??
+    messages[messages.length - 1];
+
+  // Throws away an email that could not be sent. Discarding the one this page was opened on leaves
+  // nothing to show, so it goes back to the contact.
+  const discard = async (key: string) => {
+    try {
+      await discardUnsentEmail(key);
+    } catch (error: any) {
+      createErrorToastNoThrow([
+        `Could not discard the email: ${error?.message ?? "unknown error"}`,
+      ]);
+      return;
+    }
+    if (key === emailMessageUuid) router.push(backHref);
+  };
+
+  // Only an admin, account manager or accountant with a company email may send (the server checks
+  // both too). `sendBlock` is why this person cannot, or null when they can.
+  const sendBlock = useEmailSendBlock();
+
+  // Which button opened the reply box that replaces the footer's buttons (null while the buttons
+  // show), and whether that box is minimized to a small card.
+  const [replyMode, setReplyMode] = useState<ReplyMode | null>(null);
+  const [minimized, setMinimized] = useState(false);
+  // The footer's buttons, in order.
+  const footerActions = [
+    { label: "Reply", Icon: Reply, onClick: () => setReplyMode("reply") },
+    { label: "Reply all", Icon: ReplyAll, onClick: () => setReplyMode("replyAll") },
+    { label: "Forward", Icon: Forward, onClick: () => setReplyMode("forward") },
+  ];
+
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set([emailMessageUuid]));
+  const toggle = (key: string) =>
+    setOpen((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+
+  // Once the thread is in, bring the email that was opened into view: older ones sit above it.
+  const opened = useRef<HTMLDivElement>(null);
+  const scrolled = useRef(false);
+  useEffect(() => {
+    if (isLoading || scrolled.current || !opened.current) return;
+    scrolled.current = true;
+    opened.current.scrollIntoView({ block: "start" });
+  }, [isLoading, messages]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Not while typing a reply: Escape there must not throw the draft away.
+      const typing = event.target instanceof Element && event.target.closest("textarea, input");
+      if (event.key === "Escape" && !typing) router.push(backHref);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [router, backHref]);
+
+  const subject = messages.find((message) => message.key === emailMessageUuid)?.subject ?? "Email";
+
+  return (
+    <div className="flex min-h-full flex-col bg-white">
+      <div className="space-y-3 border-b border-gray-200 px-6 py-4">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to emails
+        </Link>
+        <h1 className="text-xl font-semibold text-gray-900">{subject}</h1>
+        {messages.length > 1 && (
+          <p className="text-sm text-gray-500">{messages.length} emails in this thread</p>
+        )}
+      </div>
+
+      {isLoading ? (
+        <p className="py-12 text-center text-sm text-gray-400">Loading...</p>
+      ) : messages.length === 0 ? (
+        <p className="py-12 text-center text-sm text-gray-400">This email is not saved.</p>
+      ) : (
+        messages.map((message) => (
+          <div key={message.key} ref={message.key === emailMessageUuid ? opened : undefined}>
+            <EmailThreadMessage
+              message={message}
+              open={open.has(message.key)}
+              onToggle={() => toggle(message.key)}
+              onDiscard={() => void discard(message.key)}
+            />
+          </div>
+        ))
+      )}
+
+      {/*
+        Both stick to the bottom of the scrolling page, and mt-auto keeps them at the bottom of a
+        short one. The footer's buttons are replaced by the reply box once Reply is pressed: a
+        square card at the bottom right (ml-auto): w-170 by h-170 (42.5rem), but never wider than the
+        page nor taller than the window (the max- limits), so it can always be seen whole. Minimized,
+        it is a w-64 card.
+        pl-18 is where the sender's name and the email's text start (see EmailMessageBody).
+      */}
+      {messages.length > 0 &&
+        (replyMode ? (
+          <div
+            className={`sticky bottom-4 z-10 ml-auto mr-6 mt-auto max-w-[calc(100%-3rem)] ${
+              minimized ? "w-64" : "h-170 max-h-[calc(100vh-8rem)] w-170"
+            }`}
+          >
+            <ReplyBox
+              contactUuid={contactUuid}
+              replyingTo={replyTarget}
+              mode={replyMode}
+              minimized={minimized}
+              onMinimize={() => setMinimized(true)}
+              onRestore={() => setMinimized(false)}
+              onSent={() => {
+                setReplyMode(null);
+                setMinimized(false);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="sticky bottom-0 z-10 mt-auto flex flex-wrap gap-2 border-t border-gray-200 bg-white pb-5 pl-18 pr-6 pt-3">
+            {footerActions.map(({ label, Icon, onClick }) => (
+              <EmailActionButton
+                key={label}
+                label={label}
+                Icon={Icon}
+                onClick={onClick}
+                sendBlock={sendBlock}
+              />
+            ))}
+          </div>
+        ))}
+    </div>
+  );
+}
