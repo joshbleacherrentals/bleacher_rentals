@@ -639,23 +639,6 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
-    label: "Connect Your Gmail",
-    description:
-      "Connecting your own Gmail account to the app. Everyone with access to the web app can connect their own, whatever their role. The Google account you pick must be the one you log in with, and nobody can see or use anyone else's connection.",
-    category: "Configuration",
-    roles: {
-      admin: full("Can connect their own Gmail account."),
-      account_manager: full("Can connect their own Gmail account."),
-      developer: full("Can connect their own Gmail account."),
-      viewer: full(
-        "Viewers are read-only on operational data, but can still connect their own Gmail account.",
-      ),
-      driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: full("Can connect their own Gmail account."),
-      accountant: full("Can connect their own Gmail account."),
-    },
-  },
-  {
     label: "Blocked Customer Emails",
     description:
       "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, so adding someone as a contact cannot expose their mail. Every address at bleacherrentals.com or tpi-3.ca is always blocked without being listed. A customer who writes to a blocked person can still be searched. The list is shared and open to every role that uses the web app, in the sidebar right after Companies & Contacts: everyone can read it and add an address, but each address can only be edited or removed by the person who added it.",

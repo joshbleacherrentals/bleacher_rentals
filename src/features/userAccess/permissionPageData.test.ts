@@ -37,7 +37,6 @@ describe("permission matrix", () => {
         "Accounts Receivable",
         "Blocked Customer Emails",
         "Companies & Contacts",
-        "Connect Your Gmail",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
         "Edit Team Members",
@@ -599,26 +598,6 @@ describe("permission matrix", () => {
 
     it("names the internal chat in the accountant's role description", () => {
       expect(ROLE_DESCRIPTIONS.accountant).toMatch(/internal chat/i);
-    });
-  });
-
-  // The Gmail connect endpoints (/api/google/connect and /callback) accept any active web user.
-  describe("Connect Your Gmail", () => {
-    const row = PERMISSIONS.find((p) => p.label === "Connect Your Gmail");
-
-    it("is open to every web role, and closed to drivers, who only have the mobile app", () => {
-      const levels = Object.fromEntries(
-        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
-      );
-      expect(levels).toEqual({
-        admin: "full",
-        account_manager: "full",
-        accountant: "full",
-        maintainer: "full",
-        viewer: "full",
-        developer: "full",
-        driver: "none",
-      });
     });
   });
 
