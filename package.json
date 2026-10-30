@@ -1,6 +1,6 @@
 {
   "name": "bleacher_rentals",
-  "version": "1.21.0",
+  "version": "1.21.1",
   "private": true,
   "scripts": {
     "generate-types-staging": "supabase gen types typescript --project-id \"sycrvbdpdbaczyfdwcnc\" --schema public > database.types.ts",
@@ -106,6 +106,7 @@
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
     "@uiw/react-codemirror": "^4.25.11",
+    "@vercel/oidc": "^4.0.5",
     "@vnedyalk0v/react19-simple-maps": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
