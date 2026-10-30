@@ -10,15 +10,22 @@ import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsS
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { useInvoiceData } from "../hooks/useInvoiceData";
 import { parseCollectionsListState } from "../utils/collectionsListState";
-import { collectionsHref, parseInvoiceTab, type InvoiceTab } from "../utils/invoiceUrl";
+import { useTaskNeighbours } from "../hooks/useTaskNeighbours";
+import {
+  collectionsHref,
+  invoiceHref,
+  parseInvoiceTab,
+  type InvoiceTab,
+} from "../utils/invoiceUrl";
 import { InvoiceHeader } from "./InvoiceHeader";
 import { InvoiceInformation } from "./InvoiceInformation";
 import { InvoiceTasks } from "./InvoiceTasks";
 
 /**
  * The invoice page of one event: sticky header and tabs, Information or Tasks, and the footer with
- * Previous Task and Next Task (drawn, inactive until spec 10). The event, the tab and the list's
- * order come from the URL. docs/specs/accountant-collections-09-design.md §3.
+ * Previous Task and Next Task (links to the neighbours fixed when the page opened). The event, the
+ * tab and the list's order come from the URL. docs/specs/accountant-collections-09-design.md §3 and
+ * accountant-collections-10-prev-next.md §3.
  */
 
 // Same reasoning as on the Billing tab: a form most visits never open.
@@ -35,8 +42,28 @@ const TABS: { id: InvoiceTab; label: string }[] = [
   { id: "tasks", label: "Tasks" },
 ];
 
-const FOOTER_BUTTON =
-  "inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 cursor-not-allowed opacity-50";
+const FOOTER_LINK =
+  "inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700";
+
+/** A link, or without a destination a dimmed stand-in that cannot be focused or followed. */
+function FooterLink({ href, children }: { href: string | null; children: React.ReactNode }) {
+  if (!href) {
+    return (
+      <span
+        role="link"
+        aria-disabled="true"
+        className={`${FOOTER_LINK} cursor-not-allowed opacity-50`}
+      >
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link href={href} className={`${FOOTER_LINK} hover:bg-gray-50`}>
+      {children}
+    </Link>
+  );
+}
 
 export function InvoicePage() {
   const router = useRouter();
@@ -47,12 +74,16 @@ export function InvoicePage() {
   const listState = useMemo(() => parseCollectionsListState(searchParams), [searchParams]);
 
   const data = useInvoiceData(eventId);
+  const neighbours = useTaskNeighbours({ eventId, listState });
   const can = useQuotesBookingsCapabilities();
   const userId = usePermissionsStore((s) => s.userId);
   const timezone = useTimezoneStore((s) => s.timezone);
   const [recordOpen, setRecordOpen] = useState(false);
 
   const backHref = collectionsHref(listState);
+  // Disabled while the neighbours are not ready, whatever ids they hold.
+  const neighbourHref = (id: string | null) =>
+    neighbours.isReady && id ? invoiceHref({ eventId: id, tab, listState }) : null;
 
   if (data.notFound) {
     return (
@@ -128,14 +159,14 @@ export function InvoicePage() {
         )}
 
         <div className="flex justify-between gap-4 border-t border-gray-200 pt-6">
-          <button type="button" disabled aria-disabled="true" className={FOOTER_BUTTON}>
+          <FooterLink href={neighbourHref(neighbours.previousId)}>
             <ArrowLeft className="size-[18px]" aria-hidden />
             Previous Task
-          </button>
-          <button type="button" disabled aria-disabled="true" className={FOOTER_BUTTON}>
+          </FooterLink>
+          <FooterLink href={neighbourHref(neighbours.nextId)}>
             Next Task
             <ArrowRight className="size-[18px]" aria-hidden />
-          </button>
+          </FooterLink>
         </div>
       </div>
 

@@ -1,7 +1,13 @@
 # Accountant Collections 10: Previous Task and Next Task
 
-Status: **Draft, written 2026-10-28, waiting for "Approved".** 0 open decisions; readings to
-confirm in §1. Build order: **10** (last). Needs: [07](accountant-collections-07-collections-list.md),
+Status: **Implemented 2026-10-30** (approved by the user the same day). Deviations, none changing a
+contract: (1) the repo has no DOM renderer, so `useTaskNeighbours.test.tsx` replaces `useState` with
+a slot that survives between calls (the pattern of `useUserAccess.test.ts`), instead of rendering the
+hook; (2) a disabled Previous / Next Task is drawn as `<span role="link" aria-disabled="true">`, with
+no `href` and no `tabindex`; (3) the Playwright scenarios are S13–S19 in
+`collections.accountant.spec.ts` plus one in `collections.admin.spec.ts`, written and **not run**;
+(4) the permissions matrix is unchanged: no role gained or lost anything. Original header: written
+2026-10-28; 0 open decisions; readings to confirm in §1. Build order: **10** (last). Needs: [07](accountant-collections-07-collections-list.md),
 [09](accountant-collections-09-design.md). Needed by: nothing. Branch: `q4-sprint2-collections`.
 
 ## 0. The feature in brief (the same in all ten specs)

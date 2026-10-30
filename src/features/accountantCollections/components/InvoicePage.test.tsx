@@ -3,9 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { InvoiceStatus } from "../utils/invoiceStatus";
 import { invoiceDataFixture } from "./invoiceFixtures";
 
-const { mockSearchParams, mockInvoice, mockCan } = vi.hoisted(() => ({
+const { mockSearchParams, mockInvoice, mockNeighbours, mockCan } = vi.hoisted(() => ({
   mockSearchParams: { current: new URLSearchParams() },
   mockInvoice: vi.fn(),
+  mockNeighbours: vi.fn(),
   mockCan: { current: { recordPayment: true } },
 }));
 
@@ -25,6 +26,9 @@ vi.mock("next/dynamic", () => ({
   default: () => () => null,
 }));
 vi.mock("../hooks/useInvoiceData", () => ({ useInvoiceData: (id: string) => mockInvoice(id) }));
+vi.mock("../hooks/useTaskNeighbours", () => ({
+  useTaskNeighbours: (args: unknown) => mockNeighbours(args),
+}));
 vi.mock("@/features/quotesAndBookings/hooks/useQuotesBookingsCapabilities", () => ({
   useQuotesBookingsCapabilities: () => mockCan.current,
 }));
@@ -49,6 +53,8 @@ const unescape = (html: string) => html.replace(/&amp;/g, "&");
 beforeEach(() => {
   mockInvoice.mockReset();
   mockInvoice.mockReturnValue(invoiceDataFixture());
+  mockNeighbours.mockReset();
+  mockNeighbours.mockReturnValue({ isReady: true, previousId: null, nextId: null });
   mockCan.current = { recordPayment: true };
 });
 
@@ -165,11 +171,78 @@ describe("InvoicePage: navigation", () => {
     const html = unescape(renderAt("id=evt-1&csort=amount&cdir=desc&cnotdue=1"));
     expect(html).toContain('href="/accountant?tab=collections&csort=amount&cdir=desc&cnotdue=1"');
   });
+});
 
-  it("draws Previous Task and Next Task, inactive until spec 10 connects them", () => {
+describe("InvoicePage: Previous Task and Next Task", () => {
+  const link = (html: string, label: string) =>
+    new RegExp(`<a[^>]*href="([^"]*)"[^>]*>(?:(?!</a>)[^])*${label}`).exec(html)?.[1];
+
+  const inactive = (html: string, label: string) =>
+    new RegExp(`<span[^>]*aria-disabled="true"[^>]*>(?:(?!</span>)[^])*${label}`).test(html) &&
+    !new RegExp(`<a[^>]*>(?:(?!</a>)[^])*${label}`).test(html);
+
+  it("asks the neighbours of the event in the URL for the list's state", () => {
+    renderAt("id=evt-1&tab=tasks&csort=amount&cdir=desc&cnotdue=1");
+    expect(mockNeighbours).toHaveBeenCalledWith({
+      eventId: "evt-1",
+      listState: { sort: "amount", dir: "desc", showNotDue: true },
+    });
+  });
+
+  it("links to the neighbours, keeping the tab and the three list parameters", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
+    const html = unescape(renderAt("id=evt-1&tab=tasks&csort=amount&cdir=desc&cnotdue=1"));
+    expect(link(html, "Previous Task")).toBe(
+      "/accountant/invoice?id=evt-0&tab=tasks&csort=amount&cdir=desc&cnotdue=1",
+    );
+    expect(link(html, "Next Task")).toBe(
+      "/accountant/invoice?id=evt-2&tab=tasks&csort=amount&cdir=desc&cnotdue=1",
+    );
+  });
+
+  it("opens the neighbour on Information when the page is on Information", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
+    const html = unescape(renderAt("id=evt-1"));
+    expect(link(html, "Next Task")).toBe("/accountant/invoice?id=evt-2&tab=info");
+  });
+
+  it("carries only the three list parameters", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
+    const html = unescape(renderAt("id=evt-1&tab=info&csort=overdue&page=3&q=zed"));
+    expect(link(html, "Next Task")).toBe("/accountant/invoice?id=evt-2&tab=info&csort=overdue");
+  });
+
+  it("disables Previous Task at the first row and Next Task at the last", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: null, nextId: "evt-2" });
+    let html = renderAt("id=evt-1");
+    expect(inactive(html, "Previous Task")).toBe(true);
+    expect(link(unescape(html), "Next Task")).toBeDefined();
+
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: null });
+    html = renderAt("id=evt-1");
+    expect(inactive(html, "Next Task")).toBe(true);
+    expect(link(unescape(html), "Previous Task")).toBeDefined();
+  });
+
+  it("disables both for an event outside the list", () => {
     const html = renderAt("id=evt-1");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>[^]*Previous Task/);
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>[^]*Next Task/);
+    expect(inactive(html, "Previous Task")).toBe(true);
+    expect(inactive(html, "Next Task")).toBe(true);
+  });
+
+  it("disables both until the neighbours are ready, even if ids are present", () => {
+    mockNeighbours.mockReturnValue({ isReady: false, previousId: "evt-0", nextId: "evt-2" });
+    const html = renderAt("id=evt-1");
+    expect(inactive(html, "Previous Task")).toBe(true);
+    expect(inactive(html, "Next Task")).toBe(true);
+  });
+
+  it("does not make a disabled one focusable", () => {
+    const html = renderAt("id=evt-1");
+    expect(html).not.toMatch(
+      /<span[^>]*tabindex[^>]*aria-disabled|<span[^>]*aria-disabled[^>]*tabindex/,
+    );
+    expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[^])*(?:Previous|Next) Task/);
   });
 });
 
