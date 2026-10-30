@@ -258,6 +258,12 @@ const EventsCols = {
   tax_amount_cents: column.integer,
   is_tax_overridden: column.integer,
   finance_contact_uuid: column.text,
+  // Written by the server (service role). The two timestamps are text locally.
+  qbo_invoice_id: column.text,
+  qbo_invoice_mismatch: column.integer,
+  qbo_invoice_mismatch_reasons: column.text,
+  qbo_invoice_checked_at: column.text,
+  qbo_invoice_check_failed_at: column.text,
   content_hash: column.text,
   contract_hash: column.text,
   venue_uuid: column.text,
@@ -954,6 +960,56 @@ const Contacts = new Table(ContactsCols, {
   indexes: { company_uuid: ["company_uuid"], default_venue_uuid: ["default_venue_uuid"] },
 });
 
+const EmailMessagesCols = {
+  created_at: column.text,
+  mailbox: column.text,
+  google_message_id: column.text,
+  google_id: column.text,
+  google_thread_id: column.text,
+  google_in_reply_to: column.text,
+  google_references: column.text,
+  from_address: column.text,
+  to_addresses: column.text,
+  cc_addresses: column.text,
+  subject: column.text,
+  date: column.text,
+  snippet: column.text,
+  direction: column.text,
+  status: column.text,
+  error_text: column.text,
+  email_message_details_uuid: column.text,
+} satisfies PowerSyncColsFor<"EmailMessages">;
+const EmailMessages = new Table(EmailMessagesCols, {
+  indexes: { google_message_id: ["google_message_id"], google_id: ["google_id"] },
+});
+
+const ContactEmailMessagesCols = {
+  created_at: column.text,
+  contact_uuid: column.text,
+  email_message_uuid: column.text,
+} satisfies PowerSyncColsFor<"ContactEmailMessages">;
+const ContactEmailMessages = new Table(ContactEmailMessagesCols, {
+  indexes: { contact_uuid: ["contact_uuid"], email_message_uuid: ["email_message_uuid"] },
+});
+
+const EmailMessageDetailsCols = {
+  created_at: column.text,
+  email_message_uuid: column.text,
+  body_text: column.text,
+  body_html: column.text,
+} satisfies PowerSyncColsFor<"EmailMessageDetails">;
+const EmailMessageDetails = new Table(EmailMessageDetailsCols, {
+  indexes: { email_message_uuid: ["email_message_uuid"] },
+});
+
+const BlockedCustomerEmailsCols = {
+  created_at: column.text,
+  updated_at: column.text,
+  created_by_user_uuid: column.text,
+  email: column.text,
+} satisfies PowerSyncColsFor<"BlockedCustomerEmails">;
+const BlockedCustomerEmails = new Table(BlockedCustomerEmailsCols);
+
 const EventAttachmentsCols = {
   created_at: column.text,
   event_uuid: column.text,
@@ -1396,6 +1452,10 @@ export const AppSchema = new Schema({
   BleacherTypes,
   Companies,
   Contacts,
+  EmailMessages,
+  ContactEmailMessages,
+  EmailMessageDetails,
+  BlockedCustomerEmails,
   EventAttachments,
   EventChangeLog,
   EventLineItems,

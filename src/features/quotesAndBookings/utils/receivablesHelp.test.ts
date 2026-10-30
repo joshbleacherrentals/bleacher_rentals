@@ -15,6 +15,13 @@ describe("RECEIVABLES_HELP", () => {
     );
   });
 
+  // docs/specs/qbo-invoice-10-need-attention-tab.md: the third tab of /accountant.
+  it("explains what the Need attention tab lists and what its Reason column says", () => {
+    expect(RECEIVABLES_HELP.needAttention).toBe(
+      "Lists quotes whose QuickBooks invoice no longer matches the quote. The Reason column shows what differs.",
+    );
+  });
+
   it("explains Amount Due", () => {
     expect(RECEIVABLES_HELP.amountDue).toBe(
       "The amount that should have been paid by today based on the payment schedule.",

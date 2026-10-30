@@ -3,6 +3,7 @@ import {
   createQboConnectionPlaceholder,
   deleteQboConnection,
   updateQboConnectionDisplayName,
+  updateQboConnectionNoTaxCode,
   updateQboConnectionTaxCode,
 } from "@/features/quickbooks-integration/db";
 import { requireAdmin } from "@/features/userAccess/logic/requireAdmin";
@@ -75,6 +76,20 @@ export async function PATCH(req: NextRequest) {
     // Handle tax code update
     if ("taxCodeId" in body) {
       await updateQboConnectionTaxCode(connectionId, body.taxCodeId ?? null);
+      return NextResponse.json({ success: true });
+    }
+
+    // The "no tax" code of a Canadian invoice line (docs/specs/qbo-invoice-03c-no-tax-code.md).
+    // A body that forgot the value must not clear it, so null is the only way to clear.
+    if ("noTaxCodeId" in body) {
+      const { noTaxCodeId } = body;
+      if (noTaxCodeId !== null && (typeof noTaxCodeId !== "string" || noTaxCodeId === "")) {
+        return NextResponse.json(
+          { error: "noTaxCodeId must be a tax code id or null" },
+          { status: 400 },
+        );
+      }
+      await updateQboConnectionNoTaxCode(connectionId, noTaxCodeId);
       return NextResponse.json({ success: true });
     }
 

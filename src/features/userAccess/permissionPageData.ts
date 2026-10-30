@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR and AR Deposits tabs, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -69,7 +69,7 @@ const MAINTAINER_NO_ACCESS_NOTE =
 // Quotes & Bookings read-only; docs/specs/accountant-address-book.md adds Companies & Contacts;
 // docs/specs/accountant-team.md adds the Team page. It has nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor. Everything else on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
 
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
@@ -97,14 +97,14 @@ export const PERMISSIONS: PermissionEntry[] = [
         "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
       accountant: read(
-        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments (see those rows).",
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments, and the QuickBooks invoice (see those rows).",
       ),
     },
   },
   {
     label: "QuickBooks Invoice Flag",
     description:
-      "The 'QuickBooks Invoice' checkbox on the Billing tab of a quote or booking, which records by hand that the event has been invoiced in QuickBooks. It is bookkeeping only — it does not push anything to QuickBooks.",
+      "The 'QuickBooks Invoice' checkbox on the Billing tab of a quote or booking, which records by hand that the event has been invoiced in QuickBooks. It is also ticked automatically when an invoice is created from the quote (see QuickBooks Invoice (create and update)).",
     category: "Day to Day Operations",
     roles: {
       admin: full("Can tick or untick the flag on any quote or booking."),
@@ -119,6 +119,51 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
         "Can tick or untick the flag on any quote or booking, deleted ones included. Apart from payments (see Record a Payment), it is the only thing an accountant can change on a quote or booking — the database refuses every other change.",
+      ),
+    },
+  },
+  // docs/specs/qbo-invoice-07-card-buttons.md §5: the Create invoice and Update invoice buttons.
+  {
+    label: "QuickBooks Invoice (create and update)",
+    description:
+      "The Create invoice and Update invoice buttons on the Billing tab of a quote or booking. Create makes the invoice in QuickBooks from the quote, for a booked quote that has none; Update replaces the invoice's content with the quote's current data. The invoice is saved in QuickBooks for the books and is never sent to the client. A quote that has an invoice also gets View in QuickBooks, which opens the invoice, and Check again, which re-compares the QuickBooks invoice with the quote; the card also shows when the quote was last checked. The line's Product/Service is the one assigned to the quote's type on the Quote Types page; a quote whose type has none cannot be invoiced.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can create the invoice of any booked quote and update any invoice."),
+      account_manager: none(
+        "Cannot create or update a QuickBooks invoice. They can still tick the QuickBooks Invoice Flag.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Cannot create or update a QuickBooks invoice."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can create the invoice of any booked quote, on a quote of any office, and update any invoice. Update always asks first.",
+      ),
+    },
+  },
+  // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose invoice needs attention;
+  // docs/specs/qbo-invoice-11-counts-and-marks.md §5: and the counts and marks.
+  {
+    label: "QuickBooks Invoice Alerts",
+    description:
+      "The red notice on a quote whose QuickBooks invoice needs attention, the red count on the Accountant entry of the sidebar and on the Need attention tab of the Accountant page, and the red mark on the quote's row in the lists. A quote needs attention when its invoice in QuickBooks no longer matches the quote.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: none(
+        "Does not see the invoice alerts on the quote or in the counts and marks. The Need attention tab on the Accountant page lists the same quotes, and they can open it.",
+      ),
+      account_manager: none("Does not see the invoice alerts."),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Does not see the invoice alerts."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Sees the notice on any quote with a QuickBooks invoice, and in the counts and marks, deleted quotes excepted.",
       ),
     },
   },
@@ -150,7 +195,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Accounts Receivable",
     description:
-      "The Accountant page: the AR tab lists booked events with an amount due that should already have been paid, the AR Deposits tab lists those due later. Each shows the Amount Due and the Remaining Balance. Filters, search and sorting apply to both.",
+      "The Accountant page: the AR tab lists booked events with an amount due that should already have been paid, the AR Deposits tab lists those due later. Each shows the Amount Due and the Remaining Balance. Filters, search and sorting apply to both. A third tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
     category: "Day to Day Operations",
     roles: {
       admin: read("Can open the Accountant page and see the balances of every booking."),
@@ -304,6 +349,29 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
         "Can create, edit and delete any company, contact or venue — the same as an account manager, including the Quote Language. The page has no Venues tab: a venue is added or edited from the Default Venue field of a contact. Delete hides the record; nothing is removed from the database.",
+      ),
+    },
+  },
+  {
+    label: "Send Emails",
+    description:
+      "Replying to a contact's email from their page (the Compose button on their Emails tab, and the Reply, Reply all and Forward buttons on an email, with their box). The email goes out from your own company mailbox, so it comes from you and nobody can send as someone else. That also means your account's email has to be a @bleacherrentals.com address, whatever your role: without one the buttons are dimmed and say so. Both rules are enforced on the server, not just by the page. In the development environment an email can only go to the addresses on the Allowed Emails list. This is separate from Send To Client, which sends a quote.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can send a reply to any contact's email, from their own mailbox."),
+      account_manager: full(
+        "Can send a reply to any contact's email, from their own mailbox — they are the ones speaking to the client.",
+      ),
+      developer: none(
+        "The Companies & Contacts page is hidden from this role, so there is nothing to reply to, and the server would refuse a send anyway.",
+      ),
+      viewer: none(
+        "Viewers can read a contact's emails, but the Reply, Reply all and Forward buttons are dimmed and say why when pointed at or clicked. The server refuses the send too.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can send a reply to any contact's email, from their own mailbox, the same as an account manager.",
       ),
     },
   },
@@ -558,7 +626,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Configuration",
     roles: {
       admin: full(
-        "Able to create, update, delete, and edit all Quickbooks connections in the Quickbooks page.",
+        "Able to create, update, delete, and edit all Quickbooks connections in the Quickbooks page, and also sets, for each Canadian (CAD) connection, the QuickBooks tax code to use for every Canadian province, and the QuickBooks tax code that means 'no tax' on a Canadian invoice.",
       ),
       account_manager: none("Account managers can't even see this page even on sidebar"),
       developer: none(
@@ -568,6 +636,50 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Connect Your Gmail",
+    description:
+      "Connecting your own Gmail account to the app. Everyone with access to the web app can connect their own, whatever their role. The Google account you pick must be the one you log in with, and nobody can see or use anyone else's connection.",
+    category: "Configuration",
+    roles: {
+      admin: full("Can connect their own Gmail account."),
+      account_manager: full("Can connect their own Gmail account."),
+      developer: full("Can connect their own Gmail account."),
+      viewer: full(
+        "Viewers are read-only on operational data, but can still connect their own Gmail account.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: full("Can connect their own Gmail account."),
+      accountant: full("Can connect their own Gmail account."),
+    },
+  },
+  {
+    label: "Blocked Customer Emails",
+    description:
+      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, so adding someone as a contact cannot expose their mail. Every address at bleacherrentals.com or tpi-3.ca is always blocked without being listed. A customer who writes to a blocked person can still be searched. The list is shared and open to every role that uses the web app, in the sidebar right after Companies & Contacts: everyone can read it and add an address, but each address can only be edited or removed by the person who added it.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      account_manager: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      developer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      viewer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security. Being a viewer does not stop them adding an address: the list is a shared safety list, not operational data.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      accountant: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
     },
   },
   {
@@ -587,6 +699,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  // docs/specs/qbo-invoice-12a-quote-types-page.md §4: the Product/Service of each quote type.
+  {
+    label: "Quote Types",
+    description:
+      "This applies to the Quote Types page under Configuration, where each quote type (City, Corporate, Rural …) is assigned the QuickBooks Product/Service its invoice line is sold as, per QuickBooks connection. An administrator also adds, renames and deletes the types; a type that quotes or prices use cannot be deleted.",
+    category: "Configuration",
+    roles: {
+      admin: full(
+        "Can add, rename and delete quote types (not one that quotes or prices use), and assign, change or clear the Product/Service of any quote type, per QuickBooks connection.",
+      ),
+      account_manager: none("Account managers can't even see this page even on sidebar"),
+      developer: none(
+        "Unable to even access the pages where they can see quote types, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Viewers do not have access to the web configuration pages."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: custom(
+        "Can assign, change or clear the Product/Service of any quote type, per QuickBooks connection. Cannot add, rename or delete a quote type.",
+      ),
     },
   },
   {

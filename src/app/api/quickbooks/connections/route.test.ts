@@ -14,14 +14,26 @@ vi.mock("@/features/userAccess/logic/requireAdminOrAccountant", () => ({
 }));
 
 const getAllQboConnections = vi.fn(async () => [
-  { id: "c1", display_name: "Main", realm_id: "r1", qbo_tax_code_id: null, currency: "CAD" },
+  {
+    id: "c1",
+    display_name: "Main",
+    realm_id: "r1",
+    qbo_tax_code_id: null,
+    qbo_no_tax_code_id: null,
+    currency: "CAD",
+  },
 ]);
+const updateQboConnectionTaxCode = vi.fn(async (_id: string, _code: string | null) => undefined);
+const updateQboConnectionNoTaxCode = vi.fn(async (_id: string, _code: string | null) => undefined);
 vi.mock("@/features/quickbooks-integration/db", () => ({
   getAllQboConnections: (...args: unknown[]) => (getAllQboConnections as any)(...args),
   createQboConnectionPlaceholder: vi.fn(async () => "new-id"),
   deleteQboConnection: vi.fn(async () => undefined),
   updateQboConnectionDisplayName: vi.fn(async () => undefined),
-  updateQboConnectionTaxCode: vi.fn(async () => undefined),
+  updateQboConnectionTaxCode: (...args: [string, string | null]) =>
+    updateQboConnectionTaxCode(...args),
+  updateQboConnectionNoTaxCode: (...args: [string, string | null]) =>
+    updateQboConnectionNoTaxCode(...args),
 }));
 
 import { GET, POST, PATCH, DELETE } from "./route";
@@ -88,6 +100,66 @@ describe("/api/quickbooks/connections", () => {
     expect(res.status).toBe(403);
     expect(requireAdmin).toHaveBeenCalledTimes(1);
     expect(requireAdminOrAccountant).not.toHaveBeenCalled();
+  });
+
+  // docs/specs/qbo-invoice-03c-no-tax-code.md §4: the "no tax" code of a connection, saved by an
+  // admin through the same PATCH as the Default Tax Code.
+  describe("PATCH noTaxCodeId", () => {
+    it("saves a tax code id, for an admin", async () => {
+      const res = await PATCH(jsonRequest("PATCH", { connectionId: "c1", noTaxCodeId: "2" }));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true });
+      expect(requireAdmin).toHaveBeenCalledTimes(1);
+      expect(updateQboConnectionNoTaxCode).toHaveBeenCalledWith("c1", "2");
+    });
+
+    it("clears the code on null", async () => {
+      const res = await PATCH(jsonRequest("PATCH", { connectionId: "c1", noTaxCodeId: null }));
+
+      expect(res.status).toBe(200);
+      expect(updateQboConnectionNoTaxCode).toHaveBeenCalledWith("c1", null);
+    });
+
+    it.each([
+      ["an empty string", ""],
+      ["a number", 2],
+      ["an object", {}],
+    ])("answers 400 for %s and saves nothing", async (_label, value) => {
+      const res = await PATCH(jsonRequest("PATCH", { connectionId: "c1", noTaxCodeId: value }));
+
+      expect(res.status).toBe(400);
+      expect(updateQboConnectionNoTaxCode).not.toHaveBeenCalled();
+    });
+
+    it("a body that forgot the value does not clear the code", async () => {
+      const res = await PATCH(jsonRequest("PATCH", { connectionId: "c1" }));
+
+      expect(res.status).toBe(400);
+      expect(updateQboConnectionNoTaxCode).not.toHaveBeenCalled();
+    });
+
+    it("answers 403 for anyone but an admin and saves nothing", async () => {
+      requireAdmin.mockImplementation(async () => {
+        throw forbidden();
+      });
+
+      const res = await PATCH(jsonRequest("PATCH", { connectionId: "c1", noTaxCodeId: "2" }));
+
+      expect(res.status).toBe(403);
+      expect(updateQboConnectionNoTaxCode).not.toHaveBeenCalled();
+    });
+
+    it("leaves the Default Tax Code and the rename as they were", async () => {
+      await PATCH(jsonRequest("PATCH", { connectionId: "c1", taxCodeId: "5" }));
+      expect(updateQboConnectionTaxCode).toHaveBeenCalledWith("c1", "5");
+
+      const rename = await PATCH(
+        jsonRequest("PATCH", { connectionId: "c1", displayName: "Renamed" }),
+      );
+      expect(rename.status).toBe(200);
+      expect(updateQboConnectionNoTaxCode).not.toHaveBeenCalled();
+    });
   });
 
   it("DELETE stays admin-only", async () => {

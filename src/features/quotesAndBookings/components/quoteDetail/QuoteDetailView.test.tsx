@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     error: Error | null;
   },
   submission: null as unknown,
+  can: {} as Record<string, boolean>,
 }));
 
 vi.mock("../../hooks/useQuoteDetail", () => ({ useQuoteDetail: () => mocks.state }));
@@ -51,7 +52,7 @@ vi.mock("../../hooks/useLeadSubmission", () => ({
 vi.mock("../../hooks/useEventCurrency", () => ({ useEventCurrency: () => "USD" }));
 vi.mock("../../hooks/useGoBackOrTo", () => ({ useGoBackOrTo: () => vi.fn() }));
 vi.mock("../../hooks/useQuotesBookingsCapabilities", () => ({
-  useQuotesBookingsCapabilities: () => ({}),
+  useQuotesBookingsCapabilities: () => mocks.can,
 }));
 vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
   usePermissionsStore: () => ({ userId: "user-1" }),
@@ -69,6 +70,12 @@ vi.mock("@/components/toasts/SuccessToast", () => ({ createSuccessToast: vi.fn()
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToast: vi.fn() }));
 vi.mock("../sendQuote/SendQuoteDialog", () => ({ SendQuoteDialog: () => null }));
 vi.mock("./QuoteActionBar", () => ({ QuoteActionBar: () => null }));
+// The banner has its own test (InvoiceAttentionBanner.test.tsx); here only whether the view draws it.
+vi.mock("./invoice/InvoiceAttentionBanner", () => ({
+  InvoiceAttentionBanner: ({ eventId }: { eventId: string }) => (
+    <div data-banner="invoice-attention" data-event={eventId} />
+  ),
+}));
 vi.mock("./tabs/ContractTab", () => ({ ContractTab: () => <div data-tab="contract" /> }));
 vi.mock("./tabs/BillingTab", () => ({ BillingTab: () => <div data-tab="billing" /> }));
 vi.mock("./tabs/FilesTab", () => ({ FilesTab: () => <div data-tab="files" /> }));
@@ -93,6 +100,7 @@ function quote(over: Record<string, unknown> = {}) {
 const render = () => renderToStaticMarkup(<QuoteDetailView eventId="ev-1" />);
 
 beforeEach(() => {
+  mocks.can = {};
   mocks.submission = null;
   mocks.state = { quote: null, isLoading: true, error: null };
 });
@@ -149,6 +157,63 @@ describe("QuoteDetailView", () => {
   it("shows the deleted banner for a deleted quote", () => {
     mocks.state = { quote: quote({ deleted: true }), isLoading: false, error: null };
     expect(render()).toContain("This quote was deleted");
+  });
+
+  // docs/specs/qbo-invoice-09-banner.md §4: the banner is drawn above the tab bar, only when the user
+  // may see the invoice alerts and the quote is not deleted.
+  describe("the QuickBooks invoice banner", () => {
+    const BANNER = 'data-banner="invoice-attention"';
+
+    it("is drawn for a user who may see the invoice alerts, for the quote on the card", () => {
+      mocks.can = { seeInvoiceAlerts: true };
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+      const html = render();
+
+      expect(html).toContain(BANNER);
+      expect(html).toContain('data-event="ev-1"');
+    });
+
+    it("is drawn above the header and the tab bar", () => {
+      mocks.can = { seeInvoiceAlerts: true };
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+      const html = render();
+
+      expect(html.indexOf(BANNER)).toBeGreaterThanOrEqual(0);
+      expect(html.indexOf(BANNER)).toBeLessThan(html.indexOf("<h1"));
+      expect(html.indexOf(BANNER)).toBeLessThan(html.indexOf('role="tablist"'));
+    });
+
+    it("S5: is not drawn for a user who may not see the invoice alerts (an admin alone)", () => {
+      mocks.can = { seeInvoiceAlerts: false, manageQuickBooksInvoice: true };
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+
+      expect(render()).not.toContain(BANNER);
+    });
+
+    it("is not drawn when the capability is absent", () => {
+      mocks.can = {};
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+
+      expect(render()).not.toContain(BANNER);
+    });
+
+    it("S7: is not drawn on a deleted quote, which keeps its own notice", () => {
+      mocks.can = { seeInvoiceAlerts: true };
+      mocks.state = { quote: quote({ deleted: true }), isLoading: false, error: null };
+      const html = render();
+
+      expect(html).not.toContain(BANNER);
+      expect(html).toContain("This quote was deleted");
+    });
+
+    it("is not drawn while the quote is loading or when there is none", () => {
+      mocks.can = { seeInvoiceAlerts: true };
+      mocks.state = { quote: null, isLoading: true, error: null };
+      expect(render()).not.toContain(BANNER);
+
+      mocks.state = { quote: null, isLoading: false, error: null };
+      expect(render()).not.toContain(BANNER);
+    });
   });
 
   it("does not read the quote once itself: that is the hook's job now", () => {

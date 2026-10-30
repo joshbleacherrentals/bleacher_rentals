@@ -77,12 +77,53 @@ export async function fetchQboClasses(connectionId: string): Promise<QboClass[]>
   return data.classes || [];
 }
 
+/** A QuickBooks Product/Service (Item) an invoice line can be sold as. */
+export type QboItem = {
+  id: string;
+  name: string;
+  fullyQualifiedName: string;
+  type: string;
+};
+
+/**
+ * Fetches the active Products/Services of a connection's company that an invoice line can use.
+ * Spec: docs/specs/qbo-invoice-12-event-type-services.md
+ */
+export async function fetchQboItems(connectionId: string): Promise<QboItem[]> {
+  const response = await fetch(
+    `/api/quickbooks/items?connectionId=${encodeURIComponent(connectionId)}`,
+  );
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Failed to fetch products and services" }));
+    throw new Error(error.error || "Failed to fetch products and services");
+  }
+
+  const data = await response.json();
+  return data.items || [];
+}
+
 export type QboConnection = {
   id: string;
   display_name: string;
   realm_id: string | null;
   qbo_tax_code_id: string | null;
+  qbo_no_tax_code_id: string | null;
+  /** The company's currency, recorded when the connection was authenticated; null until then. */
+  currency: string | null;
 };
+
+/**
+ * Whether a connection is a Canadian company: its recorded currency is exactly CAD. Only such a
+ * connection shows the tax code per province and the no-tax code on the QuickBooks page; one with
+ * any other currency, or none recorded yet, shows neither.
+ * Spec: docs/specs/qbo-invoice-03e-canadian-settings-cad-only.md
+ */
+export function isCanadianConnection(currency: string | null | undefined): boolean {
+  return currency === "CAD";
+}
 
 export type QboTaxCode = {
   id: string;
@@ -211,5 +252,69 @@ export async function setQboConnectionTaxCodeApi(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Failed to set tax code" }));
     throw new Error(error.error || "Failed to set tax code");
+  }
+}
+
+/**
+ * Sets the "no tax" code of a QBO connection: the tax code a Canadian invoice line carries when it
+ * has no tax (docs/specs/qbo-invoice-03c-no-tax-code.md).
+ */
+export async function setQboConnectionNoTaxCodeApi(
+  connectionId: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const response = await fetch("/api/quickbooks/connections", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionId, noTaxCodeId: taxCodeId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Failed to set no-tax code" }));
+    throw new Error(error.error || "Failed to set no-tax code");
+  }
+}
+
+export type ProvinceTaxCodeRow = {
+  province: string;
+  qbo_tax_code_id: string;
+};
+
+/**
+ * Fetches the stored QuickBooks tax code of each Canadian province for a connection.
+ */
+export async function fetchProvinceTaxCodes(connectionId: string): Promise<ProvinceTaxCodeRow[]> {
+  const response = await fetch(
+    `/api/quickbooks/province-tax-codes?connectionId=${encodeURIComponent(connectionId)}`,
+  );
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Failed to fetch province tax codes" }));
+    throw new Error(error.error || "Failed to fetch province tax codes");
+  }
+
+  const data = await response.json();
+  return data.provinceTaxCodes || [];
+}
+
+/**
+ * Sets the QuickBooks tax code of one Canadian province for a connection (null removes it).
+ */
+export async function setProvinceTaxCodeApi(
+  connectionId: string,
+  province: string,
+  taxCodeId: string | null,
+): Promise<void> {
+  const response = await fetch("/api/quickbooks/province-tax-codes", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionId, province, taxCodeId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Failed to set province tax code" }));
+    throw new Error(error.error || "Failed to set province tax code");
   }
 }
