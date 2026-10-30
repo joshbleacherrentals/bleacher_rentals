@@ -41,7 +41,7 @@ export function usePullContactEmails() {
     let mailboxes: { error?: string }[];
     try {
       const res = await fetch(
-        `/api/dev/gmail-contact-emails?email=${encodeURIComponent(params.address)}`,
+        `/api/gmail/contact-emails?email=${encodeURIComponent(params.address)}`,
       );
       const body: EndpointBody | null = await res.json().catch(() => null);
 

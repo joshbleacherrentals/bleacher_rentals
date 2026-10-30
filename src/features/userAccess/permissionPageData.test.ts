@@ -43,6 +43,7 @@ describe("permission matrix", () => {
         "Event Chat",
         "Events",
         "Payment History",
+        "Pull Emails from Gmail",
         "QuickBooks Invoice (create and update)",
         "QuickBooks Invoice Alerts",
         "QuickBooks Invoice Flag",

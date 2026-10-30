@@ -14,7 +14,7 @@ import { useBlockedCustomerEmails, type BlockedEmailRow } from "../hooks/useBloc
  *
  * Anyone can add an address, and everyone sees the whole list, but a row can only be edited or
  * removed by the person who added it (enforced by row-level security; the buttons below just hide
- * what would be refused). The check itself runs on the server, in /api/dev/gmail-contact-emails.
+ * what would be refused). The check itself runs on the server, in /api/gmail/contact-emails.
  */
 export default function BlockedEmailsPage() {
   const access = useUserAccess();

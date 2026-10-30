@@ -5,37 +5,34 @@ import {
   isValidDateBound,
   pullContactEmails,
 } from "@/features/gmail-integration/server/contactEmails";
-import {
-  parseMailboxSourceParams,
-  resolveDomainMailboxes,
-} from "@/features/gmail-integration/server/domainMailboxes";
-import { requireAdmin } from "@/features/userAccess/logic/requireAdmin";
+import { resolveDomainMailboxes } from "@/features/gmail-integration/server/domainMailboxes";
+import { requireContactEmailPuller } from "@/features/userAccess/logic/requireContactEmailAccess";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+// Every mailbox of the domain is searched, each as its own token, so give it room.
+export const maxDuration = 120;
+
 /**
- * Development-only: every email involving an address, searched in every mailbox of a Workspace
- * domain (listed by Google's Directory API; see /api/dev/gmail-mailboxes) and merged. Nothing is
- * stored. The mailboxes come from the domain, never the request. 404 on any deployed build.
+ * Every email involving an address, searched in every mailbox of the company domain (listed by
+ * Google's Directory API) and merged. This is what "Pull from Gmail" on a contact's Emails tab
+ * asks; the page saves what comes back, this route stores nothing. The mailboxes come from the
+ * domain, never the request.
+ *
+ * Who may call it: an admin, an account manager or an accountant (requireContactEmailPuller).
  *
  * An address at a company domain (bleacherrentals.com, tpi-3.ca), or on the BlockedCustomerEmails
  * list (the Blocked Emails page), is refused with a 403 before Google is asked anything, so a
  * colleague's mail cannot be read by adding them as a contact.
  *
- *   /api/dev/gmail-contact-emails?email=customer@xyz.com
+ *   /api/gmail/contact-emails?email=customer@xyz.com
  *     &limit=50             newest N per mailbox (1-500, default 50)
  *     &before=<seconds>     only older than this; use a mailbox's `nextBefore` to page back
  *     &after=2024/01/01     only newer than this (YYYY/MM/DD or epoch seconds)
- *     &domain=tpi-3.ca      search another domain than the configured one
- *     &source=users         list the mailboxes from the Users table instead of Google
  */
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
   try {
-    await requireAdmin();
+    await requireContactEmailPuller();
 
     const params = req.nextUrl.searchParams;
     const address = params.get("email")?.trim() ?? "";
@@ -73,10 +70,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const parsed = parseMailboxSourceParams(params);
-    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-
-    const { mailboxes, ...searched } = await resolveDomainMailboxes(parsed);
+    const { mailboxes, ...searched } = await resolveDomainMailboxes({ source: "directory" });
     if (mailboxes.length === 0) {
       throw new Error(`No mailboxes were found in ${searched.domain} to search`);
     }
@@ -98,7 +92,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     if (error instanceof Response) return error;
-    console.error("Gmail contact emails dev error:", error);
+    console.error("Gmail contact emails error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
