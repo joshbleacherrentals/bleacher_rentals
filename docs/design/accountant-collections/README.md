@@ -1,6 +1,6 @@
 # Accountant Collections: design
 
-Visual design for the **Collections** tab on `/accountant` and the `/accountant/invoice` page (Information and Tasks tabs, the "Done / Next Task" modal). Drawn on 2026-10-27 from the author's Excalidraw sketch. No spec or code exists yet.
+Visual design for the **Collections** tab on `/accountant` and the `/accountant/invoice` page. Drawn on 2026-10-27 from the author's Excalidraw sketch and revised on 2026-11-02: the Tasks tab was removed (its table moved into Information as Task History), and Messages, Files, Open PDF, View customer page and the floating New Task window were added.
 
 Published canvas (private, owner-only until shared): https://claude.ai/artifact/L86cRNaAorJoeACkkeWox7
 
@@ -11,8 +11,10 @@ These are the canvas source files, copied from the published version. They open 
 - `canvas.json`: the index (artboard positions, order, titles).
 - `Main.dc.html`: Collections tab. Interactive: Show Not Due Yet, sorting by Next Follow Up, Payment Overdue and Amount Overdue.
 - `CollectionsNotDue.dc.html`: `Main` with Show Not Due Yet on.
-- `Invoice.dc.html`: invoice page with both tabs and the modal.
-- `InvoiceTasks.dc.html`, `InvoiceTaskModal.dc.html`, `InvoiceTaskPicker.dc.html`: `Invoice` opened on Tasks, with the modal, and with the date picker open.
+- `Invoice.dc.html`: invoice page. Header (Open PDF, View customer page toggle, Record Payment, Status), the Information and Messages tabs, the New Task button with its floating window, and the customer view (Approved Quote, Signed Contract, Pay Invoice).
+- `InvoiceMessages.dc.html`: `Invoice` opened on Messages.
+- `InvoiceNewTask.dc.html`, `InvoiceNewTaskPicker.dc.html`: `Invoice` with the New Task window open, and with its date picker open.
+- `InvoiceCustomerQuote.dc.html`, `InvoiceCustomerContract.dc.html`, `InvoiceCustomerPay.dc.html`: `Invoice` with View customer page on, one file per customer tab.
 - `Contacts.dc.html`: the three contact card layouts (both contacts, no finance contact, no company info).
 
 ## Notes
