@@ -21,14 +21,14 @@ import {
 import { DoneNextTaskDialog } from "./DoneNextTaskDialog";
 import { InvoiceHeader } from "./InvoiceHeader";
 import { InvoiceInformation } from "./InvoiceInformation";
-import { InvoiceTasks } from "./InvoiceTasks";
 
 /**
- * The invoice page of one event: sticky header and tabs (Information, Tasks, Messages) with the
- * New Task button, the open tab, and the footer with Previous Task and Next Task (links to the
- * neighbours fixed when the page opened). The event, the tab and the list's order come from the
- * URL. docs/specs/accountant-collections-09-design.md §3, accountant-collections-10-prev-next.md
- * §3 and accountant-collections-12-tabs-and-messages.md §3.
+ * The invoice page of one event: sticky header and tabs (Information, Messages) with the New Task
+ * button, the open tab, and the footer with Previous Task and Next Task (links to the neighbours
+ * fixed when the page opened). The event, the tab and the list's order come from the URL.
+ * docs/specs/accountant-collections-09-design.md §3, accountant-collections-10-prev-next.md §3,
+ * accountant-collections-12-tabs-and-messages.md §3 and
+ * accountant-collections-13-task-history-and-files.md §3.
  */
 
 // Same reasoning as on the Billing tab: a form most visits never open.
@@ -42,7 +42,6 @@ const RecordPaymentDialog = dynamic(
 
 const TABS: { id: InvoiceTab; label: string }[] = [
   { id: "info", label: "Information" },
-  { id: "tasks", label: "Tasks" },
   { id: "messages", label: "Messages" },
 ];
 
@@ -172,9 +171,6 @@ export function InvoicePage() {
             recordedByUserUuid={userId}
             onRecordPayment={() => setRecordOpen(true)}
           />
-        )}
-        {tab === "tasks" && (
-          <InvoiceTasks eventId={eventId} tasks={data.tasks} today={data.today} />
         )}
         {tab === "messages" && (
           <div role="tabpanel" aria-label="Messages">

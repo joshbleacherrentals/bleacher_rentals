@@ -3,15 +3,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { InvoiceStatus } from "../utils/invoiceStatus";
 import { invoiceDataFixture } from "./invoiceFixtures";
 
-const { mockSearchParams, mockInvoice, mockNeighbours, mockCan, mockMessagesTab } = vi.hoisted(
-  () => ({
+const { mockSearchParams, mockInvoice, mockNeighbours, mockCan, mockMessagesTab, mockFiles } =
+  vi.hoisted(() => ({
     mockSearchParams: { current: new URLSearchParams() },
     mockInvoice: vi.fn(),
     mockNeighbours: vi.fn(),
     mockCan: { current: { recordPayment: true, useInternalChat: true } },
     mockMessagesTab: vi.fn(),
-  }),
-);
+    mockFiles: vi.fn(),
+  }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -41,6 +41,13 @@ vi.mock("@/features/quotesAndBookings/components/quoteDetail/tabs/MessagesTab", 
     return <div data-testid="messages-tab" />;
   },
 }));
+// The Files section reads the local database and Supabase Storage; its own test covers it.
+vi.mock("./InvoiceFiles", () => ({
+  InvoiceFiles: (props: unknown) => {
+    mockFiles(props);
+    return <section aria-label="Files" />;
+  },
+}));
 vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
   usePermissionsStore: (selector: (s: { userId: string }) => unknown) =>
     selector({ userId: "user-7" }),
@@ -66,6 +73,7 @@ beforeEach(() => {
   mockNeighbours.mockReturnValue({ isReady: true, previousId: null, nextId: null });
   mockCan.current = { recordPayment: true, useInternalChat: true };
   mockMessagesTab.mockReset();
+  mockFiles.mockReset();
 });
 
 describe("InvoicePage: Information", () => {
@@ -73,11 +81,11 @@ describe("InvoicePage: Information", () => {
     const html = renderAt("id=evt-1&tab=info");
     expect(mockInvoice).toHaveBeenCalledWith("evt-1");
     expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Information</);
-    expect(html).toMatch(/role="tab"[^>]*aria-selected="false"[^>]*>Tasks</);
+    expect(html).toMatch(/role="tab"[^>]*aria-selected="false"[^>]*>Messages</);
   });
 
-  it("opens Information for a stale or missing tab", () => {
-    for (const query of ["id=evt-1&tab=bogus", "id=evt-1"]) {
+  it("opens Information for a stale or missing tab, and for an old tab=tasks link", () => {
+    for (const query of ["id=evt-1&tab=bogus", "id=evt-1", "id=evt-1&tab=tasks"]) {
       expect(renderAt(query)).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Information</);
     }
   });
@@ -85,12 +93,14 @@ describe("InvoicePage: Information", () => {
   it("has every section of the design", () => {
     const html = renderAt("id=evt-1&tab=info");
     for (const section of [
+      "Task History",
       "Contact and finance contact",
       "Venue",
       "Event",
       "Money",
       "Payment Schedule",
       "Payment History",
+      "Files",
     ]) {
       expect(html).toContain(`aria-label="${section}"`);
     }
@@ -120,8 +130,10 @@ describe("InvoicePage: Information", () => {
     expect(html).not.toContain("Walter Deleted");
   });
 
-  it("does not draw the Tasks panel", () => {
-    expect(renderAt("id=evt-1&tab=info")).not.toContain("Current task due now");
+  it("does not draw the old Tasks panel", () => {
+    const html = renderAt("id=evt-1&tab=info");
+    expect(html).not.toContain("Current task due now");
+    expect(html).not.toContain("Task list");
   });
 });
 
@@ -167,7 +179,7 @@ describe("InvoicePage: header", () => {
 
   it("has no Send Email button, on either tab", () => {
     expect(renderAt("id=evt-1&tab=info")).not.toContain("Send Email");
-    expect(renderAt("id=evt-1&tab=tasks")).not.toContain("Send Email");
+    expect(renderAt("id=evt-1&tab=messages")).not.toContain("Send Email");
   });
 });
 
@@ -192,7 +204,7 @@ describe("InvoicePage: Previous Task and Next Task", () => {
     !new RegExp(`<a[^>]*>(?:(?!</a>)[^])*${label}`).test(html);
 
   it("asks the neighbours of the event in the URL for the list's state", () => {
-    renderAt("id=evt-1&tab=tasks&csort=amount&cdir=desc&cnotdue=1");
+    renderAt("id=evt-1&tab=messages&csort=amount&cdir=desc&cnotdue=1");
     expect(mockNeighbours).toHaveBeenCalledWith({
       eventId: "evt-1",
       listState: { sort: "amount", dir: "desc", showNotDue: true },
@@ -201,12 +213,12 @@ describe("InvoicePage: Previous Task and Next Task", () => {
 
   it("links to the neighbours, keeping the tab and the three list parameters", () => {
     mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
-    const html = unescape(renderAt("id=evt-1&tab=tasks&csort=amount&cdir=desc&cnotdue=1"));
+    const html = unescape(renderAt("id=evt-1&tab=messages&csort=amount&cdir=desc&cnotdue=1"));
     expect(link(html, "Previous Task")).toBe(
-      "/accountant/invoice?id=evt-0&tab=tasks&csort=amount&cdir=desc&cnotdue=1",
+      "/accountant/invoice?id=evt-0&tab=messages&csort=amount&cdir=desc&cnotdue=1",
     );
     expect(link(html, "Next Task")).toBe(
-      "/accountant/invoice?id=evt-2&tab=tasks&csort=amount&cdir=desc&cnotdue=1",
+      "/accountant/invoice?id=evt-2&tab=messages&csort=amount&cdir=desc&cnotdue=1",
     );
   });
 
@@ -256,30 +268,61 @@ describe("InvoicePage: Previous Task and Next Task", () => {
   });
 });
 
-describe("InvoicePage: Tasks", () => {
-  it("shows the task list and the current task", () => {
-    const html = renderAt("id=evt-1&tab=tasks");
-    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Tasks</);
-    expect(html).toContain("Task list");
-    expect(html).toContain("Current task due now");
-    expect(html).toContain("Done / Next Task");
-    expect(html).not.toContain('aria-label="Money"');
+// docs/specs/accountant-collections-13-task-history-and-files.md §3 and §5.
+describe("InvoicePage: Task History and Files", () => {
+  it("puts Task History first in Information and Files last", () => {
+    const html = renderAt("id=evt-1&tab=info");
+    const at = (needle: string) => html.indexOf(needle);
+    const sections = [
+      'aria-label="Task History"',
+      "Account Manager",
+      'aria-label="Contact and finance contact"',
+      'aria-label="Money"',
+      'aria-label="Payment Schedule"',
+      'aria-label="Payment History"',
+      'aria-label="Files"',
+    ].map(at);
+    expect(sections[0]).toBeGreaterThan(-1);
+    expect(sections).toEqual([...sections].sort((a, b) => a - b));
+    expect(new Set(sections).size).toBe(sections.length);
   });
 
-  it("says No open task for an event with none", () => {
-    mockInvoice.mockReturnValue(
-      invoiceDataFixture({
-        tasks: { open: null, completed: invoiceDataFixture().tasks.completed },
-      }),
+  it("shows the task history of the event, the open task last with its tag", () => {
+    const html = renderAt("id=evt-1&tab=info");
+    expect(html).toContain("Send a follow up message to the customer");
+    expect(html).toContain("Call to the customer and ask about payment");
+    expect(html.indexOf("Send a follow up")).toBeLessThan(html.indexOf("Call to the customer"));
+    expect(html.indexOf("Call to the customer")).toBeLessThan(
+      html.indexOf("Called again to follow up"),
     );
-    const html = renderAt("id=evt-1&tab=tasks");
-    expect(html).toContain("No open task");
-    expect(html).not.toContain("Done / Next Task");
+    expect(html).toContain(">Open<");
   });
 
-  it("still opens an event with no open task on Information", () => {
+  it("says No tasks yet. for an event with none, and still opens it", () => {
     mockInvoice.mockReturnValue(invoiceDataFixture({ tasks: { open: null, completed: [] } }));
-    expect(renderAt("id=evt-1&tab=info")).toContain("Riverside Charity Run");
+    const html = renderAt("id=evt-1&tab=info");
+    expect(html).toContain("No tasks yet.");
+    expect(html).toContain("Riverside Charity Run");
+  });
+
+  it("gives the Files section the event and the office's time zone", () => {
+    renderAt("id=evt-1&tab=info");
+    expect(mockFiles).toHaveBeenCalledWith({ eventId: "evt-1", timezone: "America/Toronto" });
+  });
+
+  it("has no Tasks tab and no Task list, Current task or Done / Next Task button", () => {
+    const html = renderAt("id=evt-1&tab=info");
+    expect(html).not.toMatch(/role="tab"[^>]*>Tasks</);
+    expect(html).not.toContain('aria-label="Tasks"');
+    expect(html).not.toContain("Done / Next Task");
+    expect(html).not.toContain("No open task");
+  });
+
+  it("shows neither of them on the Messages tab", () => {
+    const html = renderAt("id=evt-1&tab=messages");
+    expect(html).not.toContain('aria-label="Task History"');
+    expect(html).not.toContain('aria-label="Files"');
+    expect(mockFiles).not.toHaveBeenCalled();
   });
 });
 
@@ -290,9 +333,9 @@ describe("InvoicePage: tab bar", () => {
   const tablist = (html: string) =>
     /role="tablist"[^>]*>((?:(?!<\/div>)[^])*)<\/div>/.exec(html)?.[1] ?? "";
 
-  it("reads Information, Tasks, Messages, with New Task after them", () => {
+  it("reads Information, Messages, with New Task after them", () => {
     const html = renderAt("id=evt-1");
-    expect(tabLabels(html)).toEqual(["Information", "Tasks", "Messages"]);
+    expect(tabLabels(html)).toEqual(["Information", "Messages"]);
     expect(html.indexOf("New Task")).toBeGreaterThan(html.indexOf(">Messages<"));
   });
 
@@ -313,7 +356,7 @@ describe("InvoicePage: tab bar", () => {
 
   it.each([
     ["info", "Information"],
-    ["tasks", "Tasks"],
+    ["tasks", "Information"],
     ["messages", "Messages"],
   ])("selects %s when the URL says so", (tab, label) => {
     const html = renderAt(`id=evt-1&tab=${tab}`);
@@ -334,7 +377,7 @@ describe("InvoicePage: Messages", () => {
     });
   });
 
-  it("shows neither Information nor Tasks on the Messages tab", () => {
+  it("shows no Information on the Messages tab", () => {
     const html = renderAt("id=evt-1&tab=messages");
     expect(html).not.toContain('aria-label="Money"');
     expect(html).not.toContain("Current task due now");
@@ -387,15 +430,15 @@ describe("InvoicePage: New Task", () => {
   });
 
   it("is on every tab", () => {
-    for (const tab of ["info", "tasks", "messages"]) {
+    for (const tab of ["info", "messages"]) {
       expect(button(renderAt(`id=evt-1&tab=${tab}`)), tab).not.toBe("");
     }
   });
 
-  it("does not turn the Tasks tab's own Done / Next Task button into a second New Task", () => {
-    const html = renderAt("id=evt-1&tab=tasks");
+  it("is the only way to a next task: no second New Task or Done / Next Task button", () => {
+    const html = renderAt("id=evt-1&tab=info");
     expect(html.match(/New Task/g)).toHaveLength(1);
-    expect(html).toContain("Done / Next Task");
+    expect(html).not.toContain("Done / Next Task");
   });
 });
 

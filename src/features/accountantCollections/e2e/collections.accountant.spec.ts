@@ -1,7 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
+  addEventFile,
+  addTask,
   cleanupBookings,
   createOverdueBooking,
+  eventFilesOf,
   payInFull,
   tasksOf,
   type SeededBooking,
@@ -11,7 +14,9 @@ import {
  * The Collections tab and the invoice page as an accountant sees them
  * (docs/specs/accountant-collections-09-design.md §5, S1–S10 and S12; and
  * accountant-collections-10-prev-next.md §4, S13–S19; and
- * accountant-collections-12-tabs-and-messages.md §4, S20–S23).
+ * accountant-collections-12-tabs-and-messages.md §4, S20–S23; and
+ * accountant-collections-13-task-history-and-files.md §4, S24–S29, which also rewrote S6, S7, S9
+ * and S12 and the paths of S13–S19 now that the Tasks tab is gone).
  *
  * Written, not run locally (project rule). This project only exists once E2E_ACCOUNTANT_EMAIL is
  * configured (see playwright.config.ts). The data is written with the service role by
@@ -159,15 +164,16 @@ test.describe("Collections tab (accountant)", () => {
     });
   });
 
-  test("S6: Done / Next Task completes the old task and shows the new one; a task dated today stays in Collections, a later one leaves it", async ({
+  test("S6: New Task completes the old task and shows the new one in Task History; a task dated today stays in Collections, a later one leaves it", async ({
     page,
   }) => {
     const booking = await seed("tasks", { taskDueInDays: 0, taskNote: "First call" });
 
-    await page.goto(`/accountant/invoice?id=${booking.eventId}&tab=tasks`);
-    await expect(page.getByText("First call")).toBeVisible({ timeout: 60_000 });
+    await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+    const history = page.getByRole("region", { name: "Task History" });
+    await expect(history.getByText("First call")).toBeVisible({ timeout: 60_000 });
 
-    await page.getByRole("button", { name: "Done / Next Task" }).click();
+    await page.getByRole("button", { name: "New Task" }).click();
     const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
     await expect(dialog.getByRole("button", { name: /2 Days/ })).toBeVisible();
     const note = dialog.getByLabel("Note to self:");
@@ -180,7 +186,7 @@ test.describe("Collections tab (accountant)", () => {
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(dialog).toHaveCount(0);
     await expect(page).toHaveURL(/\/accountant\/invoice/);
-    await expect(page.getByText("Second call")).toBeVisible();
+    await expect(history.getByText("Second call")).toBeVisible();
 
     await expect
       .poll(async () => (await tasksOf(booking.eventId)).map((t) => t.completed))
@@ -207,8 +213,10 @@ test.describe("Collections tab (accountant)", () => {
     await expect(page.getByRole("row", { name: /E2E Payer/ })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText("Paid", { exact: true }).first()).toBeVisible({ timeout: 60_000 });
 
-    await page.getByRole("tab", { name: "Tasks" }).click();
-    await expect(page.getByText("No open task")).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.getByRole("region", { name: "Task History" }).getByText("Open", { exact: true }),
+    ).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "New Task" })).toBeDisabled();
   });
 
   test("S8: Payment History has Show deleted off beside Record payment; a row opens the payment dialog", async ({
@@ -239,12 +247,16 @@ test.describe("Collections tab (accountant)", () => {
     await expect(history.getByText("Stripe payments cannot be edited or deleted.")).toBeVisible();
   });
 
-  test("S9: an event with no open task opens; Tasks says No open task", async ({ page }) => {
+  test("S9: an event with no open task opens; Task History says No tasks yet. and New Task is disabled", async ({
+    page,
+  }) => {
     const booking = await seed("notask", { taskDueInDays: 0, withOpenTask: false });
 
-    await page.goto(`/accountant/invoice?id=${booking.eventId}&tab=tasks`);
-    await expect(page.getByText("No open task")).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByRole("button", { name: "Done / Next Task" })).toHaveCount(0);
+    await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+    const history = page.getByRole("region", { name: "Task History" });
+    await expect(history.getByText("No tasks yet.")).toBeVisible({ timeout: 60_000 });
+    await expect(history.getByText("Open", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "New Task" })).toBeDisabled();
   });
 
   test("S10: an event with no contacts still opens the invoice page", async ({ page }) => {
@@ -260,7 +272,7 @@ test.describe("Collections tab (accountant)", () => {
   test("S12: there is no Send Email button on either tab", async ({ page }) => {
     const booking = await seed("noemail", { taskDueInDays: 0 });
 
-    for (const tab of ["info", "tasks"]) {
+    for (const tab of ["info", "messages"]) {
       await page.goto(`/accountant/invoice?id=${booking.eventId}&tab=${tab}`);
       await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
         timeout: 60_000,
@@ -273,7 +285,7 @@ test.describe("Collections tab (accountant)", () => {
   // are consecutive cents, so no other event can sit between two seeded ones in an amount order.
   test.describe("Previous Task and Next Task", () => {
     const invoiceUrl = (eventId: string, query = "") =>
-      `/accountant/invoice?id=${eventId}&tab=tasks${query}`;
+      `/accountant/invoice?id=${eventId}&tab=info${query}`;
     const previous = (page: Page) => page.getByRole("link", { name: "Previous Task" });
     const next = (page: Page) => page.getByRole("link", { name: "Next Task" });
 
@@ -295,7 +307,7 @@ test.describe("Collections tab (accountant)", () => {
       await open(page, mid, query);
       await next(page).click();
       await expect(page).toHaveURL(new RegExp(`id=${small.eventId}`));
-      expect(params(page).get("tab")).toBe("tasks");
+      expect(params(page).get("tab")).toBe("info");
       expect(params(page).get("csort")).toBe("amount");
       expect(params(page).get("cdir")).toBe("desc");
 
@@ -361,7 +373,7 @@ test.describe("Collections tab (accountant)", () => {
       await open(page, mid, "&csort=amount&cdir=desc");
       await expect(next(page)).toHaveAttribute("href", /id=/);
 
-      await page.getByRole("button", { name: "Done / Next Task" }).click();
+      await page.getByRole("button", { name: "New Task" }).click();
       const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
       await dialog.getByRole("button", { name: "Save" }).click();
       await expect(dialog).toHaveCount(0);
@@ -412,12 +424,12 @@ test.describe("Messages tab and New Task (accountant)", () => {
     });
   }
 
-  test("S20: the tab bar order is Information, Tasks, Messages, New Task", async ({ page }) => {
+  test("S20: the tab bar order is Information, Messages, New Task", async ({ page }) => {
     const booking = await seed("bar", { taskDueInDays: 0 });
 
     await open(page, booking);
     const tabs = await page.getByRole("tab").allInnerTexts();
-    expect(tabs.map((t) => t.trim())).toEqual(["Information", "Tasks", "Messages"]);
+    expect(tabs.map((t) => t.trim())).toEqual(["Information", "Messages"]);
     await expect(newTask(page)).toBeVisible();
     // New Task is a button after the tabs, not one of them.
     await expect(page.getByRole("tab", { name: "New Task" })).toHaveCount(0);
@@ -493,7 +505,191 @@ test.describe("Messages tab and New Task (accountant)", () => {
     await expect
       .poll(async () => (await tasksOf(booking.eventId)).map((t) => t.completed))
       .toEqual([false, true]);
-    await page.getByRole("tab", { name: "Tasks" }).click();
-    await expect(page.getByText("Second call")).toBeVisible();
+    await page.getByRole("tab", { name: "Information" }).click();
+    await expect(
+      page.getByRole("region", { name: "Task History" }).getByText("Second call"),
+    ).toBeVisible();
+  });
+});
+
+// Task History and Files in Information
+// (docs/specs/accountant-collections-13-task-history-and-files.md §4, S24–S29).
+test.describe("Task History and Files (accountant)", () => {
+  const history = (page: Page) => page.getByRole("region", { name: "Task History" });
+  const files = (page: Page) => page.getByRole("region", { name: "Files" });
+
+  async function open(page: Page, booking: SeededBooking, query = "") {
+    await page.goto(`/accountant/invoice?id=${booking.eventId}${query}`);
+    await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
+      timeout: 60_000,
+    });
+  }
+
+  /** The text of each row of a table body, cells joined by " | ". */
+  const rowTexts = async (region: ReturnType<typeof history>) =>
+    (await region.locator("tbody tr").allInnerTexts()).map((row) =>
+      row
+        .split("\t")
+        .map((cell) => cell.trim())
+        .join(" | "),
+    );
+
+  test("S24: Information opens with Task History: completed oldest first, the open one last with Open; no tasks says No tasks yet.; no Tasks tab and ?tab=tasks opens Information", async ({
+    page,
+  }) => {
+    const booking = await seed("history", { taskDueInDays: 0, taskNote: "Third call" });
+    await addTask(booking.eventId, { dueInDays: -9, note: "First call", completed: true });
+    await addTask(booking.eventId, { dueInDays: -4, note: "Second call", completed: true });
+    const empty = await seed("history-empty", { taskDueInDays: 0, withOpenTask: false });
+
+    await open(page, booking);
+    await expect(history(page).locator("th")).toHaveText(["#", "Date", "Note"]);
+    const rows = await rowTexts(history(page));
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatch(/^1 \| \d+ days ago \| First call$/);
+    expect(rows[1]).toMatch(/^2 \| \d+ days ago \| Second call$/);
+    expect(rows[2]).toMatch(/^3 \| Due Today \| Third call\s*Open$/);
+    await expect(history(page).getByText("Open", { exact: true })).toHaveCount(1);
+    // Task History is the first section of Information.
+    const sections = page
+      .getByRole("tabpanel", { name: "Information" })
+      .locator(":scope > section");
+    await expect(sections.first()).toHaveAccessibleName("Task History");
+
+    await expect(page.getByRole("tab", { name: "Tasks" })).toHaveCount(0);
+    await page.goto(`/accountant/invoice?id=${booking.eventId}&tab=tasks`);
+    await expect(page.getByRole("tab", { name: "Information" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+      { timeout: 60_000 },
+    );
+    await expect(history(page)).toBeVisible();
+
+    await open(page, empty);
+    await expect(history(page).getByText("No tasks yet.")).toBeVisible();
+  });
+
+  test("S25: Files lists the event's files; each has Download; a Download starts a file", async ({
+    page,
+  }) => {
+    const booking = await seed("files", { taskDueInDays: 0 });
+    await addEventFile(booking.eventId, { name: "Check_Scan.pdf", source: "upload" });
+    await addEventFile(booking.eventId, { name: "Quote.pdf", source: "sent_quote" });
+
+    await open(page, booking);
+    await expect(files(page).locator("th")).toHaveText([
+      "#",
+      "File Name",
+      "Type",
+      "Date",
+      "Action",
+    ]);
+    await expect(files(page).getByRole("button", { name: "Attach File" })).toBeVisible();
+    const rows = await rowTexts(files(page));
+    expect(rows[0]).toMatch(/^1 \| Check_Scan\.pdf \| PDF \| /);
+    expect(rows[1]).toMatch(/^2 \| Quote\.pdf \| PDF \| /);
+    await expect(files(page).getByRole("button", { name: /^Download / })).toHaveCount(2);
+
+    const download = page.waitForEvent("download");
+    await files(page).getByRole("button", { name: "Download Check_Scan.pdf" }).click();
+    expect((await download).suggestedFilename()).toBe("Check_Scan.pdf");
+  });
+
+  test("S26: Delete appears only on a file attached by hand; the confirmation deletes it; a signed-contract row has none", async ({
+    page,
+  }) => {
+    const booking = await seed("files-delete", { taskDueInDays: 0 });
+    await addEventFile(booking.eventId, { name: "Signed_Contract.pdf", source: "signed_contract" });
+    await addEventFile(booking.eventId, { name: "Check_Scan.pdf", source: "upload" });
+
+    await open(page, booking);
+    await expect(files(page).getByRole("button", { name: /^Delete / })).toHaveCount(1);
+    await expect(
+      files(page).getByRole("button", { name: "Delete Signed_Contract.pdf" }),
+    ).toHaveCount(0);
+
+    await files(page).getByRole("button", { name: "Delete Check_Scan.pdf" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "Delete file?" });
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(files(page).getByText("Check_Scan.pdf")).toBeVisible();
+
+    await files(page).getByRole("button", { name: "Delete Check_Scan.pdf" }).click();
+    await dialog.getByRole("button", { name: "Delete" }).click();
+    await expect(files(page).getByText("Check_Scan.pdf")).toHaveCount(0, { timeout: 30_000 });
+    await expect
+      .poll(async () => (await eventFilesOf(booking.eventId)).map((f) => f.file_name))
+      .toEqual(["Signed_Contract.pdf"]);
+  });
+
+  test("S27: Attach File: choose two files, Ready to Upload (2) shows, drop one, Save; the row appears; there is no drop zone", async ({
+    page,
+  }) => {
+    const booking = await seed("files-attach", { taskDueInDays: 0 });
+    const pdf = (name: string) => ({
+      name,
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 e2e"),
+    });
+
+    await open(page, booking);
+    await expect(files(page).getByText("No files uploaded yet")).toBeVisible();
+    await expect(files(page).getByText(/drag|drop/i)).toHaveCount(0);
+
+    await files(page)
+      .locator('input[type="file"]')
+      .setInputFiles([pdf("one.pdf"), pdf("two.pdf")]);
+    await expect(files(page).getByText("Ready to Upload (2)")).toBeVisible();
+    await files(page).getByRole("button", { name: "Remove two.pdf" }).click({ force: true });
+    await expect(files(page).getByText("Ready to Upload (1)")).toBeVisible();
+
+    await files(page).getByRole("button", { name: "Save" }).click();
+    await expect(files(page).getByText("Ready to Upload")).toHaveCount(0, { timeout: 30_000 });
+    await expect(files(page).getByRole("button", { name: "Download one.pdf" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(files(page).getByRole("button", { name: "Delete one.pdf" })).toBeVisible();
+    await expect
+      .poll(async () => await eventFilesOf(booking.eventId))
+      .toEqual([{ file_name: "one.pdf", source: "upload" }]);
+  });
+
+  test("S28: a file of a wrong type or over 20 MB is refused with a toast and is not listed", async ({
+    page,
+  }) => {
+    const booking = await seed("files-refuse", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    const input = files(page).locator('input[type="file"]');
+    await input.setInputFiles({
+      name: "archive.zip",
+      mimeType: "application/zip",
+      buffer: Buffer.from("PK"),
+    });
+    await expect(page.getByText("Invalid file type")).toBeVisible();
+    await expect(files(page).getByText("Ready to Upload")).toHaveCount(0);
+
+    await input.setInputFiles({
+      name: "huge.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.alloc(21 * 1024 * 1024),
+    });
+    await expect(page.getByText("File too large")).toBeVisible();
+    await expect(files(page).getByText("Ready to Upload")).toHaveCount(0);
+    expect(await eventFilesOf(booking.eventId)).toEqual([]);
+  });
+
+  test("S29: when a payment closes the open task, its row loses the Open tag after the sync", async ({
+    page,
+  }) => {
+    const booking = await seed("history-closes", { taskDueInDays: 0, taskNote: "Chase payment" });
+
+    await open(page, booking);
+    await expect(history(page).getByText("Open", { exact: true })).toHaveCount(1);
+
+    await payInFull(booking.eventId);
+    await expect(history(page).getByText("Open", { exact: true })).toHaveCount(0, {
+      timeout: 60_000,
+    });
+    await expect(history(page).getByText("Chase payment")).toBeVisible();
   });
 });

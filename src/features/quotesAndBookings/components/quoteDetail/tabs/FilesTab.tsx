@@ -29,14 +29,12 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   ACCEPTED_TYPES,
-  EVENT_FILES_BUCKET,
   IMAGE_TYPES,
   MAX_SIZE_MB,
   fileRefusal,
   uploadEventFile,
 } from "../../../utils/eventFileUpload";
-
-const BUCKET = EVENT_FILES_BUCKET;
+import { createEventFileUrl, removeEventFile } from "../../../utils/eventFileStorage";
 
 const isImageType = (mime: string | null) =>
   !!mime && IMAGE_TYPES.includes(mime);
@@ -120,20 +118,6 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
 
   const { data: files, isLoading } = useTypedQuery(compiled, expect<EventFileRow>());
 
-  const getSignedUrl = async (storagePath: string) => {
-    let bucket = BUCKET;
-    let path = storagePath;
-    if (storagePath.startsWith("contracts/")) {
-      bucket = "contracts";
-      path = storagePath.slice("contracts/".length);
-    }
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 3600);
-    if (error) throw error;
-    return data.signedUrl;
-  };
-
   const validateFile = (file: File): boolean => {
     const refusal = fileRefusal(file);
     if (!refusal) return true;
@@ -189,18 +173,10 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
     if (!deleteTarget || !deleteTarget.storage_path) return;
     setDeleting(true);
     try {
-      let bucket = BUCKET;
-      let path = deleteTarget.storage_path;
-      if (path.startsWith("contracts/")) {
-        bucket = "contracts";
-        path = path.slice("contracts/".length);
-      }
-      await supabase.storage.from(bucket).remove([path]);
-      const { error } = await supabase
-        .from("EventFiles")
-        .delete()
-        .eq("id", deleteTarget.id);
-      if (error) throw error;
+      await removeEventFile(supabase, {
+        id: deleteTarget.id,
+        storage_path: deleteTarget.storage_path,
+      });
     } catch (err: any) {
       createErrorToast(["Delete failed", err?.message ?? ""]);
     } finally {
@@ -212,7 +188,7 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
   const handleFileClick = async (file: EventFileRow) => {
     if (!file.storage_path) return;
     try {
-      const url = await getSignedUrl(file.storage_path);
+      const url = await createEventFileUrl(supabase, file.storage_path);
       if (isImagePath(file.storage_path) || isImageType(file.mime_type)) {
         setLightboxUrl(url);
       } else {
@@ -226,7 +202,7 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
   const handleDownload = async (file: EventFileRow) => {
     if (!file.storage_path) return;
     try {
-      const url = await getSignedUrl(file.storage_path);
+      const url = await createEventFileUrl(supabase, file.storage_path);
       const a = document.createElement("a");
       a.href = url;
       a.download = file.file_name ?? "file";

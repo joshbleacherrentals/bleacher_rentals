@@ -72,7 +72,7 @@ function inZone(value: string, timezone: string): DateTime {
   return DateTime.fromISO(value.trim().replace(" ", "T"), { zone: timezone }).setLocale("en-US");
 }
 
-function zonedDate(value: string | null, timezone: string): string {
+export function zonedDate(value: string | null, timezone: string): string {
   if (!value) return "—";
   const dt = inZone(value, timezone);
   return dt.isValid ? dt.toFormat("MMM d, yyyy") : "—";
@@ -208,6 +208,37 @@ export function buildTaskLists(
     open: open ? toTaskView(open, today) : null,
     completed: completed.map((t) => toTaskView(t, today)),
   };
+}
+
+export type TaskHistoryRow = {
+  number: number;
+  id: string;
+  /** The task's date in words, as the Collections list writes it. */
+  dateLabel: string;
+  note: string;
+  isOpen: boolean;
+};
+
+/**
+ * The Task History table: the completed tasks oldest first, then the open one, numbered from 1.
+ * `buildTaskLists` gives the completed newest first, so they are reversed.
+ * docs/specs/accountant-collections-13-task-history-and-files.md §3.
+ */
+export function buildTaskHistory(tasks: {
+  open: TaskView | null;
+  completed: readonly TaskView[];
+}): TaskHistoryRow[] {
+  const ordered = [
+    ...[...tasks.completed].reverse().map((task) => ({ task, isOpen: false })),
+    ...(tasks.open ? [{ task: tasks.open, isOpen: true }] : []),
+  ];
+  return ordered.map(({ task, isOpen }, i) => ({
+    number: i + 1,
+    id: task.id,
+    dateLabel: task.followUpLabel,
+    note: task.note,
+    isOpen,
+  }));
 }
 
 // -------------------------------------------------------------- contacts

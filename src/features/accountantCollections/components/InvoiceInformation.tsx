@@ -1,13 +1,17 @@
 import { formatDate } from "@/features/quotesAndBookings/utils/formatDate";
 import type { InvoiceData } from "../hooks/useInvoiceData";
 import { ContactCards } from "./ContactCards";
+import { InvoiceFiles } from "./InvoiceFiles";
 import { MoneyCard } from "./MoneyCard";
 import { PaymentHistoryTable } from "./PaymentHistoryTable";
 import { PaymentScheduleTable } from "./PaymentScheduleTable";
+import { TaskHistoryTable } from "./TaskHistoryTable";
 
 /**
- * The Information tab: invoice and account manager, the contacts, the venue and event cards, the
- * money, the schedule and the payments. docs/specs/accountant-collections-09-design.md §3.
+ * The Information tab: the task history, invoice and account manager, the contacts, the venue and
+ * event cards, the money, the schedule, the payments and the files.
+ * docs/specs/accountant-collections-09-design.md §3 and
+ * accountant-collections-13-task-history-and-files.md §3.
  */
 
 const SECTION_TITLE = "mb-3 text-xs font-bold uppercase tracking-wider text-gray-500";
@@ -39,6 +43,8 @@ export function InvoiceInformation({
   const { event, contacts, venue, eventInfo } = data;
   return (
     <div role="tabpanel" aria-label="Information" className="flex flex-col gap-4">
+      <TaskHistoryTable tasks={data.tasks} />
+
       <div className="flex flex-wrap justify-between gap-x-6 gap-y-2 rounded-[10px] border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
         <div>
           <span className="text-gray-500">Invoice</span>
@@ -89,6 +95,8 @@ export function InvoiceInformation({
         recordedByUserUuid={recordedByUserUuid}
         onRecordPayment={onRecordPayment}
       />
+      {/* Keyed by the event: files staged for one event must not go up to the next one. */}
+      <InvoiceFiles key={eventId} eventId={eventId} timezone={timezone} />
     </div>
   );
 }

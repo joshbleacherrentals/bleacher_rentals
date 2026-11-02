@@ -216,7 +216,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Collections",
     description:
-      "The Collections tab of the Accountant page lists the bookings with an overdue payment, one open task each, with Show Not Due Yet and sorting. Opening one leads to its invoice page, where the accountant reads the booking, records payments, and writes the next task. The page has a Messages tab with the booking's internal chat, the same as on the quote. A task is created every morning for each overdue booking and closes by itself when the payment arrives.",
+      "The Collections tab of the Accountant page lists the bookings with an overdue payment, one open task each, with Show Not Due Yet and sorting. Opening one leads to its invoice page, where the accountant reads the booking, records payments, and writes the next task. Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand. The page has a Messages tab with the booking's internal chat, the same as on the quote. A task is created every morning for each overdue booking and closes by itself when the payment arrives.",
     category: "Day to Day Operations",
     roles: {
       admin: full(

@@ -7,6 +7,7 @@ import {
   buildMoney,
   buildPaymentRows,
   buildScheduleRows,
+  buildTaskHistory,
   buildTaskLists,
   type InvoiceTaskRow,
 } from "./invoiceView";
@@ -282,6 +283,93 @@ describe("buildTaskLists", () => {
 
   it("is empty for an event with no tasks", () => {
     expect(buildTaskLists([], TODAY)).toEqual({ open: null, completed: [] });
+  });
+});
+
+// docs/specs/accountant-collections-13-task-history-and-files.md §1, §3 and §5.
+describe("buildTaskHistory", () => {
+  const task = (over: Partial<InvoiceTaskRow> & { id: string }): InvoiceTaskRow => ({
+    created_at: "2026-10-01T05:20:00.000Z",
+    due_date: "2026-11-15",
+    note: "Remind the customer about payment",
+    completed: 1,
+    ...over,
+  });
+  const history = (tasks: InvoiceTaskRow[]) => buildTaskHistory(buildTaskLists(tasks, TODAY));
+
+  it("lists the completed tasks oldest first and the open task last, numbered 1 to n", () => {
+    const rows = history([
+      task({ id: "t-new", due_date: "2026-11-01" }),
+      task({ id: "t-open", due_date: "2026-11-17", completed: 0 }),
+      task({ id: "t-old", due_date: "2026-09-01" }),
+      task({ id: "t-mid", due_date: "2026-10-01" }),
+    ]);
+    expect(rows.map((r) => [r.number, r.id, r.isOpen])).toEqual([
+      [1, "t-old", false],
+      [2, "t-mid", false],
+      [3, "t-new", false],
+      [4, "t-open", true],
+    ]);
+  });
+
+  it("puts the open task last even when it is dated before a completed one", () => {
+    const rows = history([
+      task({ id: "t-done", due_date: "2026-11-20" }),
+      task({ id: "t-open", due_date: "2026-11-10", completed: 0 }),
+    ]);
+    expect(rows.map((r) => r.id)).toEqual(["t-done", "t-open"]);
+  });
+
+  it("puts the task created first first when two completed tasks share a date", () => {
+    const rows = history([
+      task({ id: "t-second", created_at: "2026-10-02T05:20:00.000Z", due_date: "2026-11-01" }),
+      task({ id: "t-first", created_at: "2026-10-01T05:20:00.000Z", due_date: "2026-11-01" }),
+    ]);
+    expect(rows.map((r) => r.id)).toEqual(["t-first", "t-second"]);
+  });
+
+  it("writes each date in the list's wording: past, today, tomorrow and future", () => {
+    const labelOf = (dueDate: string, completed: number) =>
+      history([task({ id: "t-1", due_date: dueDate, completed })])[0].dateLabel;
+    expect(labelOf("2026-11-04", 1)).toBe("11 days ago");
+    expect(labelOf("2026-10-15", 1)).toBe("Month ago");
+    expect(labelOf("2026-11-15", 0)).toBe("Due Today");
+    expect(labelOf("2026-11-16", 0)).toBe("Due tomorrow");
+    expect(labelOf("2026-11-18", 0)).toBe("3 days after");
+    expect(labelOf("2026-11-12", 0)).toBe("3 days ago");
+  });
+
+  it("carries the note of each task", () => {
+    const [row] = history([task({ id: "t-1", note: "Call the accountant" })]);
+    expect(row.note).toBe("Call the accountant");
+  });
+
+  it("is only the open task when nothing is completed", () => {
+    const rows = history([task({ id: "t-open", completed: 0 })]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ number: 1, id: "t-open", isOpen: true });
+  });
+
+  it("is only completed tasks when none is open", () => {
+    const rows = history([task({ id: "t-1" }), task({ id: "t-2", due_date: "2026-11-01" })]);
+    expect(rows.map((r) => r.isOpen)).toEqual([false, false]);
+    expect(rows.map((r) => r.id)).toEqual(["t-2", "t-1"]);
+  });
+
+  it("is empty for an event with no tasks", () => {
+    expect(history([])).toEqual([]);
+  });
+
+  it("does not change the lists it was given", () => {
+    const lists = buildTaskLists(
+      [
+        task({ id: "t-new", due_date: "2026-11-01" }),
+        task({ id: "t-old", due_date: "2026-09-01" }),
+      ],
+      TODAY,
+    );
+    buildTaskHistory(lists);
+    expect(lists.completed.map((t) => t.id)).toEqual(["t-new", "t-old"]);
   });
 });
 

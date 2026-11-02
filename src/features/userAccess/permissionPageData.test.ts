@@ -285,6 +285,13 @@ describe("permission matrix", () => {
         );
       });
 
+      // docs/specs/accountant-collections-13-task-history-and-files.md §3.
+      it("says Information shows the task history and the files, and who can change the files", () => {
+        expect(row?.description).toContain(
+          "Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand.",
+        );
+      });
+
       it("tells the accountant what they can do there", () => {
         expect(accountant("Collections")?.note).toBe(
           "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there.",

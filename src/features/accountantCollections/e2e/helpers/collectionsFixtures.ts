@@ -88,10 +88,23 @@ export async function createOverdueBooking(options: {
   return { eventId, name: options.name };
 }
 
-/** Removes the events; their tasks, line items and payments go with them (cascade). */
+/**
+ * Removes the events; their tasks, line items and payments go with them (cascade). The objects
+ * that `addEventFile` stored in `event-files` are removed first, since the rows that name them go
+ * with the events.
+ */
 export async function cleanupBookings(eventIds: string[]): Promise<void> {
   if (eventIds.length === 0) return;
-  await admin().from("Events").delete().in("id", eventIds);
+  const db = admin();
+  const { data: files } = await db
+    .from("EventFiles")
+    .select("storage_path")
+    .in("event_uuid", eventIds);
+  const stored = (files ?? [])
+    .map((f) => f.storage_path as string | null)
+    .filter((path): path is string => !!path && !path.startsWith("contracts/"));
+  if (stored.length > 0) await db.storage.from("event-files").remove(stored);
+  await db.from("Events").delete().in("id", eventIds);
 }
 
 /** The event's tasks, open ones first. */
@@ -120,4 +133,71 @@ export async function payInFull(eventId: string, amountCents = 100_000): Promise
     paid_at: new Date().toISOString(),
   });
   if (error) throw new Error(`payInFull: ${error.message}`);
+}
+
+/** A task of the event, completed or open, `dueInDays` from today (negative for the past). */
+export async function addTask(
+  eventId: string,
+  options: { dueInDays: number; note: string; completed: boolean },
+): Promise<void> {
+  const { error } = await admin()
+    .from("ArEventTasks")
+    .insert({
+      event_uuid: eventId,
+      due_date: isoDate(options.dueInDays),
+      completed: options.completed,
+      note: options.note,
+    });
+  if (error) throw new Error(`addTask: ${error.message}`);
+}
+
+/**
+ * A file of the event, as the app stores one: the object in `event-files` (unless `source` is
+ * `signed_contract`, whose object lives in the `contracts` bucket and is not created here) and its
+ * EventFiles row. Returns the row's id.
+ */
+export async function addEventFile(
+  eventId: string,
+  options: {
+    name: string;
+    source: "upload" | "sent_quote" | "signed_contract" | "email_attachment";
+  },
+): Promise<string> {
+  const db = admin();
+  const id = crypto.randomUUID();
+  const extension = options.name.split(".").pop() ?? "bin";
+  let storagePath = `contracts/${eventId}/${id}.${extension}`;
+  if (options.source !== "signed_contract") {
+    storagePath = `${eventId}/${id}.${extension}`;
+    const { error: uploadError } = await db.storage
+      .from("event-files")
+      .upload(storagePath, new Blob(["%PDF-1.4 e2e"], { type: "application/pdf" }), {
+        contentType: "application/pdf",
+      });
+    if (uploadError) throw new Error(`addEventFile: upload failed: ${uploadError.message}`);
+  }
+  const { error } = await db.from("EventFiles").insert({
+    id,
+    event_uuid: eventId,
+    file_name: options.name,
+    storage_path: storagePath,
+    mime_type: "application/pdf",
+    file_size_bytes: 12,
+    source: options.source,
+  });
+  if (error) throw new Error(`addEventFile: row insert failed: ${error.message}`);
+  return id;
+}
+
+/** The names of the event's EventFiles rows, oldest first, with their source. */
+export async function eventFilesOf(
+  eventId: string,
+): Promise<{ file_name: string; source: string }[]> {
+  const { data, error } = await admin()
+    .from("EventFiles")
+    .select("file_name, source")
+    .eq("event_uuid", eventId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`eventFilesOf: ${error.message}`);
+  return data ?? [];
 }

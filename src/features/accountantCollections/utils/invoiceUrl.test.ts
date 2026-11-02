@@ -15,9 +15,6 @@ describe("invoiceHref", () => {
     expect(invoiceHref({ eventId: "evt-1", tab: "info", listState: DEFAULT })).toBe(
       "/accountant/invoice?id=evt-1&tab=info",
     );
-    expect(invoiceHref({ eventId: "evt-1", tab: "tasks", listState: DEFAULT })).toBe(
-      "/accountant/invoice?id=evt-1&tab=tasks",
-    );
   });
 
   it("writes tab=messages for the Messages tab", () => {
@@ -72,12 +69,17 @@ describe("withCollectionsListState", () => {
 });
 
 describe("parseInvoiceTab", () => {
-  it("opens Tasks for tasks, Messages for messages, and Information for anything else", () => {
-    expect(parseInvoiceTab("tasks")).toBe("tasks");
+  it("opens Messages for messages, and Information for anything else", () => {
     expect(parseInvoiceTab("messages")).toBe("messages");
     expect(parseInvoiceTab("info")).toBe("info");
     expect(parseInvoiceTab("bogus")).toBe("info");
     expect(parseInvoiceTab("")).toBe("info");
     expect(parseInvoiceTab(null)).toBe("info");
+  });
+
+  // docs/specs/accountant-collections-13-task-history-and-files.md §3: the Tasks tab is gone, so
+  // an old link lands on Information.
+  it("opens Information for an old tab=tasks link", () => {
+    expect(parseInvoiceTab("tasks")).toBe("info");
   });
 });

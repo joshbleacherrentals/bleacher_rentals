@@ -1,6 +1,38 @@
 # Accountant Collections 13: Task History and Files in Information
 
-Status: **Draft 2026-11-02, waiting for "Approved"**; 0 open decisions, readings to confirm in §1.
+Status: **Implemented 2026-11-02** (approved by the user the same day, readings of §1 included).
+Deviations, none changing a locked type or contract:
+(1) **A contradiction in the spec, decided by the user.** §1 and §3 say `FilesTab`'s behaviour does
+not change, §5 lists "a storage error is thrown" for the removal. The user chose "as the card does
+now": `removeEventFile` does not read the answer of the storage `remove`, the row is deleted
+either way, and only the error of the row delete is thrown. "A storage error is thrown" therefore
+holds for the signed link only; one more test pins that a storage error does not stop the row delete;
+(2) **A gap filled with the card's wording.** The spec gave no text for an event with no files; the
+table says "No files uploaded yet", as the quote card does. Change it in `FilesTable` if another is
+wanted;
+(3) the errors and refusals use `createErrorToastNoThrow` (same texts), not `createErrorToast`,
+which throws after showing the toast: with it, one refused file of a batch would drop the others
+and a failed upload would end in an unhandled rejection;
+(4) after an upload failure the staged list keeps only the files that did not go up (each file
+leaves the list as soon as it is uploaded), so a retry does not send a file twice;
+(5) `InvoiceInformation` gives `InvoiceFiles` `key={eventId}`: Previous Task and Next Task change
+`?id=` without leaving the page, and without the key the files staged for one event would be
+uploaded to the next; `InvoiceInformation.test.tsx` (new) reads the element tree for it;
+(6) `zonedDate` in `invoiceView.ts` is now exported so `invoiceFiles.ts` writes dates as the rest of
+the page does; `StagedFilesList`, `FilesTable` and `splitRefused` are exported from
+`InvoiceFiles.tsx` for the tests (same file, no new file);
+(7) the new matrix sentence stands after "...writes the next task." and before the Messages
+sentence, so "Its Information tab" reads as the invoice page;
+(8) Playwright: S24 to S29 are in `collections.accountant.spec.ts` in full and S24 to S26 in
+`collections.admin.spec.ts` in a lighter form; S6, S7, S9, S12, S17, S20, S23 and the paths of
+S13 to S19 were rewritten for the missing Tasks tab (the Done / Next Task modal still opens from
+New Task until spec 14); `helpers/collectionsFixtures.ts` gained `addTask`, `addEventFile`,
+`eventFilesOf` and `cleanupBookings` now removes the stored objects. Written and **not run**;
+(9) `FilesTab.tsx` is not Prettier-clean at `HEAD`, so it was not reformatted; its edits follow its
+own style.
+Not verified: that an accountant can open a `signed_contract` file (bucket `contracts`): the bucket's
+policy is not in `supabase/migrations`, and the quote card has the same dependency.
+Original header: written 2026-11-02; 0 open decisions, readings to confirm in §1.
 Build order: **13**. Needs: [12](accountant-collections-12-tabs-and-messages.md). Needed by: 14.
 Branch: `q4-sprint2-collections`.
 

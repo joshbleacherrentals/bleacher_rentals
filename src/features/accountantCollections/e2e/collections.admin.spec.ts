@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
+  addEventFile,
+  addTask,
   cleanupBookings,
   createOverdueBooking,
   tasksOf,
@@ -53,7 +55,7 @@ test.describe("Collections tab (admin)", () => {
       }
       const [, mid, small] = seeded;
 
-      await page.goto(`/accountant/invoice?id=${mid.eventId}&tab=tasks&csort=amount&cdir=desc`);
+      await page.goto(`/accountant/invoice?id=${mid.eventId}&tab=info&csort=amount&cdir=desc`);
       await expect(page.getByRole("heading", { name: mid.name })).toBeVisible({ timeout: 60_000 });
       await page.getByRole("link", { name: "Next Task" }).click();
       await expect(page).toHaveURL(new RegExp(`id=${small.eventId}`));
@@ -88,14 +90,14 @@ test.describe("Messages tab and New Task (admin)", () => {
     }
   }
 
-  test("S20: the tab bar order is Information, Tasks, Messages, New Task", async ({ page }) => {
+  test("S20: the tab bar order is Information, Messages, New Task", async ({ page }) => {
     await withBooking("bar", { taskDueInDays: 0 }, async (booking) => {
       await page.goto(`/accountant/invoice?id=${booking.eventId}`);
       await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
         timeout: 60_000,
       });
       const tabs = await page.getByRole("tab").allInnerTexts();
-      expect(tabs.map((t) => t.trim())).toEqual(["Information", "Tasks", "Messages"]);
+      expect(tabs.map((t) => t.trim())).toEqual(["Information", "Messages"]);
       await expect(page.getByRole("button", { name: "New Task" })).toBeVisible();
     });
   });
@@ -142,6 +144,64 @@ test.describe("Messages tab and New Task (admin)", () => {
       await expect
         .poll(async () => (await tasksOf(booking.eventId)).map((t) => t.completed))
         .toEqual([false, true]);
+    });
+  });
+});
+
+// Task History and Files in Information
+// (docs/specs/accountant-collections-13-task-history-and-files.md §4, S24, S25 and S26 in a lighter
+// form than the accountant's). Written, not run locally.
+test.describe("Task History and Files (admin)", () => {
+  const stamp = Date.now();
+
+  async function withBooking(
+    suffix: string,
+    options: Omit<Parameters<typeof createOverdueBooking>[0], "name">,
+    run: (booking: SeededBooking) => Promise<void>,
+  ) {
+    const booking = await createOverdueBooking({
+      name: `E2E Collections admin ${suffix} ${stamp}`,
+      ...options,
+    });
+    try {
+      await run(booking);
+    } finally {
+      await cleanupBookings([booking.eventId]);
+    }
+  }
+
+  test("S24: Information shows Task History with the open task last, and ?tab=tasks opens Information", async ({
+    page,
+  }) => {
+    await withBooking("history", { taskDueInDays: 0, taskNote: "Second call" }, async (booking) => {
+      await addTask(booking.eventId, { dueInDays: -5, note: "First call", completed: true });
+      await page.goto(`/accountant/invoice?id=${booking.eventId}&tab=tasks`);
+      const history = page.getByRole("region", { name: "Task History" });
+      await expect(history).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByRole("tab", { name: "Information" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await expect(page.getByRole("tab", { name: "Tasks" })).toHaveCount(0);
+      await expect(history.locator("tbody tr").first()).toContainText("First call");
+      await expect(history.locator("tbody tr").last()).toContainText("Second call");
+      await expect(history.getByText("Open", { exact: true })).toHaveCount(1);
+    });
+  });
+
+  test("S25 and S26: Files lists the files; Download on each, Delete only on one attached by hand", async ({
+    page,
+  }) => {
+    await withBooking("files", { taskDueInDays: 0 }, async (booking) => {
+      await addEventFile(booking.eventId, { name: "Check_Scan.pdf", source: "upload" });
+      await addEventFile(booking.eventId, { name: "Quote.pdf", source: "sent_quote" });
+      await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+      const files = page.getByRole("region", { name: "Files" });
+      await expect(files.getByRole("button", { name: /^Download / })).toHaveCount(2, {
+        timeout: 60_000,
+      });
+      await expect(files.getByRole("button", { name: /^Delete / })).toHaveCount(1);
+      await expect(files.getByRole("button", { name: "Delete Check_Scan.pdf" })).toBeVisible();
     });
   });
 });
