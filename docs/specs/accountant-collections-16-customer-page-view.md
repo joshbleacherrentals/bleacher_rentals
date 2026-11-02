@@ -88,6 +88,11 @@ replaces.
 - **To make the three tabs live in the header,** the customer page gets an "embedded" mode: it
   hides its own tab bar (and the EN / FR switch that sits in it), and the header's tabs tell it
   which tab to show.
+- **The language is always English for the accountant** (user's answer 2026-11-02). The frame
+  shows the page in English whatever the contact's preferred language, and the accountant cannot
+  change it (the EN / FR switch is hidden). This is only what the accountant sees on screen: what
+  Sign produces (the signed PDF, the e-mails to the customer and the account manager) is built
+  from the contact's record, not from the page, so it keeps the contact's language as before.
 
 **Readings to confirm at review:**
 
@@ -105,8 +110,10 @@ replaces.
   and reset when the accountant moves to another event with Previous / Next Task (the footer is
   hidden while the toggle is on, as drawn). Switching the toggle off and on starts at Approved
   Quote.
-- **The language is the contact's own** (the page's own rule); the EN / FR switch is hidden, so the
-  accountant cannot change it.
+- **English in the frame means all of the page's own text:** the browser's saved language choice
+  is ignored there, the "download PDF" link on Approved Quote asks for `lang=en`, and the Stripe
+  page opened by Pay is asked for English. The customer's own link is unchanged: a French contact
+  still sees French there.
 - **A New Task window that is open stays open** when the toggle is switched on (it belongs to the
   page); the New Task button is not in the customer tab strip.
 - **Pay in a new tab:** the payment page opens through `window.open`; if the browser blocks it the
@@ -152,7 +159,11 @@ replaces.
 - **`src/features/quotesAndBookings/pdf/QuotePublicTabs.tsx`** (changed): the props `embedded` and
   `initialTab`. When embedded and framed: no sticky bar; the active tab comes from the parent's
   `set-tab` messages (accepted only from `window.parent` on the same origin); on mount it posts
-  `ready`, and posts `height` (rounded up) from a `ResizeObserver` on the page root. Not embedded:
+  `ready`, and posts `height` (rounded up) from a `ResizeObserver` on the page root. The language
+  there is always `en`: the page uses `const shownLanguage = embeddedAndFramed ? "en" : language`
+  everywhere it uses `language` today (the texts, the PDF link, the pop-ups, the child tabs), so
+  the contact's language and the saved browser choice are ignored; the `language` state itself is
+  untouched, so a direct visit with `?embed=1` and no frame keeps its own language. Not embedded:
   nothing changes.
 - **`src/features/quotesAndBookings/pdf/PayInvoiceTab.tsx`** (changed): a prop `embedded`; the
   redirect is a small pure function `startCheckout({ embedded, url, open, assign })`: embedded
@@ -185,7 +196,8 @@ Playwright, written, **not run**. Roles: accountant, admin. S41 to S47.
 - **S41** the toggle is off by default; switching it on shows the three customer tabs and the
   frame; the header keeps its buttons; the footer is gone; switching it off returns.
 - **S42** each customer tab shows its page in the frame; no tab bar of its own and no EN / FR
-  switch inside the frame; the invoice page, not the frame, scrolls.
+  switch inside the frame; the invoice page, not the frame, scrolls; for a contact whose language
+  is French the frame's text is English.
 - **S43** opening the frame adds no `client_page_view` or `client_tab_change` row to the event's
   activity log, and shows no "Are you still here?" or "quote changed" pop-up.
 - **S44** Sign in the frame signs (seeded quote): the signature exists, the status badge follows
@@ -206,7 +218,8 @@ Red first.
 - **`PayInvoiceTab` `startCheckout` test:** embedded opens a new tab and clears the opener, not
   embedded assigns the address, a blocked tab reports the pay error.
 - **`QuotePublicTabs` markup test** (the project's sample quote data): embedded and framed has no
-  tab bar; not embedded has it; `initialTab` selects the visible body.
+  tab bar; not embedded has it; `initialTab` selects the visible body; embedded and framed with a
+  French contact renders English text, not embedded with the same contact renders French.
 - **`CustomerPageFrame` markup test:** the frame's `title`, the `src` with `embed=1` and the tab,
   the loading text; a pure `onFrameMessage` function: `ready` returns the tab to send, `height`
   below 480 is raised, a foreign message is ignored.
