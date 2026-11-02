@@ -1,6 +1,13 @@
 # Accountant Collections 12: the Messages tab and the New Task button
 
-Status: **Draft 2026-11-02, waiting for "Approved"**; 0 open decisions, readings to confirm in §1.
+Status: **Implemented 2026-11-02** (approved by the user the same day). Deviations, none changing a
+contract: (1) the New Task blue is not the "nearest token": `lightBlue` in `globals.css` is exactly
+the design's `#1d62a3`, so the button uses `bg-lightBlue`; (2) the Playwright scenarios S20 to S23
+are in `collections.accountant.spec.ts` in full and in `collections.admin.spec.ts` in a lighter
+form (S21 there does not send a message or press Next Task), written and **not run**; (3) the
+Vitest file also checks that Messages is the only tab that mounts the chat and that Previous Task
+and Next Task keep `tab=messages`. Original header: written 2026-11-02; 0 open decisions, readings
+to confirm in §1.
 Build order: **12**. Needs: [09](accountant-collections-09-design.md),
 [10](accountant-collections-10-prev-next.md). Needed by: 13, 14. Branch: `q4-sprint2-collections`.
 

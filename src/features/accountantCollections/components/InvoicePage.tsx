@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
+import { MessagesTab } from "@/features/quotesAndBookings/components/quoteDetail/tabs/MessagesTab";
 import { useQuotesBookingsCapabilities } from "@/features/quotesAndBookings/hooks/useQuotesBookingsCapabilities";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
@@ -17,15 +18,17 @@ import {
   parseInvoiceTab,
   type InvoiceTab,
 } from "../utils/invoiceUrl";
+import { DoneNextTaskDialog } from "./DoneNextTaskDialog";
 import { InvoiceHeader } from "./InvoiceHeader";
 import { InvoiceInformation } from "./InvoiceInformation";
 import { InvoiceTasks } from "./InvoiceTasks";
 
 /**
- * The invoice page of one event: sticky header and tabs, Information or Tasks, and the footer with
- * Previous Task and Next Task (links to the neighbours fixed when the page opened). The event, the
- * tab and the list's order come from the URL. docs/specs/accountant-collections-09-design.md §3 and
- * accountant-collections-10-prev-next.md §3.
+ * The invoice page of one event: sticky header and tabs (Information, Tasks, Messages) with the
+ * New Task button, the open tab, and the footer with Previous Task and Next Task (links to the
+ * neighbours fixed when the page opened). The event, the tab and the list's order come from the
+ * URL. docs/specs/accountant-collections-09-design.md §3, accountant-collections-10-prev-next.md
+ * §3 and accountant-collections-12-tabs-and-messages.md §3.
  */
 
 // Same reasoning as on the Billing tab: a form most visits never open.
@@ -40,6 +43,7 @@ const RecordPaymentDialog = dynamic(
 const TABS: { id: InvoiceTab; label: string }[] = [
   { id: "info", label: "Information" },
   { id: "tasks", label: "Tasks" },
+  { id: "messages", label: "Messages" },
 ];
 
 const FOOTER_LINK =
@@ -79,6 +83,7 @@ export function InvoicePage() {
   const userId = usePermissionsStore((s) => s.userId);
   const timezone = useTimezoneStore((s) => s.timezone);
   const [recordOpen, setRecordOpen] = useState(false);
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
 
   const backHref = collectionsHref(listState);
   // Disabled while the neighbours are not ready, whatever ids they hold.
@@ -126,28 +131,39 @@ export function InvoicePage() {
           canRecordPayment={can.recordPayment}
           onRecordPayment={() => setRecordOpen(true)}
         />
-        <div role="tablist" aria-label="Invoice sections" className="flex gap-1 px-6">
-          {TABS.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              onClick={() => selectTab(id)}
-              className={`flex-1 cursor-pointer rounded-t-md px-3 py-3.5 text-base font-medium ${
-                tab === id ? "bg-white text-gray-900" : "bg-black/20 text-white"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex gap-1 px-6">
+          <div role="tablist" aria-label="Invoice sections" className="flex flex-[2] gap-1">
+            {TABS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => selectTab(id)}
+                className={`flex-1 cursor-pointer rounded-t-md px-3 py-3.5 text-base font-medium ${
+                  tab === id ? "bg-white text-gray-900" : "bg-black/20 text-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            disabled={data.tasks.open === null}
+            title={data.tasks.open === null ? "There is no open task" : undefined}
+            onClick={() => setNewTaskOpen(true)}
+            className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-t-md bg-lightBlue px-3 py-3.5 text-base font-semibold text-white hover:bg-lightBlue/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="size-4" aria-hidden />
+            New Task
+          </button>
         </div>
       </div>
 
       <div className="flex flex-col gap-6 rounded-b-[10px] border border-t-0 border-gray-200 bg-white p-6">
-        {tab === "tasks" ? (
-          <InvoiceTasks eventId={eventId} tasks={data.tasks} today={data.today} />
-        ) : (
+        {tab === "info" && (
           <InvoiceInformation
             eventId={eventId}
             data={data}
@@ -156,6 +172,14 @@ export function InvoicePage() {
             recordedByUserUuid={userId}
             onRecordPayment={() => setRecordOpen(true)}
           />
+        )}
+        {tab === "tasks" && (
+          <InvoiceTasks eventId={eventId} tasks={data.tasks} today={data.today} />
+        )}
+        {tab === "messages" && (
+          <div role="tabpanel" aria-label="Messages">
+            <MessagesTab quoteId={eventId} can={can} />
+          </div>
         )}
 
         <div className="flex justify-between gap-4 border-t border-gray-200 pt-6">
@@ -169,6 +193,13 @@ export function InvoicePage() {
           </FooterLink>
         </div>
       </div>
+
+      <DoneNextTaskDialog
+        open={newTaskOpen}
+        onOpenChange={setNewTaskOpen}
+        eventId={eventId}
+        today={data.today}
+      />
 
       {can.recordPayment && recordOpen && (
         <RecordPaymentDialog

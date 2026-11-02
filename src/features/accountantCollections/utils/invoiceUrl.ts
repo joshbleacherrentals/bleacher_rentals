@@ -6,11 +6,11 @@ import { collectionsListStateToParams, type CollectionsListState } from "./colle
  * can recreate it. docs/specs/accountant-collections-09-design.md §3.
  */
 
-export type InvoiceTab = "info" | "tasks";
+export type InvoiceTab = "info" | "tasks" | "messages";
 
 /** A stale or missing `tab` opens Information. */
 export function parseInvoiceTab(raw: string | null): InvoiceTab {
-  return raw === "tasks" ? "tasks" : "info";
+  return raw === "tasks" || raw === "messages" ? raw : "info";
 }
 
 /** Every parameter the list owns: the ones a state change must clear before it writes its own. */

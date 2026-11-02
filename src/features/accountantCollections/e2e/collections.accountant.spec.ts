@@ -10,7 +10,8 @@ import {
 /**
  * The Collections tab and the invoice page as an accountant sees them
  * (docs/specs/accountant-collections-09-design.md §5, S1–S10 and S12; and
- * accountant-collections-10-prev-next.md §4, S13–S19).
+ * accountant-collections-10-prev-next.md §4, S13–S19; and
+ * accountant-collections-12-tabs-and-messages.md §4, S20–S23).
  *
  * Written, not run locally (project rule). This project only exists once E2E_ACCOUNTANT_EMAIL is
  * configured (see playwright.config.ts). The data is written with the service role by
@@ -396,5 +397,103 @@ test.describe("Collections tab (accountant)", () => {
     await page.goto("/accountant/invoice?id=00000000-0000-0000-0000-000000000000");
     await expect(page.getByText("Invoice not found")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("link", { name: "Back to Collections" })).toBeVisible();
+  });
+});
+
+// The Messages tab and the New Task button (docs/specs/accountant-collections-12-tabs-and-messages.md §4).
+test.describe("Messages tab and New Task (accountant)", () => {
+  const invoiceUrl = (eventId: string, query = "") => `/accountant/invoice?id=${eventId}${query}`;
+  const newTask = (page: Page) => page.getByRole("button", { name: "New Task" });
+
+  async function open(page: Page, booking: SeededBooking, query = "") {
+    await page.goto(invoiceUrl(booking.eventId, query));
+    await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
+      timeout: 60_000,
+    });
+  }
+
+  test("S20: the tab bar order is Information, Tasks, Messages, New Task", async ({ page }) => {
+    const booking = await seed("bar", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    const tabs = await page.getByRole("tab").allInnerTexts();
+    expect(tabs.map((t) => t.trim())).toEqual(["Information", "Tasks", "Messages"]);
+    await expect(newTask(page)).toBeVisible();
+    // New Task is a button after the tabs, not one of them.
+    await expect(page.getByRole("tab", { name: "New Task" })).toHaveCount(0);
+    const [messages, button] = await Promise.all([
+      page.getByRole("tab", { name: "Messages" }).boundingBox(),
+      newTask(page).boundingBox(),
+    ]);
+    expect(button!.x).toBeGreaterThan(messages!.x);
+  });
+
+  test("S21: Messages shows Internal and External; a message sent in Internal appears and the URL holds the tab; Next Task keeps it", async ({
+    page,
+  }) => {
+    const booking = await seed("messages", { taskDueInDays: 0, valueCents: 9_001_001 });
+    await seed("messages-next", { taskDueInDays: 0, valueCents: 9_001_000 });
+
+    await open(page, booking, "&csort=amount&cdir=desc");
+    await page.getByRole("tab", { name: "Messages" }).click();
+    await expect.poll(() => params(page).get("tab")).toBe("messages");
+    await expect(page.getByRole("tab", { name: "Messages" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    await expect(page.getByRole("tab", { name: "Internal" })).toBeVisible();
+    await page.getByRole("tab", { name: "External" }).click();
+    await expect(page.getByText("External messaging coming soon.")).toBeVisible();
+
+    await page.getByRole("tab", { name: "Internal" }).click();
+    const join = page.getByRole("button", { name: "Join chat" });
+    const menu = page.getByRole("button", { name: "Chat menu" });
+    await expect(join.or(menu)).toBeVisible({ timeout: 60_000 });
+    if (await join.isVisible()) {
+      await join.click();
+      await expect(menu).toBeVisible();
+    }
+    const text = `collections hello ${Date.now()}`;
+    await page.getByRole("textbox").click();
+    await page.keyboard.type(text);
+    await page.keyboard.press("Enter");
+    await expect(page.getByText(text)).toBeVisible();
+
+    await page.getByRole("link", { name: "Next Task" }).click();
+    await expect(page).toHaveURL(/tab=messages/);
+  });
+
+  test("S22: New Task is enabled with an open task and disabled without one", async ({ page }) => {
+    const withTask = await seed("newtask-on", { taskDueInDays: 0 });
+    const withoutTask = await seed("newtask-off", { taskDueInDays: 0, withOpenTask: false });
+
+    await open(page, withTask);
+    await expect(newTask(page)).toBeEnabled();
+
+    await open(page, withoutTask);
+    await expect(newTask(page)).toBeDisabled();
+    await expect(newTask(page)).toHaveAttribute("title", "There is no open task");
+  });
+
+  test("S23: New Task opens the Done / Next Task modal; Save completes the task and creates the next", async ({
+    page,
+  }) => {
+    const booking = await seed("newtask-save", { taskDueInDays: 0, taskNote: "First call" });
+
+    await open(page, booking, "&tab=messages");
+    await newTask(page).click();
+    const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByLabel("Note to self:").fill("Second call");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await expect
+      .poll(async () => (await tasksOf(booking.eventId)).map((t) => t.completed))
+      .toEqual([false, true]);
+    await page.getByRole("tab", { name: "Tasks" }).click();
+    await expect(page.getByText("Second call")).toBeVisible();
   });
 });

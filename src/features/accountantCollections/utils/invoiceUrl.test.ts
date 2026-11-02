@@ -20,6 +20,15 @@ describe("invoiceHref", () => {
     );
   });
 
+  it("writes tab=messages for the Messages tab", () => {
+    expect(invoiceHref({ eventId: "evt-1", tab: "messages", listState: DEFAULT })).toBe(
+      "/accountant/invoice?id=evt-1&tab=messages",
+    );
+    expect(invoiceHref({ eventId: "evt-1", tab: "messages", listState: CHANGED })).toBe(
+      "/accountant/invoice?id=evt-1&tab=messages&csort=amount&cdir=desc&cnotdue=1",
+    );
+  });
+
   it("carries the list's parameters after id and tab", () => {
     expect(invoiceHref({ eventId: "evt-1", tab: "info", listState: CHANGED })).toBe(
       "/accountant/invoice?id=evt-1&tab=info&csort=amount&cdir=desc&cnotdue=1",
@@ -63,8 +72,9 @@ describe("withCollectionsListState", () => {
 });
 
 describe("parseInvoiceTab", () => {
-  it("opens Tasks only for tasks, and Information for anything else", () => {
+  it("opens Tasks for tasks, Messages for messages, and Information for anything else", () => {
     expect(parseInvoiceTab("tasks")).toBe("tasks");
+    expect(parseInvoiceTab("messages")).toBe("messages");
     expect(parseInvoiceTab("info")).toBe("info");
     expect(parseInvoiceTab("bogus")).toBe("info");
     expect(parseInvoiceTab("")).toBe("info");

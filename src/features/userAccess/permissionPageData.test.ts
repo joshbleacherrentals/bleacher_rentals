@@ -278,6 +278,13 @@ describe("permission matrix", () => {
         expect(row?.description).toMatch(/closes by itself when the payment arrives/);
       });
 
+      // docs/specs/accountant-collections-12-tabs-and-messages.md §3.
+      it("says the invoice page has a Messages tab with the booking's internal chat", () => {
+        expect(row?.description).toContain(
+          "The page has a Messages tab with the booking's internal chat, the same as on the quote.",
+        );
+      });
+
       it("tells the accountant what they can do there", () => {
         expect(accountant("Collections")?.note).toBe(
           "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there.",

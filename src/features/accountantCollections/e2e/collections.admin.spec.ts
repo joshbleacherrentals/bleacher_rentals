@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   cleanupBookings,
   createOverdueBooking,
+  tasksOf,
   type SeededBooking,
 } from "./helpers/collectionsFixtures";
 
@@ -63,5 +64,84 @@ test.describe("Collections tab (admin)", () => {
     } finally {
       await cleanupBookings(seeded.map((b) => b.eventId));
     }
+  });
+});
+
+// The Messages tab and the New Task button
+// (docs/specs/accountant-collections-12-tabs-and-messages.md §4, S20–S23). Written, not run locally.
+test.describe("Messages tab and New Task (admin)", () => {
+  const stamp = Date.now();
+
+  async function withBooking(
+    suffix: string,
+    options: Omit<Parameters<typeof createOverdueBooking>[0], "name">,
+    run: (booking: SeededBooking) => Promise<void>,
+  ) {
+    const booking = await createOverdueBooking({
+      name: `E2E Collections admin ${suffix} ${stamp}`,
+      ...options,
+    });
+    try {
+      await run(booking);
+    } finally {
+      await cleanupBookings([booking.eventId]);
+    }
+  }
+
+  test("S20: the tab bar order is Information, Tasks, Messages, New Task", async ({ page }) => {
+    await withBooking("bar", { taskDueInDays: 0 }, async (booking) => {
+      await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+      await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
+        timeout: 60_000,
+      });
+      const tabs = await page.getByRole("tab").allInnerTexts();
+      expect(tabs.map((t) => t.trim())).toEqual(["Information", "Tasks", "Messages"]);
+      await expect(page.getByRole("button", { name: "New Task" })).toBeVisible();
+    });
+  });
+
+  test("S21: Messages shows Internal and External, and the URL holds the tab", async ({ page }) => {
+    await withBooking("messages", { taskDueInDays: 0 }, async (booking) => {
+      await page.goto(`/accountant/invoice?id=${booking.eventId}&tab=messages`);
+      await expect(page.getByRole("tab", { name: "Messages" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(page.getByRole("tab", { name: "Internal" })).toBeVisible();
+      await page.getByRole("tab", { name: "External" }).click();
+      await expect(page.getByText("External messaging coming soon.")).toBeVisible();
+    });
+  });
+
+  test("S22: New Task is enabled with an open task and disabled without one", async ({ page }) => {
+    await withBooking("newtask-on", { taskDueInDays: 0 }, async (booking) => {
+      await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+      await expect(page.getByRole("button", { name: "New Task" })).toBeEnabled({
+        timeout: 60_000,
+      });
+    });
+    await withBooking("newtask-off", { taskDueInDays: 0, withOpenTask: false }, async (booking) => {
+      await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+      await expect(page.getByRole("button", { name: "New Task" })).toBeDisabled({
+        timeout: 60_000,
+      });
+    });
+  });
+
+  test("S23: New Task opens the Done / Next Task modal; Save completes the task and creates the next", async ({
+    page,
+  }) => {
+    await withBooking("newtask-save", { taskDueInDays: 0 }, async (booking) => {
+      await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+      await page.getByRole("button", { name: "New Task" }).click();
+      const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
+      await expect(dialog).toBeVisible({ timeout: 60_000 });
+      await dialog.getByRole("button", { name: "Save" }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect
+        .poll(async () => (await tasksOf(booking.eventId)).map((t) => t.completed))
+        .toEqual([false, true]);
+    });
   });
 });

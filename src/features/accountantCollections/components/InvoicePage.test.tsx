@@ -3,12 +3,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { InvoiceStatus } from "../utils/invoiceStatus";
 import { invoiceDataFixture } from "./invoiceFixtures";
 
-const { mockSearchParams, mockInvoice, mockNeighbours, mockCan } = vi.hoisted(() => ({
-  mockSearchParams: { current: new URLSearchParams() },
-  mockInvoice: vi.fn(),
-  mockNeighbours: vi.fn(),
-  mockCan: { current: { recordPayment: true } },
-}));
+const { mockSearchParams, mockInvoice, mockNeighbours, mockCan, mockMessagesTab } = vi.hoisted(
+  () => ({
+    mockSearchParams: { current: new URLSearchParams() },
+    mockInvoice: vi.fn(),
+    mockNeighbours: vi.fn(),
+    mockCan: { current: { recordPayment: true, useInternalChat: true } },
+    mockMessagesTab: vi.fn(),
+  }),
+);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -31,6 +34,12 @@ vi.mock("../hooks/useTaskNeighbours", () => ({
 }));
 vi.mock("@/features/quotesAndBookings/hooks/useQuotesBookingsCapabilities", () => ({
   useQuotesBookingsCapabilities: () => mockCan.current,
+}));
+vi.mock("@/features/quotesAndBookings/components/quoteDetail/tabs/MessagesTab", () => ({
+  MessagesTab: (props: unknown) => {
+    mockMessagesTab(props);
+    return <div data-testid="messages-tab" />;
+  },
 }));
 vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
   usePermissionsStore: (selector: (s: { userId: string }) => unknown) =>
@@ -55,7 +64,8 @@ beforeEach(() => {
   mockInvoice.mockReturnValue(invoiceDataFixture());
   mockNeighbours.mockReset();
   mockNeighbours.mockReturnValue({ isReady: true, previousId: null, nextId: null });
-  mockCan.current = { recordPayment: true };
+  mockCan.current = { recordPayment: true, useInternalChat: true };
+  mockMessagesTab.mockReset();
 });
 
 describe("InvoicePage: Information", () => {
@@ -149,7 +159,7 @@ describe("InvoicePage: header", () => {
   });
 
   it("does not offer Record Payment to anyone else, in the header or in Payment History", () => {
-    mockCan.current = { recordPayment: false };
+    mockCan.current = { recordPayment: false, useInternalChat: true };
     const html = renderAt("id=evt-1");
     expect(html).not.toContain("Record Payment");
     expect(html).not.toContain("Record payment");
@@ -270,6 +280,122 @@ describe("InvoicePage: Tasks", () => {
   it("still opens an event with no open task on Information", () => {
     mockInvoice.mockReturnValue(invoiceDataFixture({ tasks: { open: null, completed: [] } }));
     expect(renderAt("id=evt-1&tab=info")).toContain("Riverside Charity Run");
+  });
+});
+
+// docs/specs/accountant-collections-12-tabs-and-messages.md §5.
+describe("InvoicePage: tab bar", () => {
+  const tabLabels = (html: string) =>
+    [...html.matchAll(/role="tab"[^>]*>([^<]*)</g)].map((match) => match[1]);
+  const tablist = (html: string) =>
+    /role="tablist"[^>]*>((?:(?!<\/div>)[^])*)<\/div>/.exec(html)?.[1] ?? "";
+
+  it("reads Information, Tasks, Messages, with New Task after them", () => {
+    const html = renderAt("id=evt-1");
+    expect(tabLabels(html)).toEqual(["Information", "Tasks", "Messages"]);
+    expect(html.indexOf("New Task")).toBeGreaterThan(html.indexOf(">Messages<"));
+  });
+
+  it("keeps New Task out of the tab list, which holds the tabs only", () => {
+    const html = renderAt("id=evt-1");
+    expect(tablist(html)).toContain(">Messages<");
+    expect(tablist(html)).not.toContain("New Task");
+    expect(html).not.toMatch(/role="tab"[^>]*>(?:(?!<\/button>)[^])*New Task/);
+  });
+
+  it("gives the tabs two thirds of the bar and New Task one third", () => {
+    const html = renderAt("id=evt-1");
+    const list = /<div[^>]*role="tablist"[^>]*>/.exec(html)?.[0] ?? "";
+    const newTask = /<button(?:(?!>)[^])*>(?=(?:(?!<\/button>)[^])*New Task)/.exec(html)?.[0] ?? "";
+    expect(list).toMatch(/class="[^"]*\bflex-\[2\]/);
+    expect(newTask).toMatch(/class="[^"]*\bflex-1\b/);
+  });
+
+  it.each([
+    ["info", "Information"],
+    ["tasks", "Tasks"],
+    ["messages", "Messages"],
+  ])("selects %s when the URL says so", (tab, label) => {
+    const html = renderAt(`id=evt-1&tab=${tab}`);
+    expect(html).toMatch(new RegExp(`role="tab"[^>]*aria-selected="true"[^>]*>${label}<`));
+    expect(html.match(/aria-selected="true"/g)).toHaveLength(1);
+  });
+});
+
+describe("InvoicePage: Messages", () => {
+  it("mounts the quote card's MessagesTab with the event id and the capabilities", () => {
+    const html = renderAt("id=evt-1&tab=messages");
+    expect(html).toMatch(/role="tabpanel"[^>]*aria-label="Messages"/);
+    expect(html).toContain('data-testid="messages-tab"');
+    expect(mockMessagesTab).toHaveBeenCalledTimes(1);
+    expect(mockMessagesTab).toHaveBeenCalledWith({
+      quoteId: "evt-1",
+      can: { recordPayment: true, useInternalChat: true },
+    });
+  });
+
+  it("shows neither Information nor Tasks on the Messages tab", () => {
+    const html = renderAt("id=evt-1&tab=messages");
+    expect(html).not.toContain('aria-label="Money"');
+    expect(html).not.toContain("Current task due now");
+  });
+
+  it("does not mount the chat on the other tabs", () => {
+    renderAt("id=evt-1&tab=info");
+    renderAt("id=evt-1&tab=tasks");
+    expect(mockMessagesTab).not.toHaveBeenCalled();
+  });
+
+  it("keeps the tab for Previous Task and Next Task", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
+    const html = unescape(renderAt("id=evt-1&tab=messages"));
+    expect(html).toContain('href="/accountant/invoice?id=evt-2&tab=messages"');
+    expect(html).toContain('href="/accountant/invoice?id=evt-0&tab=messages"');
+  });
+});
+
+describe("InvoicePage: New Task", () => {
+  const button = (html: string) =>
+    /<button(?:(?!<\/button>)[^])*New Task<\/button>/.exec(html)?.[0] ?? "";
+  const noOpenTask = () =>
+    mockInvoice.mockReturnValue(
+      invoiceDataFixture({
+        tasks: { open: null, completed: invoiceDataFixture().tasks.completed },
+      }),
+    );
+
+  it("is a plain button that announces a dialog, with a plus icon", () => {
+    const html = button(renderAt("id=evt-1"));
+    expect(html).toMatch(/^<button[^>]*type="button"/);
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain("<svg");
+  });
+
+  it("is enabled while the event has an open task", () => {
+    const html = button(renderAt("id=evt-1"));
+    expect(html).not.toMatch(/\sdisabled=""/);
+    expect(html).not.toContain("There is no open task");
+  });
+
+  it("is disabled, dimmed, not-allowed and explained when the event has no open task", () => {
+    noOpenTask();
+    const html = button(renderAt("id=evt-1"));
+    expect(html).toMatch(/\sdisabled=""/);
+    expect(html).toContain('title="There is no open task"');
+    expect(html).toContain("cursor-not-allowed");
+    expect(html).toContain("opacity-50");
+  });
+
+  it("is on every tab", () => {
+    for (const tab of ["info", "tasks", "messages"]) {
+      expect(button(renderAt(`id=evt-1&tab=${tab}`)), tab).not.toBe("");
+    }
+  });
+
+  it("does not turn the Tasks tab's own Done / Next Task button into a second New Task", () => {
+    const html = renderAt("id=evt-1&tab=tasks");
+    expect(html.match(/New Task/g)).toHaveLength(1);
+    expect(html).toContain("Done / Next Task");
   });
 });
 
