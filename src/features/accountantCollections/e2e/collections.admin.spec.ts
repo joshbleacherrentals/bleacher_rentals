@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   addEventFile,
   addTask,
@@ -131,13 +131,13 @@ test.describe("Messages tab and New Task (admin)", () => {
     });
   });
 
-  test("S23: New Task opens the Done / Next Task modal; Save completes the task and creates the next", async ({
+  test("S23: New Task opens the New Task window; Save completes the task and creates the next", async ({
     page,
   }) => {
     await withBooking("newtask-save", { taskDueInDays: 0 }, async (booking) => {
       await page.goto(`/accountant/invoice?id=${booking.eventId}`);
-      await page.getByRole("button", { name: "New Task" }).click();
-      const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
+      await page.getByRole("button", { name: "New Task", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "New Task" });
       await expect(dialog).toBeVisible({ timeout: 60_000 });
       await dialog.getByRole("button", { name: "Save" }).click();
       await expect(dialog).toHaveCount(0);
@@ -202,6 +202,100 @@ test.describe("Task History and Files (admin)", () => {
       });
       await expect(files.getByRole("button", { name: /^Delete / })).toHaveCount(1);
       await expect(files.getByRole("button", { name: "Delete Check_Scan.pdf" })).toBeVisible();
+    });
+  });
+});
+
+// The New Task window (docs/specs/accountant-collections-14-new-task-window.md §4, S30 to S32 in a
+// lighter form than the accountant's). Written, not run locally.
+test.describe("New Task window (admin)", () => {
+  const VIEWPORT = { width: 1280, height: 800 };
+  test.use({ viewport: VIEWPORT });
+
+  const stamp = Date.now();
+
+  async function withBooking(
+    suffix: string,
+    options: Omit<Parameters<typeof createOverdueBooking>[0], "name">,
+    run: (booking: SeededBooking) => Promise<void>,
+  ) {
+    const booking = await createOverdueBooking({
+      name: `E2E Collections admin ${suffix} ${stamp}`,
+      ...options,
+    });
+    try {
+      await run(booking);
+    } finally {
+      await cleanupBookings([booking.eventId]);
+    }
+  }
+
+  const win = (page: Page) => page.getByRole("dialog", { name: "New Task" });
+
+  async function openWindow(page: Page, booking: SeededBooking) {
+    await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+    await page.getByRole("button", { name: "New Task", exact: true }).click({ timeout: 60_000 });
+    await expect(win(page)).toBeVisible();
+  }
+
+  async function box(locator: ReturnType<typeof win>) {
+    const b = await locator.boundingBox();
+    if (!b) throw new Error("not on screen");
+    return b;
+  }
+
+  test("S30: New Task opens the window at the design's place and size, not modal", async ({
+    page,
+  }) => {
+    await withBooking("win-open", { taskDueInDays: 0 }, async (booking) => {
+      await openWindow(page, booking);
+      await expect(win(page)).toHaveAttribute("aria-modal", "false");
+      const b = await box(win(page));
+      expect([b.x, b.y, b.width, b.height].map(Math.round)).toEqual([730, 250, 430, 360]);
+    });
+  });
+
+  test("S31: while it is open, the Messages tab can be clicked and the window stays", async ({
+    page,
+  }) => {
+    await withBooking("win-page", { taskDueInDays: 0 }, async (booking) => {
+      await openWindow(page, booking);
+      const before = await box(win(page));
+      await page.getByRole("tab", { name: "Messages" }).click();
+      await expect(page.getByRole("tab", { name: "Messages" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await expect(win(page)).toBeVisible();
+      expect(await box(win(page))).toEqual(before);
+    });
+  });
+
+  test("S32: dragging the title bar moves the window and cannot take it off the screen", async ({
+    page,
+  }) => {
+    await withBooking("win-move", { taskDueInDays: 0 }, async (booking) => {
+      await openWindow(page, booking);
+      const title = win(page).getByRole("heading", { name: "New Task" });
+      const drag = async (dx: number, dy: number) => {
+        const b = await box(title);
+        const x = b.x + b.width / 2;
+        const y = b.y + b.height / 2;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + dx, y + dy, { steps: 12 });
+        await page.mouse.up();
+      };
+
+      const start = await box(win(page));
+      await drag(-200, 100);
+      const moved = await box(win(page));
+      expect(Math.round(moved.x)).toBe(Math.round(start.x - 200));
+      expect(Math.round(moved.y)).toBe(Math.round(start.y + 100));
+
+      await drag(-3000, -3000);
+      const corner = await box(win(page));
+      expect([Math.round(corner.x), Math.round(corner.y)]).toEqual([0, 0]);
     });
   });
 });

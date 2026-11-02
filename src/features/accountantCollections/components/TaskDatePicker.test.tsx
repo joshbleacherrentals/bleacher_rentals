@@ -89,12 +89,26 @@ describe("TaskMonthGrid", () => {
   });
 });
 
+// docs/specs/accountant-collections-14-new-task-window.md §3: the calendar is drawn inside the
+// window, under the button, not in a popover.
 describe("TaskDatePicker", () => {
-  it("shows its label on a button that opens the calendar", () => {
-    const html = renderToStaticMarkup(
-      <TaskDatePicker value="2026-11-12" today={TODAY} label="2 Days" onChange={() => {}} />,
-    );
-    expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*>[^]*2 Days/);
-    expect(html).toContain('aria-expanded="false"');
+  const html = renderToStaticMarkup(
+    <TaskDatePicker value="2026-11-12" today={TODAY} label="2 Days" onChange={() => {}} />,
+  );
+
+  it("shows its label on a button that says whether the calendar is open", () => {
+    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*>[^]*2 Days/);
+  });
+
+  it("is a plain toggle, not a popover trigger", () => {
+    expect(html).not.toContain("aria-haspopup");
+    expect(html).not.toContain("data-state");
+    expect(html).not.toContain("aria-controls");
+  });
+
+  it("draws no calendar until the button is pressed", () => {
+    expect(html).not.toContain('role="group"');
+    expect(html).not.toContain("November 2026");
+    expect(html).not.toContain("Next month");
   });
 });

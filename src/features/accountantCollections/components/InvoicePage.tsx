@@ -18,17 +18,20 @@ import {
   parseInvoiceTab,
   type InvoiceTab,
 } from "../utils/invoiceUrl";
-import { DoneNextTaskDialog } from "./DoneNextTaskDialog";
 import { InvoiceHeader } from "./InvoiceHeader";
 import { InvoiceInformation } from "./InvoiceInformation";
+import { NewTaskWindow } from "./NewTaskWindow";
 
 /**
  * The invoice page of one event: sticky header and tabs (Information, Messages) with the New Task
  * button, the open tab, and the footer with Previous Task and Next Task (links to the neighbours
- * fixed when the page opened). The event, the tab and the list's order come from the URL.
+ * fixed when the page opened). The event, the tab and the list's order come from the URL. The New
+ * Task button opens a floating window that belongs to the page, not to a tab, and to the event it
+ * was opened on.
  * docs/specs/accountant-collections-09-design.md §3, accountant-collections-10-prev-next.md §3,
- * accountant-collections-12-tabs-and-messages.md §3 and
- * accountant-collections-13-task-history-and-files.md §3.
+ * accountant-collections-12-tabs-and-messages.md §3,
+ * accountant-collections-13-task-history-and-files.md §3 and
+ * accountant-collections-14-new-task-window.md §3.
  */
 
 // Same reasoning as on the Billing tab: a form most visits never open.
@@ -68,6 +71,15 @@ function FooterLink({ href, children }: { href: string | null; children: React.R
   );
 }
 
+/**
+ * The event the New Task window is open for once the page shows `eventId`: the same one if it is
+ * that event, otherwise none. Leaving an event closes the window for good, so going back to it
+ * does not open the window again.
+ */
+export function windowOpenForEvent(openFor: string | null, eventId: string): string | null {
+  return openFor === eventId ? openFor : null;
+}
+
 export function InvoicePage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -82,7 +94,11 @@ export function InvoicePage() {
   const userId = usePermissionsStore((s) => s.userId);
   const timezone = useTimezoneStore((s) => s.timezone);
   const [recordOpen, setRecordOpen] = useState(false);
-  const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const [windowOpenFor, setWindowOpenFor] = useState<string | null>(null);
+  // Previous / Next Task keeps this component and changes only `?id=`: adjust during render, no
+  // effect, so the window never shows for another event, not even for one frame.
+  const keptOpenFor = windowOpenForEvent(windowOpenFor, eventId);
+  if (keptOpenFor !== windowOpenFor) setWindowOpenFor(keptOpenFor);
 
   const backHref = collectionsHref(listState);
   // Disabled while the neighbours are not ready, whatever ids they hold.
@@ -152,7 +168,7 @@ export function InvoicePage() {
             aria-haspopup="dialog"
             disabled={data.tasks.open === null}
             title={data.tasks.open === null ? "There is no open task" : undefined}
-            onClick={() => setNewTaskOpen(true)}
+            onClick={() => setWindowOpenFor(eventId)}
             className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-t-md bg-lightBlue px-3 py-3.5 text-base font-semibold text-white hover:bg-lightBlue/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="size-4" aria-hidden />
@@ -190,12 +206,14 @@ export function InvoicePage() {
         </div>
       </div>
 
-      <DoneNextTaskDialog
-        open={newTaskOpen}
-        onOpenChange={setNewTaskOpen}
-        eventId={eventId}
-        today={data.today}
-      />
+      {keptOpenFor !== null && (
+        <NewTaskWindow
+          key={eventId}
+          eventId={eventId}
+          today={data.today}
+          onClose={() => setWindowOpenFor(null)}
+        />
+      )}
 
       {can.recordPayment && recordOpen && (
         <RecordPaymentDialog

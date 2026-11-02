@@ -57,7 +57,7 @@ vi.mock("@/lib/useTimezoneStore", () => ({
     selector({ timezone: "America/Toronto" }),
 }));
 
-import { InvoicePage } from "./InvoicePage";
+import { InvoicePage, windowOpenForEvent } from "./InvoicePage";
 
 function renderAt(query: string) {
   mockSearchParams.current = new URLSearchParams(query);
@@ -439,6 +439,34 @@ describe("InvoicePage: New Task", () => {
     const html = renderAt("id=evt-1&tab=info");
     expect(html.match(/New Task/g)).toHaveLength(1);
     expect(html).not.toContain("Done / Next Task");
+  });
+
+  it("is a window, not a modal: nothing is open before it is pressed", () => {
+    for (const tab of ["info", "messages"]) {
+      const html = renderAt(`id=evt-1&tab=${tab}`);
+      expect(html).not.toContain('role="dialog"');
+      expect(html).not.toContain("Close New Task window");
+      expect(html).not.toContain("Next Task Due:");
+    }
+  });
+});
+
+// docs/specs/accountant-collections-14-new-task-window.md §3 and §5.
+describe("windowOpenForEvent", () => {
+  it("keeps the window for the event it was opened on", () => {
+    expect(windowOpenForEvent("evt-1", "evt-1")).toBe("evt-1");
+  });
+
+  it("closes it for any other event, and stays closed with nothing open", () => {
+    expect(windowOpenForEvent("evt-1", "evt-2")).toBeNull();
+    expect(windowOpenForEvent(null, "evt-1")).toBeNull();
+    expect(windowOpenForEvent(null, "")).toBeNull();
+  });
+
+  it("does not reopen on the first event once it has been left", () => {
+    // The page applies it on every render: A → B resets the state, so B → A finds nothing open.
+    const atB = windowOpenForEvent("evt-1", "evt-2");
+    expect(windowOpenForEvent(atB, "evt-1")).toBeNull();
   });
 });
 

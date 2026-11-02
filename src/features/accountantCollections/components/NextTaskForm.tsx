@@ -2,13 +2,6 @@
 
 import { useState } from "react";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { NextTaskValidationError, saveNextTask, type SaveNextTaskInput } from "../db/saveNextTask";
 import { daysBetween } from "../utils/calendarDays";
 import { defaultNextTaskDate, NEXT_TASK_DEFAULT_NOTE } from "../utils/nextTaskDefaults";
@@ -16,8 +9,10 @@ import { validateNextTask } from "../utils/validateNextTask";
 import { TaskDatePicker } from "./TaskDatePicker";
 
 /**
- * Done / Next Task: the date and note of the next task, and Save (spec 06's `saveNextTask`).
- * docs/specs/accountant-collections-09-design.md §3.
+ * The form inside the New Task window: the date and note of the next task, and Save (spec 06's
+ * `saveNextTask`). It fills the window's body: the note takes the height the window gives it.
+ * docs/specs/accountant-collections-09-design.md §3 and
+ * accountant-collections-14-new-task-window.md §3.
  */
 
 /** What the date button says: `Today`, `1 Day` or `N Days`. */
@@ -76,29 +71,30 @@ export function NextTaskFormView({
   onSave: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium">Next Task Due:</span>
-        <TaskDatePicker
-          value={dueDate}
-          today={today}
-          label={dueLabel(dueDate, today)}
-          onChange={onDueDateChange}
-        />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto p-4">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-sm font-medium">Next Task Due:</span>
+          <TaskDatePicker
+            value={dueDate}
+            today={today}
+            label={dueLabel(dueDate, today)}
+            onChange={onDueDateChange}
+          />
+        </div>
+        <div className="flex min-h-24 flex-1 flex-col gap-1.5">
+          <label htmlFor="next-task-note" className="text-sm font-medium">
+            Note to self:
+          </label>
+          <textarea
+            id="next-task-note"
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+            className="min-h-16 w-full flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900"
+          />
+        </div>
       </div>
-      <div className="flex flex-col gap-2">
-        <label htmlFor="next-task-note" className="text-sm font-medium">
-          Note to self:
-        </label>
-        <textarea
-          id="next-task-note"
-          rows={3}
-          value={note}
-          onChange={(e) => onNoteChange(e.target.value)}
-          className="min-h-[88px] w-full resize-y rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900"
-        />
-      </div>
-      <div className="flex justify-end">
+      <div className="flex shrink-0 justify-end px-4 pb-4">
         <button
           type="button"
           onClick={onSave}
@@ -112,13 +108,14 @@ export function NextTaskFormView({
   );
 }
 
-/** Mounted only while the dialog is open, so each opening starts from the defaults. */
-function NextTaskForm({
+/** Mounted only while the window is open, so each opening starts from the defaults. */
+export function NextTaskForm({
   eventId,
   today,
   onSaved,
 }: {
   eventId: string;
+  /** `YYYY-MM-DD`, the date in the timezone store. */
   today: string;
   onSaved: () => void;
 }) {
@@ -143,33 +140,5 @@ function NextTaskForm({
       onNoteChange={setNote}
       onSave={save}
     />
-  );
-}
-
-export function DoneNextTaskDialog({
-  open,
-  onOpenChange,
-  eventId,
-  today,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  eventId: string;
-  /** `YYYY-MM-DD`, the date in the timezone store. */
-  today: string;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Done / Next Task</DialogTitle>
-          <DialogDescription className="sr-only">
-            Choose the date of the next task and write a note to yourself. Saving completes the
-            current task.
-          </DialogDescription>
-        </DialogHeader>
-        <NextTaskForm eventId={eventId} today={today} onSaved={() => onOpenChange(false)} />
-      </DialogContent>
-    </Dialog>
   );
 }

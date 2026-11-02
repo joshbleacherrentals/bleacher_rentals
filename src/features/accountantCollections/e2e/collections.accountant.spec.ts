@@ -16,7 +16,9 @@ import {
  * accountant-collections-10-prev-next.md §4, S13–S19; and
  * accountant-collections-12-tabs-and-messages.md §4, S20–S23; and
  * accountant-collections-13-task-history-and-files.md §4, S24–S29, which also rewrote S6, S7, S9
- * and S12 and the paths of S13–S19 now that the Tasks tab is gone).
+ * and S12 and the paths of S13–S19 now that the Tasks tab is gone; and
+ * accountant-collections-14-new-task-window.md §4, S30–S37, which also rewrote the modal steps of
+ * S6, S17 and S23 for the New Task window).
  *
  * Written, not run locally (project rule). This project only exists once E2E_ACCOUNTANT_EMAIL is
  * configured (see playwright.config.ts). The data is written with the service role by
@@ -173,8 +175,9 @@ test.describe("Collections tab (accountant)", () => {
     const history = page.getByRole("region", { name: "Task History" });
     await expect(history.getByText("First call")).toBeVisible({ timeout: 60_000 });
 
-    await page.getByRole("button", { name: "New Task" }).click();
-    const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
+    // `exact`: with the window open, "Close New Task window" also contains these words.
+    await page.getByRole("button", { name: "New Task", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "New Task" });
     await expect(dialog.getByRole("button", { name: /2 Days/ })).toBeVisible();
     const note = dialog.getByLabel("Note to self:");
     await expect(note).toHaveValue("Follow-up needed");
@@ -373,8 +376,8 @@ test.describe("Collections tab (accountant)", () => {
       await open(page, mid, "&csort=amount&cdir=desc");
       await expect(next(page)).toHaveAttribute("href", /id=/);
 
-      await page.getByRole("button", { name: "New Task" }).click();
-      const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
+      await page.getByRole("button", { name: "New Task", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "New Task" });
       await dialog.getByRole("button", { name: "Save" }).click();
       await expect(dialog).toHaveCount(0);
 
@@ -415,7 +418,7 @@ test.describe("Collections tab (accountant)", () => {
 // The Messages tab and the New Task button (docs/specs/accountant-collections-12-tabs-and-messages.md §4).
 test.describe("Messages tab and New Task (accountant)", () => {
   const invoiceUrl = (eventId: string, query = "") => `/accountant/invoice?id=${eventId}${query}`;
-  const newTask = (page: Page) => page.getByRole("button", { name: "New Task" });
+  const newTask = (page: Page) => page.getByRole("button", { name: "New Task", exact: true });
 
   async function open(page: Page, booking: SeededBooking, query = "") {
     await page.goto(invoiceUrl(booking.eventId, query));
@@ -488,14 +491,14 @@ test.describe("Messages tab and New Task (accountant)", () => {
     await expect(newTask(page)).toHaveAttribute("title", "There is no open task");
   });
 
-  test("S23: New Task opens the Done / Next Task modal; Save completes the task and creates the next", async ({
+  test("S23: New Task opens the New Task window; Save completes the task and creates the next", async ({
     page,
   }) => {
     const booking = await seed("newtask-save", { taskDueInDays: 0, taskNote: "First call" });
 
     await open(page, booking, "&tab=messages");
     await newTask(page).click();
-    const dialog = page.getByRole("dialog", { name: "Done / Next Task" });
+    const dialog = page.getByRole("dialog", { name: "New Task" });
     await expect(dialog).toBeVisible();
 
     await dialog.getByLabel("Note to self:").fill("Second call");
@@ -691,5 +694,253 @@ test.describe("Task History and Files (accountant)", () => {
       timeout: 60_000,
     });
     await expect(history(page).getByText("Chase payment")).toBeVisible();
+  });
+});
+
+// The New Task window (docs/specs/accountant-collections-14-new-task-window.md §4, S30–S37).
+test.describe("New Task window (accountant)", () => {
+  const VIEWPORT = { width: 1280, height: 800 };
+  test.use({ viewport: VIEWPORT });
+
+  const newTask = (page: Page) => page.getByRole("button", { name: "New Task", exact: true });
+  const win = (page: Page) => page.getByRole("dialog", { name: "New Task" });
+  const handle = (page: Page, label: string) =>
+    win(page).getByRole("button", { name: label, exact: true });
+
+  async function open(page: Page, booking: SeededBooking, query = "") {
+    await page.goto(`/accountant/invoice?id=${booking.eventId}${query}`);
+    await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
+      timeout: 60_000,
+    });
+  }
+
+  async function openWindow(page: Page) {
+    await newTask(page).click();
+    await expect(win(page)).toBeVisible();
+  }
+
+  async function box(locator: ReturnType<typeof win>) {
+    const b = await locator.boundingBox();
+    if (!b) throw new Error("not on screen");
+    return b;
+  }
+
+  /** Press at the centre of `from`, move by (dx, dy) in steps, release. */
+  async function dragBy(page: Page, from: ReturnType<typeof win>, dx: number, dy: number) {
+    const b = await box(from);
+    const x = b.x + b.width / 2;
+    const y = b.y + b.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y + dy, { steps: 12 });
+    await page.mouse.up();
+  }
+
+  const title = (page: Page) => win(page).getByRole("heading", { name: "New Task" });
+
+  test("S30: New Task opens the window at the design's place and size; the page behind is not dimmed", async ({
+    page,
+  }) => {
+    const booking = await seed("win-open", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    await openWindow(page);
+
+    await expect(win(page)).toHaveAttribute("aria-modal", "false");
+    const b = await box(win(page));
+    expect(b.x).toBeCloseTo(730, 0);
+    expect(b.y).toBeCloseTo(250, 0);
+    expect(b.width).toBeCloseTo(430, 0);
+    expect(b.height).toBeCloseTo(360, 0);
+    // No overlay: nothing the size of the screen sits over the page.
+    await expect(page.locator('[class*="bg-black/50"]')).toHaveCount(0);
+    await expect(win(page).getByLabel("Note to self:")).toHaveValue("Follow-up needed");
+  });
+
+  test("S31: while it is open, the Messages tab can be clicked and the page scrolls; the window keeps its screen position", async ({
+    page,
+  }) => {
+    const booking = await seed("win-page", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    await openWindow(page);
+    const before = await box(win(page));
+
+    // Scroll a long Information page with the pointer outside the window.
+    const moneyBefore = await box(page.getByRole("region", { name: "Money" }));
+    await page.mouse.move(500, 700);
+    await page.mouse.wheel(0, 400);
+    await expect
+      .poll(async () => (await box(page.getByRole("region", { name: "Money" }))).y)
+      .toBeLessThan(moneyBefore.y);
+    expect(await box(win(page))).toEqual(before);
+
+    await page.getByRole("tab", { name: "Messages" }).click();
+    await expect.poll(() => params(page).get("tab")).toBe("messages");
+    await expect(page.getByRole("tab", { name: "Messages" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(win(page)).toBeVisible();
+    expect(await box(win(page))).toEqual(before);
+  });
+
+  test("S32: dragging the title bar moves the window and cannot take it off the screen", async ({
+    page,
+  }) => {
+    const booking = await seed("win-move", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    await openWindow(page);
+    const start = await box(win(page));
+
+    await dragBy(page, title(page), -200, 100);
+    const moved = await box(win(page));
+    expect(moved.x).toBeCloseTo(start.x - 200, 0);
+    expect(moved.y).toBeCloseTo(start.y + 100, 0);
+    expect(moved.width).toBeCloseTo(start.width, 0);
+    expect(moved.height).toBeCloseTo(start.height, 0);
+
+    // Far up and to the left: it stops at the corner.
+    await dragBy(page, title(page), -3000, -3000);
+    const corner = await box(win(page));
+    expect(corner.x).toBeCloseTo(0, 0);
+    expect(corner.y).toBeCloseTo(0, 0);
+
+    // Far down and to the right: the whole width stays in, the top 48 px stay on screen.
+    await dragBy(page, title(page), 5000, 5000);
+    const far = await box(win(page));
+    expect(far.x + far.width).toBeCloseTo(VIEWPORT.width, 0);
+    expect(far.y).toBeCloseTo(VIEWPORT.height - 48, 0);
+  });
+
+  test("S33: the east edge changes only the width, the south edge only the height, the corner both; the minimum holds", async ({
+    page,
+  }) => {
+    const booking = await seed("win-size", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    await openWindow(page);
+    const start = await box(win(page));
+
+    await dragBy(page, handle(page, "Resize window width"), 100, 60);
+    const wide = await box(win(page));
+    expect(wide.width).toBeCloseTo(start.width + 100, 0);
+    expect(wide.height).toBeCloseTo(start.height, 0);
+
+    await dragBy(page, handle(page, "Resize window height"), 60, 40);
+    const tall = await box(win(page));
+    expect(tall.height).toBeCloseTo(wide.height + 40, 0);
+    expect(tall.width).toBeCloseTo(wide.width, 0);
+
+    await dragBy(page, handle(page, "Resize window"), 30, 20);
+    const both = await box(win(page));
+    expect(both.width).toBeCloseTo(tall.width + 30, 0);
+    expect(both.height).toBeCloseTo(tall.height + 20, 0);
+    expect(both.x).toBeCloseTo(start.x, 0);
+    expect(both.y).toBeCloseTo(start.y, 0);
+
+    await dragBy(page, handle(page, "Resize window"), -3000, -3000);
+    const small = await box(win(page));
+    expect(small.width).toBeCloseTo(320, 0);
+    expect(small.height).toBeCloseTo(240, 0);
+  });
+
+  test("S34: after a move and a resize, closing and reopening, and a reload, keep the geometry", async ({
+    page,
+  }) => {
+    const booking = await seed("win-keep", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    await openWindow(page);
+    await dragBy(page, title(page), -150, -100);
+    await dragBy(page, handle(page, "Resize window"), 60, 40);
+    const kept = await box(win(page));
+
+    await page.getByRole("button", { name: "Close New Task window" }).click();
+    await expect(win(page)).toHaveCount(0);
+    await openWindow(page);
+    expect(await box(win(page))).toEqual(kept);
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
+      timeout: 60_000,
+    });
+    await openWindow(page);
+    expect(await box(win(page))).toEqual(kept);
+  });
+
+  test("S35: Save completes the open task and creates the next; the window closes; Task History shows the new Open row", async ({
+    page,
+  }) => {
+    const booking = await seed("win-save", { taskDueInDays: 0, taskNote: "First call" });
+
+    await open(page, booking);
+    await openWindow(page);
+    await win(page).getByLabel("Note to self:").fill("Second call");
+    await win(page).getByRole("button", { name: "Save" }).click();
+    await expect(win(page)).toHaveCount(0);
+
+    await expect
+      .poll(async () => (await tasksOf(booking.eventId)).map((t) => t.completed))
+      .toEqual([false, true]);
+    const history = page.getByRole("region", { name: "Task History" });
+    await expect(history.getByText("Second call")).toBeVisible();
+    await expect(history.getByText("Open", { exact: true })).toHaveCount(1);
+  });
+
+  test("S36: Previous Task / Next Task closes the window; the next event's window opens clean; going back does not reopen it", async ({
+    page,
+  }) => {
+    const first = await seed("win-nav-first", { taskDueInDays: 0, valueCents: 9_002_002 });
+    const second = await seed("win-nav-second", { taskDueInDays: 0, valueCents: 9_002_001 });
+
+    await open(page, first, "&csort=amount&cdir=desc");
+    await openWindow(page);
+    await win(page).getByLabel("Note to self:").fill("Typed on the first event");
+
+    await page.getByRole("link", { name: "Next Task" }).click();
+    await expect(page).toHaveURL(new RegExp(`id=${second.eventId}`));
+    await expect(page.getByRole("heading", { name: second.name })).toBeVisible();
+    await expect(win(page)).toHaveCount(0);
+
+    await openWindow(page);
+    await expect(win(page).getByLabel("Note to self:")).toHaveValue("Follow-up needed");
+
+    await page.getByRole("link", { name: "Previous Task" }).click();
+    await expect(page).toHaveURL(new RegExp(`id=${first.eventId}`));
+    await expect(page.getByRole("heading", { name: first.name })).toBeVisible();
+    await expect(win(page)).toHaveCount(0);
+  });
+
+  test("S37: the calendar opens inside the window; a day can be picked while the window is moved", async ({
+    page,
+  }) => {
+    const booking = await seed("win-calendar", { taskDueInDays: 0 });
+
+    await open(page, booking);
+    await openWindow(page);
+
+    // Found by its aria-expanded, not its label: the label changes with the chosen day.
+    const dateButton = win(page).locator("button[aria-expanded]");
+    await expect(dateButton).toContainText("2 Days");
+    await expect(dateButton).toHaveAttribute("aria-expanded", "false");
+    await dateButton.click();
+    await expect(dateButton).toHaveAttribute("aria-expanded", "true");
+
+    const calendar = win(page).getByRole("group", { name: "Choose the date for the next task" });
+    await expect(calendar).toBeVisible();
+    // Inside the window, not floating above the page.
+    const [inner, outer] = await Promise.all([box(calendar), box(win(page))]);
+    expect(inner.x).toBeGreaterThanOrEqual(outer.x);
+    expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
+
+    await dragBy(page, title(page), -120, 40);
+    await expect(calendar).toBeVisible();
+
+    await calendar.locator('button[aria-pressed="false"]:not([disabled])').first().click();
+    await expect(calendar).toHaveCount(0);
+    await expect(dateButton).toHaveAttribute("aria-expanded", "false");
+    await expect(dateButton).not.toContainText("2 Days");
   });
 });

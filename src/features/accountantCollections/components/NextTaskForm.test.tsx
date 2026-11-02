@@ -12,7 +12,13 @@ vi.mock("@/components/toasts/ErrorToast", () => ({
 }));
 
 import { NextTaskValidationError } from "../db/saveNextTask";
-import { canSaveNextTask, dueLabel, NextTaskFormView, submitNextTask } from "./DoneNextTaskDialog";
+import {
+  canSaveNextTask,
+  dueLabel,
+  NextTaskForm,
+  NextTaskFormView,
+  submitNextTask,
+} from "./NextTaskForm";
 
 const TODAY = "2026-11-10";
 
@@ -97,6 +103,25 @@ describe("NextTaskFormView", () => {
 
   it("disables Save while saving", () => {
     expect(render({ saving: true })).toMatch(/<button[^>]*disabled=""[^>]*>Save</);
+  });
+});
+
+// docs/specs/accountant-collections-14-new-task-window.md §3: the form now lives in the New Task
+// window, so each opening starts from the defaults and there is no dialog around it.
+describe("NextTaskForm", () => {
+  const html = renderToStaticMarkup(
+    <NextTaskForm eventId="evt-1" today={TODAY} onSaved={() => {}} />,
+  );
+
+  it("starts from today + 2 days and the default note", () => {
+    expect(html).toContain("2 Days");
+    expect(html).toMatch(/<textarea[^>]*>Follow-up needed<\/textarea>/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Save</);
+  });
+
+  it("brings no dialog or title of its own", () => {
+    expect(html).not.toContain("Done / Next Task");
+    expect(html).not.toContain('role="dialog"');
   });
 });
 

@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { DateTime } from "luxon";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /**
- * The date of the next task: a button that opens a month grid. There is no calendar component in
- * the app, so the grid is built here from the design (Sunday first, past days off, today ringed,
- * the chosen day filled), with arrows between months. All dates are `YYYY-MM-DD`, months
- * `YYYY-MM`. docs/specs/accountant-collections-09-design.md §3.
+ * The date of the next task: a button that opens a month grid under it, inside the New Task window
+ * (not in a popover). There is no calendar component in the app, so the grid is built here from
+ * the design (Sunday first, past days off, today ringed, the chosen day filled), with arrows
+ * between months. All dates are `YYYY-MM-DD`, months `YYYY-MM`.
+ * docs/specs/accountant-collections-09-design.md §3 and
+ * accountant-collections-14-new-task-window.md §3.
  */
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -131,40 +132,45 @@ export function TaskDatePicker({
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState((value || today).slice(0, 7));
 
+  const toggle = () => {
+    // Open on the month of the chosen day, not wherever the arrows last left it.
+    if (!open) setMonth((value || today).slice(0, 7));
+    setOpen(!open);
+  };
+
+  // A fragment: in the form's wrapping row the button sits beside its label and the calendar,
+  // being full width, drops to the next line and pushes the note down.
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        // Open on the month of the chosen day, not wherever the arrows last left it.
-        if (next) setMonth((value || today).slice(0, 7));
-        setOpen(next);
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
-        >
-          <CalendarDays className="size-4" aria-hidden />
-          {label}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        aria-label="Choose the date for the next task"
-        className="w-auto p-3"
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={toggle}
+        className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
       >
-        <TaskMonthGrid
-          month={month}
-          today={today}
-          selected={value}
-          onMonthChange={setMonth}
-          onPick={(date) => {
-            onChange(date);
-            setOpen(false);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
+        <CalendarDays className="size-4" aria-hidden />
+        {label}
+      </button>
+      {open && (
+        <div
+          role="group"
+          aria-label="Choose the date for the next task"
+          className="w-full rounded-[10px] border border-gray-200 bg-gray-50 p-2.5"
+        >
+          <div className="mx-auto w-fit">
+            <TaskMonthGrid
+              month={month}
+              today={today}
+              selected={value}
+              onMonthChange={setMonth}
+              onPick={(date) => {
+                onChange(date);
+                setOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

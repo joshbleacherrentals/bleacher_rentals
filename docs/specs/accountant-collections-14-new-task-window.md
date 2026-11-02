@@ -1,6 +1,23 @@
 # Accountant Collections 14: the New Task window
 
-Status: **Draft 2026-11-02, waiting for "Approved"**; 0 open decisions, readings to confirm in §1.
+Status: **Implemented 2026-11-02** (approved by the user the same day). Two decisions taken at
+build time, both written into §1, §3, §4, §5 and §7 above: (1) moving holds the left, right and top
+edges and lets the body hang off the bottom while the top 48 px stay on screen, whereas opening, a
+reload and a browser resize pull the whole window inside; (2) leaving an event closes the window
+for good, through the pure function `windowOpenForEvent` and a reset during render. Deviations,
+none changing a contract: (a) `viewport` is `{ w, h }`, the spec left its shape open; (b) the
+form wrapper `NextTaskForm` is now exported (it was private in `DoneNextTaskDialog.tsx`), and
+`NextTaskFormView` was restyled to fill the window (the note grows with the height and no longer
+resizes by hand, Save sits in a footer), with no change to its props or text; (c) the calendar
+block is full width with the 36 px grid centred in it, because `TaskMonthGrid` stays unchanged;
+(d) the Playwright scenarios S30 to S37 are in `collections.accountant.spec.ts` in full and in
+`collections.admin.spec.ts` as S30 to S32, written and **not run**, and the modal steps of S6, S17
+and S23 (both files) now use the window, with `exact: true` on the New Task button because "Close
+New Task window" also contains those words; (e) the pointer gestures of `NewTaskWindow` are covered
+only by static markup and by Playwright, not seen in a browser (the invoice page needs a Clerk
+sign-in). Not touched, outside §6: the comments in `nextTaskDefaults.ts`, `validateNextTask.ts`
+and `saveNextTask.ts` that still say "Done / Next Task". Original header: written 2026-11-02;
+0 open decisions, readings to confirm in §1.
 Build order: **14**. Needs: [12](accountant-collections-12-tabs-and-messages.md),
 [13](accountant-collections-13-task-history-and-files.md). Needed by: nothing. Branch:
 `q4-sprint2-collections`.
@@ -90,8 +107,12 @@ opens the window.
 **Readings to confirm at review:**
 
 - **Starting place and size** are the design's: 430 by 360 pixels with its top-left corner at 730,
-  250, then pulled inside the screen. Minimum 320 by 240. While moving, at least the 48 px title
-  bar stays on screen; while resizing, the window cannot grow past the screen edge.
+  250, then pulled inside the screen. Minimum 320 by 240. **Decided by the user at build time,
+  2026-11-02:** while moving, the window may hang off the bottom edge as long as its top 48 px
+  (the title bar) stay on screen; it never goes past the top, left or right edge. Opening, a reload
+  and a browser resize pull the **whole** window inside the screen (so a window left hanging off
+  the bottom is pulled up the next time). While resizing, the window cannot grow past the screen
+  edge and never goes below the minimum.
 - **Only the east edge, the south edge and the south-east corner resize**, as drawn. No west or
   north handles, no keyboard moving or resizing.
 - **One window.** New Task while it is open does nothing more.
@@ -101,6 +122,8 @@ opens the window.
   the geometry is remembered, not the text.
 - **The window belongs to the page,** not to a tab: switching between Information and Messages
   keeps it open with what was typed.
+- **Leaving the event closes the window for good** (decided by the user at build time,
+  2026-11-02): going Next Task and then Previous Task back to the first event does not reopen it.
 - **If the open task is completed while the window is open** (a payment arrives), the window stays
   and Save still creates a task, exactly as the modal did.
 - **The calendar** opens inside the window under the date button (as drawn), pushes the note down,
@@ -133,8 +156,10 @@ All under `src/features/accountantCollections/`.
 
 - **`utils/windowRect.ts`** (new): pure, with the numbers `DEFAULT_RECT = { x: 730, y: 250,
 w: 430, h: 360 }`, `MIN_SIZE = { w: 320, h: 240 }`, `KEEP_VISIBLE = 48`, and
-  `clampRect(rect, viewport)`, `moveRect(start, dx, dy, viewport)`,
-  `resizeRect(start, edge, dx, dy, viewport)` (`edge` is `"e" | "s" | "se"`),
+  `clampRect(rect, viewport)` (the whole window inside), `moveRect(start, dx, dy, viewport)`
+  (left, right and top edges held, the bottom one lets all but the top 48 px hang off),
+  `resizeRect(start, edge, dx, dy, viewport)` (`edge` is `"e" | "s" | "se"`; `viewport` is
+  `{ w, h }` everywhere),
   `parseStoredRect(raw)` (invalid or partial gives `null`), `readStoredRect()` /
   `writeStoredRect(rect)` over `localStorage` with the key `accountantCollections.newTaskWindow`,
   wrapped in try/catch.
@@ -152,10 +177,13 @@ w: 430, h: 360 }`, `MIN_SIZE = { w: 320, h: 240 }`, `KEEP_VISIBLE = 48`, and
 - **`components/TaskDatePicker.tsx`** (changed): the Popover wrapper becomes an inline one: the
   date button (`aria-expanded`) toggles the month grid under it; picking a day closes the grid.
   `TaskMonthGrid` and the month helpers are unchanged.
-- **`components/InvoicePage.tsx`** (changed): the state `windowOpenFor: string | null`; the window
-  is open when `windowOpenFor === eventId`, so moving to another event closes it without an effect.
-  The New Task button sets it; the modal of spec 12 goes; `<NewTaskWindow key={eventId} ...>` is
-  rendered at the page level.
+- **`components/InvoicePage.tsx`** (changed): the state `windowOpenFor: string | null`, the event
+  the window was opened on. The window is open while it equals `eventId`; when `eventId` changes
+  the state is reset during render (no effect) through the small pure function
+  `windowOpenForEvent(openFor, eventId)`, which gives `openFor` back when it equals `eventId` and
+  `null` otherwise, so returning to the first event does not reopen the window. The New Task button
+  sets it; the modal of spec 12 goes; `<NewTaskWindow key={eventId} ...>` is rendered at the page
+  level.
 
 ## 4. Behaviour scenarios
 
@@ -170,7 +198,8 @@ Playwright, written, **not run**. Roles: accountant, admin. S30 to S37.
 - **S34** after a move and a resize, closing and reopening, and a reload, keep the geometry.
 - **S35** Save completes the open task and creates the next one; the window closes; Task History
   shows the new Open row.
-- **S36** Previous Task / Next Task closes the window; the next event's window opens clean.
+- **S36** Previous Task / Next Task closes the window; the next event's window opens clean;
+  going back to the first event does not reopen it.
 - **S37** the calendar opens inside the window; a day can be picked while the window is moved.
 
 ## 5. Tests
@@ -185,8 +214,9 @@ Red first.
 - **`NewTaskWindow.test.tsx` (static markup):** `role="dialog"` with `aria-modal="false"`, the
   title, the close button, the three handles and their labels, no overlay element.
 - **`TaskDatePicker.test.tsx`:** `aria-expanded` on the button; the month helpers as before.
-- **`InvoicePage.test.tsx`:** the window is open only for its own event id (the small pure
-  function of the state); the New Task button is still disabled without an open task.
+- **`InvoicePage.test.tsx`:** the window is open only for its own event id
+  (`windowOpenForEvent`: same id kept, another id or `null` gives `null`); the New Task button is
+  still disabled without an open task.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check` on touched files. E2E: written,
   **SKIPPED** (not run locally, by instruction).
 
@@ -206,6 +236,7 @@ sync rules or `AppSchema.ts`.
 - **Stored geometry that no longer fits** (a smaller screen than last time): clamped on open.
 - **Two browser tabs:** each reads the stored geometry when it opens a window; the last one to
   finish a move or resize wins.
+- **Back to the first event** with Previous / Next Task: the window stays closed.
 - **A move that starts on the close button** does not move the window.
 - **Pointer lost** (release outside the browser, `pointercancel`): the gesture ends where it is
   and the geometry is saved.
