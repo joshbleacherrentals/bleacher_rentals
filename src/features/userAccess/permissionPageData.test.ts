@@ -292,10 +292,38 @@ describe("permission matrix", () => {
         );
       });
 
+      // docs/specs/accountant-collections-16-customer-page-view.md §3.
+      it("says the invoice page can show the page the customer sees, and what signing and paying do there", () => {
+        expect(row?.description).toContain(
+          "A Customer view button shows the page the customer sees (Approved Quote, Signed Contract, Pay Invoice); signing there signs for the customer and Pay opens the online payment in a new tab.",
+        );
+      });
+
+      const CUSTOMER_PAGE_SENTENCE =
+        "Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.";
+
       it("tells the accountant what they can do there", () => {
         expect(accountant("Collections")?.note).toBe(
-          "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there.",
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE}`,
         );
+      });
+
+      it("tells an admin the same", () => {
+        expect(row?.roles.admin.note).toBe(
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE}`,
+        );
+      });
+
+      it("does not give the other five roles the customer's page through this row", () => {
+        for (const role of [
+          "account_manager",
+          "viewer",
+          "developer",
+          "driver",
+          "maintainer",
+        ] as const) {
+          expect(row?.roles[role].note, role).not.toContain("customer's page");
+        }
       });
 
       it("is mentioned in the role description and in Accounts Receivable", () => {

@@ -19,7 +19,7 @@ const TOOLTIP = "Opens the signed invoice PDF, or the quote PDF if there is no s
 const SIGNED_URL_SECONDS = 3600;
 
 const BUTTON =
-  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-white/55 bg-transparent px-3.5 text-sm font-medium text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-white/55 bg-transparent px-3.5 text-sm font-medium text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
 
 type TabHandle = { opener: unknown; location: { href: string }; close: () => void };
 

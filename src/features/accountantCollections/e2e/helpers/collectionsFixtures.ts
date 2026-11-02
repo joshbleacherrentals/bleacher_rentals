@@ -90,6 +90,8 @@ export async function createOverdueBooking(options: {
 
 /** The name every terms template made by `addSignature` starts with, so cleanup finds only those. */
 const E2E_TERMS_PREFIX = "E2E Collections terms";
+/** The last name of the contact made by `addFrenchContact`, so cleanup finds only those. */
+const E2E_FRENCH_CONTACT_LAST_NAME = "E2E Collections French";
 
 /**
  * Removes the events; their tasks, line items and payments go with them (cascade). The objects
@@ -128,7 +130,35 @@ export async function cleanupBookings(eventIds: string[]): Promise<void> {
       )
       .like("name", `${E2E_TERMS_PREFIX}%`);
   }
+  // The terms and contacts that `addContractTerms` and `addFrenchContact` gave the events: the
+  // events refer to them, so they go after the events.
+  const { data: given } = await db
+    .from("Events")
+    .select("terms_and_conditions_uuid, contact_uuid")
+    .in("id", eventIds);
   await db.from("Events").delete().in("id", eventIds);
+  const termsIds = (given ?? []).map((e) => e.terms_and_conditions_uuid as string | null);
+  const contactIds = (given ?? []).map((e) => e.contact_uuid as string | null);
+  if (termsIds.some(Boolean)) {
+    await db
+      .from("TermsAndConditions")
+      .delete()
+      .in(
+        "id",
+        termsIds.filter((id): id is string => !!id),
+      )
+      .like("name", `${E2E_TERMS_PREFIX}%`);
+  }
+  if (contactIds.some(Boolean)) {
+    await db
+      .from("Contacts")
+      .delete()
+      .in(
+        "id",
+        contactIds.filter((id): id is string => !!id),
+      )
+      .like("last_name", `${E2E_FRENCH_CONTACT_LAST_NAME}%`);
+  }
 }
 
 /** The event's tasks, open ones first. */
@@ -271,4 +301,73 @@ export async function eventFilesOf(
     .order("created_at", { ascending: true });
   if (error) throw new Error(`eventFilesOf: ${error.message}`);
   return data ?? [];
+}
+
+/**
+ * Gives the event a contract template it has not signed, so the customer's page offers Sign on its
+ * Signed Contract tab (docs/specs/accountant-collections-16-customer-page-view.md §4, S44).
+ */
+export async function addContractTerms(eventId: string): Promise<void> {
+  const db = admin();
+  const { data: terms, error } = await db
+    .from("TermsAndConditions")
+    .insert({
+      name: `${E2E_TERMS_PREFIX} ${crypto.randomUUID()}`,
+      html_content: "<p>E2E terms</p>",
+    })
+    .select("id")
+    .single();
+  if (error || !terms) throw new Error(`addContractTerms: terms insert failed: ${error?.message}`);
+  const { error: linkError } = await db
+    .from("Events")
+    .update({ terms_and_conditions_uuid: terms.id as string })
+    .eq("id", eventId);
+  if (linkError) throw new Error(`addContractTerms: link failed: ${linkError.message}`);
+}
+
+/**
+ * Makes a contact whose preferred language is French the event's contact, so the customer's own
+ * link is in French (S42: the invoice page's frame is English all the same).
+ */
+export async function addFrenchContact(eventId: string): Promise<void> {
+  const db = admin();
+  const { data: contact, error } = await db
+    .from("Contacts")
+    .insert({
+      first_name: "E2E",
+      last_name: `${E2E_FRENCH_CONTACT_LAST_NAME} ${crypto.randomUUID()}`,
+      email: "e2e-french@example.com",
+      preferred_language: "french",
+      deleted: false,
+    })
+    .select("id")
+    .single();
+  if (error || !contact) throw new Error(`addFrenchContact: insert failed: ${error?.message}`);
+  const { error: linkError } = await db
+    .from("Events")
+    .update({ contact_uuid: contact.id as string })
+    .eq("id", eventId);
+  if (linkError) throw new Error(`addFrenchContact: link failed: ${linkError.message}`);
+}
+
+/** The rows of the event's activity log that a customer's visit writes (S43). */
+export async function clientActivityOf(eventId: string): Promise<string[]> {
+  const { data, error } = await admin()
+    .from("EventChangeLog")
+    .select("action_type")
+    .eq("event_uuid", eventId)
+    .like("action_type", "client_%");
+  if (error) throw new Error(`clientActivityOf: ${error.message}`);
+  return (data ?? []).map((row) => row.action_type as string);
+}
+
+/** The event's active signatures, to see that Sign in the frame really signed (S44). */
+export async function activeSignaturesOf(eventId: string): Promise<number> {
+  const { count, error } = await admin()
+    .from("ContractSignatures")
+    .select("id", { count: "exact", head: true })
+    .eq("event_uuid", eventId)
+    .eq("status", "active");
+  if (error) throw new Error(`activeSignaturesOf: ${error.message}`);
+  return count ?? 0;
 }

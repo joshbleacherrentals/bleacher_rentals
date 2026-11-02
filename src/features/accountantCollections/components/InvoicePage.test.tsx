@@ -11,6 +11,7 @@ const {
   mockMessagesTab,
   mockFiles,
   mockOpenPdf,
+  mockFrame,
 } = vi.hoisted(() => ({
   mockSearchParams: { current: new URLSearchParams() },
   mockInvoice: vi.fn(),
@@ -19,6 +20,7 @@ const {
   mockMessagesTab: vi.fn(),
   mockFiles: vi.fn(),
   mockOpenPdf: vi.fn(),
+  mockFrame: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -63,6 +65,13 @@ vi.mock("./OpenPdfButton", () => ({
     return <button type="button">Open PDF</button>;
   },
 }));
+// The customer page's frame loads a whole page; its own test covers it.
+vi.mock("./CustomerPageFrame", () => ({
+  CustomerPageFrame: (props: unknown) => {
+    mockFrame(props);
+    return <iframe title="Customer page" />;
+  },
+}));
 vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
   usePermissionsStore: (selector: (s: { userId: string }) => unknown) =>
     selector({ userId: "user-7" }),
@@ -72,7 +81,7 @@ vi.mock("@/lib/useTimezoneStore", () => ({
     selector({ timezone: "America/Toronto" }),
 }));
 
-import { InvoicePage, windowOpenForEvent } from "./InvoicePage";
+import { CustomerTabs, InvoicePage, customerViewForEvent, windowOpenForEvent } from "./InvoicePage";
 
 function renderAt(query: string) {
   mockSearchParams.current = new URLSearchParams(query);
@@ -90,6 +99,7 @@ beforeEach(() => {
   mockMessagesTab.mockReset();
   mockFiles.mockReset();
   mockOpenPdf.mockReset();
+  mockFrame.mockReset();
 });
 
 describe("InvoicePage: Information", () => {
@@ -542,5 +552,81 @@ describe("InvoicePage: states", () => {
     mockInvoice.mockReturnValue(invoiceDataFixture({ notFound: true }));
     expect(renderAt("")).toContain("Invoice not found");
     expect(mockInvoice).toHaveBeenCalledWith("");
+  });
+});
+
+// docs/specs/accountant-collections-16-customer-page-view.md §3 and §5.
+describe("InvoicePage: Customer view button", () => {
+  const viewButton = (html: string) =>
+    /<button(?:(?!<\/button>)[^])*aria-pressed(?:(?!<\/button>)[^])*Customer view/.exec(
+      html,
+    )?.[0] ?? "";
+
+  it("starts not pressed, on every tab", () => {
+    for (const tab of ["info", "messages"]) {
+      const html = renderAt(`id=evt-1&tab=${tab}`);
+      expect(viewButton(html), tab).toContain('aria-pressed="false"');
+    }
+  });
+
+  it("shows the page as before while it is off: the tabs, New Task, the footer and no frame", () => {
+    const html = renderAt("id=evt-1&tab=info");
+    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Information</);
+    expect(html).toContain("New Task");
+    expect(html).toContain("Previous Task");
+    expect(html).toContain("Next Task");
+    expect(html).not.toContain('aria-label="Customer page sections"');
+    expect(html).not.toContain("<iframe");
+    expect(mockFrame).not.toHaveBeenCalled();
+  });
+
+  it("is not in the header while the invoice loads or when it is missing", () => {
+    mockInvoice.mockReturnValue(invoiceDataFixture({ isLoading: true }));
+    expect(renderAt("id=evt-1")).not.toContain("Customer view");
+    mockInvoice.mockReturnValue(invoiceDataFixture({ notFound: true }));
+    expect(renderAt("id=evt-1")).not.toContain("Customer view");
+  });
+});
+
+describe("customerViewForEvent", () => {
+  it("keeps the switch on for the event it was switched on for", () => {
+    expect(customerViewForEvent("evt-1", "evt-1")).toBe("evt-1");
+  });
+
+  it("switches it off for any other event, and stays off with nothing on", () => {
+    expect(customerViewForEvent("evt-1", "evt-2")).toBeNull();
+    expect(customerViewForEvent(null, "evt-1")).toBeNull();
+  });
+
+  it("does not come back on the first event once it has been left", () => {
+    const atB = customerViewForEvent("evt-1", "evt-2");
+    expect(customerViewForEvent(atB, "evt-1")).toBeNull();
+  });
+});
+
+describe("CustomerTabs", () => {
+  const render = (tab: "quote" | "contract" | "pay") =>
+    renderToStaticMarkup(<CustomerTabs tab={tab} onSelect={() => {}} />);
+  const tabLabels = (html: string) =>
+    [...html.matchAll(/role="tab"[^>]*>([^<]*)</g)].map((match) => match[1]);
+
+  it("is a tablist named Customer page sections with the three tabs of the customer's page", () => {
+    const html = render("quote");
+    expect(html).toMatch(/role="tablist"[^>]*aria-label="Customer page sections"/);
+    expect(tabLabels(html)).toEqual(["Approved Quote", "Signed Contract", "Pay Invoice"]);
+  });
+
+  it.each([
+    ["quote", "Approved Quote"],
+    ["contract", "Signed Contract"],
+    ["pay", "Pay Invoice"],
+  ] as const)("selects %s, and only it", (tab, label) => {
+    const html = render(tab);
+    expect(html).toMatch(new RegExp(`role="tab"[^>]*aria-selected="true"[^>]*>${label}<`));
+    expect(html.match(/aria-selected="true"/g)).toHaveLength(1);
+  });
+
+  it("has no New Task button", () => {
+    expect(render("quote")).not.toContain("New Task");
   });
 });

@@ -73,6 +73,8 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     // docs/specs/accountant-address-book.md §4: /companies-contacts follows /messages.
     // docs/specs/accountant-team.md §6: /team follows /companies-contacts.
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: /qbo-quote-types follows /team.
+    // docs/specs/accountant-collections-16-customer-page-view.md §3: /quote follows
+    // /qbo-quote-types.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
@@ -81,9 +83,25 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/companies-contacts",
       "/team",
       "/qbo-quote-types",
+      "/quote",
       "/permissions",
       "/changelog",
     ]);
+  });
+
+  // docs/specs/accountant-collections-16-customer-page-view.md §1 and §5: the customer's page,
+  // by its address and from the Show Customer View button of a quote.
+  it("lets an admin, an account manager and an accountant open the customer's page, and nobody else", () => {
+    for (const role of ["admin", "account_manager", "accountant"] as const) {
+      expect(canAccessPath([role], "/quote/evt-1"), role).toBe(true);
+    }
+    for (const role of ["viewer", "maintainer", "developer", "driver"] as const) {
+      expect(canAccessPath([role], "/quote/evt-1"), role).toBe(false);
+    }
+  });
+
+  it("keeps the accountant's landing page the Accountant page, whatever follows it", () => {
+    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
   });
 
   // docs/specs/accountant-address-book.md: the accountant creates, edits and soft-deletes companies,

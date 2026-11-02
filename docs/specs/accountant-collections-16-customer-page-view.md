@@ -1,6 +1,10 @@
 # Accountant Collections 16: View customer page
 
-Status: **Draft 2026-11-02, waiting for "Approved"**; 0 open decisions, readings to confirm in §1.
+Status: **Implemented 2026-11-03** (approved 2026-11-03 after a revision: the first draft of
+2026-11-02 was approved, then the check against the code found that the app's frame wraps the
+page: §2 last three bullets; the user's answers of 2026-11-03 are in §1, the changes are in §3 to
+§8; what differs from the text is in §9). Not committed, not deployed; Playwright written, not
+run.
 Build order: **16** (last). Needs: [09](accountant-collections-09-design.md),
 [12](accountant-collections-12-tabs-and-messages.md). Needed by: nothing. Branch:
 `q4-sprint2-collections`.
@@ -76,10 +80,10 @@ replaces.
   header (event name, N days overdue, Open PDF, the toggle, Record Payment, the status) stays.
 - **The live page in a frame:** the same `/quote/<event id>` the customer sees, inside the invoice
   page (decision 4).
-- **It writes nothing to the event's activity log.** (Nothing needs building for this: the public
-  page already skips its activity records, the "Are you still here?" prompt and the "quote
-  changed" pop-up when a signed-in staff member has it open, and the frame is opened by a signed-in
-  accountant.)
+- **It writes nothing to the event's activity log.** The "Are you still here?" prompt and the
+  "quote changed" pop-up already stay away when a signed-in staff member has the page open (their
+  hooks wait for Clerk and check the user). The activity records do not wait for Clerk, so this
+  spec switches them off for an address with `embed=1` (user's answer 2026-11-03, below).
 - **Sign works for real**, as for the customer: it saves the signature, makes the event booked and
   sends the "quote signed" e-mails to the customer and the account manager. The accountant can
   therefore sign for the customer.
@@ -94,12 +98,36 @@ replaces.
   Sign produces (the signed PDF, the e-mails to the customer and the account manager) is built
   from the contact's record, not from the page, so it keeps the contact's language as before.
 
+**The user's answers of 2026-11-03** (to the three findings of §2, last three bullets; the invoice
+stays on `/accountant/invoice?id=<id>` whatever is chosen):
+
+- **The frame shows the bare customer page, without the app's frame.** A signed-in user who opens
+  `/quote/<id>?embed=1` gets the page as a customer gets it: no Header, no Sidebar, no PowerSync,
+  no redirect. (Asked: this, or keep the app's frame in the iframe and add `/quote` for the
+  accountant; the second was not chosen.) The ordinary `/quote/<id>` is not changed: an admin or
+  an account manager who opens it still sees it inside the app.
+- **No activity records when the address has `embed=1`.** The page does not call the activity
+  tracker at all in that case. (Asked: this, or wait for Clerk before writing; the second was
+  not chosen, because it would also stop recording customers whose browser blocks Clerk.) A
+  person who adds `?embed=1` by hand is not recorded either.
+- **`/quote` is added to the accountant's allowed pages.** An accountant can open
+  `/quote/<id>` by its address too, inside the app as an admin does. The same change makes the
+  Show Customer View button on the Contract tab of a quote card work for an accountant (today it
+  sends them to `/accountant`); the matrix says so (§3).
+
 **Readings to confirm at review:**
 
 - **How the page knows it is embedded:** `?embed=1` in the address **and** a parent frame. The
   server draws the page from the address alone (no flash of the tab bar inside the frame); after
   mount, if there is no parent frame (someone opened the address directly), the page shows its tab
   bar again so a visitor is never left without navigation.
+- **How the app drops its frame for the embedded page:** the signed-in tree of `layout.tsx`
+  (`Script`, `Toaster`, `TanstackProvider`, `DynamicSystemProvider`, `SignedInComponents`) moves
+  unchanged into a new client component `SignedInShell`. It reads `usePathname()` and
+  `useSearchParams()`: for a path starting with `/quote/` and `embed=1` it renders
+  a plain `h-dvh overflow-y-auto` box around the page (not `AuthFallback`, whose box holds the
+  scroll), otherwise the same tree as today. The layout has no access to the address' query, which is why this is a client
+  component; server and first client render agree because both read the same address.
 - **How the two pages talk:** `postMessage` between the frame and the invoice page, same origin
   only. The frame says `ready` and reports its height; the invoice page sends the tab to show.
   The address also carries `tab=<quote|contract|pay>` for the first paint.
@@ -121,7 +149,8 @@ replaces.
   words all come from `quoteStrings.ts`).
 - **Offline:** instead of the frame the page says "The customer page needs a connection.".
 - **Matrix wording** is in §3; the accountant and admin gain "sign for a customer" and "start an
-  online payment" in this place, so the Collections row says so.
+  online payment" in this place, and the accountant gains the customer's page by its address, so
+  the Collections row says so.
 
 ## 2. Research findings
 
@@ -129,10 +158,27 @@ replaces.
   `src/proxy.ts`): it builds `QuoteDocumentData` and renders `QuotePublicTabs`
   (`src/features/quotesAndBookings/pdf/`), which holds the sticky bar with the three tabs and the
   language switch, and the three tab bodies (all stay mounted, hidden by a class).
-- `useQuoteActivityTracker`, `usePresenceCheck` and `useQuoteFreshness` each return early when
-  `useAuth().userId` is set ("manager preview"). A frame on the same origin sends the Clerk cookie,
-  so a signed-in accountant is a manager preview and nothing is logged. Verify once that no
-  `client_page_view` row reaches `EventChangeLog`.
+- `usePresenceCheck` and `useQuoteFreshness` return early unless Clerk has loaded and no user is
+  signed in ("manager preview"). `useQuoteActivityTracker` returns early when `useAuth().userId`
+  is set but does **not** wait for `isLoaded`; `ClerkProvider` in `src/app/layout.tsx` has no
+  `dynamic` prop, so its first render has no user. What keeps a signed-in staff member out of the
+  log today is the next bullet, not the tracker.
+- **The app wraps the page for a signed-in user** (found 2026-11-03, when the spec was checked
+  against the code). `src/app/layout.tsx` reads `auth()`; with a user it renders `Script`,
+  `Toaster`, `TanstackProvider`, `DynamicSystemProvider` (PowerSync) and `SignedInComponents`
+  (Header, Sidebar, a scrolling `<main>`) around every page, `/quote/<id>` included; without a
+  user it renders `AuthFallback`, whose public branch is the bare page. `SignedInComponents` shows
+  a spinner instead of the page until the user's access has loaded, which is why the tracker has
+  a user when the page mounts. In an iframe the first draft of this spec would have shown the
+  whole app inside the frame, with its own scroll.
+- **A redirect for the accountant** (same finding): `accessConfig.ts` gives `admin` and
+  `account_manager` the allowed path `/quote`, not `accountant`; `useAccessRedirect` in
+  `SignedInComponents` replaces the address of any page outside the allowed paths with
+  `config.defaultRedirect` (`/accountant`). A frame of an accountant would have loaded the
+  Collections list instead of the customer page.
+- **If the app's frame is dropped for the embedded page** (the user's choice, §1), `SignedInComponents`
+  no longer holds the page back, and the tracker would run with no user on the first render and
+  record `client_page_view` for the accountant. Hence the switch-off by `embed=1` in §3.
 - Sign: `/api/contracts/sign` (no sign-in required): signature, status `booked`, `booked_at`, the
   signed PDF, two trigger e-mails, change-log lines `signature` and `status_change` (these are the
   app's normal change log, not the client activity records).
@@ -143,7 +189,7 @@ replaces.
   not come from `quoteStrings.ts`: the embedded mode adds no text there.
 - No `X-Frame-Options` or `frame-ancestors` header is set in `next.config.*` or `src/proxy.ts`, so
   the page can be framed. A future header would break this view.
-- The design: the toggle (`role="switch"`) in the header, the customer tabs in the bar, the three
+- The design: the Customer view button (`aria-pressed`) in the header, the customer tabs in the bar, the three
   customer boards (`InvoiceCustomerQuote`, `InvoiceCustomerContract`, `InvoiceCustomerPay`).
 
 ## 3. Design
@@ -152,8 +198,21 @@ replaces.
   `EMBED_PARAM = "embed"`, `EmbedTab = "quote" | "contract" | "pay"`, `parseEmbedTab(raw)`,
   messages `{ type: "quote-embed:set-tab", tab }` (parent to frame) and
   `{ type: "quote-embed:ready" }`, `{ type: "quote-embed:height", height }` (frame to parent),
-  `parseToChild(data)`, `parseToParent(data)` (anything else gives `null`), and
-  `isSameOriginFrom(event, expectedSource)`.
+  `parseToChild(data)`, `parseToParent(data)` (anything else gives `null`),
+  `isSameOriginFrom(event, expectedSource)`, `isEmbeddedQuotePage(pathname, searchParams)` (true
+  for a path starting with `/quote/` and `embed=1`; the one test the app's shell and the page
+  share) and `trackUnlessEmbedded(embedded, track)` (returns `track`, or a function that does
+  nothing when `embedded`).
+- **`src/components/SignedInShell.tsx`** (new, client): the signed-in tree that `layout.tsx` has
+  today, moved here unchanged (`Script` with the Google Maps key, `Toaster`, `TanstackProvider`,
+  `DynamicSystemProvider`, `SignedInComponents`). Props `{ children }`. With
+  `isEmbeddedQuotePage(usePathname(), useSearchParams())` it renders
+  `<div className="h-dvh overflow-y-auto">{children}</div>` instead, the bare page: no Header, no Sidebar, no PowerSync, no `useAccessRedirect`.
+- **`src/app/layout.tsx`** (changed): `userId ? <SignedInShell>{children}</SignedInShell> :
+<AuthFallback>{children}</AuthFallback>`; nothing else moves.
+- **`src/features/userAccess/accessConfig.ts`** (changed): `/quote` is added to the accountant's
+  `allowedPaths`, after `/qbo-quote-types` and before `/permissions`; the comment above the list
+  that says admin and account manager "have that prefix" is corrected. `/accountant` stays first.
 - **`src/app/quote/[eventUUID]/page.tsx`** (changed): reads `searchParams` (`embed`, `tab`) and
   passes `embedded` and `initialTab` to `QuotePublicTabs`.
 - **`src/features/quotesAndBookings/pdf/QuotePublicTabs.tsx`** (changed): the props `embedded` and
@@ -163,8 +222,10 @@ replaces.
   there is always `en`: the page uses `const shownLanguage = embeddedAndFramed ? "en" : language`
   everywhere it uses `language` today (the texts, the PDF link, the pop-ups, the child tabs), so
   the contact's language and the saved browser choice are ignored; the `language` state itself is
-  untouched, so a direct visit with `?embed=1` and no frame keeps its own language. Not embedded:
-  nothing changes.
+  untouched, so a direct visit with `?embed=1` and no frame keeps its own language. The tracker
+  the page hands to its tabs, its view and the modals is `trackUnlessEmbedded(embedded,
+useQuoteActivityTracker(data.eventId))`: with `embed=1` in the address (framed or not) nothing
+  is recorded, not even the first `client_page_view`. Not embedded: nothing changes.
 - **`src/features/quotesAndBookings/pdf/PayInvoiceTab.tsx`** (changed): a prop `embedded`; the
   redirect is a small pure function `startCheckout({ embedded, url, open, assign })`: embedded
   opens `url` in a new tab (and clears `opener`), otherwise assigns `location.href` as today; a
@@ -175,31 +236,35 @@ replaces.
   frame's messages (checked with `isSameOriginFrom`): on `ready` it sends the current tab, on
   `height` it sets the frame's height (never below 480); when `tab` changes it sends `set-tab`.
   The offline text and the loading text.
-- **`src/features/accountantCollections/components/InvoiceHeader.tsx`** (changed): the toggle
-  (`role="switch"`, `aria-checked`, label "View customer page") next to Open PDF; props
-  `customerView`, `onToggleCustomerView`.
+- **`src/features/accountantCollections/components/InvoiceHeader.tsx`** (changed): the Customer
+  view button (a toggle button: `aria-pressed`, an eye icon and the label "Customer view") next to
+  Open PDF; props `customerView`, `onToggleCustomerView`.
 - **`src/features/accountantCollections/components/InvoicePage.tsx`** (changed): state
   `customerViewFor: string | null` (on when it equals the event id, so another event resets it)
   and `customerTab`; with the toggle on, the tab strip is a `tablist` "Customer page sections"
   with Approved Quote, Signed Contract, Pay Invoice, the body is `CustomerPageFrame`, and the
   Previous / Next Task footer is hidden.
 - **`src/features/userAccess/permissionPageData.ts`** (changed): in the Collections description
-  add: "A View customer page switch shows the page the customer sees (Approved Quote, Signed
+  add: "A Customer view button shows the page the customer sees (Approved Quote, Signed
   Contract, Pay Invoice); signing there signs for the customer and Pay opens the online payment
-  in a new tab." In the admin and accountant notes: "Can open the customer's page on an invoice,
-  sign for the customer there, and start an online payment."
+  in a new tab." In the admin and accountant notes, after the existing sentence: "Can open the
+  customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for
+  the customer there, and start an online payment." (An admin already could open the page by its
+  address and from the quote; the sentence states it for both roles in one place.)
 
 ## 4. Behaviour scenarios
 
-Playwright, written, **not run**. Roles: accountant, admin. S41 to S47.
+Playwright, written, **not run**. Roles: accountant, admin. S41 to S48.
 
 - **S41** the toggle is off by default; switching it on shows the three customer tabs and the
   frame; the header keeps its buttons; the footer is gone; switching it off returns.
 - **S42** each customer tab shows its page in the frame; no tab bar of its own and no EN / FR
-  switch inside the frame; the invoice page, not the frame, scrolls; for a contact whose language
-  is French the frame's text is English.
+  switch inside the frame; **no Header or Sidebar of the app and no Collections list inside the
+  frame, whichever of the two roles opens it**; the invoice page, not the frame, scrolls; for a
+  contact whose language is French the frame's text is English.
 - **S43** opening the frame adds no `client_page_view` or `client_tab_change` row to the event's
-  activity log, and shows no "Are you still here?" or "quote changed" pop-up.
+  activity log, and shows no "Are you still here?" or "quote changed" pop-up; the same for
+  `/quote/<id>?embed=1` opened directly.
 - **S44** Sign in the frame signs (seeded quote): the signature exists, the status badge follows
   after the sync, Open PDF (spec 15) now opens the signed file.
 - **S45** Pay in the frame opens a new tab (`create-checkout` answered by a stub address); the
@@ -207,6 +272,9 @@ Playwright, written, **not run**. Roles: accountant, admin. S41 to S47.
 - **S46** Previous / Next Task resets the toggle; an open New Task window survives switching the
   toggle on.
 - **S47** `/quote/<id>?embed=1` opened directly (no frame) still shows its tab bar.
+- **S48** the accountant opens `/quote/<id>` by its address, and with Show Customer View on the
+  quote's Contract tab: the page opens inside the app (Header and Sidebar), with no redirect to
+  `/accountant`. A visitor who is not signed in sees the page as before.
 
 ## 5. Tests
 
@@ -214,7 +282,17 @@ Red first.
 
 - **`quoteEmbed.test.ts`:** `parseEmbedTab` (the three values, anything else `null`);
   `parseToChild` / `parseToParent` (valid, wrong type, wrong tab, non-numeric or negative height,
-  not an object); `isSameOriginFrom` (other origin, other source).
+  not an object); `isSameOriginFrom` (other origin, other source); `isEmbeddedQuotePage` (true for
+  `/quote/<id>` with `embed=1`; false without it, with `embed=0`, and for any path outside
+  `/quote/` such as `/accountant/invoice` or `/quotes-bookings/<id>` with `embed=1`);
+  `trackUnlessEmbedded` (embedded: the given function is never called; not embedded: it is, with
+  the same event).
+- **`SignedInShell` markup test** (next/navigation, `Header`, the providers and
+  `SignedInComponents` mocked): embedded renders the page without the shell and without the
+  providers; the same path without `embed=1`, and any other path, renders the shell.
+- **`accessConfig.test.ts`:** the exact accountant list gains `/quote`; an accountant, an admin and
+  an account manager can open `/quote/<id>`; a viewer, maintainer, developer and driver still
+  cannot; the merged list of an account manager who is also an accountant is unchanged.
 - **`PayInvoiceTab` `startCheckout` test:** embedded opens a new tab and clears the opener, not
   embedded assigns the address, a blocked tab reports the pay error.
 - **`QuotePublicTabs` markup test** (the project's sample quote data): embedded and framed has no
@@ -225,17 +303,20 @@ Red first.
   below 480 is raised, a foreign message is ignored.
 - **`InvoicePage` / `InvoiceHeader` tests:** the toggle is off by default; with it on, the three
   customer tabs, no footer; the toggle belongs to its own event id.
-- **`noHardcodedText.test.ts`** keeps passing. **`permissionPageData.test.ts`:** the new
-  sentences.
+- **`noHardcodedText.test.ts`** keeps passing (it scans `pdf/` and `src/app/quote/`;
+  `SignedInShell` is outside them). **`permissionPageData.test.ts`:** the new sentences; the test
+  that compares the accountant's Collections note word for word is updated to the new note.
 - **Gate:** `npm run tc`, `npx vitest run`, `prettier --check` on touched files (never on the
   design files). E2E: written, **SKIPPED** (not run locally, by instruction).
 
 ## 6. Files
 
-**Counted: 7 files** (limit 10): `pdf/quoteEmbed.ts` and `components/CustomerPageFrame.tsx` (new),
-`src/app/quote/[eventUUID]/page.tsx`, `pdf/QuotePublicTabs.tsx`, `pdf/PayInvoiceTab.tsx`,
-`components/InvoiceHeader.tsx` and `components/InvoicePage.tsx` (changed). **Not counted:** the
-tests, the Playwright specs, `permissionPageData.ts`. Nothing in the database, the sync rules or
+**Counted: 10 files** (limit 10): `pdf/quoteEmbed.ts`, `components/CustomerPageFrame.tsx` and
+`src/components/SignedInShell.tsx` (new), `src/app/quote/[eventUUID]/page.tsx`,
+`pdf/QuotePublicTabs.tsx`, `pdf/PayInvoiceTab.tsx`, `components/InvoiceHeader.tsx`,
+`components/InvoicePage.tsx`, `src/app/layout.tsx` and `src/features/userAccess/accessConfig.ts`
+(changed). The last three are the 2026-11-03 additions. **Not counted:** the tests, the
+Playwright specs, `permissionPageData.ts`. Nothing in the database, the sync rules or
 `AppSchema.ts`.
 
 ## 7. Edge cases and error handling
@@ -243,8 +324,18 @@ tests, the Playwright specs, `permissionPageData.ts`. Nothing in the database, t
 - **A visitor adds `?embed=1` to the public address.** With no parent frame the page shows its tab
   bar as usual; with a parent frame of another site, messages from it are ignored (other source or
   origin) and the page only loses its own tab bar.
-- **Clerk in the frame.** If the session does not reach the frame, the page would log like a
-  customer; the S43 scenario guards this.
+- **Clerk in the frame.** The page records nothing when the address has `embed=1`, so it no longer
+  depends on Clerk reaching the frame; the S43 scenario guards this. The presence prompt and the
+  "quote changed" pop-up still depend on Clerk having loaded and found a user; if Clerk fails to
+  load they stay silent (the same failure direction as today).
+- **A visitor who adds `?embed=1` by hand** is not recorded in the activity log, and, signed in,
+  sees the page without the app around it. With no frame it still shows its tab bar (above).
+- **The signed-in tree is built by `SignedInShell`** after the change: a mistake in the move
+  would show on every page of the app, so the first check of the work is that a signed-in visit of
+  an ordinary page (for example `/accountant`) renders the same Header, Sidebar and providers as
+  before.
+- **Frame or no frame, `/quote/<id>/payment-success` and the other pages under `/quote/` are not
+  affected:** only `embed=1` changes the shell.
 - **A future `frame-ancestors` or `X-Frame-Options` header** would blank the frame; the S41
   scenario guards this.
 - **The page changes inside the frame** (after Sign the content grows): the height report follows
@@ -261,4 +352,97 @@ tests, the Playwright specs, `permissionPageData.ts`. Nothing in the database, t
 
 - A read-only copy of the customer page, a warning before Sign, choosing the language, a link to
   open the customer page in its own tab (the quote card's Contract tab has one), logging the
-  accountant's visits, the Previous / Next footer in the customer view.
+  accountant's visits, the Previous / Next footer in the customer view, removing the app's frame
+  from the ordinary `/quote/<id>` (an admin or an account manager still sees it inside the app),
+  changing the page's presence and freshness hooks.
+
+## 9. Implementation notes (2026-11-03)
+
+What differs from the text above, and why:
+
+- **Pay opens a new tab only when the page is framed.** `QuotePublicTabs` gives
+  `PayInvoiceTab` `embedded={embeddedAndFramed}`, not the bare `embed=1` flag: a visitor who
+  opens `?embed=1` directly, with no frame, keeps the ordinary redirect to Stripe, since Stripe's
+  page can be shown there. The activity switch-off still follows `embed=1` alone, as decided.
+- **`initialTab` is honoured only for an embedded address.** `page.tsx` passes it when `embed=1`;
+  an ordinary customer link with `?tab=pay` is unchanged ("Not embedded: nothing changes").
+- **Exports added for tests** (no contract of the spec changed): in `quoteEmbed.ts` the constant
+  `TAB_PARAM` and the types `ToChildMessage` and `ToParentMessage`; in `CustomerPageFrame.tsx`
+  `frameSrc`, `MIN_FRAME_HEIGHT`, `FrameAction` and `CustomerPageFrameView` (the loading and
+  offline markup, which a server-side test cannot reach through the online hook); in
+  `InvoicePage.tsx` `customerViewForEvent` (the reset rule, same shape as `windowOpenForEvent`) and
+  `CustomerTabs` (the customer tab strip). `startCheckout` returns `true` when it started and
+  `false` for a blocked tab; the page sets `payError` from that.
+- **`isSameOriginFrom` reads `globalThis.location.origin`** (the spec gave it two arguments, and it
+  still has two); the test stubs `location`.
+- **Test gap: "with the switch on, no footer" is not a unit test.** The project has no DOM test
+  renderer and a server-side render cannot press the switch, so the unit tests cover the button
+  (not pressed by default, `aria-pressed`), the reset rule and the customer tab strip; the footer and the
+  New Task button disappearing is covered by S41, written, not run.
+- **E2E helper additions** (`collectionsFixtures.ts`, not in §6; the e2e helpers do not count):
+  `addContractTerms`, `addFrenchContact`, `clientActivityOf`, `activeSignaturesOf`, and
+  `cleanupBookings` also removes the terms and the contact they made. The scenarios are written
+  once in `helpers/customerPageViewTests.ts` and run as the accountant and as the admin by
+  `customerPageView.accountant.spec.ts` and `customerPageView.admin.spec.ts`; S48 is two tests
+  (the address and Show Customer View; a visitor who is not signed in).
+- **Counted files: 10**, as in §6 (the 3 new, the 7 changed). The test files, the Playwright
+  files and `permissionPageData.ts` are not counted.
+- **Checked by hand:** the public page for a visitor not signed in, on the running dev server:
+  `embed=1` has no tab bar and shows the tab of `tab=` (quote, contract, pay); `embed=0` and a
+  plain address keep the bar. **Not checked in a browser:** the signed-in shell (`SignedInShell`),
+  the frame's messages, Sign, Pay, the offline text, and S43 (no activity rows): they wait for the
+  Playwright run or a manual one.
+
+## 10. Changes after the first try (2026-11-03)
+
+The user tried the page and asked for two changes. Both are made and recorded here; the text of
+§1 to §3 is corrected where it named the old behaviour.
+The label and the header layout of the second and third items were replaced the same day by the
+redrawn header of §11; the scroll fix stands.
+
+- **A wheel over the frame now scrolls the invoice page.** The frame's box was `AuthFallback`'s
+  public box, which carries `overscroll-contain`: a frame as tall as its page cannot scroll, and
+  `overscroll-contain` stops the scroll from going on to the invoice page, so it worked only with
+  the pointer outside the frame. `SignedInShell` now renders its own `h-dvh overflow-y-auto` box
+  for the embedded page, with no `overscroll-contain`; `AuthFallback` is not used for it any more
+  (§1 reading and §3 corrected). The customer's own page keeps `AuthFallback` as before.
+- **The switch reads "Customer page"** (was "View customer page"), by the user's request: the
+  header row was too wide with the longer label. The feature's name in §0 and in the file name
+  stays. The matrix sentence names the switch by its label, so it now reads "A Customer page switch
+  shows ..." (and its test and the Playwright locator).
+- **The header's buttons stay at the right of the name.** The row still wraps, but the name's box
+  is now `min-w-[16rem] flex-1` and the buttons' group `shrink-0`, so a long name wraps inside its
+  box (the "N days overdue" text goes under it) before the buttons drop to a line of their own.
+  With the example the user showed (an event name of 29 characters and "100 days overdue", in a
+  963 px header) the four buttons, about 530 px wide with the shorter label, do not fit on the name's
+  line, so "100 days overdue" sits under the name; the buttons stay at the right.
+- **Not checked in a browser:** the Chrome extension was not connected and the built-in browser
+  was not allowed on localhost. The unit tests check the classes and the markup.
+
+## 11. The header redrawn (2026-11-03)
+
+The user redrew the header's buttons in `docs/design/accountant-collections/Invoice.dc.html` and
+asked for the page to follow it. This replaces the label and the layout of §10 (the scroll fix of
+§10 stays).
+
+- **The switch is now a button.** "Customer view" with an eye icon (`Eye`), `aria-pressed` instead
+  of `role="switch"` and `aria-checked`; outlined (`border-white/55`, no fill) when not pressed,
+  filled `bg-lightBlue` with a `border-lighterBlue` edge when pressed; 36 px tall, `rounded-md`,
+  `px-3.5`, 14 px medium, white, label on one line. The props `customerView` and
+  `onToggleCustomerView` are unchanged. The old labels, "View customer page" and "Customer page",
+  are gone from the button; the iframe's `title` ("Customer page") and the tab list's name
+  ("Customer page sections") are not the button's label and stay.
+- **One row.** The row no longer wraps; only on a window of 820 px or less do the row and the group
+  of buttons wrap (`max-[820px]:flex-wrap`, as the design's media query). The name's box takes the
+  room the buttons leave (`flex-auto`, `min-w-0`) and does not wrap; a long name is cut with an
+  ellipsis (`truncate`) and "N days overdue" keeps its whole text (`shrink-0`, `whitespace-nowrap`).
+  The buttons' group does not shrink (`shrink-0`) and keeps 8 px between buttons. This replaces
+  the "days overdue moves under the name" of §10.
+- **Open PDF** has 8 px between icon and label (was 6) and a label that does not wrap
+  (`OpenPdfButton.tsx`, a file of spec 15; its look test is added).
+- **Matrix** sentence: "A Customer view button shows ..." (and its test). The Playwright locator
+  is `getByRole("button", { name: "Customer view" })` and checks `aria-pressed`.
+- **Counted files:** still 10; `OpenPdfButton.tsx` is outside this spec's list and is changed for
+  the look only.
+- **Not checked in a browser** (Chrome extension not connected, built-in browser not allowed on
+  localhost): the markup and the classes are tested, the look is not.

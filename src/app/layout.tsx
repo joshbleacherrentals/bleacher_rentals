@@ -4,11 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { AuthFallback } from "@/components/AuthFallback";
-import Script from "next/script";
-import { SignedInComponents } from "../components/SignedInComponents";
-import { Toaster } from "sonner";
-import { TanstackProvider } from "@/components/providers/TanstackProvider";
-import { DynamicSystemProvider } from "@/components/providers/DynamicSystemProvider";
+import { SignedInShell } from "@/components/SignedInShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,18 +37,7 @@ export default async function RootLayout({
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-hidden`}>
           {userId ? (
-            <>
-              <Script
-                src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`}
-                strategy="afterInteractive"
-              />
-              <Toaster />
-              <TanstackProvider>
-                <DynamicSystemProvider>
-                  <SignedInComponents>{children}</SignedInComponents>
-                </DynamicSystemProvider>
-              </TanstackProvider>
-            </>
+            <SignedInShell>{children}</SignedInShell>
           ) : (
             <AuthFallback>{children}</AuthFallback>
           )}

@@ -35,6 +35,25 @@ beforeEach(() => {
   mocks.asked = [];
 });
 
+// docs/design/accountant-collections/Invoice.dc.html, redrawn 2026-11-03: 8 px between the icon and
+// the label, and the label never wraps.
+describe("OpenPdfButton: look", () => {
+  const looksRight = (html: string) => {
+    expect(html).toContain("gap-2");
+    expect(html).not.toContain("gap-1.5");
+    expect(html).toContain("whitespace-nowrap");
+  };
+
+  it("has 8 px between icon and label and does not wrap, as the quote PDF link", () => {
+    looksRight(render());
+  });
+
+  it("looks the same as the button for the signed PDF", () => {
+    mocks.signed = { signedPdfPath: "evt-1/sig.pdf", isLoading: false };
+    looksRight(render());
+  });
+});
+
 describe("OpenPdfButton: the quote PDF", () => {
   it("is a link that opens the live quote PDF of the event in a new tab", () => {
     const html = render("evt-9");
