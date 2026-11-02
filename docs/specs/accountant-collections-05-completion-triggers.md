@@ -1,5 +1,7 @@
 # Accountant Collections 05: triggers that complete tasks
 
+> **Amended by [spec 11](accountant-collections-11-task-sync.md):** `complete_ar_tasks_when_paid()`, `complete_ar_tasks_when_lost()` and their two triggers are replaced by `ar_sync_event_tasks()` and four deferred triggers. Read this spec as history.
+
 Status: **Implemented 2026-10-29.** Approved by the user (written 2026-10-28); the readings in §1
 were implemented as written. Build order: **05**. Needs: [01](accountant-collections-01-backend.md),
 [02](accountant-collections-02-sql-amount-due.md). Needed by: nothing else. Branch:
