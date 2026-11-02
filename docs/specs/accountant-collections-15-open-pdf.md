@@ -1,6 +1,28 @@
 # Accountant Collections 15: Open PDF
 
-Status: **Draft 2026-11-02, waiting for "Approved"**; 0 open decisions, readings to confirm in §1.
+Status: **Implemented 2026-11-02** (approved by the user the same day, the readings of §1 as
+written). Deviations, none changing a contract: (a) the error toast is `createErrorToastNoThrow`,
+not `createErrorToast`, which shows the same toast but then throws, and from a click handler that
+would be an unhandled rejection (`InvoiceFiles` does the same); the toast titles are "Could not
+open the signed PDF" (storage error, the message below it) and "Could not open the PDF" (pop-up
+blocked), the spec left the wording open; (b) the click is the exported function `openSignedPdf`
+in `OpenPdfButton.tsx`, with the tab, the storage call and the toast passed in, so the order
+"open the tab, then ask" and the three failure paths are unit-tested without a browser (still
+inside the five files of §6); (c) while the signature is being read the button is a disabled
+`<button>` with the same look, the spec said "disabled" without naming the element; (d) the signed
+address is asked for directly with `storage.from("contracts").createSignedUrl(path, 3600)`, not
+through `createEventFileUrl` of spec 13: that helper wants the `contracts/` prefix that
+`signed_pdf_path` does not have; (e) the Playwright scenarios S38 to S40 are in
+`collections.accountant.spec.ts` in full and in `collections.admin.spec.ts` in a lighter form,
+written and **not run**; they stub the two PDF responses so no PDF viewer opens. Their helper
+`addSignature` is new in `collectionsFixtures.ts`, and `cleanupBookings` now removes signatures
+first because `ContractSignatures.event_uuid` has no `ON DELETE CASCADE`; (f) the button is not
+seen in a browser (the invoice page needs a Clerk sign-in), only by static markup and Playwright.
+**The storage-policy check of §2, done once by hand:** in the local database `storage.objects`
+has the policy "Allow All for Auth" (ALL, `authenticated`, `true`), so a signed URL on `contracts`
+is allowed locally; that policy is in no migration of this repository, and what staging and
+production hold was not checked from here. Original header: written 2026-11-02; 0 open decisions,
+readings to confirm in §1.
 Build order: **15**. Needs: [09](accountant-collections-09-design.md). Needed by: nothing.
 Branch: `q4-sprint2-collections`.
 

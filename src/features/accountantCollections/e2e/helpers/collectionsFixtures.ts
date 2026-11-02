@@ -88,10 +88,14 @@ export async function createOverdueBooking(options: {
   return { eventId, name: options.name };
 }
 
+/** The name every terms template made by `addSignature` starts with, so cleanup finds only those. */
+const E2E_TERMS_PREFIX = "E2E Collections terms";
+
 /**
  * Removes the events; their tasks, line items and payments go with them (cascade). The objects
  * that `addEventFile` stored in `event-files` are removed first, since the rows that name them go
- * with the events.
+ * with the events. A signature does not cascade (its foreign key has no ON DELETE), so the
+ * signatures that `addSignature` wrote go first, with their PDFs and their terms template.
  */
 export async function cleanupBookings(eventIds: string[]): Promise<void> {
   if (eventIds.length === 0) return;
@@ -104,6 +108,26 @@ export async function cleanupBookings(eventIds: string[]): Promise<void> {
     .map((f) => f.storage_path as string | null)
     .filter((path): path is string => !!path && !path.startsWith("contracts/"));
   if (stored.length > 0) await db.storage.from("event-files").remove(stored);
+
+  const { data: signatures } = await db
+    .from("ContractSignatures")
+    .select("signed_pdf_path, terms_and_conditions_uuid")
+    .in("event_uuid", eventIds);
+  if (signatures && signatures.length > 0) {
+    const pdfs = signatures
+      .map((s) => s.signed_pdf_path as string | null)
+      .filter((path): path is string => !!path);
+    if (pdfs.length > 0) await db.storage.from("contracts").remove(pdfs);
+    await db.from("ContractSignatures").delete().in("event_uuid", eventIds);
+    await db
+      .from("TermsAndConditions")
+      .delete()
+      .in(
+        "id",
+        signatures.map((s) => s.terms_and_conditions_uuid as string),
+      )
+      .like("name", `${E2E_TERMS_PREFIX}%`);
+  }
   await db.from("Events").delete().in("id", eventIds);
 }
 
@@ -187,6 +211,53 @@ export async function addEventFile(
   });
   if (error) throw new Error(`addEventFile: row insert failed: ${error.message}`);
   return id;
+}
+
+/**
+ * A contract signature of the event, as the sign route leaves it (and a terms template of its
+ * own, which the signature must name). `pdf` is what the signature stored:
+ * - `stored`: a PDF in the `contracts` bucket at `<event id>/<signature id>.pdf`, that path in
+ *   `signed_pdf_path`;
+ * - `none`: no path (the signature was saved, the upload failed);
+ * - `missing`: a path with no object behind it.
+ * Returns the signature's id and the path it wrote (`null` for `none`).
+ */
+export async function addSignature(
+  eventId: string,
+  options: { status: "active" | "invalidated"; pdf: "stored" | "none" | "missing" },
+): Promise<{ id: string; path: string | null }> {
+  const db = admin();
+  const id = crypto.randomUUID();
+  const path = options.pdf === "none" ? null : `${eventId}/${id}.pdf`;
+
+  const { data: terms, error: termsError } = await db
+    .from("TermsAndConditions")
+    .insert({ name: `${E2E_TERMS_PREFIX} ${id}`, html_content: "<p>E2E terms</p>" })
+    .select("id")
+    .single();
+  if (termsError || !terms)
+    throw new Error(`addSignature: terms insert failed: ${termsError?.message}`);
+
+  if (options.pdf === "stored" && path) {
+    const { error: uploadError } = await db.storage
+      .from("contracts")
+      .upload(path, new Blob(["%PDF-1.4 e2e signed"], { type: "application/pdf" }), {
+        contentType: "application/pdf",
+      });
+    if (uploadError) throw new Error(`addSignature: upload failed: ${uploadError.message}`);
+  }
+
+  const { error } = await db.from("ContractSignatures").insert({
+    id,
+    event_uuid: eventId,
+    terms_and_conditions_uuid: terms.id as string,
+    signer_name: "E2E Signer",
+    status: options.status,
+    signed_pdf_path: path,
+    invalidated_at: options.status === "invalidated" ? new Date().toISOString() : null,
+  });
+  if (error) throw new Error(`addSignature: row insert failed: ${error.message}`);
+  return { id, path };
 }
 
 /** The names of the event's EventFiles rows, oldest first, with their source. */

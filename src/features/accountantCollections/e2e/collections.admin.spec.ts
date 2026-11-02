@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   addEventFile,
+  addSignature,
   addTask,
   cleanupBookings,
   createOverdueBooking,
@@ -296,6 +297,88 @@ test.describe("New Task window (admin)", () => {
       await drag(-3000, -3000);
       const corner = await box(win(page));
       expect([Math.round(corner.x), Math.round(corner.y)]).toEqual([0, 0]);
+    });
+  });
+});
+
+// Open PDF in the header (docs/specs/accountant-collections-15-open-pdf.md §4, S38 to S40 in a
+// lighter form than the accountant's). Written, not run locally.
+test.describe("Open PDF (admin)", () => {
+  const stamp = Date.now();
+
+  async function withBooking(
+    suffix: string,
+    run: (booking: SeededBooking) => Promise<void>,
+  ): Promise<void> {
+    const booking = await createOverdueBooking({
+      name: `E2E Collections admin ${suffix} ${stamp}`,
+      taskDueInDays: 0,
+    });
+    try {
+      await run(booking);
+    } finally {
+      await cleanupBookings([booking.eventId]);
+    }
+  }
+
+  const open = async (page: Page, booking: SeededBooking) => {
+    await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+    await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
+      timeout: 60_000,
+    });
+  };
+
+  test("S38: with no signature, Open PDF links to the quote PDF in a new tab", async ({ page }) => {
+    await withBooking("pdf-none", async (booking) => {
+      await open(page, booking);
+      const link = page.getByRole("link", { name: "Open PDF" });
+      await expect(link).toHaveAttribute("href", `/api/quotes/${booking.eventId}/pdf`);
+      await expect(link).toHaveAttribute("target", "_blank");
+    });
+  });
+
+  test("S39: with an active signature and a stored PDF, Open PDF is a button that opens the signed file", async ({
+    page,
+    context,
+  }) => {
+    await withBooking("pdf-signed", async (booking) => {
+      const signature = await addSignature(booking.eventId, { status: "active", pdf: "stored" });
+      // Stubbed, so no PDF viewer opens: what is checked is the address of the new tab.
+      await context.route(/\/storage\/v1\/object\/sign\/contracts\//, (route) =>
+        route.request().method() === "GET"
+          ? route.fulfill({ status: 200, contentType: "application/pdf", body: "%PDF-1.4 e2e" })
+          : route.continue(),
+      );
+
+      await open(page, booking);
+      await expect(page.getByRole("link", { name: "Open PDF" })).toHaveCount(0);
+      const popup = context.waitForEvent("page");
+      await page.getByRole("button", { name: "Open PDF" }).click();
+      await expect
+        .poll(async () => (await popup).url())
+        .toContain(`/storage/v1/object/sign/contracts/${booking.eventId}/${signature.id}.pdf`);
+    });
+  });
+
+  test("S40: an invalidated signature opens the quote PDF; a signed path with no object shows a toast", async ({
+    page,
+    context,
+  }) => {
+    await withBooking("pdf-invalidated", async (booking) => {
+      await addSignature(booking.eventId, { status: "invalidated", pdf: "stored" });
+      await open(page, booking);
+      await expect(page.getByRole("link", { name: "Open PDF" })).toHaveAttribute(
+        "href",
+        `/api/quotes/${booking.eventId}/pdf`,
+      );
+    });
+
+    await withBooking("pdf-missing", async (booking) => {
+      await addSignature(booking.eventId, { status: "active", pdf: "missing" });
+      await open(page, booking);
+      await page.getByRole("button", { name: "Open PDF" }).click();
+      await expect(page.getByText("Could not open the signed PDF")).toBeVisible();
+      await expect.poll(() => context.pages().length).toBe(1);
     });
   });
 });

@@ -1,6 +1,7 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type BrowserContext, type Page, type Route } from "@playwright/test";
 import {
   addEventFile,
+  addSignature,
   addTask,
   cleanupBookings,
   createOverdueBooking,
@@ -18,7 +19,8 @@ import {
  * accountant-collections-13-task-history-and-files.md §4, S24–S29, which also rewrote S6, S7, S9
  * and S12 and the paths of S13–S19 now that the Tasks tab is gone; and
  * accountant-collections-14-new-task-window.md §4, S30–S37, which also rewrote the modal steps of
- * S6, S17 and S23 for the New Task window).
+ * S6, S17 and S23 for the New Task window; and
+ * accountant-collections-15-open-pdf.md §4, S38–S40).
  *
  * Written, not run locally (project rule). This project only exists once E2E_ACCOUNTANT_EMAIL is
  * configured (see playwright.config.ts). The data is written with the service role by
@@ -942,5 +944,121 @@ test.describe("New Task window (accountant)", () => {
     await expect(calendar).toHaveCount(0);
     await expect(dateButton).toHaveAttribute("aria-expanded", "false");
     await expect(dateButton).not.toContainText("2 Days");
+  });
+});
+
+// Open PDF in the header (docs/specs/accountant-collections-15-open-pdf.md §4, S38–S40). The PDF
+// responses are fulfilled by the test, so no PDF viewer opens and no PDF is rendered: what is
+// checked is which address the new tab was sent to.
+test.describe("Open PDF (accountant)", () => {
+  const openPdf = (page: Page) => page.getByRole("link", { name: "Open PDF" });
+  const openPdfButton = (page: Page) => page.getByRole("button", { name: "Open PDF" });
+
+  async function open(page: Page, booking: SeededBooking) {
+    await page.goto(`/accountant/invoice?id=${booking.eventId}`);
+    await expect(page.getByRole("heading", { name: booking.name })).toBeVisible({
+      timeout: 60_000,
+    });
+  }
+
+  /** Answers a quote PDF and a signed PDF with a stub, and records the addresses asked for. */
+  async function stubPdfs(context: BrowserContext) {
+    const asked: string[] = [];
+    const stub = (route: Route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      asked.push(route.request().url());
+      return route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: "%PDF-1.4 e2e",
+      });
+    };
+    await context.route(/\/api\/quotes\/[^/]+\/pdf(\?.*)?$/, stub);
+    await context.route(/\/storage\/v1\/object\/sign\/contracts\//, stub);
+    return asked;
+  }
+
+  test("S38: with no signature, Open PDF is a link that opens the quote PDF in a new tab", async ({
+    page,
+    context,
+  }) => {
+    const booking = await seed("pdf-none", { taskDueInDays: 0 });
+    const asked = await stubPdfs(context);
+
+    await open(page, booking);
+    await expect(openPdf(page)).toHaveAttribute("href", `/api/quotes/${booking.eventId}/pdf`);
+    await expect(openPdf(page)).toHaveAttribute("target", "_blank");
+
+    const popup = context.waitForEvent("page");
+    await openPdf(page).click();
+    await expect((await popup).url()).toContain(`/api/quotes/${booking.eventId}/pdf`);
+
+    // The invoice page is where it was.
+    await expect(page).toHaveURL(new RegExp(`/accountant/invoice\\?id=${booking.eventId}`));
+    await expect(page.getByRole("heading", { name: booking.name })).toBeVisible();
+    expect(asked.some((url) => url.includes("/storage/v1/"))).toBe(false);
+  });
+
+  test("S39: with an active signature and a stored PDF, Open PDF opens the signed file (a signed URL on the contracts bucket)", async ({
+    page,
+    context,
+  }) => {
+    const booking = await seed("pdf-signed", { taskDueInDays: 0 });
+    const signature = await addSignature(booking.eventId, { status: "active", pdf: "stored" });
+    const asked = await stubPdfs(context);
+
+    await open(page, booking);
+    // A button, not a link: the address is signed at the click.
+    await expect(openPdfButton(page)).toBeVisible();
+    await expect(openPdf(page)).toHaveCount(0);
+
+    const popup = context.waitForEvent("page");
+    await openPdfButton(page).click();
+    const opened = await popup;
+    await expect
+      .poll(() => opened.url())
+      .toContain(`/storage/v1/object/sign/contracts/${booking.eventId}/${signature.id}.pdf`);
+    expect(opened.url()).toContain("token=");
+
+    await expect(page).toHaveURL(new RegExp(`/accountant/invoice\\?id=${booking.eventId}`));
+    expect(asked.some((url) => url.includes("/api/quotes/"))).toBe(false);
+  });
+
+  test("S40: an invalidated signature, or one without a stored PDF, opens the quote PDF", async ({
+    page,
+    context,
+  }) => {
+    const invalidated = await seed("pdf-invalidated", { taskDueInDays: 0 });
+    await addSignature(invalidated.eventId, { status: "invalidated", pdf: "stored" });
+    const empty = await seed("pdf-empty-path", { taskDueInDays: 0 });
+    await addSignature(empty.eventId, { status: "active", pdf: "none" });
+    await stubPdfs(context);
+
+    for (const booking of [invalidated, empty]) {
+      await open(page, booking);
+      await expect(openPdf(page)).toHaveAttribute("href", `/api/quotes/${booking.eventId}/pdf`);
+      const popup = context.waitForEvent("page");
+      await openPdf(page).click();
+      await expect((await popup).url()).toContain(`/api/quotes/${booking.eventId}/pdf`);
+    }
+  });
+
+  test("S40: a signed path that points at a missing object shows a toast, closes the blank tab and opens nothing else", async ({
+    page,
+    context,
+  }) => {
+    const booking = await seed("pdf-missing", { taskDueInDays: 0 });
+    await addSignature(booking.eventId, { status: "active", pdf: "missing" });
+    const asked = await stubPdfs(context);
+
+    await open(page, booking);
+    await openPdfButton(page).click();
+
+    await expect(page.getByText("Could not open the signed PDF")).toBeVisible();
+    // The blank tab goes away again; only the invoice page is left, still on the same event.
+    await expect.poll(() => context.pages().length).toBe(1);
+    await expect(page).toHaveURL(new RegExp(`/accountant/invoice\\?id=${booking.eventId}`));
+    // Never the quote PDF in its place.
+    expect(asked.some((url) => url.includes("/api/quotes/"))).toBe(false);
   });
 });

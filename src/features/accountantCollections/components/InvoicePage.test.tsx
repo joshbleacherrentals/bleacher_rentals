@@ -3,15 +3,23 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { InvoiceStatus } from "../utils/invoiceStatus";
 import { invoiceDataFixture } from "./invoiceFixtures";
 
-const { mockSearchParams, mockInvoice, mockNeighbours, mockCan, mockMessagesTab, mockFiles } =
-  vi.hoisted(() => ({
-    mockSearchParams: { current: new URLSearchParams() },
-    mockInvoice: vi.fn(),
-    mockNeighbours: vi.fn(),
-    mockCan: { current: { recordPayment: true, useInternalChat: true } },
-    mockMessagesTab: vi.fn(),
-    mockFiles: vi.fn(),
-  }));
+const {
+  mockSearchParams,
+  mockInvoice,
+  mockNeighbours,
+  mockCan,
+  mockMessagesTab,
+  mockFiles,
+  mockOpenPdf,
+} = vi.hoisted(() => ({
+  mockSearchParams: { current: new URLSearchParams() },
+  mockInvoice: vi.fn(),
+  mockNeighbours: vi.fn(),
+  mockCan: { current: { recordPayment: true, useInternalChat: true } },
+  mockMessagesTab: vi.fn(),
+  mockFiles: vi.fn(),
+  mockOpenPdf: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -48,6 +56,13 @@ vi.mock("./InvoiceFiles", () => ({
     return <section aria-label="Files" />;
   },
 }));
+// Open PDF reads the local signatures and asks Supabase Storage; its own test covers it.
+vi.mock("./OpenPdfButton", () => ({
+  OpenPdfButton: (props: unknown) => {
+    mockOpenPdf(props);
+    return <button type="button">Open PDF</button>;
+  },
+}));
 vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
   usePermissionsStore: (selector: (s: { userId: string }) => unknown) =>
     selector({ userId: "user-7" }),
@@ -74,6 +89,7 @@ beforeEach(() => {
   mockCan.current = { recordPayment: true, useInternalChat: true };
   mockMessagesTab.mockReset();
   mockFiles.mockReset();
+  mockOpenPdf.mockReset();
 });
 
 describe("InvoicePage: Information", () => {
@@ -180,6 +196,42 @@ describe("InvoicePage: header", () => {
   it("has no Send Email button, on either tab", () => {
     expect(renderAt("id=evt-1&tab=info")).not.toContain("Send Email");
     expect(renderAt("id=evt-1&tab=messages")).not.toContain("Send Email");
+  });
+});
+
+// docs/specs/accountant-collections-15-open-pdf.md §3 and §5.
+describe("InvoicePage: Open PDF", () => {
+  it("gives the header's Open PDF the event of the URL", () => {
+    renderAt("id=evt-1&tab=info");
+    expect(mockOpenPdf).toHaveBeenCalledWith({ eventId: "evt-1" });
+  });
+
+  it("is in the header on every tab, before Record Payment", () => {
+    for (const tab of ["info", "messages"]) {
+      const html = renderAt(`id=evt-1&tab=${tab}`);
+      expect(html, tab).toContain(">Open PDF<");
+      expect(html.indexOf(">Open PDF<"), tab).toBeLessThan(html.indexOf("Record Payment"));
+    }
+  });
+
+  it("is there for someone who may not record payments", () => {
+    mockCan.current = { recordPayment: false, useInternalChat: true };
+    expect(renderAt("id=evt-1")).toContain(">Open PDF<");
+  });
+
+  it("follows the event when Previous Task and Next Task change the URL", () => {
+    renderAt("id=evt-1");
+    renderAt("id=evt-2");
+    expect(mockOpenPdf).toHaveBeenNthCalledWith(1, { eventId: "evt-1" });
+    expect(mockOpenPdf).toHaveBeenNthCalledWith(2, { eventId: "evt-2" });
+  });
+
+  it("is not drawn while the invoice is loading or when it is not found", () => {
+    mockInvoice.mockReturnValue(invoiceDataFixture({ isLoading: true }));
+    expect(renderAt("id=evt-1")).not.toContain("Open PDF");
+    mockInvoice.mockReturnValue(invoiceDataFixture({ notFound: true }));
+    expect(renderAt("id=evt-1")).not.toContain("Open PDF");
+    expect(mockOpenPdf).not.toHaveBeenCalled();
   });
 });
 

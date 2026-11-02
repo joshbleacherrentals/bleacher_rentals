@@ -1,9 +1,11 @@
 import type { InvoiceStatus } from "../utils/invoiceStatus";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
+import { OpenPdfButton } from "./OpenPdfButton";
 
 /**
- * The header of the invoice page: the event, "N days overdue" (Collections only), Record Payment
- * and the status. There is no Send Email button. docs/specs/accountant-collections-09-design.md §3.
+ * The header of the invoice page: the event, "N days overdue" (Collections only), Open PDF, Record
+ * Payment and the status. There is no Send Email button.
+ * docs/specs/accountant-collections-09-design.md §3 and accountant-collections-15-open-pdf.md §3.
  */
 
 function overdueText(days: number): string {
@@ -11,12 +13,14 @@ function overdueText(days: number): string {
 }
 
 export function InvoiceHeader({
+  eventId,
   name,
   status,
   daysOverdue,
   canRecordPayment,
   onRecordPayment,
 }: {
+  eventId: string;
   name: string;
   status: InvoiceStatus;
   daysOverdue: number | null;
@@ -32,6 +36,7 @@ export function InvoiceHeader({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <OpenPdfButton eventId={eventId} />
         {canRecordPayment && (
           <button
             type="button"

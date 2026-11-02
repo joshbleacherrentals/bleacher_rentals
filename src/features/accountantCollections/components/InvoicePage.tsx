@@ -30,8 +30,8 @@ import { NewTaskWindow } from "./NewTaskWindow";
  * was opened on.
  * docs/specs/accountant-collections-09-design.md §3, accountant-collections-10-prev-next.md §3,
  * accountant-collections-12-tabs-and-messages.md §3,
- * accountant-collections-13-task-history-and-files.md §3 and
- * accountant-collections-14-new-task-window.md §3.
+ * accountant-collections-13-task-history-and-files.md §3,
+ * accountant-collections-14-new-task-window.md §3 and accountant-collections-15-open-pdf.md §3.
  */
 
 // Same reasoning as on the Billing tab: a form most visits never open.
@@ -140,6 +140,7 @@ export function InvoicePage() {
 
       <div className="sticky top-0 z-10 rounded-t-[10px] bg-gradient-to-r from-gray-800 to-gray-600">
         <InvoiceHeader
+          eventId={eventId}
           name={data.event.name}
           status={data.event.status}
           daysOverdue={data.event.daysOverdue}
