@@ -7,6 +7,10 @@ Deviations and findings (the approved function, triggers and schedule are unchan
 
 - **The nightly command** was not named in §3.2. It is `SELECT * FROM public.ar_sync_all_event_tasks();`
   and the test pins it.
+- **The two old migrations are deleted** (user, 2026-11-02: `20261028140000` and `20261028150000`
+  never reached production). The new migration therefore has no `DROP` block and no
+  `cron.unschedule`; reading 4, §3.2, §3.6 and §5 are amended to say so. The pgTAP file still
+  asserts that the old functions, triggers and job do not exist.
 - **The migration can run twice** end to end (`CREATE OR REPLACE`, `DROP ... IF EXISTS` before each
   `CREATE CONSTRAINT TRIGGER`), not only the job step.
 - **The test settles the database first.** The old cron test gave every existing booked event a
@@ -205,9 +209,10 @@ decide which payments count; a change moves the debt of every event of that offi
    change into Lost (spec 05 acted on the change itself).
 4. **Specs 04 and 05 are replaced** (the user's "one place"): `create_ar_collection_tasks()`,
    `complete_ar_tasks_when_paid()`, `complete_ar_tasks_when_lost()`, their two triggers and the
-   job `create-ar-collection-tasks` are dropped; the nightly job is renamed
-   `sync-ar-collection-tasks`. Their tests move into this spec's test file. The two committed
-   migrations are history and are not edited.
+   job `create-ar-collection-tasks` are not kept; the nightly job is renamed
+   `sync-ar-collection-tasks`. Their tests move into this spec's test file. **Amended 2026-11-02
+   (user):** the two migrations that made them (`20261028140000`, `20261028150000`) never reached
+   production, so they are deleted and this spec's migration is the only one. It drops nothing.
 5. **The nightly run now also completes.** It completes the open tasks of every booked event
    whose Amount Due is 0 and of every Lost event. The first night after the deploy this also
    closes any task a schedule or price edit left open earlier (the case spec 05 §6 accepted),
@@ -266,8 +271,7 @@ decide which payments count; a change moves the debt of every event of that offi
 
 ## 3. The design
 
-`supabase/migrations/20261031120000_ar_task_sync.sql`, one transaction, so there is no gap
-between dropping the old objects and creating the new ones.
+`supabase/migrations/20261031120000_ar_task_sync.sql`, one transaction.
 
 ### 3.1 The function: the whole rule
 
@@ -290,8 +294,8 @@ false`); `'completed'` if a row changed, else `'none'`.
 **`public.ar_sync_all_event_tasks() RETURNS TABLE (created integer, completed integer)`**
 (`SECURITY DEFINER`, same attributes). `today` is Toronto's date. It calls `ar_sync_event_tasks`
 for every booked, non-deleted event and for every Lost event that has an open task, and counts
-the results. Job: `cron.schedule('sync-ar-collection-tasks', '20 5 * * *', ...)`; the old job
-`create-ar-collection-tasks` is unscheduled first (only if it exists, so the file can run twice).
+the results. Job: `cron.schedule('sync-ar-collection-tasks', '20 5 * * *', ...)`; a schedule with
+a name replaces the job of that name, so the file can run twice.
 
 ### 3.3 The trigger function
 
@@ -333,9 +337,12 @@ line, and this test stays red until it exists or the table is listed with a reas
 
 ### 3.6 What the migration removes
 
-`DROP TRIGGER complete_ar_tasks_when_paid ON "PaymentHistory"`, `DROP TRIGGER
-complete_ar_tasks_when_lost ON "Events"`, `DROP FUNCTION` for the two trigger functions and for
-`create_ar_collection_tasks()`, and the unscheduling of `create-ar-collection-tasks`.
+Nothing. Amended 2026-11-02 (user): the two migrations of specs 04 and 05 never reached
+production and are deleted, so there is no `complete_ar_tasks_when_paid()`,
+`complete_ar_tasks_when_lost()`, `create_ar_collection_tasks()`, trigger or job
+`create-ar-collection-tasks` to drop on a database built from the repository. A local database
+made before the deletion still holds them and needs `supabase db reset`. The test still asserts
+that none of them exists.
 
 ### 3.7 A walk-through
 
@@ -413,7 +420,9 @@ constraints deferred until after the edit.
 
 **Not counted:** `supabase/tests/ar_task_sync.test.sql` (new), `ar_task_sync.concurrency.sh`
 (renamed from `ar_collection_tasks_cron.concurrency.sh`), `package.json` (scripts), the two old
-test files (deleted), and a one-line "amended by spec 11" note at the top of specs 04 and 05. No
+test files (deleted), the two old migrations `20261028140000_ar_collection_tasks_cron.sql` and
+`20261028150000_ar_task_completion_triggers.sql` (deleted, see §3.6), and a one-line "amended by
+spec 11" note at the top of specs 04 and 05. No
 `AppSchema.ts`, `database.types.ts`, sync rules or UI. The permissions matrix is not touched: the
 triggers are system behaviour and give no role a new ability.
 

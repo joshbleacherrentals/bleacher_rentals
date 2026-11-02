@@ -1,6 +1,6 @@
 # Accountant Collections 04: the daily job that creates tasks
 
-> **Amended by [spec 11](accountant-collections-11-task-sync.md):** `create_ar_collection_tasks()` and the job `create-ar-collection-tasks` are replaced by `ar_sync_all_event_tasks()` and the job `sync-ar-collection-tasks`. Read this spec as history.
+> **Amended by [spec 11](accountant-collections-11-task-sync.md):** `create_ar_collection_tasks()` and the job `create-ar-collection-tasks` are replaced by `ar_sync_all_event_tasks()` and the job `sync-ar-collection-tasks`. This spec's migration (`20261028140000_ar_collection_tasks_cron.sql`) was deleted before production; spec 11's migration creates the replacement. Read this spec as history.
 
 Status: **Implemented 2026-10-29.** Approved by the user (written 2026-10-28); the two readings
 in §1 were implemented as written. Build order: **04**. Needs:

@@ -1,6 +1,7 @@
 -- Collections: one function keeps the tasks in step with the debt — see
--- docs/specs/accountant-collections-11-task-sync.md. It replaces the function, the triggers and the
--- job of specs 04 and 05; their two migrations stay as history and are not edited.
+-- docs/specs/accountant-collections-11-task-sync.md. It is the only migration for the daily job of
+-- spec 04 and the completion triggers of spec 05: their own two migrations never reached production
+-- and were deleted, so nothing here has to drop anything.
 --
 -- THE RULE LIVES IN ONE PLACE: public.ar_sync_event_tasks(event, today). For an eligible event
 -- (booked, not deleted) it looks at the state after the change:
@@ -41,23 +42,9 @@
 -- The functions are SECURITY DEFINER because the signed-in user who writes the payment may not touch
 -- ArEventTasks or run ar_event_amount_due; the owner bypasses RLS. EXECUTE is revoked from the app
 -- roles. The file can run twice.
-
--- ── Remove what specs 04 and 05 built ───────────────────────────────────────
-
-DROP TRIGGER IF EXISTS complete_ar_tasks_when_paid ON public."PaymentHistory";
-DROP TRIGGER IF EXISTS complete_ar_tasks_when_lost ON public."Events";
-DROP FUNCTION IF EXISTS public.complete_ar_tasks_when_paid();
-DROP FUNCTION IF EXISTS public.complete_ar_tasks_when_lost();
-DROP FUNCTION IF EXISTS public.create_ar_collection_tasks();
-
--- pg_cron raises on an unknown name, so ask first.
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'create-ar-collection-tasks') THEN
-    PERFORM cron.unschedule('create-ar-collection-tasks');
-  END IF;
-END;
-$$;
+--
+-- A database that still holds the two deleted migrations (a local one made before they were removed)
+-- keeps their function, triggers and job: reset it with `supabase db reset`.
 
 -- ── 1. The rule ─────────────────────────────────────────────────────────────
 
