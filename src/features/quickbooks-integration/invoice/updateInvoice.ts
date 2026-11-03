@@ -108,7 +108,11 @@ async function replaceInvoiceContent(params: ReplaceContent): Promise<UpdateInvo
     return setupFailure(e);
   }
   if (resolution.kind === "choose") {
-    return { status: "choose_customer", candidates: resolution.candidates };
+    return {
+      status: "choose_customer",
+      candidates: resolution.candidates,
+      reason: resolution.reason,
+    };
   }
 
   // 7

@@ -11,7 +11,8 @@ Branch: `q4-sprint1-finance-role`.
 Specs: `qbo-invoice-01` … `qbo-invoice-11`, plus `03a-province-tax-codes`, `03b-zone-class`,
 `03c-no-tax-code`, `03d-canadian-line-tax-code`, `03e-canadian-settings-cad-only`,
 `06a-check-on-save`, and `12-event-type-services`, `12a-quote-types-page`,
-`12b-use-the-mapping` and `12c-manage-quote-types`.
+`12b-use-the-mapping` and `12c-manage-quote-types`; and `02a-customer-matching` (implemented,
+2026-11-03: finds the customers the accountants entered by Company name and Display name only).
 Builds on: [accountant-quotes-05-is-qbo-column.md](accountant-quotes-05-is-qbo-column.md),
 [quote-staleness-detection.md](quote-staleness-detection.md),
 [accountant-role.md](accountant-role.md).

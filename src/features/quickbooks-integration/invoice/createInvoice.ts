@@ -1,7 +1,12 @@
 import { createHash } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../database.types";
-import { resolveInvoiceCustomer, type CustomerChoice, type QboCustomerSummary } from "../customers";
+import {
+  resolveInvoiceCustomer,
+  type CustomerChoice,
+  type CustomerChoiceReason,
+  type QboCustomerSummary,
+} from "../customers";
 import { attachQuotePdf } from "./attachQuotePdf";
 import {
   NO_TAX_CODE_MISSING,
@@ -47,7 +52,12 @@ export type CreateInvoiceResult =
       /** Absent when the check failed itself; the warning says so. */
       check?: InvoiceCheck;
     }
-  | { status: "choose_customer"; candidates: QboCustomerSummary[] }
+  | {
+      status: "choose_customer";
+      candidates: QboCustomerSummary[];
+      /** `name_taken`: QuickBooks refused a new customer; the candidate is the one that holds the name. */
+      reason: CustomerChoiceReason;
+    }
   | { status: "invoice_number_exists"; invoice: ExistingInvoice }
   | { status: "error"; httpStatus: 400 | 404 | 409 | 502; error: string };
 
@@ -272,7 +282,11 @@ export async function createInvoiceFromSource(
     return setupFailure(e);
   }
   if (resolution.kind === "choose") {
-    return { status: "choose_customer", candidates: resolution.candidates };
+    return {
+      status: "choose_customer",
+      candidates: resolution.candidates,
+      reason: resolution.reason,
+    };
   }
 
   // 8

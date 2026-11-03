@@ -619,15 +619,33 @@ describe("createInvoice — an invoice with this number is already in QuickBooks
 describe("createInvoice — the accountant has to choose a customer", () => {
   it("returns the candidates and stops: nothing is written to QuickBooks or to Events", async () => {
     const candidates = [
-      { id: "1", displayName: "Pat Lee", companyName: "Acme", email: "pat@example.com" },
-      { id: "2", displayName: "Pat Lee", companyName: null, email: null },
+      {
+        id: "1",
+        displayName: "Pat Lee",
+        companyName: "Acme",
+        email: "pat@example.com",
+        active: true,
+      },
+      { id: "2", displayName: "Pat Lee", companyName: null, email: null, active: true },
     ];
-    state.customer = { kind: "choose", candidates };
+    state.customer = { kind: "choose", candidates, reason: "several" };
 
     const result = await run();
 
-    expect(result).toEqual({ status: "choose_customer", candidates });
+    expect(result).toEqual({ status: "choose_customer", candidates, reason: "several" });
     expect(calls).toEqual(["load", "item", "qbo:find-invoice", "customer"]);
+    expectNothingWritten();
+  });
+
+  it("carries the reason when the customer step offers the customer that holds a taken name (spec 02a)", async () => {
+    const candidates = [
+      { id: "7", displayName: "Pat Lee", companyName: "Pat Lee", email: null, active: false },
+    ];
+    state.customer = { kind: "choose", candidates, reason: "name_taken" };
+
+    const result = await run();
+
+    expect(result).toEqual({ status: "choose_customer", candidates, reason: "name_taken" });
     expectNothingWritten();
   });
 });
