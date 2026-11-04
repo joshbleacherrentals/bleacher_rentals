@@ -125,7 +125,7 @@ describe("AccountsReceivableTabs", () => {
       expect(html).toContain(header);
     }
     expect(html).toContain("Event a");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
     expect(html).toContain("Dana Whitfield");
     expect(html).toContain("$1,000");
     expect(html).toContain("$2,000");

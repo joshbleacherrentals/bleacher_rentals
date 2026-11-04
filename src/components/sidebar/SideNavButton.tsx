@@ -6,6 +6,8 @@ import { CountBadge } from "@/components/CountBadge";
 type SideNavButtonProps = {
   label: string;
   href: string;
+  /** Other path prefixes that keep the button highlighted. */
+  activePrefixes?: string[];
   icon: React.ComponentType<any>;
   /** Renders an unread dot to the right of the label. */
   showIndicator?: boolean;
@@ -20,12 +22,13 @@ type SideNavButtonProps = {
 export const SideNavButton = ({
   label,
   href,
+  activePrefixes = [],
   icon: Icon,
   showIndicator = false,
   badge,
 }: SideNavButtonProps) => {
   const pathname = usePathname();
-  const isSelected = pathname.startsWith(href);
+  const isSelected = [href, ...activePrefixes].some((prefix) => pathname.startsWith(prefix));
 
   return (
     <Link

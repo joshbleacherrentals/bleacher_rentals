@@ -11,6 +11,8 @@ const isPublicRoute = createRouteMatcher([
   "/api/stripe/(.*)",
   "/api/events/(.*)/po",
   "/api/cron/(.*)",
+  // Gmail's push notifications, through Pub/Sub. It checks the subscription's signed token itself.
+  "/api/gmail/push",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

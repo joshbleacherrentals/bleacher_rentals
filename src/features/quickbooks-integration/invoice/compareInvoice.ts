@@ -1,3 +1,4 @@
+import { addressText, appearsIn, regionForms } from "./addressText";
 import { INVOICE_REASONS } from "./invoiceTypes";
 import type {
   InvoiceCheck,
@@ -78,10 +79,33 @@ export function compareInvoice(input: {
   }
   compareText("customer", "Bill to", expected.BillAddr.Line1, actual.billToLine1);
 
-  compareText("address", "Street", expected.ShipAddr.Line1, actual.ship.street);
-  compareText("address", "City", expected.ShipAddr.City, actual.ship.city);
-  compareText("address", "State", expected.ShipAddr.CountrySubDivisionCode, actual.ship.state);
-  compareText("address", "ZIP code", expected.ShipAddr.PostalCode, actual.ship.zip);
+  // The ship-to is read as text from every part QuickBooks holds: an invoice saved by hand in
+  // QuickBooks keeps the street in Line1 and moves the city, province and postal code into free-text
+  // lines, leaving the separate fields empty. Each part of the quote's address has to appear in that
+  // text (a province in either its name or its code, a postal code with or without its space). A
+  // part the quote has no value for is not looked for. A difference shows the field QuickBooks holds,
+  // or the whole address when that field is empty.
+  const { ship } = actual;
+  const shipParts = [ship.street, ship.city, ship.state, ship.zip, ...ship.other];
+  const shipShown = addressText(shipParts);
+  const compareAddress = (
+    field: string,
+    quoteValue: string | null | undefined,
+    qboValue: string | null | undefined,
+    options: { forms?: (value: string) => string[]; compact?: boolean } = {},
+  ) => {
+    const wanted = text(quoteValue);
+    if (wanted === "") return;
+    const forms = options.forms ? options.forms(wanted) : [wanted];
+    if (forms.some((form) => appearsIn(form, shipParts, { compact: options.compact }))) return;
+    add("address", field, wanted, text(qboValue) || shipShown);
+  };
+  compareAddress("Street", expected.ShipAddr.Line1, ship.street);
+  compareAddress("City", expected.ShipAddr.City, ship.city);
+  compareAddress("State", expected.ShipAddr.CountrySubDivisionCode, ship.state, {
+    forms: regionForms,
+  });
+  compareAddress("ZIP code", expected.ShipAddr.PostalCode, ship.zip, { compact: true });
 
   compareText("memo", "Memo", expected.PrivateNote, actual.memo);
 

@@ -8,6 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { formatInvoiceNumber } from "../../../utils/invoiceNumber";
 
 export type HistoryEvent = {
   id: string;
@@ -53,7 +54,7 @@ function EventRow({ event }: { event: HistoryEvent }) {
     >
       <div className="min-w-0">
         <div className="text-sm font-medium text-darkBlue truncate">
-          {event.eventName ?? "Untitled Event"} (#{event.invoiceNumber ?? "—"})
+          {event.eventName ?? "Untitled Event"} (#{formatInvoiceNumber(event.invoiceNumber) ?? "—"})
         </div>
         <div className="text-xs text-gray-400 mt-0.5">
           {formatDate(event.eventStart)} - {formatDate(event.eventEnd)}

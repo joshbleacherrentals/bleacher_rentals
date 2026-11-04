@@ -28,8 +28,14 @@ const INVOICE = {
   totalCents: 123456,
 };
 const CANDIDATES = [
-  { id: "C1", displayName: "Dana Whitfield", companyName: "Riverside High", email: "dana@r.edu" },
-  { id: "C2", displayName: "Dana Whitfield", companyName: null, email: null },
+  {
+    id: "C1",
+    displayName: "Dana Whitfield",
+    companyName: "Riverside High",
+    email: "dana@r.edu",
+    active: true,
+  },
+  { id: "C2", displayName: "Dana Whitfield", companyName: null, email: null, active: true },
 ];
 
 const created = (
@@ -224,7 +230,7 @@ describe("Create flow", () => {
 
   it("S5: choose_customer opens the customer window with the candidates, and sends nothing yet", async () => {
     const { flow, io, posted, state } = harness([
-      { status: "choose_customer", candidates: CANDIDATES },
+      { status: "choose_customer", candidates: CANDIDATES, reason: "several" },
     ]);
 
     await flow.press("create");
@@ -234,15 +240,32 @@ describe("Create flow", () => {
       action: "create",
       request: { eventId: EVENT_ID },
       candidates: CANDIDATES,
+      reason: "several",
     });
     expect(posted).toHaveLength(1);
     expect(io.success).not.toHaveBeenCalled();
     expect(io.remember).not.toHaveBeenCalled();
   });
 
+  it("spec 02a: the window carries the reason of a customer whose name is taken", async () => {
+    const { flow, state } = harness([
+      { status: "choose_customer", candidates: [CANDIDATES[0]], reason: "name_taken" },
+    ]);
+
+    await flow.press("create");
+
+    expect(state.dialog).toEqual({
+      kind: "choose_customer",
+      action: "create",
+      request: { eventId: EVENT_ID },
+      candidates: [CANDIDATES[0]],
+      reason: "name_taken",
+    });
+  });
+
   it("S5: 'Use this customer' sends the same request again with customerChoice, and closes the window first", async () => {
     const { flow, posted, state, log } = harness([
-      { status: "choose_customer", candidates: CANDIDATES },
+      { status: "choose_customer", candidates: CANDIDATES, reason: "several" },
       created(),
     ]);
     await flow.press("create");
@@ -260,7 +283,7 @@ describe("Create flow", () => {
 
   it("S5: 'Create a new customer' sends { kind: 'new' }", async () => {
     const { flow, posted, state } = harness([
-      { status: "choose_customer", candidates: CANDIDATES },
+      { status: "choose_customer", candidates: CANDIDATES, reason: "several" },
       created(),
     ]);
     await flow.press("create");
@@ -306,7 +329,7 @@ describe("Create flow", () => {
   it("keeps the customer already chosen when the number window follows, and the other way round", async () => {
     const { flow, posted, state } = harness([
       { status: "invoice_number_exists", invoice: INVOICE },
-      { status: "choose_customer", candidates: CANDIDATES },
+      { status: "choose_customer", candidates: CANDIDATES, reason: "several" },
       updated({ linkedExisting: true }),
     ]);
     await flow.press("create");
@@ -324,7 +347,7 @@ describe("Create flow", () => {
 
   it("the busy label stays 'create' for the re-sends that follow a window", async () => {
     const { flow, state, log } = harness([
-      { status: "choose_customer", candidates: CANDIDATES },
+      { status: "choose_customer", candidates: CANDIDATES, reason: "several" },
       created(),
     ]);
     await flow.press("create");
@@ -443,7 +466,7 @@ describe("Update flow", () => {
 
   it("choose_customer opens the customer window; the answer re-sends the request with customerChoice", async () => {
     const { flow, posted, state } = harness([
-      { status: "choose_customer", candidates: CANDIDATES },
+      { status: "choose_customer", candidates: CANDIDATES, reason: "several" },
       updated(),
     ]);
     await flow.press("update");

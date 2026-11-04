@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { canSendEmail } from "./logic/canSendEmail";
+import type { WebRole } from "./logic/determineAccess";
 import { PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_LABELS, ROLE_ORDER } from "./permissionPageData";
 
 describe("permission matrix", () => {
@@ -27,12 +29,13 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Edit Team Members, and Quote Types", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Blocked Emails, Edit Team Members, and Quote Types", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
       expect(granted.sort()).toEqual([
         "Accounts Receivable",
+        "Blocked Customer Emails",
         "Collections",
         "Companies & Contacts",
         "Driver Payments & QuickBooks Bills",
@@ -41,12 +44,14 @@ describe("permission matrix", () => {
         "Event Chat",
         "Events",
         "Payment History",
+        "Pull Emails from Gmail",
         "QuickBooks Invoice (create and update)",
         "QuickBooks Invoice Alerts",
         "QuickBooks Invoice Flag",
         "Quote Files",
         "Quote Types",
         "Record a Payment",
+        "Send Emails",
         "Work Trackers",
       ]);
     });
@@ -920,5 +925,23 @@ describe("permission matrix", () => {
         /and the QuickBooks invoice \(see those rows\)/,
       );
     });
+  });
+});
+
+// The page tells people what they may do and the code decides it; this keeps the two from drifting.
+describe("Send Emails", () => {
+  const row = PERMISSIONS.find((p) => p.label === "Send Emails");
+
+  it("is granted to exactly the roles canSendEmail allows: admin, account manager and accountant", () => {
+    for (const role of Object.keys(ROLE_LABELS) as WebRole[]) {
+      expect(row?.roles[role].level !== "none", role).toBe(canSendEmail([role]));
+    }
+    expect(
+      (Object.keys(ROLE_LABELS) as WebRole[]).filter((role) => row?.roles[role].level === "full"),
+    ).toEqual(expect.arrayContaining(["admin", "account_manager", "accountant"]));
+  });
+
+  it("tells a viewer why the buttons are dimmed", () => {
+    expect(row?.roles.viewer.note).toMatch(/dimmed/i);
   });
 });

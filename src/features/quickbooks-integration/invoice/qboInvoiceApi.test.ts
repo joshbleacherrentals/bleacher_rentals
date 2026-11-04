@@ -83,7 +83,7 @@ describe("readQboInvoice — the snapshot", () => {
       dueDate: "2026-10-15",
       customerId: "cust-1",
       billToLine1: "Pat Lee",
-      ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631" },
+      ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631", other: [] },
       memo: "SC - CLEMSON - RALLY",
       lines: [
         {
@@ -152,6 +152,28 @@ describe("readQboInvoice — the snapshot", () => {
     ).toBeNull();
   });
 
+  it("keeps the later address lines and the country, which QuickBooks fills when it is saved by hand", async () => {
+    const snapshot = (await read(
+      rawInvoice({
+        ShipAddr: {
+          Line1: "145 Pacific Avenue",
+          Line2: "Winnipeg MB R3B 2Z6",
+          Line3: "",
+          Line5: "Suite 5",
+          Country: "Canada",
+        },
+      }),
+    ))!.snapshot;
+
+    expect(snapshot.ship).toEqual({
+      street: "145 Pacific Avenue",
+      city: "",
+      state: "",
+      zip: "",
+      other: ["Winnipeg MB R3B 2Z6", "Suite 5", "Canada"],
+    });
+  });
+
   it("an invoice with nothing but its id still reads: every value is empty, no line", async () => {
     const snapshot = (await read({ Id: "inv-1", SyncToken: "0" } as ReturnType<typeof rawInvoice>))!
       .snapshot;
@@ -162,7 +184,7 @@ describe("readQboInvoice — the snapshot", () => {
       dueDate: "",
       customerId: "",
       billToLine1: "",
-      ship: { street: "", city: "", state: "", zip: "" },
+      ship: { street: "", city: "", state: "", zip: "", other: [] },
       memo: "",
       lines: [],
       totalCents: null,

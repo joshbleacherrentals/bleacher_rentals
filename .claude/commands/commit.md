@@ -1,9 +1,30 @@
 ---
 description: Review every local change, write the message, and commit — never push
+argument-hint: [quick]
 ---
 
 Commit whatever is currently uncommitted. I should be able to type `/commit` and
 walk away.
+
+**Mode:** `$1`. If that is `quick`, follow "Quick mode" below instead of sections
+1–4. Anything else, or nothing, is the normal full process.
+
+## Quick mode
+
+For when I just want it recorded, fast. Do only this:
+
+1. `git status --short` and `git diff --stat`, then skim the diff for secrets,
+   `.env` values and debug logging. Leave out anything that should not be
+   committed and say so.
+2. **Skip `npm run tc` and `npx vitest run`.** Do not run them.
+3. `npx prettier --write` on the files being committed, and only those.
+4. **One commit**, whatever is in it, with a one-line `type(scope): subject`
+   message and no body.
+5. Then section 5 as usual: never push, not on `main`, show the summary line, the
+   unpushed count and the push command.
+
+End with one plain sentence saying the type-check and tests were not run, so a
+quick commit is never mistaken for a checked one.
 
 ## 1. Look at everything first
 
@@ -50,11 +71,8 @@ Follow the repo's convention: `type(scope): subject`, with type one of `feat`,
 Do not restate the diff in prose. If the reader can see it in the code, leave it
 out.
 
-End every message with:
-
-```
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-```
+Do not add a `Co-Authored-By` line, a "Generated with Claude" line, or any other
+attribution to the message. It is just my commit.
 
 ## 5. Commit, and stop there
 

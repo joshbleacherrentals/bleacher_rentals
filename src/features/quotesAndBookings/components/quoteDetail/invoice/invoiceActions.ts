@@ -1,5 +1,6 @@
 import type {
   CustomerChoice,
+  CustomerChoiceReason,
   QboCustomerSummary,
 } from "@/features/quickbooks-integration/customers";
 import type { InvoiceWarning } from "@/features/quickbooks-integration/invoice/createInvoice";
@@ -93,6 +94,7 @@ export type InvoiceDialog =
       action: InvoiceAction;
       request: InvoiceRequest;
       candidates: QboCustomerSummary[];
+      reason: CustomerChoiceReason;
     }
   | {
       kind: "number_exists";
@@ -129,7 +131,13 @@ export function createInvoiceFlow(eventId: string, io: InvoiceFlowIo) {
         for (const warning of result.warnings) io.warn(warningMessage(warning));
         return;
       case "choose_customer":
-        io.setDialog({ kind: "choose_customer", action, request, candidates: result.candidates });
+        io.setDialog({
+          kind: "choose_customer",
+          action,
+          request,
+          candidates: result.candidates,
+          reason: result.reason,
+        });
         return;
       case "invoice_number_exists":
         io.setDialog({ kind: "number_exists", action, request, invoice: result.invoice });

@@ -19,6 +19,11 @@ export const PREFERRED_LANGUAGE_OPTIONS: { label: string; value: PreferredLangua
   { label: "French", value: "french" },
 ];
 
+/** The two-letter code shown on a contact's overview. */
+export function preferredLanguageBadge(value: PreferredLanguage): "EN" | "FR" {
+  return value === "french" ? "FR" : "EN";
+}
+
 /** Narrow a local text value to the enum, defaulting to English. */
 export function toPreferredLanguage(value: string | null | undefined): PreferredLanguage {
   return value === "french" ? "french" : "english";

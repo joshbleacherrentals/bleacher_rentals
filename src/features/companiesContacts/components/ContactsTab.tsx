@@ -1,18 +1,17 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Plus } from "lucide-react";
 import { useContactsAll } from "../hooks/useContactsAll";
 import { filterContacts } from "../utils/searchFilter";
 import { CreateContactModal } from "./CreateContactModal";
-import { ContactDetailModal } from "./ContactDetailModal";
-import type { ContactFull } from "../hooks/useContactsAll";
 
 export function ContactsTab() {
+  const router = useRouter();
   const { contacts, isLoading } = useContactsAll();
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [selected, setSelected] = useState<ContactFull | null>(null);
 
   const filtered = useMemo(() => filterContacts(contacts, query), [contacts, query]);
 
@@ -67,7 +66,7 @@ export function ContactsTab() {
               {filtered.map((contact) => (
                 <tr
                   key={contact.id}
-                  onClick={() => setSelected(contact)}
+                  onClick={() => router.push(`/contacts/${contact.id}`)}
                   className="hover:bg-blue-50/40 cursor-pointer transition-colors"
                 >
                   <td className="px-4 py-3 font-medium text-gray-800">
@@ -84,7 +83,6 @@ export function ContactsTab() {
       )}
 
       <CreateContactModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
-      <ContactDetailModal contact={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

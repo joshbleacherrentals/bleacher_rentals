@@ -122,15 +122,27 @@ beforeEach(() => {
 });
 
 const CANDIDATES = [
-  { id: "C1", displayName: "Dana Whitfield", companyName: "Riverside High", email: "dana@r.edu" },
-  { id: "C2", displayName: "Dana W.", companyName: null, email: null },
+  {
+    id: "C1",
+    displayName: "Dana Whitfield",
+    companyName: "Riverside High",
+    email: "dana@r.edu",
+    active: true,
+  },
+  { id: "C2", displayName: "Dana W.", companyName: null, email: null, active: true },
 ];
 
 describe("CustomerChoiceDialog", () => {
   const draw = (over: Partial<Parameters<typeof CustomerChoiceDialog>[0]> = {}) => {
     const onChoose = vi.fn();
     const onCancel = vi.fn();
-    const props = { candidates: CANDIDATES, onChoose, onCancel, ...over };
+    const props = {
+      candidates: CANDIDATES,
+      reason: "several" as const,
+      onChoose,
+      onCancel,
+      ...over,
+    };
     return { onChoose, onCancel, tree: expand(CustomerChoiceDialog(props)), props };
   };
 
@@ -144,7 +156,12 @@ describe("CustomerChoiceDialog", () => {
 
   it("shows nothing it was not given: no company or email text for a candidate without them", () => {
     const html = renderToStaticMarkup(
-      <CustomerChoiceDialog candidates={[CANDIDATES[1]]} onChoose={() => {}} onCancel={() => {}} />,
+      <CustomerChoiceDialog
+        candidates={[CANDIDATES[1]]}
+        reason="several"
+        onChoose={() => {}}
+        onCancel={() => {}}
+      />,
     );
     expect(html).toContain("Dana W.");
     expect(html).not.toContain("null");
@@ -191,6 +208,56 @@ describe("CustomerChoiceDialog", () => {
     captured.onOpenChange?.(true);
 
     expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("several matches keep the title, the text and the 'Create a new customer' button", () => {
+    const { tree, props } = draw();
+    const html = renderToStaticMarkup(<CustomerChoiceDialog {...props} />);
+
+    expect(html).toContain("Which QuickBooks customer?");
+    expect(html).toContain("More than one customer in QuickBooks matches");
+    expect(buttons(tree).map((b) => textOf(b.props.children))).toContain("Create a new customer");
+  });
+
+  // docs/specs/qbo-invoice-02a-customer-matching.md §4: QuickBooks refused a new customer because
+  // the name is taken, so the one that holds it is offered, and creating another would fail again.
+  describe("a name that is taken (spec 02a)", () => {
+    const taken = (over: Partial<(typeof CANDIDATES)[number]> = {}) => ({
+      candidates: [{ ...CANDIDATES[0], displayName: "Jennifer Green", ...over }],
+      reason: "name_taken" as const,
+    });
+
+    it("says that QuickBooks already has the customer, with its name", () => {
+      const { props } = draw(taken());
+      const html = renderToStaticMarkup(<CustomerChoiceDialog {...props} />);
+
+      expect(html).toContain("QuickBooks already has this customer");
+      expect(html).toContain("QuickBooks already has a customer named Jennifer Green");
+      expect(html).not.toContain("More than one customer");
+    });
+
+    it("has no 'Create a new customer' button, but Use this customer and Cancel", () => {
+      const { tree, onChoose, onCancel } = draw(taken());
+      const labels = buttons(tree).map((b) => textOf(b.props.children));
+
+      expect(labels).not.toContain("Create a new customer");
+      press(tree, "Use this customer");
+      expect(onChoose).toHaveBeenCalledWith({ kind: "existing", customerId: "C1" });
+      press(tree, "Cancel");
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("says an inactive customer will be turned on, and says nothing of the kind for an active one", () => {
+      const inactive = renderToStaticMarkup(
+        <CustomerChoiceDialog {...draw(taken({ active: false })).props} />,
+      );
+      const active = renderToStaticMarkup(
+        <CustomerChoiceDialog {...draw(taken({ active: true })).props} />,
+      );
+
+      expect(inactive).toContain("Inactive in QuickBooks. Using it turns it on.");
+      expect(active).not.toContain("Inactive in QuickBooks");
+    });
   });
 });
 
@@ -551,6 +618,7 @@ describe("InvoiceDialogs", () => {
       action: "create",
       request,
       candidates: CANDIDATES,
+      reason: "several",
     };
     const { f, tree } = draw(dialog);
 

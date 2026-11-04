@@ -368,13 +368,57 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Unable to even access the page, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: read(
-        "This user can see companies, contacts and venues and every detail, but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
+        "This user can see companies, contacts and venues and every detail (including opening a contact's emails), but cannot create, edit or delete any of them. Enforced in the database by row-level security, so the block holds even though the page still shows the buttons — a write appears to succeed locally and is then rejected by the server.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
         "Can create, edit and delete any company, contact or venue — the same as an account manager, including the Quote Language. The page has no Venues tab: a venue is added or edited from the Default Venue field of a contact. Delete hides the record; nothing is removed from the database.",
       ),
+    },
+  },
+  {
+    label: "Send Emails",
+    description:
+      "Replying to a contact's email from their page (the Compose button on their Emails tab, and the Reply, Reply all and Forward buttons on an email, with their box). The email goes out from your own company mailbox, so it comes from you and nobody can send as someone else. That also means your account's email has to be a @bleacherrentals.com address, whatever your role: without one the buttons are dimmed and say so. Both rules are enforced on the server, not just by the page. In the development environment an email can only go to the addresses on the Allowed Emails list. This is separate from Send To Client, which sends a quote.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can send a reply to any contact's email, from their own mailbox."),
+      account_manager: full(
+        "Can send a reply to any contact's email, from their own mailbox — they are the ones speaking to the client.",
+      ),
+      developer: none(
+        "The Companies & Contacts page is hidden from this role, so there is nothing to reply to, and the server would refuse a send anyway.",
+      ),
+      viewer: none(
+        "Viewers can read a contact's emails, but the Reply, Reply all and Forward buttons are dimmed and say why when pointed at or clicked. The server refuses the send too.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full(
+        "Can send a reply to any contact's email, from their own mailbox, the same as an account manager.",
+      ),
+    },
+  },
+  {
+    label: "Pull Emails from Gmail",
+    description:
+      "The Pull from Gmail button on a contact's Emails tab. It searches every company mailbox for the contact's address and saves what it finds onto the contact, so the emails from before the app started following the mailboxes show up. New emails are added to a contact automatically; nobody has to press the button for those. It never pulls an address at a company domain or on the Blocked Emails list. Enforced on the server, not just by the page.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can pull any contact's emails from Gmail."),
+      account_manager: full(
+        "Can pull any contact's emails from Gmail — they are the ones speaking to the client.",
+      ),
+      developer: none(
+        "The Companies & Contacts page is hidden from this role, so there is nothing to pull, and the server would refuse it anyway.",
+      ),
+      viewer: none(
+        "Pulling saves emails onto the contact, and viewers are read-only on operational data, so the server refuses it. They can still read the emails already on a contact and open them.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: full("Can pull any contact's emails from Gmail, the same as an account manager."),
     },
   },
   {
@@ -638,6 +682,33 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
+    label: "Blocked Customer Emails",
+    description:
+      "The Blocked Emails page: addresses whose emails can never be pulled from Gmail onto a contact, so adding someone as a contact cannot expose their mail. Every address at bleacherrentals.com or tpi-3.ca is always blocked without being listed. A customer who writes to a blocked person can still be searched. The list is shared and open to every role that uses the web app, in the sidebar right after Companies & Contacts: everyone can read it and add an address, but each address can only be edited or removed by the person who added it.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      account_manager: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      developer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      viewer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security. Being a viewer does not stop them adding an address: the list is a shared safety list, not operational data.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
+      accountant: custom(
+        "Can see the whole list and add an address. Can edit or remove only the addresses they added themselves, not anyone else's. Enforced in the database by row-level security.",
+      ),
     },
   },
   {

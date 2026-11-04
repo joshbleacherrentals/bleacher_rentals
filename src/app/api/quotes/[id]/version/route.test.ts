@@ -24,6 +24,10 @@ describe("parseVersionIdParam", () => {
     expect(parseVersionIdParam("100123")).toEqual({ kind: "invoice_number", value: 100123 });
   });
 
+  it("reads a number printed with nine digits as the same invoice number", () => {
+    expect(parseVersionIdParam("000000042")).toEqual({ kind: "invoice_number", value: 42 });
+  });
+
   it("classifies a valid UUID", () => {
     const uuid = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
     expect(parseVersionIdParam(uuid)).toEqual({ kind: "uuid", value: uuid });

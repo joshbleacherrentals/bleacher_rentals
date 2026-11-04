@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
   },
   turbopack: {},
   allowedDevOrigins: ["192.168.1.3"],
+  // Companies & Contacts is now two pages, /contacts and /companies. Keeps old bookmarks working.
+  async redirects() {
+    return [{ source: "/companies-contacts", destination: "/contacts", permanent: false }];
+  },
 };
 
 export default nextConfig;

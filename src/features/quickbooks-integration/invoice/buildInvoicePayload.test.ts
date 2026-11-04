@@ -44,6 +44,20 @@ const refs = (over: Partial<InvoiceRefs> = {}): InvoiceRefs => ({
 
 const line = (s = source(), r = refs()) => buildInvoicePayload(s, r).body.Line[0];
 
+describe("buildInvoicePayload — the invoice number", () => {
+  it("writes a short number with nine digits", () => {
+    expect(buildInvoicePayload(source({ invoiceNumber: 42 }), refs()).body.DocNumber).toBe(
+      "000000042",
+    );
+  });
+
+  it("leaves a nine-digit number as it is", () => {
+    expect(buildInvoicePayload(source({ invoiceNumber: 483920174 }), refs()).body.DocNumber).toBe(
+      "483920174",
+    );
+  });
+});
+
 describe("buildInvoicePayload", () => {
   it("builds the SC - CLEMSON - RALLY invoice body", () => {
     const { body, warnings } = buildInvoicePayload(source(), refs());

@@ -29,6 +29,7 @@ import {
   ImageIcon,
   Receipt,
   MailCheck,
+  MailX,
   Tags,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
@@ -39,6 +40,8 @@ type SidebarButtonItem = {
   key: string;
   label: string;
   href: string;
+  /** Other path prefixes that keep this item highlighted, for a section spread over several pages. */
+  activePrefixes?: string[];
   icon: React.ComponentType<any>;
   /**
    * Which roles may see this button when it sits inside a section. Absent means everyone who can
@@ -188,8 +191,16 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     type: "button",
     key: "companies-contacts",
     label: "Companies & Contacts",
-    href: "/companies-contacts",
+    href: "/contacts",
+    activePrefixes: ["/companies"],
     icon: BookUser,
+  },
+  {
+    type: "button",
+    key: "blocked-emails",
+    label: "Blocked Emails",
+    href: "/blocked-emails",
+    icon: MailX,
   },
   {
     type: "section",
@@ -359,6 +370,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -376,6 +388,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -386,10 +399,11 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "driver-calendar",
     "documentation",
   ],
-  developer: ["roadmap", "dev-tools"],
+  developer: ["roadmap", "dev-tools", "blocked-emails"],
   viewer: [
     "dashboard",
     "quotes-bookings",
+    "blocked-emails",
     "sales-offices",
     "team",
     "assets",
@@ -401,7 +415,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "documentation",
   ],
   driver: [],
-  maintainer: ["dashboard", "quality-assurance", "documentation", "assets"],
+  maintainer: ["dashboard", "quality-assurance", "documentation", "assets", "blocked-emails"],
   // docs/specs/accountant-address-book.md: Companies & Contacts, after Messages (ALL_ITEMS sets the order).
   // docs/specs/accountant-team.md: Team, after Quotes & Bookings.
   // docs/specs/qbo-invoice-12a-quote-types-page.md: Configuration, which holds only Quote Types for them.
@@ -412,6 +426,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "work-trackers",
     "messages",
     "companies-contacts",
+    "blocked-emails",
     "configuration",
     "documentation",
   ],

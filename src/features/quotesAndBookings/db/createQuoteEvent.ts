@@ -103,18 +103,10 @@ export async function createQuoteEvent(
   // code is fatal to the connector, so the write was discarded and the user was
   // told their change could not be saved, on a quote that had saved perfectly.
 
-  // Generate unique 9-digit invoice number (must use Supabase RPC)
-  const { data: invoiceData } = await (supabase.rpc as any)("generate_invoice_number");
-
-  if (invoiceData != null) {
-    await typedExecute(
-      db
-        .updateTable("Events")
-        .set({ invoice_number: Number(invoiceData) } as any)
-        .where("id", "=", eventUuid)
-        .compile(),
-    );
-  }
+  // The invoice number is NOT asked for here. The database gives it to the row when this INSERT
+  // uploads (trigger `events_assign_invoice_number`, 20261103120000), so it also works offline and
+  // no code path can forget it. It reaches this screen with the next sync.
+  // Spec: docs/specs/invoice-number-01-assign-in-database.md
 
   // 3. Insert line items
   if (state.lineItems.length > 0) {

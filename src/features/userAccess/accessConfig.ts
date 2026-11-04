@@ -44,10 +44,12 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/terms-and-conditions",
       "/pricing-matrix",
       "/quote",
-      "/companies-contacts",
+      "/companies",
+      "/contacts",
       "/messages",
       "/stripe-connections",
       "/automatic-emails",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,
@@ -73,8 +75,10 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/sales-offices",
       "/permissions",
       "/quote",
-      "/companies-contacts",
+      "/companies",
+      "/contacts",
       "/messages",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,
@@ -82,7 +86,13 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
   developer: {
     // All of /dev-tools: the developer's Dev Tools sidebar section lists every
     // page under it. Sync Health keeps its own page gate on top of this.
-    allowedPaths: ["/roadmap", "/changelog", "/driver-satisfaction", "/dev-tools"],
+    allowedPaths: [
+      "/roadmap",
+      "/blocked-emails",
+      "/changelog",
+      "/driver-satisfaction",
+      "/dev-tools",
+    ],
     showSidebar: true,
   },
   viewer: {
@@ -106,7 +116,9 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/dev-tools",
       "/sales-offices",
       "/permissions",
-      "/companies-contacts",
+      "/companies",
+      "/contacts",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,
@@ -125,6 +137,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/damage-reports",
       "/repairs",
       "/permissions",
+      "/blocked-emails",
       "/changelog",
       "/assets",
       "/roadmap/backlog",
@@ -138,7 +151,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     // read-only — the prefix also reaches /new and /{id}/edit, which guard themselves by
     // capability. docs/specs/accountant-quotes-11: /messages, the internal chat — the prefix also
     // reaches /messages/external, a placeholder the sidebar does not offer them (D4).
-    // docs/specs/accountant-address-book.md: /companies-contacts, where they create, edit and
+    // docs/specs/accountant-address-book.md: /companies and /contacts, where they create, edit and
     // soft-delete companies, contacts and venues. docs/specs/accountant-team.md: /team — the prefix
     // also reaches /team/new and /team/{id}/edit/..., which guard themselves by edit access (the
     // list is every user, a profile opens for a driver only, and the database is the lock).
@@ -156,11 +169,13 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/quotes-bookings",
       "/work-trackers",
       "/messages",
-      "/companies-contacts",
+      "/companies",
+      "/contacts",
       "/team",
       "/qbo-quote-types",
       "/quote",
       "/permissions",
+      "/blocked-emails",
       "/changelog",
     ],
     showSidebar: true,

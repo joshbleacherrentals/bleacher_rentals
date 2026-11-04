@@ -2,12 +2,27 @@
  * Pure helpers for invoice-number display and quote routing.
  */
 
+/** Every invoice number is written with at least this many digits (`000000042`). */
+const INVOICE_NUMBER_DIGITS = 9;
+
+/**
+ * The invoice number as it is shown and sent: the stored number padded with zeros to nine digits.
+ * The database keeps a plain number; this is the one place that adds the zeros, so a list, a PDF
+ * and QuickBooks all read the same. A number of ten digits or more is not cut. Null for a missing
+ * number (null, undefined, 0).
+ * Spec: docs/specs/invoice-number-02-nine-digit-format.md
+ */
+export function formatInvoiceNumber(invoiceNumber: number | null | undefined): string | null {
+  if (!invoiceNumber) return null;
+  return String(invoiceNumber).padStart(INVOICE_NUMBER_DIGITS, "0");
+}
+
 /** Returns the display string for a quote: invoice number if available, fallback to eventId (UUID). */
 export function resolveInvoiceDisplay(
   invoiceNumber: number | null | undefined,
   eventId: string,
 ): string {
-  return invoiceNumber ? String(invoiceNumber) : eventId;
+  return formatInvoiceNumber(invoiceNumber) ?? eventId;
 }
 
 /**

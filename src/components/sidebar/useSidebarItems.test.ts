@@ -20,6 +20,30 @@ describe("useSidebarItems", () => {
     expect(keys).toContain("configuration");
   });
 
+  it("every web role finds Blocked Emails as its own button, straight after Companies & Contacts", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "accountant",
+      "maintainer",
+      "developer",
+    ] as const) {
+      const items = useSidebarItems([role]);
+      expect(items).toContainEqual(
+        expect.objectContaining({ key: "blocked-emails", href: "/blocked-emails" }),
+      );
+    }
+    const keys = useSidebarItems(["admin"]).map((i) => i.key);
+    expect(keys.indexOf("blocked-emails")).toBe(keys.indexOf("companies-contacts") + 1);
+  });
+
+  it("no one else gets the configuration section", () => {
+    for (const role of ["account_manager", "viewer", "maintainer"] as const) {
+      expect(useSidebarItems([role]).map((i) => i.key)).not.toContain("configuration");
+    }
+  });
+
   it("admin lists Accountant immediately before Work Trackers", () => {
     const keys = useSidebarItems(["admin"]).map((i) => i.key);
     expect(keys.indexOf("accountant")).toBe(keys.indexOf("work-trackers") - 1);
@@ -148,7 +172,7 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, the Configuration section and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, Blocked Emails, the Configuration section and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
@@ -157,6 +181,7 @@ describe("useSidebarItems", () => {
       "work-trackers",
       "messages",
       "companies-contacts",
+      "blocked-emails",
       "configuration",
       "documentation",
     ]);
@@ -190,13 +215,17 @@ describe("useSidebarItems", () => {
     const companiesContacts = items[5];
     expect(companiesContacts.type).toBe("button");
     expect("label" in companiesContacts && companiesContacts.label).toBe("Companies & Contacts");
-    expect("href" in companiesContacts && companiesContacts.href).toBe("/companies-contacts");
+    // Two pages (/contacts, /companies); the button opens the first and stays lit on both.
+    expect("href" in companiesContacts && companiesContacts.href).toBe("/contacts");
+    expect("activePrefixes" in companiesContacts && companiesContacts.activePrefixes).toEqual([
+      "/companies",
+    ]);
 
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: Configuration, with Quote Types only.
-    const configuration = items[6];
+    const configuration = items[7];
     expect(configuration.type).toBe("section");
 
-    const docs = items[7];
+    const docs = items[8];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",

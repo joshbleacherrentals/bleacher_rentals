@@ -142,7 +142,7 @@ const snapshot = (over: Partial<QboInvoiceSnapshot> = {}): QboInvoiceSnapshot =>
   dueDate: "2026-10-15",
   customerId: "cust-1",
   billToLine1: "Pat Lee",
-  ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631" },
+  ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631", other: [] },
   memo: "SC - CLEMSON - RALLY",
   lines: [
     {
