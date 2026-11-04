@@ -61,7 +61,6 @@ test.describe("Collections tab (accountant)", () => {
     const tabs = await page.getByRole("tab").allInnerTexts();
     expect(tabs.map((t) => t.trim().split("\n")[0])).toEqual([
       "Collections",
-      "AR",
       "AR Deposits",
       "Need attention",
     ]);
@@ -69,7 +68,7 @@ test.describe("Collections tab (accountant)", () => {
     await expect(page.getByRole("switch", { name: "Show Deleted" })).toHaveCount(0);
     await expect(page.getByRole("switch", { name: "Show Not Due Yet" })).toBeVisible();
 
-    await page.getByRole("tab", { name: /^AR(?! Deposits)/ }).click();
+    await page.getByRole("tab", { name: /^AR Deposits/ }).click();
     await expect(page.getByPlaceholder(/^Search by name, invoice #/)).toBeVisible();
   });
 

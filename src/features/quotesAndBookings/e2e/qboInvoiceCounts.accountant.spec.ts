@@ -6,7 +6,7 @@ import { cleanupQuote, createQuote, type CreatedQuote } from "./helpers/quoteTes
  * The sidebar counts, the tab-label counts and the row marks, as an accountant
  * (docs/specs/qbo-invoice-11-counts-and-marks.md §6: S1, S3, S4, S5, S6, S7 and S8; S2, an admin who
  * is not an accountant, is in qboInvoiceCounts.admin.spec.ts). The count is on the Accountant item
- * of the sidebar only, and the tab number on Need attention only (not on AR or AR Deposits).
+ * of the sidebar only, and the tab number on Need attention only (not on AR Deposits).
  *
  * Written, not run locally (standing instruction: no Playwright runs on this machine). This project
  * only exists once E2E_ACCOUNTANT_EMAIL is configured (see playwright.config.ts).
@@ -15,8 +15,9 @@ import { cleanupQuote, createQuote, type CreatedQuote } from "./helpers/quoteTes
  * a check. The database is shared, so other quotes may need attention too: the sidebar's number is
  * compared with the number the same rule gives straight from the database, never with a fixed one.
  * S6 replaces the Update route with a fake that clears the flag, as the real route's check does.
- * S4 and S8 use two of the quotes seeded for the AR tabs (supabase/seed.sql): the AR one and the AR
- * Deposits one are put in the flagged state for the test and put back afterwards.
+ * S4, S5 and S8 use the quotes seeded for the receivables lists (supabase/seed.sql): the AR one (the
+ * AR tab is gone from the page, but the quote still counts for Need attention) and the AR Deposits
+ * one are put in the flagged state for the test and put back afterwards.
  */
 
 const INVOICE_ROUTE = "**/api/quickbooks/invoice";
@@ -145,7 +146,7 @@ test.describe("QuickBooks invoice counts and marks (accountant)", () => {
     await expect.poll(() => numberOn(sidebarBadge(page, ACCOUNTANT_ITEM))).toBe(expected);
   });
 
-  test("S4: the Need attention label counts its rows, AR and AR Deposits carry none; a Filter Panel filter changes the number, not the sidebar's", async ({
+  test("S4: the Need attention label counts its rows, AR Deposits carries none; a Filter Panel filter changes the number, not the sidebar's", async ({
     page,
   }) => {
     const ar = await eventIdOfInvoice(SEEDED_AR_INVOICE);
@@ -162,7 +163,7 @@ test.describe("QuickBooks invoice counts and marks (accountant)", () => {
     await expect(tabCount(page, "need-attention")).toBeVisible({ timeout: 60_000 });
     const rows = Number(await tabCount(page, "need-attention").textContent());
     await expect(page.getByRole("columnheader", { name: `Event Name (${rows})` })).toBeVisible();
-    // AR and AR Deposits: the seeded quote of each is flagged above, and neither label has a number.
+    // AR Deposits: its seeded quote is flagged above, and its label has no number.
     await expect(anyTabCount(page)).toHaveCount(1);
 
     // An office no quote belongs to empties the list: the Need attention label loses its number, the
@@ -189,14 +190,14 @@ test.describe("QuickBooks invoice counts and marks (accountant)", () => {
     await expect(tabCount(page, "need-attention")).toHaveText(before!);
   });
 
-  test("S5: a quote that needs attention has the red dot on the list and on its AR row, with the reasons on hover", async ({
+  test("S5: a quote that needs attention has the red dot on the list and on its AR Deposits row, with the reasons on hover", async ({
     page,
   }) => {
     const quote = await makeQuote();
-    const ar = await eventIdOfInvoice(SEEDED_AR_INVOICE);
-    seeded.push(ar);
+    const deposits = await eventIdOfInvoice(SEEDED_AR_DEPOSITS_INVOICE);
+    seeded.push(deposits);
     await updateEvent(quote.eventId, needsAttention('["totals","dates"]'));
-    await updateEvent(ar, needsAttention('["dates"]'));
+    await updateEvent(deposits, needsAttention('["dates"]'));
 
     await page.goto(`/quotes-bookings?q=${quote.invoiceNumber}`);
     const mark = marksIn(rowOf(page, quote.invoiceNumber));
@@ -205,8 +206,8 @@ test.describe("QuickBooks invoice counts and marks (accountant)", () => {
     await expect(mark).toHaveAttribute("title", "Dates do not match, Totals do not match");
     await expect(mark).toHaveAttribute("aria-label", "Dates do not match, Totals do not match");
 
-    await page.goto(`/accountant?tab=ar&q=${SEEDED_AR_INVOICE}`);
-    await expect(marksIn(rowOf(page, SEEDED_AR_INVOICE))).toHaveAttribute(
+    await page.goto(`/accountant?tab=ar_deposits&q=${SEEDED_AR_DEPOSITS_INVOICE}`);
+    await expect(marksIn(rowOf(page, SEEDED_AR_DEPOSITS_INVOICE))).toHaveAttribute(
       "title",
       "Dates do not match",
       { timeout: 60_000 },
@@ -302,19 +303,14 @@ test.describe("QuickBooks invoice counts and marks (accountant)", () => {
       .toBe(await quotesNeedingAttention());
   });
 
-  test("S8: the AR tabs still show the same rows and balances as before", async ({ page }) => {
-    await page.goto(`/accountant?tab=ar&q=${SEEDED_AR_INVOICE}`);
+  test("S8: AR Deposits still shows the same rows and balances as before", async ({ page }) => {
+    await page.goto(`/accountant?tab=ar_deposits&q=${SEEDED_AR_DEPOSITS_INVOICE}`);
 
-    // Gulf Breeze Youth Soccer Cup: nothing paid, both installments overdue (supabase/seed.sql).
-    const row = rowOf(page, SEEDED_AR_INVOICE);
-    await expect(row).toContainText("Gulf Breeze Youth Soccer Cup", { timeout: 60_000 });
+    // Lac-Brume Carnaval d'hiver: its payment is due after today (supabase/seed.sql).
+    const row = rowOf(page, SEEDED_AR_DEPOSITS_INVOICE);
+    await expect(row).toContainText("Lac-Brume", { timeout: 60_000 });
     await expect(page.getByRole("columnheader", { name: /^Amount Due/ })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: /^Remaining Balance/ })).toBeVisible();
     await expect(row).toContainText(/\$[\d,]+\.\d{2}/);
-
-    await page.goto(`/accountant?tab=ar_deposits&q=${SEEDED_AR_DEPOSITS_INVOICE}`);
-    await expect(rowOf(page, SEEDED_AR_DEPOSITS_INVOICE)).toContainText("Lac-Brume", {
-      timeout: 60_000,
-    });
   });
 });

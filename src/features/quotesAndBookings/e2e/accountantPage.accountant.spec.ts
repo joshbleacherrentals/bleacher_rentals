@@ -18,13 +18,13 @@ const params = (page: Page) => new URL(page.url()).searchParams;
 const searchBox = (page: Page) => page.getByPlaceholder(/^Search by name, invoice #/);
 
 test.describe("Accountant page (accountant)", () => {
-  test("S1: lands on /accountant with ?tab=ar, and the sidebar offers Accountant, Work Trackers, Documentation", async ({
+  test("S1: lands on /accountant with ?tab=collections, and the sidebar offers Accountant, Work Trackers, Documentation", async ({
     page,
   }) => {
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/accountant/, { timeout: 60_000 });
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
+    await expect.poll(() => params(page).get("tab")).toBe("collections");
     await expect(page.getByRole("heading", { name: "Accountant" })).toBeVisible();
 
     const sidebar = page.getByTestId("sidebar");
@@ -40,7 +40,7 @@ test.describe("Accountant page (accountant)", () => {
     page,
   }) => {
     await page.goto(ACCOUNTANT);
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
+    await expect.poll(() => params(page).get("tab")).toBe("collections");
     // The tab's own starting sort stays out of the URL.
     expect(params(page).get("sort")).toBeNull();
 
@@ -51,8 +51,8 @@ test.describe("Accountant page (accountant)", () => {
     await expect(
       page.getByRole("complementary", { name: "Filters" }).getByText("Status", { exact: true }),
     ).toHaveCount(0);
-    await page.getByRole("tab", { name: /^AR(?! Deposits)/ }).click();
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
+    await page.getByRole("tab", { name: /^Need attention/ }).click();
+    await expect.poll(() => params(page).get("tab")).toBe("need_attention");
     await expect(
       page.getByRole("complementary", { name: "Filters" }).getByText("Status", { exact: true }),
     ).toHaveCount(0);
@@ -61,10 +61,10 @@ test.describe("Accountant page (accountant)", () => {
   test("S3: a search reaches the URL and survives a reload and a trip away and back", async ({
     page,
   }) => {
-    await page.goto(ACCOUNTANT);
+    await page.goto(`${ACCOUNTANT}?tab=ar_deposits`);
     await searchBox(page).fill("a");
     await expect.poll(() => params(page).get("q")).toBe("a");
-    expect(params(page).get("tab")).toBe("ar");
+    expect(params(page).get("tab")).toBe("ar_deposits");
 
     await page.reload();
     await expect(searchBox(page)).toHaveValue("a");
@@ -72,27 +72,38 @@ test.describe("Accountant page (accountant)", () => {
     await page.goto("/permissions");
     await page.goBack();
     await expect(searchBox(page)).toHaveValue("a");
-    expect(params(page).get("tab")).toBe("ar");
+    expect(params(page).get("tab")).toBe("ar_deposits");
   });
 
   test("S4: Show Deleted writes ?showDeleted=1 and shows the Deleted only chip", async ({
     page,
   }) => {
-    await page.goto(ACCOUNTANT);
+    await page.goto(`${ACCOUNTANT}?tab=ar_deposits`);
     await page.getByRole("switch", { name: "Show Deleted" }).click();
 
     await expect.poll(() => params(page).get("showDeleted")).toBe("1");
     await expect(page.getByText("Deleted only")).toBeVisible();
   });
 
-  test("S9: an old ?tab=all with a status opens AR, rewrites the URL, and ignores the status", async ({
+  test("S9: an old ?tab=all with a status opens Collections, rewrites the URL, and ignores the status", async ({
     page,
   }) => {
     await page.goto(`${ACCOUNTANT}?tab=all&statuses=quoted`);
 
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
+    await expect.poll(() => params(page).get("tab")).toBe("collections");
     expect(params(page).get("statuses")).toBeNull();
-    await expect(page.getByRole("tab", { name: /^AR(?! Deposits)/ })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Collections" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  test("S10: the AR tab is gone, and an old ?tab=ar opens Collections", async ({ page }) => {
+    await page.goto(`${ACCOUNTANT}?tab=ar`);
+
+    await expect.poll(() => params(page).get("tab")).toBe("collections");
+    await expect(page.getByRole("tab", { name: /^AR(?! Deposits)/ })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Collections" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

@@ -59,13 +59,13 @@ test.describe("Need attention tab (accountant)", () => {
     await Promise.all(quotes.splice(0).map((quote) => cleanupQuote(quote.eventId)));
   });
 
-  test("S1: the page has the tab Need attention, still opens on AR, and ?tab=need_attention opens it", async ({
+  test("S1: the page has the tab Need attention, opens on Collections, and ?tab=need_attention opens it", async ({
     page,
   }) => {
     await page.goto("/accountant");
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
+    await expect.poll(() => params(page).get("tab")).toBe("collections");
     await expect(page.getByRole("tab", { name: "Need attention" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /^AR(?! Deposits)/ })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Collections" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

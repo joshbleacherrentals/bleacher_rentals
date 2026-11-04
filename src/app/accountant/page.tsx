@@ -36,9 +36,10 @@ import type { PageSize } from "@/features/quotesAndBookings/utils/pagination";
 import { nextSort, type SortKey } from "@/features/quotesAndBookings/utils/sortEvents";
 
 /**
- * The Accountant page: the AR and AR Deposits tabs, taken out of /quotes-bookings, and Collections,
- * the tab it opens on. The filter sidebar, the Filter button, search, Show Deleted and the filter
- * chips belong to the AR tabs and are not drawn on Collections.
+ * The Accountant page: the AR Deposits tab, taken out of /quotes-bookings, and Collections, the tab
+ * it opens on. The AR tab is gone (Collections replaced it); its logic is kept, see `ACCOUNTANT_TABS`.
+ * The filter sidebar, the Filter button, search, Show Deleted and the filter chips belong to the
+ * receivables tabs and are not drawn on Collections.
  * docs/specs/accountant-quotes-02-accountant-page.md
  * docs/specs/accountant-collections-09-design.md
  */
@@ -232,14 +233,6 @@ export default function AccountantPage() {
           <div className="flex flex-wrap items-center gap-3">
             <TabsList className="shrink-0">
               <TabsTrigger value="collections">Collections</TabsTrigger>
-              <TabsTrigger value="ar">
-                AR
-                <InfoTooltip
-                  label="About the AR tab"
-                  content={RECEIVABLES_HELP.ar}
-                  focusable={false}
-                />
-              </TabsTrigger>
               <TabsTrigger value="ar_deposits">
                 AR Deposits
                 <InfoTooltip

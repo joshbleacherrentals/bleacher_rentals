@@ -225,15 +225,18 @@ describe("permission matrix", () => {
         expect(row?.roles.viewer.note).toMatch(/Billing tab/);
       });
 
-      it("describes both tabs", () => {
-        expect(row?.description).toMatch(/AR tab/);
+      // The AR tab was taken off the page when Collections replaced it.
+      it("describes the AR Deposits tab and no longer an AR tab", () => {
         expect(row?.description).toMatch(/AR Deposits tab/);
+        expect(row?.description).not.toMatch(/\bAR tab/);
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(/its AR Deposits tab/);
+        expect(ROLE_DESCRIPTIONS.accountant).not.toMatch(/AR and AR Deposits/);
       });
 
       // docs/specs/qbo-invoice-10-need-attention-tab.md §5.
       it("describes the Need attention tab, which lists the quotes whose invoice no longer matches", () => {
         expect(row?.description).toContain(
-          "A third tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
+          "A second tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
         );
       });
 

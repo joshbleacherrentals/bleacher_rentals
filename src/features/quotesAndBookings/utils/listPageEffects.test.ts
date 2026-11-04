@@ -85,15 +85,17 @@ describe("queryStringToWrite", () => {
     );
   });
 
-  it("writes ?tab=ar on /accountant when the URL has none — the first sync rewrites it", () => {
-    const arState: UrlSyncedListState = {
+  it("writes ?tab=ar_deposits on /accountant when the URL has none — the first sync rewrites it", () => {
+    const depositsState: UrlSyncedListState = {
       ...state,
-      tab: "ar",
-      sort: { key: "start_date", direction: "desc" },
+      tab: "ar_deposits",
+      sort: { key: "start_date", direction: "asc" },
     };
-    expect(queryStringToWrite(arState, "", ACCT)).toBe("tab=ar");
-    expect(queryStringToWrite(arState, "tab=all&statuses=quoted", ACCT)).toBe("tab=ar");
-    expect(queryStringToWrite(arState, "tab=ar", ACCT)).toBeNull();
+    expect(queryStringToWrite(depositsState, "", ACCT)).toBe("tab=ar_deposits");
+    expect(queryStringToWrite(depositsState, "tab=all&statuses=quoted", ACCT)).toBe(
+      "tab=ar_deposits",
+    );
+    expect(queryStringToWrite(depositsState, "tab=ar_deposits", ACCT)).toBeNull();
   });
 });
 
@@ -122,7 +124,6 @@ describe("tabSwitchOutcome", () => {
     expect(tabSwitchOutcome("collections", false, ACCT).sort).toEqual(
       defaultSortForTab("collections", ACCT),
     );
-    expect(tabSwitchOutcome("ar", false, ACCT).sort).toEqual(defaultSortForTab("ar", ACCT));
     expect(tabSwitchOutcome("ar_deposits", false, ACCT).sort).toEqual(
       defaultSortForTab("ar_deposits", ACCT),
     );
@@ -130,7 +131,6 @@ describe("tabSwitchOutcome", () => {
   });
 
   it("drops a status filter when the tab does not offer one", () => {
-    expect(tabSwitchOutcome("ar", true, ACCT).dropStatuses).toBe(true);
     expect(tabSwitchOutcome("ar_deposits", true, ACCT).dropStatuses).toBe(true);
   });
 
@@ -139,6 +139,6 @@ describe("tabSwitchOutcome", () => {
   });
 
   it("has nothing to drop when no status is chosen", () => {
-    expect(tabSwitchOutcome("ar", false, ACCT).dropStatuses).toBe(false);
+    expect(tabSwitchOutcome("ar_deposits", false, ACCT).dropStatuses).toBe(false);
   });
 });
