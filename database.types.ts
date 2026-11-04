@@ -2588,6 +2588,31 @@ isOneToOne: false
 "addresses_match":
 { Args: { "a_id": string,"b_id": string }; Returns: boolean
                            },
+"ar_event_amount_due":
+{ Args: { "p_event": string,"p_today": string }; Returns: number
+                           },
+"ar_event_balances":
+{ Args: { "p_event": string,"p_today": string }; Returns: {
+              "amount_due_cents": number,"received_cents": number,"remaining_cents": number,"total_cents": number
+            }[]
+                           },
+"ar_event_total_cents":
+{ Args: { "p_event": string }; Returns: number
+                           },
+"ar_is_canadian_province":
+{ Args: { "p_value": string }; Returns: boolean
+                           },
+"ar_office_currency":
+{ Args: { "p_office": string }; Returns: string
+                           },
+"ar_sync_all_event_tasks":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "completed": number,"created": number
+            }[]
+                           },
+"ar_sync_event_tasks":
+{ Args: { "p_event": string,"p_today": string }; Returns: string
+                           },
 "bleacher_change_reason_label":
 { Args: { "code": string }; Returns: string
                            },
