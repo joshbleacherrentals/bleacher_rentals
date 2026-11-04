@@ -50,8 +50,11 @@ QuickBooks connection**
   provinces of each zone; a state belongs to one zone only.
 - **The rule that finds a zone.** `zoneOfEvent(event, zoneByState)` in
   `quotesAndBookings/utils/zoneOfEvent.ts` reads the event's state, normalises it
-  (`normalizeStateProvince`: trimmed, lowercase, one spelling of D.C.) and looks it up in a map
-  from `buildZoneByState(rows)`. It returns null for a missing state or a state in no zone.
+  (`normalizeStateProvince`: trimmed, lowercase, one spelling of D.C., and a state or province
+  code such as MT or ON written as its name, so a venue in `MT` finds the zone table's `Montana`
+  and the reverse; amended 2026-11-04 after a quote with `MT` was made without a Class) and looks
+  it up in a map from `buildZoneByState(rows)`. It returns null for a missing state or a state in
+  no zone.
   Those three functions are pure, so server code can use them.
 - **The precedent.** `create-bill` turns a destination state into a class the same way
   (state → zone → class for the vendor's connection) and attaches `ClassRef`.
