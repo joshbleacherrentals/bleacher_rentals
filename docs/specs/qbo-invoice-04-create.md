@@ -185,7 +185,10 @@ reaches QuickBooks):
 - **S1** admin posts a booked quote's id: `created`; reloading the quote shows
   `is_qbo` ticked.
 - **S2** a quote that is not booked: 400 with the status message.
-- **S3** a quote with no invoice number: 400 with the issue's message.
+- **S3** a quote with no invoice number: 400 with the issue's message. _(Removed from the
+  Playwright file 2026-11-04: the database now numbers every new event and keeps a stored number, so
+  such a row can no longer be made; the refusal stays in `validateInvoiceSource`, unit-tested. See
+  `invoice-number-01-assign-in-database.md`.)_
 - **S4** an accountant on a quote of another office: allowed.
 - **S5** a viewer and an account manager: 403.
 - **S6** a quote that already has an invoice: 409.

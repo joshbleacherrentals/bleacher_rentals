@@ -90705,3 +90705,38 @@ UPDATE public."Events"
 SET quote_sent_at = created_at
 WHERE quote_sent_at IS NULL
   AND event_status IS DISTINCT FROM 'draft'::public.event_status;
+
+
+-- Invoice numbers for the events the seed left without one
+-- (docs/specs/invoice-number-01-assign-in-database.md §3).
+-- Most of the events above are inserted while the triggers are off, so the trigger that gives a new
+-- event its number never saw them. This is the numbering of the production migration
+-- (20261103120000, step 2): the lowest free numbers from 1 upward, in the order the events were
+-- created, then the counter continues after them. The triggers are off again, as at the top of the
+-- file: it is a data fix and must not resync collections tasks or recompute hashes.
+SET session_replication_role = replica;
+
+WITH todo AS (
+  SELECT id, row_number() OVER (ORDER BY created_at, id) AS rn
+  FROM public."Events"
+  WHERE invoice_number IS NULL
+),
+free AS (
+  SELECT g AS num, row_number() OVER (ORDER BY g) AS rn
+  FROM generate_series(1, (SELECT count(*) FROM public."Events")) AS g
+  WHERE NOT EXISTS (SELECT 1 FROM public."Events" e WHERE e.invoice_number = g)
+),
+given AS (
+  UPDATE public."Events" e
+  SET invoice_number = free.num
+  FROM todo
+  JOIN free USING (rn)
+  WHERE e.id = todo.id
+  RETURNING e.invoice_number
+)
+SELECT setval('public.events_invoice_number_seq',
+              greatest(max(invoice_number), (SELECT last_value FROM public.events_invoice_number_seq)))
+FROM given
+HAVING count(*) > 0;
+
+RESET ALL;

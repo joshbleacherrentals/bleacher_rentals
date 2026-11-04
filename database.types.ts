@@ -2586,9 +2586,6 @@ isOneToOne: false
 "format_history_address":
 { Args: { "address_uuid": string }; Returns: string
                            },
-"generate_invoice_number":
-{ Args: Record<PropertyKey, never>; Returns: number
-                           },
 "get_current_account_manager_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
