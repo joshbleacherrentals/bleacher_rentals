@@ -49,7 +49,7 @@ existing numbers (never changed); the QuickBooks code; any change to who may do 
 - **All 1364 rows without a number are numbered**, in order of `created_at`.
 - **One counter for every event**, not one per QuickBooks company.
 - **No two events ever share a number.**
-- The number is stored as a number; spec 02 writes it with nine digits.
+- The number is stored as a number; spec 02 shows it with nine digits (QuickBooks gets it plain, spec 02 §1a).
 
 **Readings to confirm at review.**
 

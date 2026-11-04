@@ -1,4 +1,3 @@
-import { formatInvoiceNumber } from "@/features/quotesAndBookings/utils/invoiceNumber";
 import type {
   InvoiceBuildWarning,
   InvoiceIssue,
@@ -133,8 +132,9 @@ export function buildInvoicePayload(
   };
 
   const body: QboInvoiceBody = {
-    // validateInvoiceSource has refused a quote without a number. Written with nine digits.
-    DocNumber: formatInvoiceNumber(source.invoiceNumber)!,
+    // validateInvoiceSource has refused a quote without a number. Written as stored (43, not
+    // 000000043): QuickBooks must carry the same text the update check compares with.
+    DocNumber: String(source.invoiceNumber),
     TxnDate: source.eventStart,
     DueDate: source.dueDate,
     CustomerRef: { value: refs.customerId },

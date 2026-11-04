@@ -1,15 +1,33 @@
 # Invoice number — shown and sent with nine digits
 
-Status: **Implemented 2026-11-04 (approved in chat), not committed.** 0 open decisions; three
+Status: **Implemented 2026-11-04 (approved in chat); amended the same day: QuickBooks gets the
+plain number, no zeros (§1a).** 0 open decisions; three
 readings to confirm (§1, last paragraph). Pair: [01 — the database assigns it](invoice-number-01-assign-in-database.md); the two
 are independent and may ship in either order. Branch: `q4-sprint3-bug-fix`.
 
 ## 0. The request, and what it is not
 
-New invoice numbers are 1, 2, 3, …; they must read `000000001`, `000000002`, … wherever a person or
-QuickBooks sees them. The number stays a **number** in the database (so sorting, the unique index and
-every query are unchanged); the zeros are added when it is shown or sent, by **one** helper used in
-every place.
+New invoice numbers are 1, 2, 3, …; they must read `000000001`, `000000002`, … wherever a person
+sees them (**not** in QuickBooks, §1a). The number stays a **number** in the database (so sorting,
+the unique index and every query are unchanged); the zeros are added when it is shown, by **one**
+helper used in every place.
+
+## 1a. Amendment 2026-11-04 — QuickBooks gets the plain number
+
+The first version sent `000000043` as the QuickBooks `DocNumber`. The user saw that the database says
+`43` while QuickBooks says `000000043`, and that Update invoice then refuses the invoice ("does not
+have this quote's invoice number (43)"). **Decision (the user's): QuickBooks carries the number as
+stored — `43`, never `000000043`.** Everything a person reads in the app keeps the nine digits.
+
+- `buildInvoicePayload.ts` writes `DocNumber` as `String(invoiceNumber)`; `createInvoice.ts` asks for
+  the same text in its duplicate check. `updateInvoice.ts` already compared with `String(...)` and
+  does not change.
+- An invoice created in QuickBooks under the zero-padded text (only test invoices, made before this
+  amendment) no longer matches; its number must be changed in QuickBooks, or the invoice deleted
+  there, before Update invoice can link it.
+- Old nine-digit numbers are unaffected: `String(483920174)` is the same text as before.
+
+Where the rest of this spec says QuickBooks gets nine digits, §1a wins.
 
 **Not part of this spec:** assigning numbers (01); the column's type, `AppSchema.ts`, sync rules.
 
@@ -56,8 +74,8 @@ every place.
   event history sheet and the quote detail title.
 - **The public route** `/api/quotes/[id]/version` takes digits and reads them with `Number(...)`, so
   `000000042` already means 42 there; nothing changes (a test pins it).
-- **Existing invoices in QuickBooks** carry the old nine-digit number as text; padding a nine-digit
-  number changes nothing, so the check keeps matching them.
+- **Existing invoices in QuickBooks** carry the old nine-digit number as text; that text is the same
+  as `String(number)`, so the check keeps matching them (§1a).
 - **Numbers of ten digits or more** are not cut: padding only adds zeros in front.
 
 ## 3. Database
@@ -69,9 +87,9 @@ None.
 - **`utils/invoiceNumber.ts`** (changed): new `formatInvoiceNumber(n: number | null | undefined):
 string | null` — the number as text, padded with zeros to nine digits; null for null, undefined or 0.
   `resolveInvoiceDisplay` uses it and keeps its fall-back to the event id.
-- **`buildInvoicePayload.ts`, `createInvoice.ts`** (changed): `DocNumber` and the duplicate-check
-  value are `formatInvoiceNumber(source.invoiceNumber)` (the existing `no_invoice_number` refusal
-  already guarantees the number is set).
+- **`buildInvoicePayload.ts`, `createInvoice.ts`** (changed, then amended by §1a): `DocNumber` and
+  the duplicate-check value are `String(source.invoiceNumber)` — the plain number, no zeros (the
+  existing `no_invoice_number` refusal already guarantees the number is set).
 - **`create-checkout/route.ts`** (changed): the label is `#{formatted number}`; without a number it
   stays the first eight characters of the id.
 - **`utils/searchEvents.ts`** (changed): the invoice-number part of the search compares against the
@@ -116,8 +134,8 @@ Red first. Prettier only on touched files.
 - **`invoiceNumber.test.ts`:** 1 → `000000001`; 42 → `000000042`; 483920174 → `483920174`;
   1234567890 (ten digits) is not cut; null, undefined and 0 → null; `resolveInvoiceDisplay` returns the
   padded text, and the event id when there is no number.
-- **`buildInvoicePayload.test.ts`, `createInvoice.test.ts`:** a source with number 42 builds
-  `DocNumber` `000000042` and the duplicate check queries `DocNumber = '000000042'`; a nine-digit
+- **`buildInvoicePayload.test.ts`, `createInvoice.test.ts`** (as amended by §1a): a source with
+  number 42 builds `DocNumber` `42` and the duplicate check queries `DocNumber = '42'`; a nine-digit
   number is unchanged.
 - **`searchEvents.test.ts`:** `000000042` and `42` both match number 42; a number that does not
   contain the text does not match.
@@ -130,8 +148,8 @@ Red first. Prettier only on touched files.
 
 - **No number yet** (a quote not yet synced): "—" in lists, the id on the PDF, `no_invoice_number` on
   Create invoice; unchanged.
-- **A quote invoiced before this change** keeps the number it was created with (nine digits); the
-  invoice check keeps matching it.
+- **A quote invoiced before this change** keeps the number it was created with; an old nine-digit
+  one keeps matching. A test invoice created as `000000043` does not (§1a).
 - **Offline / PowerSync, Clerk.** Not applicable: display only.
 
 ## 9. Risks

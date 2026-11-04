@@ -6,10 +6,11 @@
 const INVOICE_NUMBER_DIGITS = 9;
 
 /**
- * The invoice number as it is shown and sent: the stored number padded with zeros to nine digits.
+ * The invoice number as a person sees it: the stored number padded with zeros to nine digits.
  * The database keeps a plain number; this is the one place that adds the zeros, so a list, a PDF
- * and QuickBooks all read the same. A number of ten digits or more is not cut. Null for a missing
- * number (null, undefined, 0).
+ * and the Stripe label all read the same. QuickBooks is the exception: it gets the plain number
+ * (`43`, not `000000043`), so it matches the database. A number of ten digits or more is not cut.
+ * Null for a missing number (null, undefined, 0).
  * Spec: docs/specs/invoice-number-02-nine-digit-format.md
  */
 export function formatInvoiceNumber(invoiceNumber: number | null | undefined): string | null {
