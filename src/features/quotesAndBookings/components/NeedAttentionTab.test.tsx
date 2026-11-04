@@ -133,7 +133,7 @@ describe("NeedAttentionTab columns", () => {
     expect(html).toContain("Event a");
     expect(html).toContain("Dana Whitfield");
     expect(html).toContain("Sep 20, 2026");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
   });
 
   it("puts the row count in the header of the first column, as the AR tabs do", () => {

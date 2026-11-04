@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../database.types";
+import { formatInvoiceNumber } from "@/features/quotesAndBookings/utils/invoiceNumber";
 import {
   resolveInvoiceCustomer,
   type CustomerChoice,
@@ -263,7 +264,8 @@ export async function createInvoiceFromSource(
   // validateInvoiceSource has refused a quote without these.
   const connectionId = source.connectionId!;
   const billedContact = source.billedContact!;
-  const docNumber = String(source.invoiceNumber);
+  // The number as buildInvoicePayload writes it (nine digits), so the duplicate check looks for it.
+  const docNumber = formatInvoiceNumber(source.invoiceNumber)!;
 
   // 6
   let existing: ExistingInvoice | null;

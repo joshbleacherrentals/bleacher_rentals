@@ -594,6 +594,14 @@ describe("createInvoice — an invoice with this number is already in QuickBooks
     expect(state.findQuery).toContain("DocNumber = '100200300'");
   });
 
+  it("asks for the nine-digit text of a short number, the way it will be written", async () => {
+    state.source = sourceOf({ invoiceNumber: 42 });
+
+    await run();
+
+    expect(state.findQuery).toContain("DocNumber = '000000042'");
+  });
+
   it("turns a total with float noise into exact cents", async () => {
     state.invoicesByNumber = [
       {

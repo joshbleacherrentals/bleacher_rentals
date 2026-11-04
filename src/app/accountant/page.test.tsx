@@ -237,7 +237,7 @@ describe("/accountant receivables", () => {
     expect(html).toContain("Amount Due ($1,000)");
     expect(html).toContain("Remaining Balance ($2,000)");
     expect(html).not.toContain("Subtotal");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
     expect(html).toContain("Dana Whitfield");
   });
 
@@ -284,7 +284,7 @@ describe("/accountant Need attention", () => {
       expect(html).toContain(header);
     }
     expect(html).toContain("Fall Classic");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
     expect(html).toContain("Dana Whitfield");
     expect(html).toContain("Dates do not match, Totals do not match");
     expect(html).not.toContain("Amount Due");
@@ -567,7 +567,7 @@ describe("/accountant row marks", () => {
 
     expect(html).toContain("Amount Due ($1,000)");
     expect(html).toContain("Remaining Balance ($2,000)");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
     expect(html).toContain("Dana Whitfield");
   });
 });
