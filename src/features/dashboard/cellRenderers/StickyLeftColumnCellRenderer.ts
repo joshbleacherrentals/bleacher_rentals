@@ -21,6 +21,10 @@ import {
   hasSubrentalAccessForRange,
 } from "@/features/userAccess/logic/hasSubrentalAccessForDate";
 import { resolveSubrentalConstraint } from "../ui/event/EventBody";
+import { canEditEvent } from "@/features/userAccess/logic/canEditEvent";
+import { setEventBleacherLinked } from "@/features/eventConfiguration/functions/saveEventPanelChange";
+import { triage } from "@/features/alerts/triage";
+import { supabaseClientRegistry } from "../util/supabaseClientRegistry";
 
 /**
  * CellRenderer for the sticky left column that displays bleacher information
@@ -40,9 +44,14 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
   private unsubSwap?: () => void;
   private unsubMaintenance?: () => void;
   private unsubSubrental?: () => void;
+  private unsubPermissions?: () => void;
   private isFormExpanded = false;
   private isMaintenanceFormExpanded = false;
   private selectedBleacherUuids: string[] = [];
+  // Whether the +/– on each bleacher row is drawn. It follows `isFormExpanded`, except that the
+  // event panel shows it only to someone who may change that event (D9 of
+  // docs/specs/dashboard-events-read-only.md). Swap keeps following `isFormExpanded` alone.
+  private toggleShown = false;
 
   private yAxis: "Bleachers" | "Events" = "Bleachers";
   private events: DashboardEvent[];
@@ -74,16 +83,22 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
           ? mt.bleacherUuids.slice()
           : st.bleacherUuids.slice();
 
+    this.toggleShown = this.computeToggleShown();
+
     // Helper to apply expand/select changes to all cells
-    const applyChanges = (expandedChanged: boolean, selectedChanged: boolean) => {
+    const applyChanges = (
+      expandedChanged: boolean,
+      selectedChanged: boolean,
+      toggleChanged = false,
+    ) => {
       const ticker = (this.app as any)?.ticker;
       const doUpdate = () => {
         for (const [row, cell] of this.cellPool.entries()) {
-          if (expandedChanged) {
-            cell.setFormExpanded(this.isFormExpanded);
-            if (!this.isFormExpanded) {
-              useSwapStore.getState().reset();
-            }
+          if (expandedChanged || toggleChanged) {
+            cell.setFormExpanded(this.toggleShown);
+          }
+          if (expandedChanged && !this.isFormExpanded) {
+            useSwapStore.getState().reset();
           }
           if (selectedChanged) {
             const b = this.bleachers[row];
@@ -105,10 +120,11 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
       // Only track event bleacherUuids when event form is the active one
       const selectedChanged =
         !this.isMaintenanceFormExpanded && s.bleacherUuids !== this.selectedBleacherUuids;
-      if (!expandedChanged && !selectedChanged) return;
+      const toggleChanged = this.refreshToggleShown();
+      if (!expandedChanged && !selectedChanged && !toggleChanged) return;
       if (expandedChanged) this.isFormExpanded = anyExpanded;
       if (selectedChanged) this.selectedBleacherUuids = s.bleacherUuids.slice();
-      applyChanges(expandedChanged, selectedChanged);
+      applyChanges(expandedChanged, selectedChanged, toggleChanged);
     });
 
     this.unsubMaintenance = useMaintenanceEventStore.subscribe((s) => {
@@ -119,10 +135,11 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
       const expandedChanged = anyExpanded !== this.isFormExpanded;
       // Track maintenance bleacherUuids when maintenance form is active
       const selectedChanged = s.isFormExpanded && s.bleacherUuids !== this.selectedBleacherUuids;
-      if (!expandedChanged && !selectedChanged) return;
+      const toggleChanged = this.refreshToggleShown();
+      if (!expandedChanged && !selectedChanged && !toggleChanged) return;
       if (expandedChanged) this.isFormExpanded = anyExpanded;
       if (selectedChanged) this.selectedBleacherUuids = s.bleacherUuids.slice();
-      applyChanges(expandedChanged, selectedChanged);
+      applyChanges(expandedChanged, selectedChanged, toggleChanged);
     });
 
     this.unsubSubrental = useSubrentalEventStore.subscribe((s) => {
@@ -136,10 +153,16 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
         s.isFormExpanded &&
         (newSelected.length !== this.selectedBleacherUuids.length ||
           newSelected[0] !== this.selectedBleacherUuids[0]);
-      if (!expandedChanged && !selectedChanged) return;
+      const toggleChanged = this.refreshToggleShown();
+      if (!expandedChanged && !selectedChanged && !toggleChanged) return;
       if (expandedChanged) this.isFormExpanded = anyExpanded;
       if (selectedChanged) this.selectedBleacherUuids = newSelected;
-      applyChanges(expandedChanged, selectedChanged);
+      applyChanges(expandedChanged, selectedChanged, toggleChanged);
+    });
+
+    // The roles reach the store after sign-in, and an event panel may already be open by then.
+    this.unsubPermissions = usePermissionsStore.subscribe(() => {
+      if (this.refreshToggleShown()) applyChanges(false, false, true);
     });
 
     // Subscribe to swap store for UI updates
@@ -151,6 +174,87 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
         this.updateSwapButtons();
       }
     });
+  }
+
+  /**
+   * May the signed-in user change the event the panel holds? The same answer the panel's palette
+   * button uses (`canEditEvent`).
+   */
+  private canEditOpenEvent(): boolean {
+    const perms = usePermissionsStore.getState();
+    const st = useCurrentEventStore.getState();
+    const all = useDashboardBleachersStore.getState().data;
+    const eventBleacherZoneIds = st.bleacherUuids
+      .map((id) => all.find((b) => b.bleacherUuid === id && !b.isSubrentalRow)?.zoneUuid)
+      .filter((z): z is string => !!z);
+
+    return canEditEvent({
+      isAdmin: perms.isAdmin,
+      isAccountManager: perms.isAccountManager,
+      accountManagerZoneIds: perms.accountManagerZoneIds,
+      leadZoneIds: perms.leadZoneIds,
+      userId: perms.userId,
+      originalOwnerUserUuid: st.originalOwnerUserUuid,
+      eventBleacherZoneIds,
+    });
+  }
+
+  /** Are the +/– on the bleacher rows drawn right now? */
+  private computeToggleShown(): boolean {
+    // The maintenance and sub-rental forms keep their own behaviour.
+    if (useMaintenanceEventStore.getState().isFormExpanded) return true;
+    if (useSubrentalEventStore.getState().isFormExpanded) return true;
+    if (!useCurrentEventStore.getState().isFormExpanded) return false;
+    return this.canEditOpenEvent();
+  }
+
+  /** Recompute `toggleShown`; true when it changed. */
+  private refreshToggleShown(): boolean {
+    const next = this.computeToggleShown();
+    if (next === this.toggleShown) return false;
+    this.toggleShown = next;
+    return true;
+  }
+
+  /**
+   * Writes one +/– click of the event panel, then re-checks the event's alerts, as Update did.
+   * The grid already shows the change; a failed write puts the bleacher back.
+   */
+  private async saveEventBleacher(eventUuid: string, bleacherUuid: string, linked: boolean) {
+    try {
+      await setEventBleacherLinked({ eventUuid, bleacherUuid, linked });
+    } catch (error) {
+      console.error("Failed to save the bleacher change:", error);
+      const now = useCurrentEventStore.getState();
+      if (now.eventUuid === eventUuid) {
+        const has = now.bleacherUuids.includes(bleacherUuid);
+        if (linked && has) {
+          now.setField(
+            "bleacherUuids",
+            now.bleacherUuids.filter((n) => n !== bleacherUuid),
+          );
+        } else if (!linked && !has) {
+          now.setField("bleacherUuids", [...now.bleacherUuids, bleacherUuid]);
+        }
+      }
+      createErrorToastNoThrow([
+        linked
+          ? "Could not add the bleacher to the event. It was taken off again."
+          : "Could not take the bleacher off the event. It was put back.",
+      ]);
+      return;
+    }
+
+    try {
+      await triage(
+        "Events",
+        linked ? { id: eventUuid } : { id: eventUuid, removed_bleacher_uuids: [bleacherUuid] },
+        supabaseClientRegistry.getClient() ?? undefined,
+      );
+    } catch (error) {
+      // The bleacher change is saved; the alerts catch up with the next change.
+      console.error("Failed to re-check the event's alerts:", error);
+    }
   }
 
   /**
@@ -267,7 +371,10 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
           return;
         }
         const st = useCurrentEventStore.getState();
-        if (!st.isFormExpanded) return;
+        if (!st.isFormExpanded || !st.eventUuid) return;
+
+        // The +/– is hidden from anyone without the right; this is the second lock.
+        if (!this.canEditOpenEvent()) return;
 
         // Part 3: AM may unassign a bleacher they don't own, but may not assign
         // one. Only gate the assign direction (bleacher not yet on the event).
@@ -302,15 +409,13 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
           }
         }
 
+        // Saved at once (D1). The grid shows the change now; a failed write puts it back.
         const selected = st.bleacherUuids;
         const updated = selected.includes(id)
           ? selected.filter((n) => n !== id)
           : [...selected, id];
         st.setField("bleacherUuids", updated);
-        st.setField(
-          "subrentalConstraint",
-          resolveSubrentalConstraint(updated, st.eventStart, st.eventEnd),
-        );
+        void this.saveEventBleacher(st.eventUuid, id, isAssigning);
       });
 
       // Wire map pin click handler
@@ -369,7 +474,7 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
       });
 
       // Initial state application
-      cell.setFormExpanded(this.isFormExpanded);
+      cell.setFormExpanded(this.toggleShown);
       if (bleacher) cell.setSelected(this.selectedBleacherUuids.includes(bleacher.bleacherUuid));
       // Apply initial swap button state for this cell
       this.applySwapStateToCell(cell, bleacher);
@@ -430,10 +535,14 @@ export class StickyLeftColumnCellRenderer implements ICellRenderer {
     try {
       this.unsubSubrental?.();
     } catch {}
+    try {
+      this.unsubPermissions?.();
+    } catch {}
     this.unsub = undefined;
     this.unsubSwap = undefined;
     this.unsubMaintenance = undefined;
     this.unsubSubrental = undefined;
+    this.unsubPermissions = undefined;
     this.cellPool.clear();
     this.baker.destroyAll();
   }

@@ -79,16 +79,16 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "should be able to create, update, delete, and edit any events, regardless of who event is assigned to. This includes the ability to reassign events between account managers.",
+        "should be able to create, update, delete, and edit any events on the Quotes & Bookings page, regardless of who event is assigned to. This includes the ability to reassign events between account managers. On the Dashboard an event opens read-only: an admin can still change its colour, add or remove its bleachers, and move events between bleachers, but cannot create, edit or delete an event there.",
       ),
       account_manager: custom(
-        "Account managers can freely create events, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner.",
+        "Account managers can freely create events on the Quotes & Bookings page, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner. On the Dashboard they cannot create or edit events: an event opens read-only. They can change the colour and the bleachers of an event only where they could also edit it, and can move events between bleachers.",
       ),
       developer: none(
         "Unable to even access the pages where they can see events, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: read(
-        "This user will be able to see all the event and every detail but not able to create, edit, or delete any events.",
+        "This user will be able to see all the event and every detail but not able to create, edit, or delete any events. On the Dashboard they can open an event to read it, and its Quote button takes them to the event's page.",
       ),
       driver: custom(
         "Can file a ticket to the developers from the mobile app, and edit their own for a short window afterwards. Has no access to the rest of the roadmap — they cannot see, edit or comment on anyone else's work.",
@@ -337,7 +337,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "should be able to create, update, delete, and edit any cells, regardless of who is assigned to bleacher. ",
       ),
       account_manager: custom(
-        "Account managers can freely create notes and events on cells, but can edit or delete only those cells that were created in the bleacher field assigned to them. They are able to view All cells regardless of the event owner.",
+        "Account managers can freely create notes on cells, and work trackers, maintenance events and sub-rentals from a cell, but can edit or delete only those cells that were created in the bleacher field assigned to them. They are able to view All cells regardless of the event owner.",
       ),
       developer: none(
         "Unable to even access the pages where they can see cells, and developer is only meant to work on the developer roadmap.",

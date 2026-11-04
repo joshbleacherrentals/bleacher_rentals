@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Trash, Truck, X, CalendarPlus, Wrench, Handshake, ShieldAlert } from "lucide-react";
+import { Check, Trash, Truck, X, Wrench, Handshake, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSelectedBlockStore } from "../state/useSelectedBlock";
 import { Tables } from "../../../../database.types";
@@ -8,7 +8,6 @@ import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteBlock, saveBlock } from "../db/client/db";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
-import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useUser } from "@clerk/nextjs";
 import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
@@ -166,133 +165,6 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
     }
 
     onWorkTrackerOpen?.(buildWorkTrackerDraft({ bleacherUuid, date, workTrackerUuid }));
-  };
-
-  const handleCreateEvent = () => {
-    if (!date || !bleacherUuid) {
-      createErrorToast(["Failed to create event. Missing date or bleacher id."]);
-      return;
-    }
-
-    // AM can only create events with own bleachers — OR within an accepted subrental date range
-    const perms = usePermissionsStore.getState();
-    let subrentalConstraint: { eventStart: string; eventEnd: string } | null = null;
-    if (perms.isAccountManager && !perms.isAdmin) {
-      const dashBleachers = useDashboardBleachersStore.getState().data;
-      // Must find the original (non-subrental) row — when a zone filter hides the original zone,
-      // only the subrental row is in the store; treat that as "not owned" so we fall through
-      // to the subrental constraint check rather than bypassing it entirely.
-      const bleacher = dashBleachers.find(
-        (b) => b.bleacherUuid === bleacherUuid && !b.isSubrentalRow,
-      );
-      const ownedByAM =
-        bleacher &&
-        isBleacherOwnedByAM({
-          bleacherZoneUuid: bleacher.zoneUuid,
-          accountManagerZoneIds: perms.accountManagerZoneIds,
-        });
-      if (!ownedByAM) {
-        // Find the specific accepted subrental range covering this date
-        const subrentalRow = dashBleachers.find(
-          (b) =>
-            b.bleacherUuid === bleacherUuid &&
-            b.isSubrentalRow &&
-            perms.accountManagerZoneIds.includes(b.zoneUuid ?? "") &&
-            (b.acceptedSubrentalAccess ?? []).some(
-              (r) => date >= r.eventStart.substring(0, 10) && date <= r.eventEnd.substring(0, 10),
-            ),
-        );
-        const matchingRange = subrentalRow?.acceptedSubrentalAccess?.find(
-          (r) => date >= r.eventStart.substring(0, 10) && date <= r.eventEnd.substring(0, 10),
-        );
-        if (!matchingRange) {
-          createErrorToast(["You can only create events with bleachers assigned to you."]);
-          return;
-        }
-        subrentalConstraint = {
-          eventStart: matchingRange.eventStart.substring(0, 10),
-          eventEnd: matchingRange.eventEnd.substring(0, 10),
-        };
-      }
-    }
-
-    const eventStore = useCurrentEventStore.getState();
-
-    // Calculate end date (7 days after start date), clamped to subrental window if applicable
-    const startDate = new Date(date);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 7);
-
-    // Format dates as YYYY-MM-DD
-    const formatDate = (d: Date) => d.toISOString().split("T")[0];
-
-    let clampedStart = formatDate(startDate);
-    let clampedEnd = formatDate(endDate);
-    if (subrentalConstraint) {
-      const { eventStart: srStart, eventEnd: srEnd } = subrentalConstraint;
-      if (clampedStart < srStart) clampedStart = srStart;
-      if (clampedStart > srEnd) clampedStart = srStart;
-      if (clampedEnd > srEnd) clampedEnd = srEnd;
-      if (clampedEnd < clampedStart) clampedEnd = clampedStart;
-    }
-
-    // Cap end date against accepted subrental blocks on this bleacher:
-    // 1. If clampedStart falls inside a block (e.g. we clicked a subrental row), cap at that block's end.
-    // 2. Also cap at the day before the next block that starts after clampedStart.
-    {
-      const allBleachers = useDashboardBleachersStore.getState().data;
-      const originalBleacher = allBleachers.find(
-        (b) => b.bleacherUuid === bleacherUuid && !b.isSubrentalRow,
-      );
-      const blocks = originalBleacher?.acceptedSubrentalBlocks ?? [];
-
-      // Current block: a block that contains clampedStart
-      const currentBlock = blocks.find(
-        (r) =>
-          r.eventStart.substring(0, 10) <= clampedStart &&
-          r.eventEnd.substring(0, 10) >= clampedStart,
-      );
-      if (currentBlock) {
-        const blockEnd = currentBlock.eventEnd.substring(0, 10);
-        if (blockEnd < clampedEnd) clampedEnd = blockEnd;
-      }
-
-      // Next block: the earliest block starting strictly after clampedStart
-      const nextBlockStart = blocks
-        .map((r) => r.eventStart.substring(0, 10))
-        .filter((s) => s > clampedStart)
-        .sort()[0];
-      if (nextBlockStart) {
-        const d = new Date(nextBlockStart + "T12:00:00Z");
-        d.setUTCDate(d.getUTCDate() - 1);
-        const dayBefore = d.toISOString().split("T")[0];
-        if (dayBefore < clampedEnd) clampedEnd = dayBefore;
-      }
-
-      if (clampedEnd < clampedStart) clampedEnd = clampedStart;
-    }
-
-    // Set the event configuration
-    eventStore.setField("isFormExpanded", true);
-    eventStore.setField("isFormMinimized", false);
-    eventStore.setField("eventStart", clampedStart);
-    eventStore.setField("eventEnd", clampedEnd);
-    eventStore.setField("bleacherUuids", [bleacherUuid]);
-    if (subrentalConstraint) {
-      eventStore.setField("subrentalConstraint", subrentalConstraint);
-    }
-
-    // Set current user as owner
-    if (!eventStore.ownerUserUuid) {
-      const clerkId = user?.id;
-      if (clerkId) {
-        const match = users.find((u) => u.clerk_user_id === clerkId);
-        if (match) eventStore.setField("ownerUserUuid", match.id);
-      }
-    }
-
-    // Close the cell editor
-    handleClose();
   };
 
   const handleCreateMaintenance = () => {
@@ -555,15 +427,6 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
                     onClick={handleOpenWorkTracker}
                   >
                     <Truck className="h-4 w-4" />
-                  </button>
-                </AppTooltip>
-                <AppTooltip content="Create Event">
-                  <button
-                    aria-label="Create Event"
-                    className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-black hover:bg-gray-100 transition-all duration-200"
-                    onClick={handleCreateEvent}
-                  >
-                    <CalendarPlus className="h-4 w-4" />
                   </button>
                 </AppTooltip>
                 <AppTooltip content="Maintenance">

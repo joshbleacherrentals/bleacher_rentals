@@ -39,13 +39,16 @@ test.describe("Event form alerts (account manager)", () => {
     );
   });
 
-  test("S7: the owner dropdown lists more than the signed-in user", async ({ page }) => {
+  test("S7: the owner of an event somebody else made is shown by name", async ({ page }) => {
     await openEventForm(page, fixture.eventUuid);
 
-    // A role that syncs only its own Users row would show a one-entry list —
-    // the silent regression this migration could have introduced.
-    await page.getByTestId("event-owner-select").getByRole("button").click();
-    await expect(page.getByRole("listitem")).not.toHaveCount(0);
-    await expect(page.getByRole("listitem")).not.toHaveCount(1);
+    // The Owner field is read-only now, so its list can no longer be opened and counted.
+    // What it still proves: a role that syncs only its own Users row cannot name another
+    // user, and the field would fall back to its placeholder. The fixture's owner is the
+    // admin, not this account manager.
+    const owner = page.getByTestId("event-owner-select").getByRole("button");
+    await expect(owner).toBeDisabled();
+    await expect(owner).not.toHaveText(/Select owner/);
+    await expect(owner).not.toHaveText("");
   });
 });

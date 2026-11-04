@@ -59,7 +59,6 @@ export const CreateEventButton = () => {
               onClick={() => {
                 currentEventStore.setField("isFormExpanded", false);
                 currentEventStore.resetForm();
-                useCurrentEventStore.getState().setField("ownerUserUuid", null);
               }}
               className="px-2 py-2 bg-transparent font-light rounded mb-2 hover:bg-gray-100 hover:border-darkBlue border-transparent border transition text-gray-500 hover:text-darkBlue text-3xl cursor-pointer"
             >
@@ -78,7 +77,6 @@ export const CreateEventButton = () => {
               onClick={() => {
                 currentEventStore.setField("isFormExpanded", false);
                 currentEventStore.resetForm();
-                useCurrentEventStore.getState().setField("ownerUserUuid", null);
               }}
               className="px-2 py-2 bg-transparent font-light rounded mb-2 hover:bg-gray-100 hover:border-darkBlue border-transparent border transition text-gray-500 hover:text-darkBlue text-3xl cursor-pointer"
             >
@@ -175,37 +173,29 @@ export const CreateEventButton = () => {
   // Viewer cannot create events or maintenance
   if (isViewer) return null;
 
-  // Neither form expanded: show split button
+  // No form expanded: one "+ Create" button. The dashboard no longer creates events
+  // (docs/specs/dashboard-events-read-only.md), so its menu holds only the two things it can create.
   return (
     <div className="mb-2 flex items-center justify-end" ref={dropdownRef}>
       <div className="relative flex">
         <PrimaryButton
-          className="rounded-r-none"
-          onClick={() => {
-            currentEventStore.setField("isFormExpanded", true);
-            currentEventStore.setField("isFormMinimized", false);
-            if (!currentEventStore.ownerUserUuid) {
-              const resolved = resolveCurrentUserUuid();
-              if (resolved) {
-                useCurrentEventStore.getState().setField("ownerUserUuid", resolved);
-              }
-            }
-          }}
-        >
-          + New Event
-        </PrimaryButton>
-        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={dropdownOpen}
           onClick={() => setDropdownOpen((o) => !o)}
-          className="px-1.5 bg-darkBlue text-white rounded-r hover:bg-lightBlue transition-colors cursor-pointer border-l border-white/20"
         >
+          + Create
           <ChevronDown
             className={`h-3.5 w-3.5 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
           />
-        </button>
+        </PrimaryButton>
         {dropdownOpen && (
-          <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded shadow-md z-50 min-w-[180px]">
-            <button
-              onClick={() => {
+          <div
+            role="menu"
+            className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded shadow-md z-50 min-w-[180px]"
+          >
+            <CreateMenuItems
+              onMaintenance={() => {
                 setDropdownOpen(false);
                 maintenanceStore.openForm();
                 const resolved = resolveCurrentUserUuid();
@@ -213,13 +203,7 @@ export const CreateEventButton = () => {
                   useMaintenanceEventStore.getState().setField("ownerUserUuid", resolved);
                 }
               }}
-              className="w-full cursor-pointer px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 flex items-center gap-2"
-            >
-              <Wrench className="h-3.5 w-3.5" />
-              Maintenance Event
-            </button>
-            <button
-              onClick={() => {
+              onSubrental={() => {
                 setDropdownOpen(false);
                 subrentalsStore.openForm();
                 const resolved = resolveCurrentUserUuid();
@@ -227,14 +211,40 @@ export const CreateEventButton = () => {
                   useSubrentalEventStore.getState().setField("createdByUserUuid", resolved);
                 }
               }}
-              className="w-full cursor-pointer px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 flex items-center gap-2"
-            >
-              <Handshake className="h-3.5 w-3.5" />
-              Sub-Rental Request
-            </button>
+            />
           </div>
         )}
       </div>
     </div>
   );
 };
+
+/** What the open "+ Create" menu offers. Its own component so a test can draw it. */
+export const CreateMenuItems = ({
+  onMaintenance,
+  onSubrental,
+}: {
+  onMaintenance: () => void;
+  onSubrental: () => void;
+}) => (
+  <>
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onMaintenance}
+      className="w-full cursor-pointer px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 flex items-center gap-2"
+    >
+      <Wrench className="h-3.5 w-3.5" />
+      Maintenance Event
+    </button>
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onSubrental}
+      className="w-full cursor-pointer px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 flex items-center gap-2"
+    >
+      <Handshake className="h-3.5 w-3.5" />
+      Sub-Rental Request
+    </button>
+  </>
+);
