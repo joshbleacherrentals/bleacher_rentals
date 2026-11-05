@@ -1,6 +1,6 @@
 # Event change log 01: payment recorded
 
-Status: **DRAFT 2026-11-05, waiting for "Approved"**. 0 open decisions; readings to confirm in §1.
+Status: **APPROVED and IMPLEMENTED 2026-11-05, uncommitted**. 0 open decisions; readings R1 to R7 of §1 confirmed.
 Build order: **01 of 07**. Needs: nothing. Needed by: 02 to 05 use the row builder this spec adds.
 Plan: [event-change-log-plan.md](event-change-log-plan.md). Branch: `q4-sprint3-finance`.
 

@@ -359,3 +359,64 @@ describe("payment rows — getDetail", () => {
     expect(logDetail(row, [])).toBe("Attached to the email and saved to Files");
   });
 });
+
+// ── payment_add rows (docs/specs/event-change-log-01-payment-recorded.md §3, §5) ──
+
+const addedRow = (over: Partial<LogRow> = {}): LogRow =>
+  paymentRow({
+    action_type: "payment_add",
+    prev_value: null,
+    next_value: "$25.00 · Check · Aug 14, 2026",
+    ...over,
+  });
+
+describe("payment_add rows — getTitle", () => {
+  it("reads 'Payment recorded: ' and the text saved in the row", () => {
+    expect(logTitle(addedRow(), [])).toBe("Payment recorded: $25.00 · Check · Aug 14, 2026");
+  });
+
+  it("keeps the minus sign of a refund", () => {
+    expect(logTitle(addedRow({ next_value: "-$50.00 · Check · Aug 14, 2026" }), [])).toBe(
+      "Payment recorded: -$50.00 · Check · Aug 14, 2026",
+    );
+  });
+
+  // R5: the title is the history of the moment, so an edit made later does not rewrite it.
+  it("R5: does not change when the payment is edited, or is gone", () => {
+    const row = addedRow();
+    const title = "Payment recorded: $25.00 · Check · Aug 14, 2026";
+    expect(logTitle(row, [])).toBe(title);
+    expect(logTitle(row, [PAYMENT])).toBe(title);
+    expect(logTitle(row, [{ ...PAYMENT, amountCents: 99900 }])).toBe(title);
+    expect(logTitle(row, [{ ...PAYMENT, paymentMethodType: "cash" }])).toBe(title);
+  });
+
+  it("falls back to naming the payment from the list when the row saved no text", () => {
+    expect(logTitle(addedRow({ next_value: null }), [PAYMENT])).toBe(
+      "Payment recorded: $120.00 · ACH Payment · Aug 14, 2026",
+    );
+    expect(logTitle(addedRow({ next_value: null }), [])).toBe("Payment recorded: Payment 11111111");
+  });
+
+  it("never prints the raw payment:<id> field name", () => {
+    expect(logTitle(addedRow(), [])).not.toContain("payment:");
+    expect(logTitle(addedRow({ next_value: null }), [])).not.toContain(PAYMENT.id);
+  });
+
+  it("leaves the edit and delete titles as they were", () => {
+    expect(logTitle(paymentRow({}), [PAYMENT])).toBe(
+      "Payment edited: $120.00 · ACH Payment · Aug 14, 2026",
+    );
+    expect(
+      logTitle(paymentRow({ action_type: "payment_delete", next_value: null }), [PAYMENT]),
+    ).toBe("Payment deleted: $120.00 · ACH Payment · Aug 14, 2026");
+  });
+});
+
+describe("payment_add rows — getDetail", () => {
+  it("has no second line: the title carries it", () => {
+    expect(logDetail(addedRow(), [])).toBeNull();
+    expect(logDetail(addedRow(), [PAYMENT])).toBeNull();
+    expect(logDetail(addedRow({ next_value: null }), [PAYMENT])).toBeNull();
+  });
+});

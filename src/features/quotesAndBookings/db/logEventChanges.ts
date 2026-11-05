@@ -17,7 +17,10 @@ export type ActionType =
   // A manual payment edited or soft-deleted (docs/specs/accountant-quotes-09). `field_name` carries
   // `payment:<id>`; a deletion's row names the payment and never the reason.
   | "payment_edit"
-  | "payment_delete";
+  | "payment_delete"
+  // A manual payment recorded (docs/specs/event-change-log-01). `field_name` carries
+  // `payment:<id>`; `next_value` is "$100.00 · Check · Aug 14, 2026", and there is no previous value.
+  | "payment_add";
 
 export const TRACKED_FIELDS = [
   "event_name",

@@ -46,6 +46,7 @@ const ACTION_CONFIG: Record<string, { icon: string; color: string; label: string
   line_item_add: { icon: "➕", color: "text-green-600", label: "Added" },
   line_item_remove: { icon: "➖", color: "text-red-600", label: "Removed" },
   line_item_change: { icon: "✏️", color: "text-amber-600", label: "Changed" },
+  payment_add: { icon: "💳", color: "text-green-600", label: "Payment recorded" },
   payment_edit: { icon: "💳", color: "text-amber-600", label: "Payment edited" },
   payment_delete: { icon: "🗑️", color: "text-red-600", label: "Payment deleted" },
 };
@@ -107,6 +108,12 @@ export function getTitle(row: LogRow, payments: readonly PaymentForEdit[] = []):
   const config = ACTION_CONFIG[row.action_type ?? "update"] ?? ACTION_CONFIG.update;
   const fieldLabel = FIELD_LABELS[row.field_name ?? ""] ?? row.field_name ?? "";
 
+  // The text the row saved, not the payment as it is now: an edit made later must not rewrite the
+  // history of the row (docs/specs/event-change-log-01, R5). Only a row with no text asks the list.
+  if (row.action_type === "payment_add") {
+    return `${config.label}: ${row.next_value ?? paymentLogLabel(row.field_name, payments)}`;
+  }
+
   if (row.action_type === "payment_edit" || row.action_type === "payment_delete") {
     return `${config.label}: ${paymentLogLabel(row.field_name, payments)}`;
   }
@@ -128,7 +135,8 @@ export function getTitle(row: LogRow, payments: readonly PaymentForEdit[] = []):
 /**
  * The second line of a payment row: what an edit changed (previous → next), or, for a deletion, the
  * payment's description when the title could not carry it. Never a reason: a deletion's row does not
- * have one (docs/specs/accountant-quotes-09, D7). Null for every other row.
+ * have one (docs/specs/accountant-quotes-09, D7). A recorded payment has no second line: its title
+ * carries everything (docs/specs/event-change-log-01). Null for every other row.
  */
 export function getDetail(row: LogRow, payments: readonly PaymentForEdit[] = []): string | null {
   if (row.action_type === "file_add") return FILE_ADD_DETAIL;
@@ -184,6 +192,17 @@ function ChangeDetailModal({
               <p className="font-medium text-gray-800">{formatDateTime(log.changed_at)}</p>
             </div>
           </div>
+
+          {log.action_type === "payment_add" && (
+            <div className="text-sm">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                Recorded payment
+              </span>
+              <p className="font-medium text-green-700 bg-green-50 border border-green-100 rounded-lg p-3">
+                {log.next_value ?? paymentLogLabel(log.field_name, payments)}
+              </p>
+            </div>
+          )}
 
           {log.action_type === "payment_edit" && (
             <div className="grid grid-cols-2 gap-4 text-sm">
