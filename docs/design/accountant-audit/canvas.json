@@ -1,0 +1,17 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-06T12:00:00Z" },
+  "title": "Audit tab design",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 460, "title": "1 · No driver chosen", "expand": "fill" },
+    "Search.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 560, "title": "2 · Searching for a driver", "expand": "fill" },
+    "Table.dc.html": { "x": 2720, "y": 0, "w": 1280, "h": 800, "title": "3 · Driver's work trackers", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "Search.dc.html", "Table.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -260, "text": "Accountant — Audit tab", "kind": "title1", "maxW": 4000 }
+  },
+  "designSystems": []
+}
