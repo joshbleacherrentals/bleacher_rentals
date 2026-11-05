@@ -42,6 +42,8 @@ const ACTION_CONFIG: Record<string, { icon: string; color: string; label: string
   sign: { icon: "✍️", color: "text-purple-600", label: "Signed" },
   send: { icon: "📧", color: "text-indigo-600", label: "Sent" },
   file_add: { icon: "📎", color: "text-indigo-600", label: "File added" },
+  file_upload: { icon: "📎", color: "text-green-600", label: "File uploaded" },
+  file_delete: { icon: "🗑️", color: "text-red-600", label: "File deleted" },
   status_change: { icon: "🔄", color: "text-orange-600", label: "Status Changed" },
   line_item_add: { icon: "➕", color: "text-green-600", label: "Added" },
   line_item_remove: { icon: "➖", color: "text-red-600", label: "Removed" },
@@ -125,6 +127,8 @@ export function getTitle(row: LogRow, payments: readonly PaymentForEdit[] = []):
   if (row.action_type === "sign") return "Contract Signed";
   if (row.action_type === "send") return `Quote Sent to ${row.next_value ?? "client"}`;
   if (row.action_type === "file_add") return `File added: ${row.next_value ?? "file"}`;
+  if (row.action_type === "file_upload") return `File uploaded: ${row.next_value ?? "file"}`;
+  if (row.action_type === "file_delete") return `File deleted: ${row.prev_value ?? "file"}`;
   if (row.action_type === "line_item_add") return `Line Item Added`;
   if (row.action_type === "line_item_remove") return `Line Item Removed`;
   if (row.action_type === "line_item_change") return `Line Item Changed`;
@@ -150,7 +154,7 @@ export function getDetail(row: LogRow, payments: readonly PaymentForEdit[] = [])
   return null;
 }
 
-function ChangeDetailModal({
+export function ChangeDetailModal({
   log,
   payments,
   onClose,
@@ -316,6 +320,17 @@ function ChangeDetailModal({
               </span>
               <p className="font-medium text-gray-800">{log.next_value ?? "—"}</p>
               <p className="text-xs text-gray-400 mt-1">{FILE_ADD_DETAIL}</p>
+            </div>
+          )}
+
+          {(log.action_type === "file_upload" || log.action_type === "file_delete") && (
+            <div className="text-sm">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                File
+              </span>
+              <p className="font-medium text-gray-800">
+                {(log.action_type === "file_upload" ? log.next_value : log.prev_value) ?? "—"}
+              </p>
             </div>
           )}
 

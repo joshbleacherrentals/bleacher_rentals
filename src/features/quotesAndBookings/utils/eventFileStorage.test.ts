@@ -1,5 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Spec: docs/specs/event-change-log-02-file-upload-delete.md §3 and §5 (A1). The Log row of a delete
+// is written by `logFileDeleted` once the EventFiles row is gone; here it and the toast are captured.
+const mocks = vi.hoisted(() => ({ logFileDeleted: vi.fn(), toast: vi.fn() }));
+
+vi.mock("../db/logEventFile", () => ({
+  logFileDeleted: (p: unknown) => mocks.logFileDeleted(p),
+}));
+vi.mock("@/components/toasts/ErrorToast", () => ({
+  createErrorToastNoThrow: (lines: string[]) => mocks.toast(lines),
+}));
+
 import { createEventFileUrl, eventFileLocation, removeEventFile } from "./eventFileStorage";
+
+beforeEach(() => {
+  mocks.logFileDeleted.mockReset();
+  mocks.logFileDeleted.mockResolvedValue(undefined);
+  mocks.toast.mockReset();
+});
 
 // Spec: docs/specs/accountant-collections-13-task-history-and-files.md §3 and §5. The three
 // storage steps of the quote card's Files tab, now shared with the invoice page.
@@ -91,11 +109,12 @@ describe("createEventFileUrl", () => {
 });
 
 describe("removeEventFile", () => {
-  const file = { id: "file-1", storage_path: "evt-1/abc.pdf" };
+  const file = { id: "file-1", storage_path: "evt-1/abc.pdf", file_name: "abc.pdf" };
+  const log = { eventId: "evt-1", changedByUserUuid: "user-9" };
 
   it("removes the stored object, then the row", async () => {
     const { client, calls, removeObjects, eq } = fakeClient();
-    await removeEventFile(client, file);
+    await removeEventFile(client, file, log);
     expect(calls).toEqual(["bucket:event-files", "remove", "delete:EventFiles"]);
     expect(removeObjects).toHaveBeenCalledWith(["evt-1/abc.pdf"]);
     expect(eq).toHaveBeenCalledWith("id", "file-1");
@@ -103,7 +122,11 @@ describe("removeEventFile", () => {
 
   it("takes a contracts/ object from the contracts bucket", async () => {
     const { client, calls, removeObjects } = fakeClient();
-    await removeEventFile(client, { id: "file-2", storage_path: "contracts/x/y.pdf" });
+    await removeEventFile(
+      client,
+      { id: "file-2", storage_path: "contracts/x/y.pdf", file_name: "y.pdf" },
+      log,
+    );
     expect(calls[0]).toBe("bucket:contracts");
     expect(removeObjects).toHaveBeenCalledWith(["x/y.pdf"]);
   });
@@ -111,15 +134,79 @@ describe("removeEventFile", () => {
   it("throws the error of the row delete", async () => {
     const boom = { message: "permission denied" };
     const { client } = fakeClient({ rowDelete: { error: boom } });
-    await expect(removeEventFile(client, file)).rejects.toBe(boom);
+    await expect(removeEventFile(client, file, log)).rejects.toBe(boom);
   });
 
   // As the quote card has always done (the user's answer to the contradiction in spec 13): the
   // storage answer is not read, the row is deleted whatever it says.
   it("does not stop at a storage error: the row is still deleted", async () => {
     const { client, calls, eq } = fakeClient({ remove: { error: new Error("storage down") } });
-    await expect(removeEventFile(client, file)).resolves.toBeUndefined();
+    await expect(removeEventFile(client, file, log)).resolves.toBeUndefined();
     expect(calls).toContain("delete:EventFiles");
     expect(eq).toHaveBeenCalledWith("id", "file-1");
+  });
+
+  // ── The Log row (spec 02, R2, R4, A1) ──
+  describe("the Log row", () => {
+    it("R2: writes one row, with the given event, the file's name and the author, after the row delete", async () => {
+      const { client, calls } = fakeClient();
+      mocks.logFileDeleted.mockImplementation(async () => {
+        calls.push("log");
+      });
+
+      await removeEventFile(client, file, log);
+
+      expect(mocks.logFileDeleted).toHaveBeenCalledTimes(1);
+      expect(mocks.logFileDeleted).toHaveBeenCalledWith({
+        eventId: "evt-1",
+        fileName: "abc.pdf",
+        changedByUserUuid: "user-9",
+      });
+      expect(calls).toEqual(["bucket:event-files", "remove", "delete:EventFiles", "log"]);
+    });
+
+    it("A1: the event id comes from the third parameter, not from the file", async () => {
+      const { client } = fakeClient();
+      await removeEventFile(client, file, { eventId: "another-event", changedByUserUuid: null });
+      expect(mocks.logFileDeleted).toHaveBeenCalledWith({
+        eventId: "another-event",
+        fileName: "abc.pdf",
+        changedByUserUuid: null,
+      });
+    });
+
+    it("writes no row when the row delete throws", async () => {
+      const { client } = fakeClient({ rowDelete: { error: { message: "permission denied" } } });
+      await expect(removeEventFile(client, file, log)).rejects.toBeDefined();
+      expect(mocks.logFileDeleted).not.toHaveBeenCalled();
+    });
+
+    it("still writes the row when the storage step failed, because the row is what the user sees go", async () => {
+      const { client } = fakeClient({ remove: { error: new Error("storage down") } });
+      await removeEventFile(client, file, log);
+      expect(mocks.logFileDeleted).toHaveBeenCalledTimes(1);
+    });
+
+    it("R4: a failing Log write does not throw and shows the toast", async () => {
+      const { client, calls } = fakeClient();
+      mocks.logFileDeleted.mockRejectedValueOnce(new Error("local db closed"));
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await expect(removeEventFile(client, file, log)).resolves.toBeUndefined();
+
+      expect(calls).toContain("delete:EventFiles");
+      expect(mocks.toast).toHaveBeenCalledTimes(1);
+      expect(mocks.toast).toHaveBeenCalledWith([
+        "The file was deleted, but its Log row could not be written",
+      ]);
+      expect(errors).toHaveBeenCalled();
+      errors.mockRestore();
+    });
+
+    it("shows no toast when the row is written", async () => {
+      const { client } = fakeClient();
+      await removeEventFile(client, file, log);
+      expect(mocks.toast).not.toHaveBeenCalled();
+    });
   });
 });

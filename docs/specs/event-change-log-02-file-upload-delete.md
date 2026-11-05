@@ -1,6 +1,7 @@
 # Event change log 02: files uploaded and deleted
 
-Status: **DRAFT 2026-11-05, waiting for "Approved"**. 0 open decisions; readings to confirm in §1.
+Status: **APPROVED and IMPLEMENTED 2026-11-05, uncommitted** (§3 amended the same day, A1:
+`removeEventFile` gets the event id, then approved again). 0 open decisions; readings to confirm in §1.
 Build order: **02 of 07**. Needs: [01](event-change-log-01-payment-recorded.md) (the `eventLogInsert`
 row builder and the `ActionType` list). Needed by: nothing.
 Plan: [event-change-log-plan.md](event-change-log-plan.md). Branch: `q4-sprint3-finance`.
@@ -51,6 +52,19 @@ page's Files section (`InvoiceFiles.tsx`). Neither writes a Log row.
   Files" says so), so a viewer's upload or delete is recorded under the viewer's name.
   `permissionPageData.ts` is not edited: nobody gains or loses an ability.
 
+**A1 (amendment of §3, 2026-11-05): how `removeEventFile` learns the quote the Log row belongs to.**
+
+- **Found while starting the implementation:** the first version of §3 gave `removeEventFile` only
+  `{ id; storage_path; file_name }` and `changedByUserUuid`, but `logFileDeleted` needs `eventId`
+  (the quote whose Log gets the row, `EventChangeLog.event_uuid`). The function did not have it, and
+  the `EventFiles` row it deletes cannot give it back after the delete.
+- **Question:** who passes the event id into `removeEventFile`.
+- **Options:** A, inside the `file` object; B, a separate parameter; C, read from the deleted row
+  (`delete().eq("id", id).select("event_uuid")`).
+- **User's answer:** **B**, a separate parameter:
+  `removeEventFile(supabase, file, { eventId, changedByUserUuid })`. `file` stays
+  `{ id; storage_path; file_name }`.
+
 ## 2. Research findings
 
 - `uploadEventFile` stores the object in `event-files`, inserts the `EventFiles` row, and removes
@@ -92,13 +106,24 @@ Each is one `typedExecute(eventLogInsert({...}))`.
 `EventFiles` insert succeeds it calls `logFileUploaded` with `file.name`; a throw from it is caught,
 logged to the console and shown as the toast of R4. The returned id is unchanged.
 
-**`removeEventFile`** takes `file: { id; storage_path; file_name }` and a second new parameter
-`changedByUserUuid`. After the row delete succeeds it calls `logFileDeleted` with `file_name`, with
-the same catch.
+**`removeEventFile`** (A1) takes `file: { id; storage_path; file_name }` and a third parameter
+`{ eventId: string; changedByUserUuid: string | null }`:
+
+```ts
+export async function removeEventFile(
+  supabase: SupabaseClient<any>,
+  file: { id: string; storage_path: string; file_name: string },
+  log: { eventId: string; changedByUserUuid: string | null },
+): Promise<void>;
+```
+
+After the row delete succeeds it calls `logFileDeleted` with `log.eventId`, `file.file_name` and
+`log.changedByUserUuid`, with the same catch.
 
 **Components.** `FilesTab.tsx` and `InvoiceFiles.tsx` read `userId` from `usePermissionsStore` and
-pass it, and pass the file's name into `removeEventFile` (`file_name` / `name`). Nothing else in
-them changes.
+pass it to both helpers. They pass the file's name into `removeEventFile` (`file_name` / `name`) and
+the quote's id as `eventId` (`quoteId` in `FilesTab`, `eventId` in `InvoiceFiles`; both are the
+`eventId` they already hand to `uploadEventFile`). Nothing else in them changes.
 
 **`LogTab.tsx`.**
 
@@ -125,10 +150,12 @@ No database change and no sync rules change.
 - `eventFileUpload.test.ts`: a row after a successful upload; none when the storage step fails;
   none when the insert fails (and the object is removed, as now); a failing Log write does not
   throw and shows the toast.
-- `eventFileStorage.test.ts`: a row after the row delete; none when the delete throws; a storage
-  error still does not stop the row delete.
+- `eventFileStorage.test.ts`: a row after the row delete, with the given event id (A1), the file's
+  name and the author; none when the delete throws; a storage error still does not stop the row
+  delete; a failing Log write does not throw and shows the toast.
 - `LogTab.test.ts`: title, detail and modal of both types; `file_add` is unchanged.
-- `FilesTab.test.ts`, `InvoiceFiles.test.tsx`: the user id and the name reach the helpers.
+- `FilesTab.test.ts`, `InvoiceFiles.test.tsx`: the user id, the event id and the name reach the
+  helpers.
 
 ## 6. Files
 

@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
+import { logFileDeleted } from "../db/logEventFile";
 import { EVENT_FILES_BUCKET } from "./eventFileUpload";
 
 /**
@@ -33,15 +35,31 @@ export async function createEventFileUrl(
 }
 
 /**
- * Removes the stored object and then the EventFiles row. The storage answer is not read, as the
- * quote card never did: the row goes either way. Throws the error of the row delete.
+ * Removes the stored object and then the EventFiles row, and writes the `file_delete` Log row. The
+ * storage answer is not read, as the quote card never did: the row goes either way, and the delete
+ * is recorded because the row is what the user sees go. Throws the error of the row delete, and then
+ * writes no Log row. A Log row that fails does not throw: the file is gone, so it is reported with a
+ * toast (docs/specs/event-change-log-02-file-upload-delete.md R2, R4, A1).
+ * `log.eventId` is the quote whose Log gets the row; `log.changedByUserUuid` is the user's
+ * `Users.id`.
  */
 export async function removeEventFile(
   supabase: SupabaseClient<any>,
-  file: { id: string; storage_path: string },
+  file: { id: string; storage_path: string; file_name: string },
+  log: { eventId: string; changedByUserUuid: string | null },
 ): Promise<void> {
   const { bucket, path } = eventFileLocation(file.storage_path);
   await supabase.storage.from(bucket).remove([path]);
   const { error } = await supabase.from("EventFiles").delete().eq("id", file.id);
   if (error) throw error;
+  try {
+    await logFileDeleted({
+      eventId: log.eventId,
+      fileName: file.file_name,
+      changedByUserUuid: log.changedByUserUuid,
+    });
+  } catch (logError) {
+    console.error("Could not write the Log row of a deleted file:", logError);
+    createErrorToastNoThrow(["The file was deleted, but its Log row could not be written"]);
+  }
 }

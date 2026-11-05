@@ -7,10 +7,38 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 type Compiled = { sql: string; parameters: unknown[] };
 
+type HookStubs = Partial<Record<"useState" | "useMemo" | "useRef" | "useEffect", unknown>>;
+
 const mocks = vi.hoisted(() => ({
   compiled: [] as Compiled[],
   answer: { data: [] as unknown[], isLoading: false },
+  supabase: {} as object,
+  /** `Users.id` of the signed-in user, as `usePermissionsStore` holds it. */
+  userUuid: "user-uuid-5" as string | null,
+  uploadEventFile: vi.fn(),
+  removeEventFile: vi.fn(),
+  /** While set, the component's hooks are these stubs (see `callComponent`); otherwise the real ones. */
+  hooks: null as HookStubs | null,
 }));
+
+// Spec: docs/specs/event-change-log-02-file-upload-delete.md §3 and §5. The project has no DOM
+// environment and no testing-library, and `renderToStaticMarkup` cannot press a button, so the
+// handlers are reached by calling the component itself with stubbed hooks. Every other test of this
+// file renders with the real ones: the stubs delegate unless `mocks.hooks` is set.
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  const hook =
+    (name: keyof HookStubs) =>
+    (...args: unknown[]) =>
+      ((mocks.hooks?.[name] ?? actual[name]) as (...a: unknown[]) => unknown)(...args);
+  return {
+    ...actual,
+    useState: hook("useState"),
+    useMemo: hook("useMemo"),
+    useRef: hook("useRef"),
+    useEffect: hook("useEffect"),
+  };
+});
 
 vi.mock("@/components/providers/SystemProvider", async () => {
   const { DummyDriver, Kysely, SqliteAdapter, SqliteIntrospector, SqliteQueryCompiler } =
@@ -35,7 +63,19 @@ vi.mock("@/lib/powersync/typedQuery", () => ({
 }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: "user_clerk_7" }) }));
 vi.mock("@/utils/supabase/useClerkSupabaseClient", () => ({
-  useClerkSupabaseClient: () => ({}),
+  useClerkSupabaseClient: () => mocks.supabase,
+}));
+vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
+  usePermissionsStore: (select: (s: { userId: string | null }) => unknown) =>
+    select({ userId: mocks.userUuid }),
+}));
+vi.mock("@/features/quotesAndBookings/utils/eventFileUpload", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/quotesAndBookings/utils/eventFileUpload")>()),
+  uploadEventFile: (p: unknown) => mocks.uploadEventFile(p),
+}));
+vi.mock("@/features/quotesAndBookings/utils/eventFileStorage", () => ({
+  createEventFileUrl: vi.fn(),
+  removeEventFile: (...args: unknown[]) => mocks.removeEventFile(...args),
 }));
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToastNoThrow: vi.fn() }));
 
@@ -46,6 +86,7 @@ import {
   StagedFilesList,
   type StagedFile,
 } from "./InvoiceFiles";
+import { AlertDialogAction } from "@/components/ui/alert-dialog";
 import { buildFileRows, type InvoiceFileRow } from "../utils/invoiceFiles";
 
 const TZ = "America/Toronto";
@@ -70,6 +111,11 @@ const FILES: InvoiceFileRow[] = [
 beforeEach(() => {
   mocks.compiled = [];
   mocks.answer = { data: FILES, isLoading: false };
+  mocks.userUuid = "user-uuid-5";
+  mocks.uploadEventFile.mockReset();
+  mocks.uploadEventFile.mockResolvedValue("new-file-id");
+  mocks.removeEventFile.mockReset();
+  mocks.removeEventFile.mockResolvedValue(undefined);
 });
 
 const render = () => renderToStaticMarkup(<InvoiceFiles eventId="evt-1" timezone={TZ} />);
@@ -317,5 +363,132 @@ describe("splitRefused", () => {
     ]);
     expect(accepted.map((x) => x.name)).toEqual(["a.pdf", "b.pdf"]);
     expect(refused).toHaveLength(1);
+  });
+});
+
+// ── The Log row of an upload and of a delete (spec 02, §3 and §5, A1) ──
+
+type Node = { type?: unknown; props?: { children?: unknown } & Record<string, any> } | unknown;
+
+/** Every element of the tree `component` returned that `matches`, without rendering any child. */
+function findAll(node: Node, matches: (el: any) => boolean): any[] {
+  if (Array.isArray(node)) return node.flatMap((child) => findAll(child, matches));
+  if (!node || typeof node !== "object") return [];
+  const el = node as { props?: { children?: unknown } };
+  return [...(matches(el) ? [el] : []), ...findAll(el.props?.children, matches)];
+}
+
+/**
+ * Calls `InvoiceFiles` as a function with its hooks stubbed: `useState` returns the given values by
+ * the order of the component's `useState` calls (0 staged, 1 saving, 2 deleteTarget, 3 deleting),
+ * and its setters do nothing. Returns the element tree, whose handlers can then be called.
+ */
+function callComponent(state: Record<number, unknown>) {
+  let next = 0;
+  mocks.hooks = {
+    useState: (initial: unknown) => {
+      const index = next++;
+      return [index in state ? state[index] : initial, vi.fn()];
+    },
+    useMemo: (compute: () => unknown) => compute(),
+    useRef: (initial: unknown) => ({ current: initial }),
+    useEffect: () => undefined,
+  };
+  try {
+    return InvoiceFiles({ eventId: "evt-1", timezone: TZ });
+  } finally {
+    mocks.hooks = null;
+  }
+}
+
+const pdf = (name: string) => new File(["x"], name, { type: "application/pdf" });
+
+describe("InvoiceFiles: Save writes the Log row through uploadEventFile", () => {
+  const save = (state: Record<number, unknown>) => {
+    const [list] = findAll(callComponent(state), (el) => el.type === StagedFilesList);
+    return list.props.onSave() as Promise<void>;
+  };
+
+  it("hands the event, the user's Users.id and the file to uploadEventFile, once per file", async () => {
+    const a = pdf("a.pdf");
+    const b = pdf("b.pdf");
+    await save({
+      0: [
+        { id: "s-1", file: a },
+        { id: "s-2", file: b },
+      ],
+    });
+    expect(mocks.uploadEventFile).toHaveBeenCalledTimes(2);
+    expect(mocks.uploadEventFile).toHaveBeenNthCalledWith(1, {
+      supabase: mocks.supabase,
+      eventId: "evt-1",
+      file: a,
+      source: "upload",
+      uploadedBy: "user_clerk_7",
+      changedByUserUuid: "user-uuid-5",
+    });
+    expect(mocks.uploadEventFile).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ file: b, changedByUserUuid: "user-uuid-5" }),
+    );
+  });
+
+  it("keeps the Clerk id for EventFiles.uploaded_by and the Users.id for the Log, as two different values", async () => {
+    await save({ 0: [{ id: "s-1", file: pdf("a.pdf") }] });
+    const call = mocks.uploadEventFile.mock.calls[0][0];
+    expect(call.uploadedBy).toBe("user_clerk_7");
+    expect(call.changedByUserUuid).toBe("user-uuid-5");
+    expect(call.changedByUserUuid).not.toBe(call.uploadedBy);
+  });
+
+  it("passes a null author when the user id is not loaded", async () => {
+    mocks.userUuid = null;
+    await save({ 0: [{ id: "s-1", file: pdf("a.pdf") }] });
+    expect(mocks.uploadEventFile.mock.calls[0][0].changedByUserUuid).toBeNull();
+  });
+
+  it("uploads nothing when nothing is staged", async () => {
+    await save({ 0: [] });
+    expect(mocks.uploadEventFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("InvoiceFiles: Delete writes the Log row through removeEventFile", () => {
+  const target = {
+    number: 2,
+    id: "f-scan",
+    name: "Check_Scan.pdf",
+    typeLabel: "PDF",
+    dateLabel: "Oct 22, 2026",
+    storagePath: "evt-1/s.pdf",
+    canDelete: true,
+  };
+  const confirmDelete = (state: Record<number, unknown>) => {
+    const [action] = findAll(callComponent(state), (el) => el.type === AlertDialogAction);
+    return action.props.onClick() as Promise<void>;
+  };
+
+  it("hands the file, with its name, and the event and the user's Users.id to removeEventFile", async () => {
+    await confirmDelete({ 2: target });
+    expect(mocks.removeEventFile).toHaveBeenCalledTimes(1);
+    expect(mocks.removeEventFile).toHaveBeenCalledWith(
+      mocks.supabase,
+      { id: "f-scan", storage_path: "evt-1/s.pdf", file_name: "Check_Scan.pdf" },
+      { eventId: "evt-1", changedByUserUuid: "user-uuid-5" },
+    );
+  });
+
+  it("passes a null author when the user id is not loaded", async () => {
+    mocks.userUuid = null;
+    await confirmDelete({ 2: target });
+    expect(mocks.removeEventFile.mock.calls[0][2]).toEqual({
+      eventId: "evt-1",
+      changedByUserUuid: null,
+    });
+  });
+
+  it("deletes nothing for a file with no storage path", async () => {
+    await confirmDelete({ 2: { ...target, storagePath: null } });
+    expect(mocks.removeEventFile).not.toHaveBeenCalled();
   });
 });

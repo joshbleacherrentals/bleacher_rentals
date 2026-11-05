@@ -5,6 +5,7 @@ import { Download, FileText, Loader2, Paperclip, Trash2, Upload, X } from "lucid
 import { useAuth } from "@clerk/nextjs";
 import { db } from "@/components/providers/SystemProvider";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
+import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -227,6 +228,8 @@ export function FilesTable({
 export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone: string }) {
   const supabase = useClerkSupabaseClient();
   const { userId } = useAuth();
+  // `Users.id`, for the Log rows of an upload and of a delete. `userId` above is the Clerk id.
+  const userUuid = usePermissionsStore((s) => s.userId);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [staged, setStaged] = useState<StagedFile[]>([]);
@@ -294,6 +297,7 @@ export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone:
           file: item.file,
           source: "upload",
           uploadedBy: userId,
+          changedByUserUuid: userUuid,
         });
         // A file that went up leaves the list, so a retry after a later failure does not send it twice.
         removeStaged(item.id);
@@ -322,10 +326,15 @@ export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone:
     if (!deleteTarget?.storagePath) return;
     setDeleting(true);
     try {
-      await removeEventFile(supabase, {
-        id: deleteTarget.id,
-        storage_path: deleteTarget.storagePath,
-      });
+      await removeEventFile(
+        supabase,
+        {
+          id: deleteTarget.id,
+          storage_path: deleteTarget.storagePath,
+          file_name: deleteTarget.name,
+        },
+        { eventId, changedByUserUuid: userUuid },
+      );
     } catch (err) {
       createErrorToastNoThrow(["Delete failed", errorMessage(err)]);
     } finally {
