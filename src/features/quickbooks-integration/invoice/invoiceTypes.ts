@@ -57,12 +57,21 @@ export type InvoiceIssue = { code: InvoiceIssueCode; message: string };
 
 export type QboItemRef = { id: string; name: string; description: string | null };
 
+/**
+ * Where the company's own Class setting wants the Class (spec 03f): `line` when QuickBooks tracks
+ * Classes per transaction line, `header` when it tracks them for the whole transaction (the invoice's
+ * own Class field), `none` when it tracks neither.
+ */
+export type ClassPlacement = "line" | "header" | "none";
+
 /** What the builder is given besides the quote. */
 export type InvoiceRefs = {
   item: QboItemRef;
   customerId: string;
   /** Spec 03b; null when the quote has no Class. */
   classId: string | null;
+  /** Spec 03f: read live from QuickBooks; decides where `classId` is written, or whether at all. */
+  classPlacement: ClassPlacement;
   /** Spec 03a; null when the province has no code mapped. */
   canadianTaxCodeId: string | null;
   /** Spec 03c: the connection's code for a Canadian line with no tax; null when none is set. */
@@ -94,6 +103,8 @@ export type QboInvoiceBody = {
   ShipAddr: { Line1: string; City: string; CountrySubDivisionCode: string; PostalCode: string };
   PrivateNote: string;
   GlobalTaxCalculation: "TaxExcluded";
+  /** The invoice's own Class (spec 03f); set only when the company tracks Classes per transaction. */
+  ClassRef?: { value: string };
   Line: [QboInvoiceLine];
 };
 
@@ -172,6 +183,8 @@ export type QboInvoiceSnapshot = {
    */
   ship: { street: string; city: string; state: string; zip: string; other: string[] };
   memo: string;
+  /** The invoice's own Class (spec 03f); null when it has none. The line's is in `lines`. */
+  headerClassId: string | null;
   lines: QboInvoiceLineSnapshot[];
   /** Null when QuickBooks sent no total, or one that is not an amount. */
   totalCents: number | null;

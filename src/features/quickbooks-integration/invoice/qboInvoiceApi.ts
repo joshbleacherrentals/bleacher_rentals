@@ -71,6 +71,8 @@ type RawQboInvoice = {
     Country?: string;
   };
   PrivateNote?: string;
+  /** The invoice's own Class (spec 03f). */
+  ClassRef?: { value?: string };
   Line?: RawQboLine[];
   TotalAmt?: number | string;
   TxnTaxDetail?: { TotalTax?: number | string };
@@ -185,6 +187,7 @@ function snapshotOf(invoice: RawQboInvoice): QboInvoiceSnapshot {
       ].filter((part): part is string => !!part?.trim()),
     },
     memo: invoice.PrivateNote ?? "",
+    headerClassId: invoice.ClassRef?.value ?? null,
     lines: (invoice.Line ?? [])
       .filter((line) => line.DetailType === "SalesItemLineDetail")
       .map((line) => ({

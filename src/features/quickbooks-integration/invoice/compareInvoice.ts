@@ -1,6 +1,7 @@
 import { addressText, appearsIn, regionForms } from "./addressText";
 import { INVOICE_REASONS } from "./invoiceTypes";
 import type {
+  ClassPlacement,
   InvoiceCheck,
   InvoiceDifference,
   InvoiceReason,
@@ -50,8 +51,13 @@ export function compareInvoice(input: {
   /** The quote's total (the amount after discounts plus the tax) and its tax, in cents. */
   quote: { totalCents: number; taxCents: number };
   actual: QboInvoiceSnapshot;
+  /**
+   * Where the company wants the Class (spec 03f), which is where it was written: on the line, on the
+   * invoice's own field, or nowhere, in which case no Class is compared.
+   */
+  classPlacement: ClassPlacement;
 }): InvoiceCheck {
-  const { expected, quote, actual } = input;
+  const { expected, quote, actual, classPlacement } = input;
   const found: InvoiceDifference[] = [];
   const add = (reason: InvoiceReason, field: string, quoteValue: string, qboValue: string) =>
     found.push({ reason, field, quote: quoteValue, qbo: qboValue });
@@ -62,6 +68,12 @@ export function compareInvoice(input: {
     qboValue: string | null | undefined,
   ) => {
     if (text(quoteValue) !== text(qboValue)) add(reason, field, text(quoteValue), text(qboValue));
+  };
+
+  const compareClass = (quoteValue: string | null | undefined, qboValue: string | null) => {
+    const wanted = text(quoteValue);
+    const held = text(qboValue);
+    if (wanted !== held) add("class", "Class", wanted || "none", held || "none");
   };
 
   compareText("number", "Invoice number", expected.DocNumber, actual.docNumber);
@@ -126,12 +138,13 @@ export function compareInvoice(input: {
 
     compareText("tax_code", "Tax code", detail.TaxCodeRef.value, line.taxCodeId);
 
-    const expectedClass = text(detail.ClassRef?.value);
-    const actualClass = text(line.classId);
-    if (expectedClass !== actualClass) {
-      add("class", "Class", expectedClass || "none", actualClass || "none");
+    if (classPlacement === "line") {
+      compareClass(detail.ClassRef?.value, line.classId);
     }
   }
+
+  // The invoice's own Class is read whatever the number of lines. With no Class tracked, none is read.
+  if (classPlacement === "header") compareClass(expected.ClassRef?.value, actual.headerClassId);
 
   // QuickBooks' own total and tax say what the lines above do not: that its calculation agrees with
   // the quote's. A wrong amount, tax code or line count already makes them differ, so they are
