@@ -1,7 +1,6 @@
 # Accountant Audit 02: the driver select and the driver's details
 
-Status: **DRAFT 2026-11-06, waiting for "Approved"** (0 open decisions; readings to confirm in
-§1). Build order: **02 of 04**. Needs: [01](accountant-audit-01-tab.md) (the tab and
+Status: **IMPLEMENTED 2026-11-06, uncommitted** (APPROVED 2026-11-06; e2e written, not run). Build order: **02 of 04**. Needs: [01](accountant-audit-01-tab.md) (the tab and
 `AuditTab`). Needed by: [04](accountant-audit-04-table.md) (the chosen driver feeds the table).
 Spec 03 does not need it: its data is keyed by a driver uuid it is given.
 Plan: [accountant-audit-plan.md](accountant-audit-plan.md). Branch: `q4-sprint3-finance`.
@@ -348,3 +347,18 @@ Tests: the eight of §5, and `accountantAudit/e2e/auditDriver.accountant.spec.ts
 - Changing `SelectDriver`, its zones note or the order of other pages' driver lists.
 - A marker on the closed select for an inactive driver (R2).
 - Any write: this tab edits no driver and no tracker.
+
+## 9. Implementation notes (2026-11-06)
+
+- `AuditDriverInfo` takes the already-read facts as a prop (`info`); `AuditTab` calls
+  `useAuditDriverInfo` and draws the block only when the details have loaded (R10). The spec did
+  not fix the props.
+- `useDrivers.db.ts`: `buildDriversQuery` returns the compiled query; with no current user it
+  returns the "no rows" query, as before. The two duplicated column lists became one constant.
+- `AuditTab`: a `driver` that is unknown after the list loaded is treated as no driver at once
+  (the empty state shows) while the effect removes it from the URL (R6).
+- Tests: the R6 effect is exercised by running `useEffect` synchronously in a static render, as the
+  project has no `@testing-library/react`. S1 to S7 are in `auditDriver.accountant.spec.ts` and
+  `auditDriver.admin.spec.ts`, written, not run.
+- Sync rules: the Accountant bucket re-read for `Drivers` and `Addresses` (whole tables); no
+  change needed (R-C). `Users` was not re-checked beyond the join `useDrivers` already makes.
