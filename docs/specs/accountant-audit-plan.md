@@ -133,7 +133,8 @@ built test-first, and closed with the final report of CLAUDE.md (`npm run tc`, `
 ## 3. Decisions taken (all by the user, 2026-11-06)
 
 Settled by the request, so not asked: who the tab is for; its name and place; the nine columns;
-that Paid / Not paid comes from the week's group found through the tracker's date; that the
+that Paid / Not paid comes from the week's group of the tracker (found through its date, and
+read through the tracker's `worktracker_group_uuid`, A1); that the
 Status column uses the icons of /work-trackers; that the code of /work-trackers is reused where
 it can be.
 
@@ -205,6 +206,14 @@ see the drivers of all zones.)
 
 - **Options:** the order of the existing query (by user id, not alphabetical); alphabetical.
 - **User's answer:** alphabetical (first name, then last name), in Audit only.
+
+**A1 (2026-11-06, after the first drafts): how a tracker finds its week's group** (amends spec
+03; the request said to look the group up by the tracker's date).
+
+- **Options:** a join on the driver and the date range of the week; the tracker's own
+  `worktracker_group_uuid`, which the database fills from the same date.
+- **User's answer:** use `worktracker_group_uuid` instead of the extra calculations. A tracker
+  with no link (no date) has no group and shows "–" (D2).
 
 ## 4. The design
 

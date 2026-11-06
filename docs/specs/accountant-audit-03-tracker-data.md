@@ -1,7 +1,8 @@
 # Accountant Audit 03: the driver's trackers and their payment status
 
-Status: **DRAFT 2026-11-06, waiting for "Approved"** (0 open decisions; readings to confirm in
-§1). Build order: **03 of 04**. Needs: nothing in the app (it is a data layer that is given a
+Status: **IMPLEMENTED 2026-11-06, uncommitted** (APPROVED 2026-11-06; 0 open decisions; amended
+the same day by A1, the group is read through `worktracker_group_uuid`; no e2e in this spec).
+Build order: **03 of 04**. Needs: nothing in the app (it is a data layer that is given a
 driver uuid). Needed by: [04](accountant-audit-04-table.md), which draws what this spec reads.
 Plan: [accountant-audit-plan.md](accountant-audit-plan.md). Branch: `q4-sprint3-finance`.
 
@@ -96,8 +97,8 @@ Plan: [accountant-audit-plan.md](accountant-audit-plan.md). Branch: `q4-sprint3-
     (`src/features/workTrackers/util.ts`).
   - `useDrivers` and `SelectUserDropDown`, the select behind `SelectDriver`.
   - `workTrackerGroupPaid.ts` and `useWorkTrackerGroupPaid`: read one group by (driver, week
-    start). That fits a single week, not a history; a history needs the group of each
-    tracker's date, which is a join by date.
+    start). That fits a single week, not a history; a history needs the group of each tracker,
+    which the tracker's own `worktracker_group_uuid` gives (A1 of spec 03).
   - `Pagination` and `PageSize` (25 / 50 / 100), and `DataTable` (`src/components/DataTable.tsx`).
 - **Read-only.** The tab writes nothing. Marking a week Paid stays on the Work Trackers pages.
 - **Checks of the project (CLAUDE.md).** `npm run tc`, `npm run test`, `npm run lint` (format
@@ -128,17 +129,32 @@ that serves them. It changes no screen, so it needs no permissions row and no e2
 - **D6: paging.** **User's answer:** pages of 25 / 50 / 100. This spec supplies the page and the
   total; the pager is spec 04.
 
+**Amendment A1 (2026-11-06, after the first draft): how a tracker finds its group.**
+
+- **Question:** how the Paid / Not paid of a tracker is found. The request said to take the
+  tracker's date and look up the week's group. The first draft followed that with a join on the
+  driver and a date range (`week_start <= date <= week_end`), and offered the tracker's own
+  `worktracker_group_uuid` as a reading (the database fills it from the same date).
+- **User's answer:** use `worktracker_group_uuid` instead of the extra calculations.
+- **Consequence:** the groups join is a plain join on the group's id. There is no date
+  comparison and no week boundary in the query. A tracker with no `worktracker_group_uuid`
+  (it has no date), or whose group row is not on the device, has no group and reads `none`
+  (D2). The result is the same as the date rule for every tracker that has a date.
+
 **Readings to confirm:**
 
-- **R1:** Paid / Not paid is found by a join on the driver and the date: the group of the same
-  driver whose `week_start <= date <= week_end`. This is the user's rule ("take the date, look
-  the group up"). The tracker's own `worktracker_group_uuid` holds the same link (a database
-  trigger fills it from the date) and is not used. If you would rather use it, say so before
-  approving; the result is the same for every tracker that has a date.
-- **R2:** the join is done in SQL, one query for the page. `WorkTrackerGroups` has a local index
-  on `driver_uuid`, so for each tracker the join looks at one driver's groups only. There are
-  two watchers per driver: the page and the total. This is lighter than one watcher per row
-  (the docstring of `useWorkTrackerGroupPaid` warns against that).
+- **R1:** Paid / Not paid is read through the tracker's own link (A1):
+  `WorkTrackerGroups g` joined on `g.id = wt.worktracker_group_uuid`. The database keeps the
+  column right: the trigger `assign_worktracker_to_group` sets it whenever a tracker with a date
+  and a driver is inserted, or its date or driver is changed; `validate_worktracker_group`
+  refuses a group of another driver or another week; and the migration
+  `20260316134614_backfill_worktrackergroups.sql` filled it for the trackers that existed.
+  So every tracker with a date and a driver has the link. This spec does not repair a tracker
+  whose link is missing; it reads `none` for it.
+- **R2:** the group is joined in SQL, in the one query for the page, on the group's id, so each
+  tracker gets at most one group and cannot be repeated. There are two watchers per driver: the
+  page and the total. This is lighter than one watcher per row (the docstring of
+  `useWorkTrackerGroupPaid` warns against that).
 - **R3:** paging is done in SQL (`LIMIT` / `OFFSET`), with a separate `count(*)` for the total.
   The order has a last tie-break on `WorkTrackers.id` so that a row never moves between pages.
 - **R4:** a page number past the last page is clamped to the last page; a page number below 1 is
@@ -159,12 +175,17 @@ that serves them. It changes no screen, so it needs no permissions row and no e2
   descending and adds `LIMIT` / `OFFSET`.
 - `pickup_time_start` is plain text `HH:MM:SS`; a null means Any Time. In SQLite, `order by x
 desc` puts nulls last, so undated trackers fall to the end of the list.
-- The group of a tracker on /work-trackers is read by driver and `week_start`
-  (`buildWorkTrackerGroupPaidQuery`); `useDriversForWeek` reads all groups of a week. Weeks run
-  Monday to Sunday and `unique (driver_uuid, week_start)`, so a date matches at most one group of
-  a driver and the join cannot repeat a tracker.
-- `WorkTrackers` and `WorkTrackerGroups` both have a local `driver_uuid` index, `Bleachers`,
-  `WorkTrackerTypes` and `Addresses` are joined on their id.
+- The group of a week on /work-trackers is read by driver and `week_start`
+  (`buildWorkTrackerGroupPaidQuery`); `useDriversForWeek` reads all groups of a week. A tracker
+  also carries its own link, `WorkTrackers.worktracker_group_uuid` (a foreign key to
+  `WorkTrackerGroups.id`). The database sets it from the tracker's driver and date
+  (`assign_worktracker_to_group`, before insert or before an update of `date` or `driver_uuid`;
+  a tracker with no date or no driver gets none), checks it (`validate_worktracker_group`) and
+  backfilled it once (`20260316134614_backfill_worktrackergroups.sql`). A group is one row per
+  driver per week, Monday to Sunday (`unique (driver_uuid, week_start)`). The column is in the
+  local schema (`AppSchema.ts`, with an index).
+- `WorkTrackers` has a local `driver_uuid` index, which the driver filter uses. `Bleachers`,
+  `WorkTrackerTypes`, `Addresses` and `WorkTrackerGroups` are joined on their id.
 - The tests of local queries run the compiled SQL on `node:sqlite` with a fake Kysely `db`
   (`workTrackerGroupPaid.test.ts`, `useWorkTrackerAccess.test.ts`); this spec uses the same
   harness.
@@ -226,8 +247,7 @@ export function buildAuditTrackerCountQuery(driverUuid: string | null);
 - `db.selectFrom("WorkTrackers as wt")`, left joins: `Bleachers as b` on `b.id = wt.bleacher_uuid`;
   `WorkTrackerTypes as t` on `t.id = wt.work_tracker_type_uuid`; `Addresses as pu` on
   `pu.id = wt.pickup_address_uuid`; `Addresses as dof` on `dof.id = wt.dropoff_address_uuid`;
-  `WorkTrackerGroups as g` on `g.driver_uuid = wt.driver_uuid and g.week_start <= wt.date and
-g.week_end >= wt.date`.
+  `WorkTrackerGroups as g` on `g.id = wt.worktracker_group_uuid` (A1, R1).
 - Selects `wt.id`, `wt.status`, `wt.date`, `b.bleacher_number`, `t.code as type_code`,
   `t.display_name as type_name`, the four address fields of each of `pu` and `dof`
   (`pickup_id`, `pickup_street`, ..., `dropoff_id`, `dropoff_street`, ...), `wt.drive_minutes`,
@@ -282,11 +302,12 @@ of §5 and, on screen, by spec 04's scenarios.
     a tracker with no date at the end; equal rows ordered by id;
   - paging: pages of 2 over 5 trackers give 2, 2, 1 rows, no row twice, none missing; the count
     query says 5;
-  - payment: a tracker whose date is inside a paid group is `paid`; inside an unpaid group
-    (`is_paid` 0) `not_paid`; inside a group with `is_paid` null `not_paid`; a date on the
-    group's Monday and on its Sunday matches; a tracker with no date has no group (`none`); a
-    date in a week with no group row has none; another driver's paid group of the same week is
-    not used;
+  - payment (A1): a tracker linked to a paid group is `paid`; linked to an unpaid group
+    (`is_paid` 0) `not_paid`; linked to a group with `is_paid` null `not_paid`; a tracker with
+    a null `worktracker_group_uuid` (no date) is `none`; a tracker whose `worktracker_group_uuid`
+    names a group row that is not in the table is `none`; the status follows the linked group
+    and nothing else (a paid group of the same driver and week that the tracker is not linked
+    to is not used); two trackers linked to one group get the same status;
   - the bleacher is the assigned one: with `actual_bleacher_uuid` set to another bleacher the
     row still carries the assigned bleacher's number;
   - a missing type, bleacher, pickup or dropoff address row leaves the tracker listed with nulls;
@@ -310,10 +331,12 @@ Tests: the three of §5.
 - **No driver chosen.** Inert queries, no rows, no loading flag.
 - **A driver with no trackers.** `rows: []`, `total: 0`; spec 04 draws the empty message.
 - **A driver with many trackers.** Only one page is read; the total is a separate cheap count.
-- **A tracker whose week has no group yet** (a group is made by the database when a tracker with
-  a date is saved, so it is rare: a tracker not yet synced back, or an old row). `none`, drawn
-  as "–" (D2).
-- **A tracker with no date.** No group, `none`; it is listed after all dated ones (D5).
+- **A tracker with no group link, or whose group row is not on the device** (the database makes
+  the group and the link when a tracker with a date is saved, so this is rare: a tracker or its
+  group not yet synced down). `none`, drawn as "–" (D2). It turns into Paid / Not paid by itself
+  when the group arrives.
+- **A tracker with no date.** No link and no group, `none`; it is listed after all dated ones
+  (D5).
 - **A group marked paid or unpaid on /work-trackers while Audit is open.** The page query reads
   `WorkTrackerGroups`, so it re-runs and the status changes by itself.
 - **Offline, auth error from Clerk.** The data is local; nothing is fetched online.
@@ -323,4 +346,36 @@ Tests: the three of §5.
 - The table, the status icons, the formatting of time and distance (spec 04).
 - Filters, search, sorting by a column, a date window: none was asked for.
 - Any write. Marking a week paid stays on /work-trackers.
-- Reading `actual_bleacher_uuid` (D3) or `worktracker_group_uuid` (R1).
+- Reading `actual_bleacher_uuid` (D3).
+- A join on the driver and a date range, and any week arithmetic (A1).
+- Repairing a tracker whose `worktracker_group_uuid` is missing (R1).
+
+## 9. Implementation notes (2026-11-06)
+
+No contract of §3 changed: the three files, the exported names and signatures are as written.
+Where the spec left a detail open, this is what was built:
+
+- **Builders return compiled queries.** `buildAuditTrackersQuery` and
+  `buildAuditTrackerCountQuery` end in `.compile()`, like `buildWorkTrackerGroupPaidQuery`, so the
+  tests run them through the harness of `workTrackerGroupPaid.test.ts` and the hook passes them
+  straight to `useTypedQuery`.
+- **The raw row has a name.** `AuditTrackerResultRow` (exported from `auditRows.ts`) is the row
+  `toAuditRow` takes, one field per selected column. Its `status` is `string | null`, as the local
+  schema types it; `toAuditRow` casts it to `Enums<"worktracker_status">`.
+- **Address column names** (the `...` of §3): `pickup_street`, `pickup_city`,
+  `pickup_state_province`, `pickup_zip_postal`, and the same four with `dropoff_`.
+- **No driver:** the hook itself returns `rows: []`, `total: 0` and `isLoading: false`, so a stale
+  or still-loading result of the inert queries never leaks out. Both queries still run, because
+  hooks cannot be skipped.
+- **`error`** is the count query's error, else the page query's.
+- **The five joins stay (user, 2026-11-06).** The page query has five left joins (`Bleachers`,
+  `WorkTrackerTypes`, `Addresses` twice, `WorkTrackerGroups`), while
+  [slow-local-db-step1-split-watchers.md](slow-local-db-step1-split-watchers.md) prefers small
+  queries joined in JS for heavy watched queries. The user kept the joins as approved in R2 and
+  will deal with them only if a slowdown shows on the Audit tab. Nothing was measured.
+- **Sync buckets read again** (R-C): the Accountant bucket (`Drivers`, `Addresses`, `Bleachers`,
+  `WorkTrackers`, `WorkTrackerGroups`, `WorkTrackerTypes`, `Users`) and the Admin bucket of
+  `br_powersync/config/sync_rules.yaml` give all the tables this spec reads. No sync-rule change.
+- **Tests:** 49 in three files (`auditRows.test.ts` 15, `auditTrackers.test.ts` 21,
+  `useAuditTrackers.test.tsx` 13). The ordering tests were checked by mutation: without the `wt.id`
+  tie-break, or with the date ascending, they fail.
