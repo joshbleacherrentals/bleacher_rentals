@@ -37,12 +37,42 @@ function todayDate(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+/**
+ * Sends the person to Stripe Checkout. Inside the invoice page's frame (`embedded`) Stripe's page
+ * cannot be shown, so it opens in a new tab with no link back to the opener; `false` means the
+ * browser blocked that tab. Anywhere else the page is replaced, as it always was.
+ * docs/specs/accountant-collections-16-customer-page-view.md §3.
+ */
+export function startCheckout({
+  embedded,
+  url,
+  open,
+  assign,
+}: {
+  embedded: boolean;
+  url: string;
+  open: (url: string, target: string) => { opener: unknown } | null;
+  assign: (url: string) => void;
+}): boolean {
+  if (!embedded) {
+    assign(url);
+    return true;
+  }
+  const tab = open(url, "_blank");
+  if (!tab) return false;
+  tab.opener = null;
+  return true;
+}
+
 export function PayInvoiceTab({
   data,
   track,
+  embedded = false,
 }: {
   data: QuoteDocumentData;
   track: (e: TrackEvent) => void;
+  /** Shown inside the invoice page's frame: Stripe opens in a new tab. */
+  embedded?: boolean;
 }) {
   const { currency, language } = data;
   const s = quoteText(language);
@@ -151,7 +181,15 @@ export function PayInvoiceTab({
           field_name: "payment",
           next_value: formatMoney(payAmountCents),
         });
-        window.location.href = json.url;
+        const started = startCheckout({
+          embedded,
+          url: json.url,
+          open: (url, target) => window.open(url, target),
+          assign: (url) => {
+            window.location.href = url;
+          },
+        });
+        if (!started) setPayError(s.payError);
       } else {
         setPayError(json.error ?? s.payError);
       }

@@ -60,6 +60,27 @@ describe("searchEvents — invoice number", () => {
   it("still searches by name", () => {
     expect(ids(searchEvents(events, "summer"))).toEqual(["b"]);
   });
+
+  describe("a short number, which is printed with nine digits", () => {
+    const withShort = [
+      makeEvent({ id: "short", event_name: "Autumn Show", invoice_number: 42 }),
+      makeEvent({ id: "other", event_name: "Winter Gala", invoice_number: 77 }),
+    ];
+
+    it("is found by the number as printed, with its zeros", () => {
+      expect(ids(searchEvents(withShort, "000000042"))).toEqual(["short"]);
+      expect(ids(searchEvents(withShort, "#000000042"))).toEqual(["short"]);
+    });
+
+    it("is found by the number typed without zeros", () => {
+      expect(ids(searchEvents(withShort, "42"))).toEqual(["short"]);
+    });
+
+    it("is not found by a number it does not contain", () => {
+      expect(ids(searchEvents(withShort, "000000077"))).toEqual(["other"]);
+      expect(ids(searchEvents(withShort, "000000043"))).toEqual([]);
+    });
+  });
 });
 
 describe("searchEvents — amounts", () => {

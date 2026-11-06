@@ -7,7 +7,6 @@ import { loadEventForModal } from "@/features/eventConfiguration/functions/loadE
 import { loadMaintenanceEventById } from "../../db/client/loadMaintenanceEventById";
 import { loadSubrentalEventById } from "../../db/client/loadSubrentalEventById";
 import { supabaseClientRegistry } from "../../util/supabaseClientRegistry";
-import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
 import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useDashboardBleachersStore } from "../../state/useDashboardBleachersStore";
 
@@ -245,11 +244,6 @@ export class EventBody extends Sprite {
       );
     } else {
       await loadEventForModal(bleacherEvent.eventUuid, "dashboard");
-      const es = useCurrentEventStore.getState();
-      es.setField(
-        "subrentalConstraint",
-        resolveSubrentalConstraint(es.bleacherUuids, es.eventStart, es.eventEnd),
-      );
     }
   }
 }

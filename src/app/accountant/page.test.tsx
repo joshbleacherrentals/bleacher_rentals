@@ -71,6 +71,10 @@ vi.mock("@/features/quotesAndBookings/components/FilterPanel", () => ({
     return null;
   },
 }));
+// The Collections tab has its own tests; here only whether the page draws it.
+vi.mock("@/features/accountantCollections/components/CollectionsTab", () => ({
+  CollectionsTab: () => <div data-testid="collections-tab" />,
+}));
 vi.mock("@/features/quotesAndBookings/hooks/useUserNames", () => ({
   useUserNames: () => new Map([["am-1", "Dana Whitfield"]]),
 }));
@@ -155,7 +159,7 @@ beforeEach(() => {
   signInAs("admin");
   mockAttention.mockReturnValue({ data: [attentionRow], isLoading: false, error: undefined });
   mockArData.mockReturnValue({
-    data: { ar: [arRow], ar_deposits: [] },
+    data: { ar: [], ar_deposits: [arRow] },
     isLoading: false,
     error: undefined,
   });
@@ -172,8 +176,8 @@ describe("/accountant", () => {
     expect(html).not.toContain("Create Quote");
   });
 
-  it("has the Show Deleted switch", () => {
-    expect(renderAt("")).toContain("Show Deleted");
+  it("has the Show Deleted switch on the AR Deposits tab", () => {
+    expect(renderAt("tab=ar_deposits")).toContain("Show Deleted");
   });
 
   it("carries no scorecard banner, even from a scorecard link", () => {
@@ -182,34 +186,46 @@ describe("/accountant", () => {
 });
 
 describe("/accountant tabs", () => {
-  it("offers AR, AR Deposits and Need attention, in that order, and nothing else", () => {
+  it("offers Collections, AR Deposits and Need attention, in that order, and nothing else", () => {
     const html = renderAt("");
     expect(html.match(/role="tab"/g)).toHaveLength(3);
-    expect(html).toContain(">AR<");
+    expect(html).toContain(">Collections<");
     expect(html).toContain(">AR Deposits<");
     expect(html).toContain(">Need attention<");
-    expect(html.indexOf(">AR<")).toBeLessThan(html.indexOf(">AR Deposits<"));
+    expect(html.indexOf(">Collections<")).toBeLessThan(html.indexOf(">AR Deposits<"));
     expect(html.indexOf(">AR Deposits<")).toBeLessThan(html.indexOf(">Need attention<"));
     expect(html).not.toContain(">All Events<");
   });
 
-  it("puts an info icon on every tab", () => {
+  it("has no AR tab: the Collections tab replaced it", () => {
     const html = renderAt("");
-    expect(html).toContain('aria-label="About the AR tab"');
+    expect(html).not.toContain(">AR<");
+    expect(html).not.toContain('aria-label="About the AR tab"');
+  });
+
+  it("puts an info icon on the AR Deposits and Need attention tabs", () => {
+    const html = renderAt("");
     expect(html).toContain('aria-label="About the AR Deposits tab"');
     expect(html).toContain('aria-label="About the Need attention tab"');
   });
 
-  it("keeps the info icon inside the Need attention tab, where the AR tabs have theirs", () => {
+  it("keeps the info icon inside the Need attention tab, where AR Deposits has its own", () => {
     const html = renderAt("");
     expect(html).toMatch(
       /<button[^>]*role="tab"[^>]*>Need attention<[^]*?aria-label="About the Need attention tab"[^]*?<\/button>/,
     );
   });
 
-  it("opens AR when ?tab is missing, unknown, or the old All Events", () => {
-    for (const query of ["", "tab=bogus", "tab=all"]) {
-      expect(renderAt(query)).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
+  it("opens Collections from an old ?tab=ar bookmark: the AR tab is gone", () => {
+    const html = renderAt("tab=ar");
+    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Collections</);
+    expect(html).toContain('data-testid="collections-tab"');
+  });
+
+  it("opens Collections from ?tab=collections, and from a missing, unknown or old ?tab", () => {
+    // docs/specs/accountant-collections-07-collections-list.md §6.
+    for (const query of ["tab=collections", "", "tab=bogus", "tab=all"]) {
+      expect(renderAt(query)).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Collections</);
     }
   });
 
@@ -227,9 +243,53 @@ describe("/accountant tabs", () => {
   });
 });
 
+// docs/specs/accountant-collections-09-design.md §1, §3 and §5 (S1).
+describe("/accountant Collections tab", () => {
+  it("draws the Collections body and none of the AR bodies", () => {
+    const html = renderAt("tab=collections");
+    expect(html).toContain('data-testid="collections-tab"');
+    expect(html).not.toContain("Event Name (1)");
+    expect(html).not.toContain("No invoice needs attention");
+  });
+
+  it("opens on Collections for a bare /accountant", () => {
+    expect(renderAt("")).toContain('data-testid="collections-tab"');
+  });
+
+  it("hides the filter sidebar, the Filter button, the search box, Show Deleted and the chips", () => {
+    const html = renderAt("tab=collections&q=acme&am=am-1&showDeleted=1");
+    expect(mockFilterPanel).not.toHaveBeenCalled();
+    expect(html).not.toContain("Search by name, invoice #");
+    expect(html).not.toContain("Show Deleted");
+    expect(html).not.toContain("Clear all filters");
+    expect(html).not.toContain("Filter");
+  });
+
+  it("keeps the filter controls on the AR Deposits and Need attention tabs", () => {
+    for (const query of ["tab=ar_deposits", "tab=need_attention"]) {
+      mockFilterPanel.mockClear();
+      const html = renderAt(query);
+      expect(mockFilterPanel, query).toHaveBeenCalled();
+      expect(html, query).toContain("Search by name, invoice #");
+      expect(html, query).toContain("Show Deleted");
+    }
+  });
+
+  it("does not draw the Collections body on the other tabs", () => {
+    for (const query of ["tab=ar_deposits", "tab=need_attention"]) {
+      expect(renderAt(query), query).not.toContain('data-testid="collections-tab"');
+    }
+  });
+
+  it("leaves the number on Need attention, whichever tab is open", () => {
+    signInAs("accountant");
+    expect(renderAt("tab=collections")).toContain("accountant-tab-count-need-attention");
+  });
+});
+
 describe("/accountant receivables", () => {
   it("shows the AR columns and no Subtotal or Tax", () => {
-    const html = renderAt("tab=ar");
+    const html = renderAt("tab=ar_deposits");
     expect(mockArData).toHaveBeenCalledWith([listEvent], expect.any(Function));
     for (const header of ["Event Name (1)", "Account Manager", "Start Date", "Invoice #"]) {
       expect(html).toContain(header);
@@ -237,19 +297,19 @@ describe("/accountant receivables", () => {
     expect(html).toContain("Amount Due ($1,000)");
     expect(html).toContain("Remaining Balance ($2,000)");
     expect(html).not.toContain("Subtotal");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
     expect(html).toContain("Dana Whitfield");
   });
 
   it("puts an info icon on Amount Due and Remaining Balance, and both still sort", () => {
-    const html = renderAt("tab=ar");
+    const html = renderAt("tab=ar_deposits");
     expect(html).toContain('aria-label="About Amount Due"');
     expect(html).toContain('aria-label="About Remaining Balance"');
     expect(html).toMatch(/<button[^>]*>[^<]*Amount Due \(\$1,000\)/);
     expect(html).toMatch(/<button[^>]*>[^<]*Remaining Balance \(\$2,000\)/);
   });
 
-  it("works out both tabs from one set of queries, on whichever tab opens", () => {
+  it("works out the balances from one set of queries, on whichever tab opens", () => {
     renderAt("tab=ar_deposits");
     expect(mockArData).toHaveBeenCalledTimes(1);
     mockArData.mockClear();
@@ -257,14 +317,14 @@ describe("/accountant receivables", () => {
     expect(mockArData).toHaveBeenCalledTimes(1);
   });
 
-  it("searches AR balances", () => {
-    expect(renderAt("q=1%2C000")).toContain("Fall Classic");
-    expect(renderAt("q=2000.00")).toContain("Fall Classic");
-    expect(renderAt("q=9%2C999")).not.toContain("Fall Classic");
+  it("searches AR Deposits balances", () => {
+    expect(renderAt("tab=ar_deposits&q=1%2C000")).toContain("Fall Classic");
+    expect(renderAt("tab=ar_deposits&q=2000.00")).toContain("Fall Classic");
+    expect(renderAt("tab=ar_deposits&q=9%2C999")).not.toContain("Fall Classic");
   });
 
-  it("uses the search placeholder the AR tabs have always had", () => {
-    expect(renderAt("")).toContain(
+  it("uses the search placeholder the receivables tabs have always had", () => {
+    expect(renderAt("tab=ar_deposits")).toContain(
       "Search by name, invoice #, manager, date, amount due, remaining balance, contact, company...",
     );
   });
@@ -284,7 +344,7 @@ describe("/accountant Need attention", () => {
       expect(html).toContain(header);
     }
     expect(html).toContain("Fall Classic");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
     expect(html).toContain("Dana Whitfield");
     expect(html).toContain("Dates do not match, Totals do not match");
     expect(html).not.toContain("Amount Due");
@@ -316,13 +376,11 @@ describe("/accountant Need attention", () => {
     expect(mockListData.mock.calls.at(-1)![1]).toBe(true);
   });
 
-  it("leaves the AR tabs as they were: no Reason column there", () => {
-    for (const query of ["tab=ar", "tab=ar_deposits"]) {
-      const html = renderAt(query);
-      expect(html).not.toContain("Reason");
-      expect(html).not.toContain("Dates do not match");
-    }
-    expect(renderAt("tab=ar")).toContain("Amount Due ($1,000)");
+  it("leaves AR Deposits as it was: no Reason column there", () => {
+    const html = renderAt("tab=ar_deposits");
+    expect(html).not.toContain("Reason");
+    expect(html).not.toContain("Dates do not match");
+    expect(html).toContain("Amount Due ($1,000)");
   });
 
   it("still works out the receivables from one set of queries on this tab", () => {
@@ -333,8 +391,6 @@ describe("/accountant Need attention", () => {
 
 describe("/accountant status filter", () => {
   it("does not offer Status on any tab", () => {
-    renderAt("tab=ar");
-    expect(lastFilterPanelProps().showStatus).toBe(false);
     renderAt("tab=ar_deposits");
     expect(lastFilterPanelProps().showStatus).toBe(false);
     renderAt("tab=need_attention");
@@ -342,7 +398,7 @@ describe("/accountant status filter", () => {
   });
 
   it("ignores a status in the URL", () => {
-    renderAt("tab=ar&statuses=quoted");
+    renderAt("tab=ar_deposits&statuses=quoted");
     expect(lastListFilters().statuses).toEqual([]);
     renderAt("tab=all&statuses=quoted");
     expect(lastListFilters().statuses).toEqual([]);
@@ -357,7 +413,7 @@ describe("/accountant applied filters", () => {
   });
 
   it("lists each applied filter, including Deleted only from Show Deleted", () => {
-    const html = renderAt("q=acme&am=am-1&office=office-1&showDeleted=1");
+    const html = renderAt("tab=ar_deposits&q=acme&am=am-1&office=office-1&showDeleted=1");
     for (const label of [
       "Search: “acme”",
       "Account Manager: Dana Whitfield",
@@ -370,7 +426,7 @@ describe("/accountant applied filters", () => {
     expect(html).toContain("Clear all filters");
   });
 
-  it("builds the AR tabs from deleted events when Show Deleted is on", () => {
+  it("builds the receivables tabs from deleted events when Show Deleted is on", () => {
     renderAt("showDeleted=1");
     expect(mockListData.mock.calls.at(-1)![1]).toBe(true);
   });
@@ -409,9 +465,9 @@ describe("/accountant Need attention count", () => {
     expect(countOnNeedAttention(renderAt(""))).toBe(2);
   });
 
-  it("puts no number on the AR and AR Deposits labels, though their rows need attention", () => {
+  it("puts no number on the AR Deposits label, though its rows need attention", () => {
     mockArData.mockReturnValue({
-      data: { ar: [arRow], ar_deposits: [{ ...arRow, id: "evt-2" }] },
+      data: { ar: [], ar_deposits: [arRow, { ...arRow, id: "evt-2" }] },
       isLoading: false,
       error: undefined,
     });
@@ -438,11 +494,11 @@ describe("/accountant Need attention count", () => {
     );
   });
 
-  it("leaves the tab names and the opening tab as they were", () => {
-    const html = renderAt("");
+  it("leaves the tab names as they were", () => {
+    const html = renderAt("tab=ar_deposits");
 
     expect(html.match(/role="tab"/g)).toHaveLength(3);
-    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR</);
+    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR Deposits</);
     expect(renderAt("tab=need_attention")).toMatch(
       /role="tab"[^>]*aria-selected="true"[^>]*>Need attention</,
     );
@@ -474,9 +530,9 @@ describe("/accountant Need attention count", () => {
   });
 
   it("does not follow the search box: the number stays while the table narrows", () => {
-    const html = renderAt("q=zzz");
+    const html = renderAt("tab=ar_deposits&q=zzz");
 
-    expect(html).toContain("Nothing is due on past events");
+    expect(html).toContain("No deposits are due");
     expect(countOnNeedAttention(html)).toBe(1);
   });
 
@@ -490,7 +546,7 @@ describe("/accountant Need attention count", () => {
     expect(countOnNeedAttention(html)).toBe(1);
   });
 
-  it("asks for the AR balances once, whichever tab opens, and never for the counts", () => {
+  it("asks for the receivable balances once, whichever tab opens, and never for the counts", () => {
     renderAt("");
     expect(mockArData).toHaveBeenCalledTimes(1);
     mockArData.mockClear();
@@ -521,8 +577,8 @@ describe("/accountant row marks", () => {
     signInAs("accountant");
   });
 
-  it("marks the AR row of a quote that needs attention, with the short text of each reason", () => {
-    const html = renderAt("tab=ar");
+  it("marks the AR Deposits row of a quote that needs attention, with the short text of each reason", () => {
+    const html = renderAt("tab=ar_deposits");
 
     expect(html).toContain('data-testid="invoice-attention-mark"');
     expect(html).toContain('title="Dates do not match, Totals do not match"');
@@ -531,22 +587,10 @@ describe("/accountant row marks", () => {
     );
   });
 
-  it("marks the AR Deposits row too", () => {
-    mockArData.mockReturnValue({
-      data: { ar: [], ar_deposits: [arRow] },
-      isLoading: false,
-      error: undefined,
-    });
-
-    expect(renderAt("tab=ar_deposits")).toContain(
-      'title="Dates do not match, Totals do not match"',
-    );
-  });
-
   it("marks no row of a quote that does not need attention", () => {
     mockAlerts.mockReturnValue(alertsOf([["evt-other", ["dates"]]]));
 
-    expect(renderAt("tab=ar")).not.toContain("invoice-attention-mark");
+    expect(renderAt("tab=ar_deposits")).not.toContain("invoice-attention-mark");
   });
 
   it("does not mark the Need attention tab: it has the Reason column", () => {
@@ -559,15 +603,15 @@ describe("/accountant row marks", () => {
   it("marks nothing for an admin who is not an accountant", () => {
     signInAs("admin");
 
-    expect(renderAt("tab=ar")).not.toContain("invoice-attention-mark");
+    expect(renderAt("tab=ar_deposits")).not.toContain("invoice-attention-mark");
   });
 
-  it("leaves the AR rows and balances as they were", () => {
-    const html = renderAt("tab=ar");
+  it("leaves the AR Deposits rows and balances as they were", () => {
+    const html = renderAt("tab=ar_deposits");
 
     expect(html).toContain("Amount Due ($1,000)");
     expect(html).toContain("Remaining Balance ($2,000)");
-    expect(html).toContain("#1042");
+    expect(html).toContain("#000001042");
     expect(html).toContain("Dana Whitfield");
   });
 });

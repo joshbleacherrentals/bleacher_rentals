@@ -2,6 +2,9 @@
 
 Status: **Implemented 2026-10-22.** 0 open decisions; one reading to confirm
 (§1, last paragraph).
+**Amended by [02a](qbo-invoice-02a-customer-matching.md) (implemented 2026-11-03):** the search also
+matches Display name and Company name, the company can match, and a refused duplicate name offers
+the customer that holds it. §1 and §4 below say what they said when this spec was implemented.
 Implementation order: **02** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Builds on: spec 01 is not required; this spec is independent of it.

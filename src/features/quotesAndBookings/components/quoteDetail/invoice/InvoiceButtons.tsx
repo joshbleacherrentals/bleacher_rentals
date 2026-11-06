@@ -124,6 +124,7 @@ export function InvoiceDialogs({
       return (
         <CustomerChoiceDialog
           candidates={dialog.candidates}
+          reason={dialog.reason}
           onChoose={(choice) => flow.chooseCustomer(dialog, choice)}
           onCancel={flow.cancel}
         />

@@ -7,6 +7,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { QuotesBookingsEvent } from "../types";
 import { useNeedAttentionData } from "../hooks/useNeedAttentionData";
 import { INVOICE_REASON_TEXT } from "../utils/invoiceAttention";
+import { formatInvoiceNumber } from "../utils/invoiceNumber";
 import { needAttentionRows, type NeedAttentionEvent } from "../utils/needAttentionRows";
 import { searchEvents } from "../utils/searchEvents";
 import { sortEvents, type EventSort, type SortKey } from "../utils/sortEvents";
@@ -109,7 +110,9 @@ function NeedAttentionTable({
       header: "Invoice #",
       sortKey: "invoice_number",
       render: (event) => (
-        <CellSecondary>{event.invoice_number ? `#${event.invoice_number}` : "—"}</CellSecondary>
+        <CellSecondary>
+          {event.invoice_number ? `#${formatInvoiceNumber(event.invoice_number)}` : "—"}
+        </CellSecondary>
       ),
     },
     {

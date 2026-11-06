@@ -119,6 +119,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"ArEventTasks": {
+                  Row: {
+                    "completed": boolean,"created_at": string,"due_date": string,"event_uuid": string,"id": string,"note": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "completed"?: boolean,"created_at"?: string,"due_date": string,"event_uuid": string,"id"?: string,"note": string
+                  }
+                  Update: {
+                    "completed"?: boolean,"created_at"?: string,"due_date"?: string,"event_uuid"?: string,"id"?: string,"note"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ar_event_tasks_event_fkey"
+      columns: ["event_uuid"]
+isOneToOne: false
+      referencedRelation: "Events"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"BleacherAnnualInspections": {
                   Row: {
                     "bleacher_uuid": string,"created_at": string,"created_by": string | null,"document_path": string | null,"id": string,"inspected_on": string | null,"next_due_on": string,"notes": string | null
@@ -2568,6 +2588,31 @@ isOneToOne: false
 "addresses_match":
 { Args: { "a_id": string,"b_id": string }; Returns: boolean
                            },
+"ar_event_amount_due":
+{ Args: { "p_event": string,"p_today": string }; Returns: number
+                           },
+"ar_event_balances":
+{ Args: { "p_event": string,"p_today": string }; Returns: {
+              "amount_due_cents": number,"received_cents": number,"remaining_cents": number,"total_cents": number
+            }[]
+                           },
+"ar_event_total_cents":
+{ Args: { "p_event": string }; Returns: number
+                           },
+"ar_is_canadian_province":
+{ Args: { "p_value": string }; Returns: boolean
+                           },
+"ar_office_currency":
+{ Args: { "p_office": string }; Returns: string
+                           },
+"ar_sync_all_event_tasks":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "completed": number,"created": number
+            }[]
+                           },
+"ar_sync_event_tasks":
+{ Args: { "p_event": string,"p_today": string }; Returns: string
+                           },
 "bleacher_change_reason_label":
 { Args: { "code": string }; Returns: string
                            },
@@ -2585,9 +2630,6 @@ isOneToOne: false
                            },
 "format_history_address":
 { Args: { "address_uuid": string }; Returns: string
-                           },
-"generate_invoice_number":
-{ Args: Record<PropertyKey, never>; Returns: number
                            },
 "get_current_account_manager_id":
 { Args: Record<PropertyKey, never>; Returns: string

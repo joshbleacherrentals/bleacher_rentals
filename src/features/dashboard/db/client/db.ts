@@ -2,13 +2,8 @@ import { toast } from "sonner";
 import React from "react";
 import { createErrorToast, ErrorToast } from "@/components/toasts/ErrorToast";
 import { createSuccessToast, SuccessToast } from "@/components/toasts/SuccessToast";
-import {
-  AddressData,
-  CurrentEventStore,
-} from "../../../eventConfiguration/state/useCurrentEventStore";
-import { normalizeLostFields } from "@/features/quotesAndBookings/utils/lostReason";
+import { AddressData } from "../../../eventConfiguration/state/useCurrentEventStore";
 import { useMemo } from "react";
-import { UserResource } from "@clerk/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Enums } from "../../../../../database.types";
 import {
@@ -19,7 +14,7 @@ import {
   SetupTeardownBlock,
 } from "../../types";
 import { Database, Tables, TablesInsert } from "../../../../../database.types";
-import { calculateNumDays, checkEventFormRules } from "../../functions";
+import { calculateNumDays } from "../../functions";
 import { useDashboardEventsStore } from "../../state/useDashboardEventsStore";
 import {
   buildTripDeletedNotification,
@@ -281,7 +276,6 @@ export async function moveWorkTracker(params: {
     previous_bleacher_uuid: params.previousBleacherUuid,
   });
   trace.mark("alert triage");
-
 
   trace.end({ workTrackerUuid: params.workTrackerUuid });
 }
@@ -561,108 +555,4 @@ export async function deleteBlock(
       }),
     { duration: 10000 },
   );
-}
-
-export async function createEvent(
-  state: CurrentEventStore,
-  supabase: SupabaseClient<Database>,
-  user: UserResource | null,
-): Promise<string> {
-  if (!supabase) {
-    console.warn("No Supabase Client found");
-    throw new Error("No Supabase Client found");
-  }
-
-  if (!checkEventFormRules(state, user)) {
-    throw new Error("Event form validation failed");
-  }
-
-  // 1. Insert Address
-  const address_uuid = crypto.randomUUID();
-  await typedExecute(
-    db
-      .insertInto("Addresses")
-      .values({
-        id: address_uuid,
-        city: state.addressData?.city ?? "",
-        state_province: state.addressData?.state ?? "",
-        street: state.addressData?.address ?? "",
-        zip_postal: state.addressData?.postalCode ?? "",
-      })
-      .compile(),
-  );
-
-  // 2. Insert Event
-  const event_uuid = crypto.randomUUID();
-  await typedExecute(
-    db
-      .insertInto("Events")
-      .values({
-        id: event_uuid,
-        event_name: state.eventName,
-        event_start: state.eventStart,
-        event_end: state.eventEnd,
-        setup_start: state.sameDaySetup ? null : state.setupStart,
-        teardown_end: state.sameDayTeardown ? null : state.teardownEnd,
-        lenient: state.lenient ? 1 : 0,
-        total_seats: state.seats,
-        seven_row: state.sevenRow,
-        ten_row: state.tenRow,
-        fifteen_row: state.fifteenRow,
-        address_uuid,
-        event_status: state.selectedStatus,
-        ...normalizeLostFields({ ...state, status: state.selectedStatus }),
-        contract_revenue_cents: state.contractRevenueCents,
-        notes: state.notes,
-        hsl_hue: state.hslHue,
-        must_be_clean: state.mustBeClean ? 1 : 0,
-        goodshuffle_url: state.goodshuffleUrl ?? null,
-        created_by_user_uuid: state.ownerUserUuid ?? null,
-        deleted: 0,
-        booked_at: state.bookedAt ? new Date(state.bookedAt).toISOString() : null,
-        ...(state.createdAt ? { created_at: new Date(state.createdAt).toISOString() } : {}),
-      })
-      .compile(),
-  );
-
-  // 3. Insert BleacherEvents
-  for (const bleacher_uuid of state.bleacherUuids) {
-    await typedExecute(
-      db
-        .insertInto("BleacherEvents")
-        .values({
-          id: crypto.randomUUID(),
-          event_uuid,
-          bleacher_uuid,
-        })
-        .compile(),
-    );
-  }
-
-  createSuccessToast(["Event Created"]);
-  return event_uuid;
-}
-
-export async function deleteEvent(
-  eventUuid: string | null,
-  stateProv: string,
-  supabase: SupabaseClient<Database>,
-  user: UserResource | null,
-): Promise<void> {
-  if (!supabase) {
-    console.warn("No Supabase Client found");
-    throw new Error("No Supabase Client found");
-  }
-
-  if (!eventUuid) {
-    console.error("No eventUuid provided for deletion");
-    throw new Error("No event selected to delete.");
-  }
-
-  // Soft delete — mark as deleted instead of removing rows
-  await typedExecute(
-    db.updateTable("Events").set({ deleted: 1 }).where("id", "=", eventUuid).compile(),
-  );
-
-  createSuccessToast(["Event Deleted"]);
 }

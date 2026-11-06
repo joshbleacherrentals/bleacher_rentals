@@ -107,19 +107,11 @@ test.describe("Create invoice route (admin)", () => {
     expect(error).toContain("quoted");
   });
 
-  test("S3: a booked quote with no invoice number is refused with the issue's message", async ({
-    page,
-  }) => {
-    const eventId = await createEvent({ event_status: "booked", invoice_number: null });
-    try {
-      const res = await page.request.post(INVOICE_ROUTE, { data: { eventId } });
-
-      expect(res.status()).toBe(400);
-      expect((await res.json()).error).toContain("no invoice number");
-    } finally {
-      await cleanupQuote(eventId);
-    }
-  });
+  // S3 (a booked quote with no invoice number is refused with the issue's message) is gone: since
+  // the database gives every new event its number (docs/specs/invoice-number-01-assign-in-database.md)
+  // a row inserted with a null number is numbered by the trigger, and a stored number cannot be
+  // cleared, so no row without a number can be made here. The refusal stays in
+  // validateInvoiceSource and is covered by its unit tests.
 
   test("S6: a quote that already has an invoice is refused with 409", async ({ page }) => {
     const eventId = await createEvent({

@@ -7,9 +7,18 @@ type ToggleProps = {
   checked: boolean;
   onChange: (value: boolean) => void;
   inline?: boolean;
+  /** Shown as it is but cannot be switched. */
+  disabled?: boolean;
 };
 
-export const Toggle = ({ label, tooltip, checked, onChange, inline = false }: ToggleProps) => {
+export const Toggle = ({
+  label,
+  tooltip,
+  checked,
+  onChange,
+  inline = false,
+  disabled = false,
+}: ToggleProps) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const LabelWithTooltip = (
     <div className={`flex items-center ${inline ? "gap-1" : "mb-2"}`}>
@@ -50,12 +59,15 @@ export const Toggle = ({ label, tooltip, checked, onChange, inline = false }: To
   return (
     <div className={inline ? "flex flex-row items-center gap-2" : "flex flex-col"}>
       {LabelWithTooltip}
-      <label className="relative inline-flex items-center cursor-pointer">
+      <label
+        className={`relative inline-flex items-center ${disabled ? "cursor-default opacity-60" : "cursor-pointer"}`}
+      >
         <input
           type="checkbox"
           className="sr-only peer"
           onChange={(e) => onChange(e.target.checked)}
           checked={checked}
+          disabled={disabled}
         />
         <div className="w-11 h-6 bg-black/20 peer-focus:outline-none peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-darkBlue"></div>
       </label>

@@ -156,8 +156,10 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     // also reaches /team/new and /team/{id}/edit/..., which guard themselves by edit access (the
     // list is every user, a profile opens for a driver only, and the database is the lock).
     // docs/specs/qbo-invoice-12a-quote-types-page.md: /qbo-quote-types, the one Configuration page
-    // they open (the URL does not start with /quote: admin and account manager have that prefix).
-    // Plus the two pages every role may read. Not /all-work-trackers or /work-tracker-types. With no
+    // they open. docs/specs/accountant-collections-16-customer-page-view.md: /quote, the customer's
+    // page, which they open by its address and with Show Customer View on a quote (admin and account
+    // manager have it too). Plus the two pages every role may read. Not /all-work-trackers or
+    // /work-tracker-types. With no
     // /dashboard, defaultRedirect falls through
     // to the first path here, so /accountant must stay first. This must not be empty:
     // useAccessRedirect would bounce a user with no allowed path forever (the driver's [] is safe
@@ -171,6 +173,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/contacts",
       "/team",
       "/qbo-quote-types",
+      "/quote",
       "/permissions",
       "/blocked-emails",
       "/changelog",

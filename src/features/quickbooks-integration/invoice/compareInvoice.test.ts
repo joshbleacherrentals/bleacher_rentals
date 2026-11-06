@@ -43,7 +43,7 @@ const snapshot = (over: Partial<QboInvoiceSnapshot> = {}): QboInvoiceSnapshot =>
   dueDate: "2026-10-15",
   customerId: "cust-1",
   billToLine1: "Pat Lee",
-  ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631" },
+  ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631", other: [] },
   memo: "SC - CLEMSON - RALLY",
   lines: [
     {
@@ -104,13 +104,15 @@ describe("compareInvoice — an invoice that is the quote's", () => {
     const actual = snapshot({
       memo: "  SC - CLEMSON - RALLY ",
       billToLine1: "Pat Lee  ",
-      ship: { street: "1 Main St ", city: "Clemson", state: "SC", zip: "29631" },
+      ship: { street: "1 Main St ", city: "Clemson", state: "SC", zip: "29631", other: [] },
     });
     expect(compare(actual).matches).toBe(true);
 
     const body = expected();
     body.ShipAddr.City = "";
-    const noCity = snapshot({ ship: { street: "1 Main St", city: "", state: "SC", zip: "29631" } });
+    const noCity = snapshot({
+      ship: { street: "1 Main St", city: "", state: "SC", zip: "29631", other: [] },
+    });
     expect(compare(noCity, body).matches).toBe(true);
   });
 
@@ -164,22 +166,30 @@ describe("compareInvoice — each reason on its own", () => {
     ],
     [
       "address (the street)",
-      snapshot({ ship: { street: "2 Main St", city: "Clemson", state: "SC", zip: "29631" } }),
+      snapshot({
+        ship: { street: "2 Main St", city: "Clemson", state: "SC", zip: "29631", other: [] },
+      }),
       [{ reason: "address", field: "Street", quote: "1 Main St", qbo: "2 Main St" }],
     ],
     [
       "address (the city)",
-      snapshot({ ship: { street: "1 Main St", city: "Easley", state: "SC", zip: "29631" } }),
+      snapshot({
+        ship: { street: "1 Main St", city: "Easley", state: "SC", zip: "29631", other: [] },
+      }),
       [{ reason: "address", field: "City", quote: "Clemson", qbo: "Easley" }],
     ],
     [
       "address (the state)",
-      snapshot({ ship: { street: "1 Main St", city: "Clemson", state: "NC", zip: "29631" } }),
+      snapshot({
+        ship: { street: "1 Main St", city: "Clemson", state: "NC", zip: "29631", other: [] },
+      }),
       [{ reason: "address", field: "State", quote: "SC", qbo: "NC" }],
     ],
     [
       "address (the zip)",
-      snapshot({ ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29632" } }),
+      snapshot({
+        ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29632", other: [] },
+      }),
       [{ reason: "address", field: "ZIP code", quote: "29631", qbo: "29632" }],
     ],
     [
@@ -352,7 +362,7 @@ describe("compareInvoice — several reasons", () => {
         dueDate: "2026-10-20",
         txnDate: "2026-11-05",
         docNumber: "1",
-        ship: { street: "2 Main St", city: "Easley", state: "SC", zip: "29631" },
+        ship: { street: "2 Main St", city: "Easley", state: "SC", zip: "29631", other: [] },
       }),
     );
 
@@ -372,5 +382,141 @@ describe("compareInvoice — several reasons", () => {
     const result = compare(snapshot({ memo: "other", totalCents: 802501, taxCents: 52501 }));
 
     expect(result.reasons).toEqual(["memo", "totals"]);
+  });
+});
+
+// An accountant opens the invoice in QuickBooks and presses Save without editing anything. QuickBooks
+// keeps the street in Line1 and moves the city, province and postal code into free-text lines; the
+// separate City / State / ZIP fields come back empty. The address is read as text from every part.
+describe("compareInvoice — an invoice QuickBooks saved in its own screen", () => {
+  /** The builder's body for a Canadian venue, the province as the quote stores it: the full name. */
+  const canadianBody = (): QboInvoiceBody => {
+    const body = expected();
+    body.ShipAddr = {
+      Line1: "145 Pacific Avenue",
+      City: "Winnipeg",
+      CountrySubDivisionCode: "Manitoba",
+      PostalCode: "R3B 2Z6",
+    };
+    return body;
+  };
+
+  /** The address as QuickBooks holds it after a Save: the street, then the rest as text. */
+  const saved = (...other: string[]) =>
+    snapshot({
+      ship: { street: "145 Pacific Avenue", city: "", state: "", zip: "", other },
+    });
+
+  it.each([
+    ["the province as a code", ["Winnipeg MB R3B 2Z6"]],
+    ["the province as a name", ["Winnipeg, Manitoba R3B 2Z6"]],
+    ["the postal code without its space", ["Winnipeg, MB R3B2Z6"]],
+    ["the country on its own line", ["Winnipeg MB R3B 2Z6", "Canada"]],
+    ["the city and the rest on separate lines", ["Winnipeg", "MB R3B 2Z6"]],
+  ])("matches when the rest of the address is text: %s", (_label, other) => {
+    expect(compare(saved(...other), canadianBody())).toEqual({
+      matches: true,
+      reasons: [],
+      differences: [],
+    });
+  });
+
+  it("matches a US address whose state QuickBooks writes as a code while the quote has the name", () => {
+    const body = expected();
+    body.ShipAddr.CountrySubDivisionCode = "South Carolina";
+    const actual = snapshot({
+      ship: { street: "1 Main St", city: "", state: "", zip: "", other: ["Clemson SC 29631"] },
+    });
+
+    expect(compare(actual, body).matches).toBe(true);
+  });
+
+  it("matches a US address whose state QuickBooks writes as a name while the quote has the code", () => {
+    const actual = snapshot({
+      ship: {
+        street: "1 Main St",
+        city: "",
+        state: "",
+        zip: "",
+        other: ["Clemson, South Carolina 29631-1234"],
+      },
+    });
+
+    expect(compare(actual).matches).toBe(true);
+  });
+
+  it("matches when the street line also carries a unit", () => {
+    const actual = snapshot({
+      ship: { street: "1 Main St, Suite 5", city: "Clemson", state: "SC", zip: "29631", other: [] },
+    });
+
+    expect(compare(actual).matches).toBe(true);
+  });
+
+  it("a city that is not in the text is a difference, shown with the address QuickBooks holds", () => {
+    const result = compare(saved("Brandon MB R3B 2Z6"), canadianBody());
+
+    expect(result.reasons).toEqual(["address"]);
+    expect(result.differences).toEqual([
+      {
+        reason: "address",
+        field: "City",
+        quote: "Winnipeg",
+        qbo: "145 Pacific Avenue, Brandon MB R3B 2Z6",
+      },
+    ]);
+  });
+
+  it("a province that is not in the text is a difference", () => {
+    const result = compare(saved("Winnipeg ON R3B 2Z6"), canadianBody());
+
+    expect(result.differences.map((d) => d.field)).toEqual(["State"]);
+  });
+
+  it("a postal code that is not in the text is a difference", () => {
+    const result = compare(saved("Winnipeg MB R3B 2Z7"), canadianBody());
+
+    expect(result.differences.map((d) => d.field)).toEqual(["ZIP code"]);
+  });
+
+  it("a street that is not in the text is a difference", () => {
+    const actual = snapshot({
+      ship: {
+        street: "146 Pacific Avenue",
+        city: "",
+        state: "",
+        zip: "",
+        other: ["Winnipeg MB R3B 2Z6"],
+      },
+    });
+
+    expect(compare(actual, canadianBody()).differences.map((d) => d.field)).toEqual(["Street"]);
+  });
+
+  it("an address with nothing in it differs in every part, each shown as empty", () => {
+    const empty = snapshot({
+      ship: { street: "", city: "", state: "", zip: "", other: [] },
+    });
+
+    expect(compare(empty, canadianBody()).differences).toEqual([
+      { reason: "address", field: "Street", quote: "145 Pacific Avenue", qbo: "" },
+      { reason: "address", field: "City", quote: "Winnipeg", qbo: "" },
+      { reason: "address", field: "State", quote: "Manitoba", qbo: "" },
+      { reason: "address", field: "ZIP code", quote: "R3B 2Z6", qbo: "" },
+    ]);
+  });
+
+  it("a part the quote has no value for is not looked for", () => {
+    const body = canadianBody();
+    body.ShipAddr.City = "";
+    body.ShipAddr.PostalCode = "";
+
+    expect(compare(saved("MB"), body).matches).toBe(true);
+  });
+
+  it("the other parts of the invoice are still compared", () => {
+    const result = compare({ ...saved("Winnipeg MB R3B 2Z6"), memo: "other" }, canadianBody());
+
+    expect(result.reasons).toEqual(["memo"]);
   });
 });

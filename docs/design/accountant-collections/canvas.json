@@ -1,0 +1,127 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "CollectionsNotDue.dc.html": {
+      "expand": "fill",
+      "h": 1220,
+      "is_interactive": true,
+      "title": "Collections: Show Not Due Yet on",
+      "w": 1280,
+      "x": 1360,
+      "y": 0
+    },
+    "Contacts.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Contact card variants",
+      "w": 1280,
+      "x": 2720,
+      "y": 2440
+    },
+    "Invoice.dc.html": {
+      "expand": "fill",
+      "h": 2400,
+      "is_interactive": true,
+      "title": "Invoice: Information",
+      "w": 1280,
+      "x": 0,
+      "y": 1340
+    },
+    "InvoiceMessages.dc.html": {
+      "expand": "fill",
+      "h": 980,
+      "is_interactive": true,
+      "title": "Invoice: Messages",
+      "w": 1280,
+      "x": 1360,
+      "y": 1340
+    },
+    "InvoiceNewTask.dc.html": {
+      "expand": "fill",
+      "h": 980,
+      "is_interactive": true,
+      "title": "New Task window (does not block the page)",
+      "w": 1280,
+      "x": 2720,
+      "y": 1340
+    },
+    "InvoiceNewTaskPicker.dc.html": {
+      "expand": "fill",
+      "h": 980,
+      "is_interactive": true,
+      "title": "New Task window: date picker open",
+      "w": 1280,
+      "x": 1360,
+      "y": 2440
+    },
+    "InvoiceCustomerQuote.dc.html": {
+      "expand": "fill",
+      "h": 1400,
+      "is_interactive": true,
+      "title": "Customer page: Approved Quote",
+      "w": 1280,
+      "x": 0,
+      "y": 3860
+    },
+    "InvoiceCustomerContract.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Customer page: Signed Contract",
+      "w": 1280,
+      "x": 1360,
+      "y": 3860
+    },
+    "InvoiceCustomerPay.dc.html": {
+      "expand": "fill",
+      "h": 1300,
+      "is_interactive": true,
+      "title": "Customer page: Pay Invoice",
+      "w": 1280,
+      "x": 2720,
+      "y": 3860
+    },
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 800,
+      "is_interactive": true,
+      "title": "Collections tab",
+      "w": 1280,
+      "x": 0,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-27T21:30:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "t1": {
+      "kind": "title1",
+      "maxW": 2640,
+      "text": "Accountant: Collections and Invoice",
+      "w": 240,
+      "x": 0,
+      "y": -280
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "CollectionsNotDue.dc.html",
+    "Invoice.dc.html",
+    "InvoiceMessages.dc.html",
+    "InvoiceNewTask.dc.html",
+    "InvoiceNewTaskPicker.dc.html",
+    "Contacts.dc.html",
+    "InvoiceCustomerQuote.dc.html",
+    "InvoiceCustomerContract.dc.html",
+    "InvoiceCustomerPay.dc.html"
+  ],
+  "pages": [],
+  "title": "Accountant Collections"
+}

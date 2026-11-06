@@ -96,6 +96,11 @@ describe("ContractTab: the Signed banner", () => {
     expect(render(quote())).not.toContain("Signed:");
   });
 
+  it("shows the number with nine digits", () => {
+    expect(render(quote({ invoiceNumber: 1042 }))).toContain("000001042");
+    expect(render(quote({ invoiceNumber: 483920174 }))).toContain("483920174");
+  });
+
   it("calls a booked event an invoice, whatever the signature, and any other a quote", () => {
     mocks.signature = null;
     expect(render(quote({ eventStatus: "booked" }))).toContain("Invoice #:");

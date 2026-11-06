@@ -14,7 +14,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(27);
+SELECT plan(28);
 
 -- ── Shape ───────────────────────────────────────────────────────────────────
 
@@ -220,11 +220,18 @@ SELECT is(
   'an accountant can read the changelog, which every signed-in user can'
 );
 
--- Handing out the role stays an administrator's job.
+-- Handing out the role stays an administrator's job. An accountant reads their own row (migration
+-- 20261030120000: the API routes decide a user's roles by reading it under RLS) and nobody else's.
 SELECT is(
-  (SELECT count(*)::int FROM public."Accountants"),
+  (SELECT count(*)::int FROM public."Accountants" WHERE user_uuid = :'user_acct'),
+  1,
+  'an accountant can read their own row of Accountants'
+);
+
+SELECT is(
+  (SELECT count(*)::int FROM public."Accountants" WHERE user_uuid <> :'user_acct'),
   0,
-  'an accountant cannot read the list of who holds the role'
+  'an accountant cannot read the list of who else holds the role'
 );
 
 SELECT throws_ok(
