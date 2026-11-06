@@ -19,6 +19,9 @@ const { calls, state, createClient } = vi.hoisted(() => {
     customerArgs: [] as unknown[],
     zoneClass: { classId: "class-1" } as unknown,
     zoneClassArgs: [] as unknown[],
+    placement: "line" as string,
+    placementError: null as Error | null,
+    placementArgs: [] as unknown[],
     taxCode: "tax-ON" as string | null,
     taxCodeArgs: [] as unknown[],
     noTaxCode: "tax-none" as string | null,
@@ -136,6 +139,15 @@ vi.mock("./resolveZoneClass", () => ({
   }),
 }));
 
+vi.mock("./readClassPlacement", () => ({
+  readClassPlacement: vi.fn(async (...args: unknown[]) => {
+    calls.push("class-placement");
+    state.placementArgs = args;
+    if (state.placementError) throw state.placementError;
+    return state.placement;
+  }),
+}));
+
 vi.mock("./resolveProvinceTaxCode", () => ({
   resolveProvinceTaxCode: vi.fn(async (...args: unknown[]) => {
     calls.push("tax-code");
@@ -247,6 +259,9 @@ beforeEach(() => {
     customerArgs: [],
     zoneClass: { classId: "class-1" },
     zoneClassArgs: [],
+    placement: "line",
+    placementError: null,
+    placementArgs: [],
     taxCode: "tax-ON",
     taxCodeArgs: [],
     noTaxCode: "tax-none",
@@ -317,6 +332,7 @@ describe("createInvoice — the order of §4", () => {
       "item",
       "qbo:find-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "qbo:create-invoice",
       "read-is-qbo",
@@ -333,11 +349,12 @@ describe("createInvoice — the order of §4", () => {
 
     await run();
 
-    expect(calls.slice(0, 8)).toEqual([
+    expect(calls.slice(0, 9)).toEqual([
       "load",
       "item",
       "qbo:find-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "tax-code",
       "no-tax-code",
@@ -828,6 +845,126 @@ describe("createInvoice — the QuickBooks invoice", () => {
   });
 });
 
+// docs/specs/qbo-invoice-03f-canadian-class-on-header.md §4 and §7: step 8 asks QuickBooks where the
+// company wants the Class, after the customer is settled and before the zone is looked up.
+describe("createInvoice — the Class by the company's setting (spec 03f)", () => {
+  const sent = () => state.posts[0].body;
+
+  it("reads the setting once, in the quote's connection, after the customer and before the zone", async () => {
+    await run();
+
+    expect(calls.filter((c) => c === "class-placement")).toHaveLength(1);
+    expect(state.placementArgs).toEqual(["conn-1"]);
+    expect(calls.indexOf("customer")).toBeLessThan(calls.indexOf("class-placement"));
+    expect(calls.indexOf("class-placement")).toBeLessThan(calls.indexOf("zone-class"));
+    expect(calls.indexOf("class-placement")).toBeLessThan(calls.indexOf("qbo:create-invoice"));
+  });
+
+  it("does not read it when the accountant still has to choose a customer", async () => {
+    state.customer = { kind: "choose", candidates: [], reason: "multiple" };
+
+    await run();
+
+    expect(calls).not.toContain("class-placement");
+  });
+
+  it("hands what it read to the check, which then reads nothing itself", async () => {
+    state.placement = "header";
+
+    await run();
+
+    expect(state.checkArgs[2]).toEqual({ classPlacement: "header" });
+    expect(calls.filter((c) => c === "class-placement")).toHaveLength(1);
+  });
+
+  it("line: the Class is on the line and the invoice has none of its own", async () => {
+    state.placement = "line";
+
+    await run();
+
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toEqual({ value: "class-1" });
+    expect(sent().ClassRef).toBeUndefined();
+  });
+
+  it("header: the Class is the invoice's own and the line carries none", async () => {
+    state.placement = "header";
+
+    const result = await run();
+
+    expect(sent().ClassRef).toEqual({ value: "class-1" });
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toBeUndefined();
+    expect(result).toMatchObject({ status: "created", warnings: [] });
+  });
+
+  it("header with a zone that has no Class: no Class anywhere, and the class_missing warning", async () => {
+    state.placement = "header";
+    state.zoneClass = {
+      classId: null,
+      warning: { code: "class_missing", state: "SC", reason: "no_class" },
+    };
+
+    const result = await run();
+
+    expect(sent().ClassRef).toBeUndefined();
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toBeUndefined();
+    expect(result).toMatchObject({
+      warnings: [{ code: "class_missing", state: "SC", reason: "no_class" }],
+    });
+  });
+
+  it("none: no zone lookup, no Class anywhere, the class_not_tracked warning and no class_missing", async () => {
+    state.placement = "none";
+    // Were the zone looked up, it would give this: it must not be asked, nor its warning passed on.
+    state.zoneClass = {
+      classId: null,
+      warning: { code: "class_missing", state: "SC", reason: "no_zone" },
+    };
+
+    const result = await run();
+
+    expect(calls).not.toContain("zone-class");
+    expect(sent().ClassRef).toBeUndefined();
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toBeUndefined();
+    expect(result).toMatchObject({ status: "created", warnings: [{ code: "class_not_tracked" }] });
+    expect(
+      (result as { warnings: Array<{ code: string }> }).warnings.map((w) => w.code),
+    ).not.toContain("class_missing");
+    expect(state.checkArgs[2]).toEqual({ classPlacement: "none" });
+  });
+
+  it("a failed read ends in 502 with its message, before anything is written", async () => {
+    state.placementError = new Error("QuickBooks preferences read failed: no scope");
+
+    const result = await run();
+
+    expect(result).toEqual({
+      status: "error",
+      httpStatus: 502,
+      error: "QuickBooks preferences read failed: no scope",
+    });
+    expect(calls).toEqual(["load", "item", "qbo:find-invoice", "customer", "class-placement"]);
+    expectNothingWritten();
+  });
+
+  it("a lost token in the read is passed on with 502", async () => {
+    state.placementError = new Error(
+      "QuickBooks connection needs to be re-authenticated (invalid_grant).",
+    );
+
+    expect(await run()).toMatchObject({ status: "error", httpStatus: 502 });
+  });
+
+  it("a Canadian quote on a company that tracks per line still puts the Class on the line", async () => {
+    state.source = canadian();
+    state.placement = "line";
+
+    await run();
+
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toEqual({ value: "class-1" });
+    expect(sent().ClassRef).toBeUndefined();
+  });
+});
+
 describe("createInvoice — QuickBooks refuses the invoice", () => {
   it("answers 502 with the interpreted fault and writes nothing to Events", async () => {
     state.createResponse = json(
@@ -854,6 +991,7 @@ describe("createInvoice — QuickBooks refuses the invoice", () => {
       "item",
       "qbo:find-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "qbo:create-invoice",
     ]);
@@ -1099,6 +1237,8 @@ describe("createInvoice — the invoice check (spec 06)", () => {
         amountCents: 750000,
         taxCents: 52500,
       }),
+      // The setting just read is handed over, so the check does not read it again (spec 03f).
+      { classPlacement: "line" },
     ]);
   });
 
@@ -1248,6 +1388,7 @@ describe("createInvoiceFromSource — case 3 of spec 05, creating again after 'n
     expect(calls).toEqual([
       "qbo:find-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "qbo:create-invoice",
       "read-is-qbo",

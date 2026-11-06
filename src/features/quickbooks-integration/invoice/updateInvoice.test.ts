@@ -16,6 +16,9 @@ const { calls, state, createClient } = vi.hoisted(() => {
     customerError: null as Error | null,
     customerArgs: [] as unknown[],
     zoneClass: { classId: "class-1" } as unknown,
+    placement: "line" as string,
+    placementError: null as Error | null,
+    placementArgs: [] as unknown[],
     taxCode: "tax-ON" as string | null,
     taxCodeArgs: [] as unknown[],
     noTaxCode: "tax-none" as string | null,
@@ -138,6 +141,15 @@ vi.mock("../customers", async (importOriginal) => ({
     state.customerArgs = args;
     if (state.customerError) throw state.customerError;
     return state.customer;
+  }),
+}));
+
+vi.mock("./readClassPlacement", () => ({
+  readClassPlacement: vi.fn(async (...args: unknown[]) => {
+    calls.push("class-placement");
+    state.placementArgs = args;
+    if (state.placementError) throw state.placementError;
+    return state.placement;
   }),
 }));
 
@@ -297,6 +309,9 @@ beforeEach(() => {
     customerError: null,
     customerArgs: [],
     zoneClass: { classId: "class-1" },
+    placement: "line",
+    placementError: null,
+    placementArgs: [],
     taxCode: "tax-ON",
     taxCodeArgs: [],
     noTaxCode: "tax-none",
@@ -408,6 +423,7 @@ describe("updateInvoice — case 1, the order of §4", () => {
       "item",
       "qbo:read-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "qbo:update-invoice",
       "log:updated",
@@ -421,11 +437,12 @@ describe("updateInvoice — case 1, the order of §4", () => {
 
     await run();
 
-    expect(calls.slice(0, 8)).toEqual([
+    expect(calls.slice(0, 9)).toEqual([
       "load",
       "item",
       "qbo:read-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "tax-code",
       "no-tax-code",
@@ -654,6 +671,117 @@ describe("updateInvoice — warnings", () => {
       { code: "class_missing", state: "ON", reason: "no_class" },
       { code: "tax_code_missing", province: "ON" },
     ]);
+  });
+});
+
+// docs/specs/qbo-invoice-03f-canadian-class-on-header.md §4 and §7: step 7 asks QuickBooks where the
+// company wants the Class, after the customer is settled and before the zone is looked up; update
+// and overwrite share it.
+describe("updateInvoice — the Class by the company's setting (spec 03f)", () => {
+  const sent = () => state.posts[0].body;
+
+  it("reads the setting once, in the quote's connection, after the customer and before the zone", async () => {
+    await run();
+
+    expect(calls.filter((c) => c === "class-placement")).toHaveLength(1);
+    expect(state.placementArgs).toEqual(["conn-1"]);
+    expect(calls.indexOf("customer")).toBeLessThan(calls.indexOf("class-placement"));
+    expect(calls.indexOf("class-placement")).toBeLessThan(calls.indexOf("zone-class"));
+    expect(calls.indexOf("class-placement")).toBeLessThan(calls.indexOf("qbo:update-invoice"));
+  });
+
+  it("does not read it when the accountant still has to choose a customer", async () => {
+    state.customer = { kind: "choose", candidates: [], reason: "multiple" };
+
+    await run();
+
+    expect(calls).not.toContain("class-placement");
+  });
+
+  it("hands what it read to the check, which then reads nothing itself", async () => {
+    state.placement = "header";
+
+    await run();
+
+    expect(state.checkArgs[2]).toEqual({ classPlacement: "header" });
+    expect(calls.filter((c) => c === "class-placement")).toHaveLength(1);
+  });
+
+  it("line: the sparse update puts the Class on the line and none on the invoice", async () => {
+    state.placement = "line";
+
+    await run();
+
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toEqual({ value: "class-1" });
+    expect(sent().ClassRef).toBeUndefined();
+  });
+
+  it("header: the sparse update carries the invoice's own Class, and the line none", async () => {
+    state.placement = "header";
+
+    const result = await run();
+
+    expect(sent().ClassRef).toEqual({ value: "class-1" });
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toBeUndefined();
+    expect(sent()).toMatchObject({ Id: "inv-1", SyncToken: "7", sparse: true });
+    expect(result).toMatchObject({ status: "updated", warnings: [] });
+  });
+
+  it("none: no zone lookup, no Class anywhere, the class_not_tracked warning and no class_missing", async () => {
+    state.placement = "none";
+    state.zoneClass = {
+      classId: null,
+      warning: { code: "class_missing", state: "SC", reason: "no_zone" },
+    };
+
+    const result = await run();
+
+    expect(calls).not.toContain("zone-class");
+    expect(sent().ClassRef).toBeUndefined();
+    expect(sent().Line[0].SalesItemLineDetail.ClassRef).toBeUndefined();
+    expect(result).toMatchObject({ status: "updated", warnings: [{ code: "class_not_tracked" }] });
+    expect(state.checkArgs[2]).toEqual({ classPlacement: "none" });
+  });
+
+  it("a failed read ends in 502 with its message, before QuickBooks is asked to update", async () => {
+    state.placementError = new Error("QuickBooks preferences read failed: no scope");
+
+    const result = await run();
+
+    expect(result).toEqual({
+      status: "error",
+      httpStatus: 502,
+      error: "QuickBooks preferences read failed: no scope",
+    });
+    expect(calls).toEqual(["load", "item", "qbo:read-invoice", "customer", "class-placement"]);
+    expectNothingWritten();
+  });
+
+  describe("overwriting an invoice found by number shares it", () => {
+    beforeEach(() => {
+      state.source = unlinked();
+    });
+
+    it("header: the overwrite carries the invoice's own Class, and the line none", async () => {
+      state.placement = "header";
+
+      await overwrite();
+
+      expect(state.placementArgs).toEqual(["conn-1"]);
+      expect(sent().ClassRef).toEqual({ value: "class-1" });
+      expect(sent().Line[0].SalesItemLineDetail.ClassRef).toBeUndefined();
+      expect(state.checkArgs[2]).toEqual({ classPlacement: "header" });
+    });
+
+    it("a failed read ends in 502 before the update, and nothing is linked", async () => {
+      state.placementError = new Error("QuickBooks preferences read failed: boom");
+
+      const result = await overwrite();
+
+      expect(result).toMatchObject({ status: "error", httpStatus: 502 });
+      expect(calls).toEqual(["load", "item", "qbo:read-invoice", "customer", "class-placement"]);
+      expectNothingWritten();
+    });
   });
 });
 
@@ -978,6 +1106,7 @@ describe("updateInvoice — QuickBooks refuses the update", () => {
       "item",
       "qbo:read-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "qbo:update-invoice",
     ]);
@@ -1045,6 +1174,7 @@ describe("updateInvoice — case 3, creating again after 'not found'", () => {
       "qbo:read-invoice",
       "qbo:find-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "qbo:create-invoice",
       "read-is-qbo",
@@ -1159,6 +1289,8 @@ describe("updateInvoice — the invoice check (spec 06)", () => {
         amountCents: 750000,
         taxCents: 52500,
       }),
+      // The setting just read is handed over, so the check does not read it again (spec 03f).
+      { classPlacement: "line" },
     ]);
   });
 
@@ -1330,6 +1462,7 @@ describe("overwriteInvoice — case 2, overwriting the invoice found by number",
       "item",
       "qbo:read-invoice",
       "customer",
+      "class-placement",
       "zone-class",
       "qbo:update-invoice",
       "read-is-qbo",

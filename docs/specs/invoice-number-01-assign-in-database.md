@@ -1,5 +1,7 @@
 # Invoice number — the database assigns it when the event is created
 
+> **Amended 2026-11-06 by [03 — start at 300000001](invoice-number-03-start-at-300000001.md):** the counter now runs from 300000001 to 999999999, and the numbers this spec gave (1, 2, 3, …) were moved up by 300000000. Where this text says the counter starts at 1, 03 wins.
+
 Status: **Implemented 2026-11-04 (approved in chat), not committed, not deployed.** 0 open
 decisions; six readings to confirm (§1, last paragraph); one change made while implementing
 (§2, §3 step 2, R1: the backfill switches the user triggers off). Pair: [02 — nine-digit format](invoice-number-02-nine-digit-format.md); the two are

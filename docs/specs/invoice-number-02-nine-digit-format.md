@@ -1,5 +1,7 @@
 # Invoice number — shown and sent with nine digits
 
+> **See also 2026-11-06 [03 — start at 300000001](invoice-number-03-start-at-300000001.md):** new numbers are now 300000001 and up, which already have nine digits, so the padding adds nothing to them; the helper stays for the events 03 leaves with a small number. Examples below with `000000042` describe the old range.
+
 Status: **Implemented 2026-11-04 (approved in chat); amended the same day: QuickBooks gets the
 plain number, no zeros (§1a).** 0 open decisions; three
 readings to confirm (§1, last paragraph). Pair: [01 — the database assigns it](invoice-number-01-assign-in-database.md); the two

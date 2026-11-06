@@ -18,6 +18,9 @@ const { state, calls, createClient } = vi.hoisted(() => {
     customerArgs: [] as unknown[],
     zoneClass: { classId: "class-1" } as unknown,
     zoneArgs: [] as unknown[],
+    placement: "line" as string,
+    placementError: null as Error | null,
+    placementArgs: [] as unknown[],
     provinceCode: null as string | null,
     noTaxCode: null as string | null,
     updates: [] as Array<{ table: string; values: Record<string, unknown>; filters: unknown[] }>,
@@ -84,6 +87,15 @@ vi.mock("./resolveZoneClass", () => ({
   }),
 }));
 
+vi.mock("./readClassPlacement", () => ({
+  readClassPlacement: vi.fn(async (...args: unknown[]) => {
+    calls.push("class-placement");
+    state.placementArgs = args;
+    if (state.placementError) throw state.placementError;
+    return state.placement;
+  }),
+}));
+
 vi.mock("./resolveProvinceTaxCode", () => ({
   resolveProvinceTaxCode: vi.fn(async () => {
     calls.push("province-code");
@@ -144,6 +156,7 @@ const snapshot = (over: Partial<QboInvoiceSnapshot> = {}): QboInvoiceSnapshot =>
   billToLine1: "Pat Lee",
   ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631", other: [] },
   memo: "SC - CLEMSON - RALLY",
+  headerClassId: null,
   lines: [
     {
       amountCents: 750000,
@@ -183,6 +196,9 @@ beforeEach(() => {
     customerArgs: [],
     zoneClass: { classId: "class-1" },
     zoneArgs: [],
+    placement: "line",
+    placementError: null,
+    placementArgs: [],
     provinceCode: null,
     noTaxCode: null,
     updates: [],
@@ -201,7 +217,15 @@ describe("runInvoiceCheck — the order, and where it looks", () => {
   it("looks the Item up, reads the invoice, then looks the other references up, all in order", async () => {
     await runInvoiceCheck(EVENT_ID, sourceOf());
 
-    expect(calls).toEqual(["item", "read-invoice", "customer-link", "zone-class", "write"]);
+    // The setting is read in the same try as the Item and the invoice, when it is not handed over.
+    expect(calls).toEqual([
+      "item",
+      "read-invoice",
+      "class-placement",
+      "customer-link",
+      "zone-class",
+      "write",
+    ]);
   });
 
   it("does everything in the connection of the quote's sales office", async () => {
@@ -254,6 +278,98 @@ describe("runInvoiceCheck — the order, and where it looks", () => {
     );
 
     expect(calls).toEqual([]);
+  });
+});
+
+// docs/specs/qbo-invoice-03f-canadian-class-on-header.md §4 and §7: the Class is checked where the
+// company's own setting puts it. A placement handed over by create or update is used as it is; with
+// none handed over (Save, Check again) the check reads the setting itself, in the office's connection.
+describe("runInvoiceCheck — the Class by the company's setting", () => {
+  /** An invoice whose Class is the invoice's own (the header), the line carrying none. */
+  const onHeader = (headerClassId: string | null = "class-1") =>
+    version({ headerClassId, lines: [{ ...snapshot().lines[0], classId: null }] });
+
+  it("reads the setting once, in the connection of the quote's sales office, when none is handed over", async () => {
+    await runInvoiceCheck(EVENT_ID, sourceOf());
+
+    expect(calls.filter((c) => c === "class-placement")).toHaveLength(1);
+    expect(state.placementArgs).toEqual(["conn-office"]);
+  });
+
+  it("a placement handed over is used, and the setting is not read", async () => {
+    state.invoice = onHeader();
+
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf(), { classPlacement: "header" });
+
+    expect(calls).not.toContain("class-placement");
+    expect(result).toMatchObject({ status: "checked", matches: true });
+  });
+
+  it("header: an invoice with the Class on its own field matches", async () => {
+    state.placement = "header";
+    state.invoice = onHeader();
+
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf());
+
+    expect(result).toEqual({ status: "checked", matches: true, reasons: [], differences: [] });
+  });
+
+  it("header: the same Class on the line only is reason class", async () => {
+    state.placement = "header";
+
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf());
+
+    expect(result).toMatchObject({ matches: false, reasons: ["class"] });
+    expect((result as { differences: unknown[] }).differences).toEqual([
+      { reason: "class", field: "Class", quote: "class-1", qbo: "none" },
+    ]);
+  });
+
+  it("header: the Class QuickBooks holds none of is reason class, as the user saw it", async () => {
+    state.placement = "header";
+    state.zoneClass = { classId: "1000000001" };
+    state.invoice = onHeader(null);
+
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf());
+
+    expect((result as { differences: unknown[] }).differences).toEqual([
+      { reason: "class", field: "Class", quote: "1000000001", qbo: "none" },
+    ]);
+  });
+
+  it("line: the Class on the line matches, as before", async () => {
+    state.placement = "line";
+
+    expect(await runInvoiceCheck(EVENT_ID, sourceOf())).toMatchObject({ matches: true });
+  });
+
+  it("none: the zone is not looked up and no class difference is reported, whatever QuickBooks holds", async () => {
+    state.placement = "none";
+
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf());
+
+    expect(calls).not.toContain("zone-class");
+    expect(result).toMatchObject({ status: "checked", matches: true });
+  });
+
+  it("none handed over: the same, and nothing is read", async () => {
+    const result = await runInvoiceCheck(EVENT_ID, sourceOf(), { classPlacement: "none" });
+
+    expect(calls).not.toContain("class-placement");
+    expect(calls).not.toContain("zone-class");
+    expect(result).toMatchObject({ matches: true });
+  });
+
+  it("a failed read is a QboReadError with its message, and only the failure time is written", async () => {
+    state.placementError = new Error("QuickBooks preferences read failed: no scope");
+
+    const failure = await runInvoiceCheck(EVENT_ID, sourceOf()).catch((e) => e);
+
+    expect(failure).toBeInstanceOf(QboReadError);
+    expect(failure.message).toBe("QuickBooks preferences read failed: no scope");
+    expect(calls).not.toContain("customer-link");
+    expect(calls).not.toContain("zone-class");
+    expect(state.updates.map((u) => u.values)).toEqual([failureOnly]);
   });
 });
 

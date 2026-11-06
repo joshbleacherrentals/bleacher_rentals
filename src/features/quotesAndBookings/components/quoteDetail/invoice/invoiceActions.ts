@@ -75,6 +75,8 @@ export function warningMessage(warning: InvoiceWarning): string {
       return "The invoice could not be checked against the quote.";
     case "class_missing":
       return `No QuickBooks Class was found for ${warning.state}. The invoice was made without one; set the Class in QuickBooks.`;
+    case "class_not_tracked":
+      return "This QuickBooks company does not track Classes. The invoice was made without one.";
     case "tax_code_missing":
       return `No QuickBooks tax code is mapped for ${warning.province}. The invoice was made without tax; map the code on the QuickBooks page, then press Update invoice.`;
   }
