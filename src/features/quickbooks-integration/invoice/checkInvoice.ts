@@ -9,7 +9,8 @@ import {
 } from "./buildInvoicePayload";
 import { compareInvoice } from "./compareInvoice";
 import { findQboItem } from "./findQboItem";
-import type { InvoiceCheck, InvoiceSource } from "./invoiceTypes";
+import type { ClassPlacement, InvoiceCheck, InvoiceSource } from "./invoiceTypes";
+import { readClassPlacement } from "./readClassPlacement";
 import { readQboInvoice } from "./qboInvoiceApi";
 import { resolveNoTaxCode, resolveProvinceTaxCode } from "./resolveProvinceTaxCode";
 import { resolveZoneClass } from "./resolveZoneClass";
@@ -67,10 +68,14 @@ async function skip(eventId: string, message: string): Promise<InvoiceCheckResul
  * connection of the quote's sales office; every reference is looked up there too). Nothing is
  * created in QuickBooks and no customer is asked for or made. A QuickBooks failure throws a
  * QboReadError; a failure to save the answer is an ordinary Error.
+ * Where the Class is checked follows the company's own Class setting (spec 03f). Create and update
+ * hand over the placement they have just read; a check started by Save or Check again reads it
+ * itself, in the same try as the Item and the invoice.
  */
 export async function runInvoiceCheck(
   eventId: string,
   source: InvoiceSource,
+  options: { classPlacement?: ClassPlacement } = {},
 ): Promise<InvoiceCheckResult> {
   const { qboInvoiceId } = source;
   if (!qboInvoiceId) throw new Error("This quote has no QuickBooks invoice to check.");
@@ -84,9 +89,11 @@ export async function runInvoiceCheck(
 
   let item;
   let invoice;
+  let classPlacement: ClassPlacement;
   try {
     item = await findQboItem(connectionId, qboServiceId);
     invoice = await readQboInvoice(connectionId, qboInvoiceId);
+    classPlacement = options.classPlacement ?? (await readClassPlacement(connectionId));
   } catch (e) {
     await recordFailure(eventId);
     throw new QboReadError(messageOf(e));
@@ -101,7 +108,9 @@ export async function runInvoiceCheck(
   }
 
   const customerId = await readLinkedCustomerId(connectionId, billedContact.id);
-  const zoneClass = await resolveZoneClass(connectionId, source.venue.state);
+  // A company that tracks no Classes has none to look up (spec 03f).
+  const zoneClass =
+    classPlacement === "none" ? null : await resolveZoneClass(connectionId, source.venue.state);
   const canadianTaxCodeId =
     source.canadianProvince && source.taxCents > 0
       ? await resolveProvinceTaxCode(connectionId, source.canadianProvince)
@@ -117,7 +126,8 @@ export async function runInvoiceCheck(
     item,
     // "" when the contact has no stored link: the comparison then reports the customer.
     customerId: customerId ?? "",
-    classId: zoneClass.classId,
+    classId: zoneClass?.classId ?? null,
+    classPlacement,
     canadianTaxCodeId,
     noTaxCodeId,
   });
@@ -126,6 +136,7 @@ export async function runInvoiceCheck(
     // The quote's total is the amount after discounts plus the tax (spec 03).
     quote: { totalCents: source.amountCents + source.taxCents, taxCents: source.taxCents },
     actual: invoice.snapshot,
+    classPlacement,
   });
 
   const { error } = await getSupabaseAdmin()

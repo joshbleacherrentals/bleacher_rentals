@@ -178,6 +178,13 @@ describe("warningMessage", () => {
     );
   });
 
+  // docs/specs/qbo-invoice-03f-canadian-class-on-header.md §4
+  it("class_not_tracked", () => {
+    expect(warningMessage({ code: "class_not_tracked" })).toBe(
+      "This QuickBooks company does not track Classes. The invoice was made without one.",
+    );
+  });
+
   it("tax_code_missing", () => {
     expect(warningMessage({ code: "tax_code_missing", province: "ON" })).toBe(
       "No QuickBooks tax code is mapped for ON. The invoice was made without tax; map the code on the QuickBooks page, then press Update invoice.",

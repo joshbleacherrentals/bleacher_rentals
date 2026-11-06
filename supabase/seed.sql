@@ -90711,9 +90711,10 @@ WHERE quote_sent_at IS NULL
 -- (docs/specs/invoice-number-01-assign-in-database.md §3).
 -- Most of the events above are inserted while the triggers are off, so the trigger that gives a new
 -- event its number never saw them. This is the numbering of the production migration
--- (20261103120000, step 2): the lowest free numbers from 1 upward, in the order the events were
--- created, then the counter continues after them. The triggers are off again, as at the top of the
--- file: it is a data fix and must not resync collections tasks or recompute hashes.
+-- (20261103120000, step 2), in the counter's range since docs/specs/invoice-number-03-start-at-300000001.md
+-- (migration 20261106120000): the lowest free numbers from 300000001 upward, in the order the events
+-- were created, then the counter continues after them. The triggers are off again, as at the top of
+-- the file: it is a data fix and must not resync collections tasks or recompute hashes.
 SET session_replication_role = replica;
 
 WITH todo AS (
@@ -90723,7 +90724,7 @@ WITH todo AS (
 ),
 free AS (
   SELECT g AS num, row_number() OVER (ORDER BY g) AS rn
-  FROM generate_series(1, (SELECT count(*) FROM public."Events")) AS g
+  FROM generate_series(300000001, 300000000 + (SELECT count(*) FROM public."Events")) AS g
   WHERE NOT EXISTS (SELECT 1 FROM public."Events" e WHERE e.invoice_number = g)
 ),
 given AS (

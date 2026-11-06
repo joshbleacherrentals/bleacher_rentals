@@ -37,6 +37,7 @@ const refs = (over: Partial<InvoiceRefs> = {}): InvoiceRefs => ({
   item: { id: "77", name: "Bleacher Rental - Corporate", description: "Temporary seating" },
   customerId: "900",
   classId: null,
+  classPlacement: "line",
   canadianTaxCodeId: null,
   noTaxCodeId: null,
   ...over,
@@ -136,6 +137,99 @@ describe("buildInvoicePayload", () => {
       value: "5",
     });
     expect("ClassRef" in line().SalesItemLineDetail).toBe(false);
+  });
+
+  // docs/specs/qbo-invoice-03f-canadian-class-on-header.md §4: the Class goes where the company's own
+  // Class-tracking setting says: on the line, on the invoice itself (the header), or nowhere.
+  describe("the Class by the company's setting", () => {
+    it("line: the Class is on the line only, and the whole body is what it was before 03f", () => {
+      const { body } = buildInvoicePayload(
+        source(),
+        refs({ classId: "5", classPlacement: "line" }),
+      );
+
+      expect(body.Line[0].SalesItemLineDetail.ClassRef).toEqual({ value: "5" });
+      expect(body).not.toHaveProperty("ClassRef");
+      expect(body).toEqual({
+        DocNumber: "100200300",
+        TxnDate: "2026-11-14",
+        DueDate: "2026-11-01",
+        CustomerRef: { value: "900" },
+        BillAddr: { Line1: "Dabo Swinney" },
+        ShipAddr: {
+          Line1: "100 Tiger Blvd",
+          City: "Clemson",
+          CountrySubDivisionCode: "SC",
+          PostalCode: "29634",
+        },
+        PrivateNote: "SC - CLEMSON - RALLY",
+        GlobalTaxCalculation: "TaxExcluded",
+        Line: [
+          {
+            DetailType: "SalesItemLineDetail",
+            Amount: "7500.00",
+            Description: "Temporary seating",
+            SalesItemLineDetail: {
+              ItemRef: { value: "77", name: "Bleacher Rental - Corporate" },
+              Qty: 1,
+              UnitPrice: "7500.00",
+              TaxCodeRef: { value: "NON" },
+              ClassRef: { value: "5" },
+            },
+          },
+        ],
+      });
+    });
+
+    it("header: the Class is the invoice's own, and the line carries none", () => {
+      const { body } = buildInvoicePayload(
+        source(),
+        refs({ classId: "5", classPlacement: "header" }),
+      );
+
+      expect(body.ClassRef).toEqual({ value: "5" });
+      expect("ClassRef" in body.Line[0].SalesItemLineDetail).toBe(false);
+    });
+
+    it("none: the Class is written nowhere, even when one is given", () => {
+      const { body } = buildInvoicePayload(
+        source(),
+        refs({ classId: "5", classPlacement: "none" }),
+      );
+
+      expect(body).not.toHaveProperty("ClassRef");
+      expect("ClassRef" in body.Line[0].SalesItemLineDetail).toBe(false);
+    });
+
+    it.each(["line", "header", "none"] as const)(
+      "%s with no Class given: the Class is written nowhere",
+      (classPlacement) => {
+        const { body } = buildInvoicePayload(source(), refs({ classId: null, classPlacement }));
+
+        expect(body).not.toHaveProperty("ClassRef");
+        expect("ClassRef" in body.Line[0].SalesItemLineDetail).toBe(false);
+      },
+    );
+
+    it("the quote's own state or province plays no part: only the placement decides", () => {
+      const ontario = source({
+        venue: { street: "1 Yonge St", city: "Toronto", state: "ON", zip: "M5E 1E5" },
+        canadianProvince: "ON",
+        currency: "CAD",
+        taxCents: 97500,
+      });
+      const codes = { canadianTaxCodeId: "5", noTaxCodeId: "2", classId: "5" };
+
+      const onLine = buildInvoicePayload(ontario, refs({ ...codes, classPlacement: "line" })).body;
+      const onHeader = buildInvoicePayload(
+        source(),
+        refs({ ...codes, classPlacement: "header" }),
+      ).body;
+
+      expect(onLine.Line[0].SalesItemLineDetail.ClassRef).toEqual({ value: "5" });
+      expect(onLine).not.toHaveProperty("ClassRef");
+      expect(onHeader.ClassRef).toEqual({ value: "5" });
+    });
   });
 
   it("sends nothing to the client: no BillEmail, no email status", () => {

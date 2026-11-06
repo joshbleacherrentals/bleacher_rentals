@@ -1,7 +1,9 @@
 -- ============================================================================
 -- Tests for the invoice number counter and its triggers on Events
--- Migration: 20261103120000_events_invoice_number_sequence.sql
--- Spec:      docs/specs/invoice-number-01-assign-in-database.md (§3, §7)
+-- Migrations: 20261103120000_events_invoice_number_sequence.sql,
+--             20261106120000_events_invoice_number_range.sql
+-- Specs:      docs/specs/invoice-number-01-assign-in-database.md (§3, §7)
+--             docs/specs/invoice-number-03-start-at-300000001.md (§3, §7)
 -- ============================================================================
 --   psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
 --     -v ON_ERROR_STOP=1 -f supabase/tests/events_invoice_number.test.sql
@@ -12,6 +14,7 @@
 --
 -- What it pins down:
 --   * the counter and the two triggers exist; the random generator is gone;
+--   * the counter runs from 300000001 to 999999999 and stops there (spec 03);
 --   * an insert without a number gets the next one, and two inserts get consecutive numbers;
 --   * an insert that brings its own number keeps it, and the counter skips a number a hand-made
 --     row already holds (rule 3);
@@ -20,8 +23,9 @@
 --   * a stored number cannot be changed or cleared by an update, but a row whose number is null
 --     may be given one;
 --   * the unique index still refuses a duplicate inserted by hand.
--- The one-time backfill of the rows that had no number is checked by a dry run (the spec, §7),
--- not here: after the migration there is no row left for it to number.
+-- The one-time backfill of the rows that had no number (spec 01) and the one-time move of the small
+-- numbers up by 300000000 (spec 03) are checked by dry runs (the specs, §7), not here: after the
+-- migrations there is no row left for them to number.
 -- ============================================================================
 
 \set ON_ERROR_STOP on
@@ -29,7 +33,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(15);
+SELECT plan(18);
 
 -- The counter's state, to put back at the end.
 CREATE TEMP TABLE seq_before AS
@@ -52,6 +56,17 @@ SELECT is(
   (SELECT prosecdef FROM pg_proc WHERE oid = 'public.assign_invoice_number()'::regprocedure),
   true, 'the numbering function runs as its owner, so nextval works for every role');
 
+-- The range of the counter (spec 03).
+SELECT is(
+  (SELECT min_value FROM pg_sequences
+   WHERE schemaname = 'public' AND sequencename = 'events_invoice_number_seq'),
+  300000001::bigint, 'the counter starts at 300000001');
+
+SELECT is(
+  (SELECT max_value FROM pg_sequences
+   WHERE schemaname = 'public' AND sequencename = 'events_invoice_number_seq'),
+  999999999::bigint, 'the counter stops at 999999999');
+
 -- ═══ A NEW ROW ══════════════════════════════════════════════════════════════
 
 INSERT INTO public."Events" (event_name, event_start, event_end, lenient)
@@ -63,9 +78,9 @@ VALUES ('IN second', '2026-07-01', '2026-07-02', false)
 RETURNING id AS ev_b \gset
 
 SELECT ok(
-  (SELECT invoice_number IS NOT NULL AND invoice_number > 0
+  (SELECT invoice_number BETWEEN 300000001 AND 999999999
    FROM public."Events" WHERE id = :'ev_a'),
-  'a row inserted without a number gets one');
+  'a row inserted without a number gets one from 300000001 up');
 
 SELECT is(
   (SELECT invoice_number FROM public."Events" WHERE id = :'ev_b'),
@@ -83,10 +98,10 @@ SELECT is(
   987654321::bigint, 'a row that brings a number keeps it');
 
 -- The counter is moved next to a number a hand-made row holds.
-SELECT setval('public.events_invoice_number_seq', 5000);
+SELECT setval('public.events_invoice_number_seq', 300005000);
 
 INSERT INTO public."Events" (event_name, event_start, event_end, lenient, invoice_number)
-VALUES ('IN taken', '2026-07-01', '2026-07-02', false, 5001);
+VALUES ('IN taken', '2026-07-01', '2026-07-02', false, 300005001);
 
 INSERT INTO public."Events" (event_name, event_start, event_end, lenient)
 VALUES ('IN skipped', '2026-07-01', '2026-07-02', false)
@@ -94,7 +109,7 @@ RETURNING id AS ev_d \gset
 
 SELECT is(
   (SELECT invoice_number FROM public."Events" WHERE id = :'ev_d'),
-  5002::bigint, 'the counter skips a number that is already held and takes the next one');
+  300005002::bigint, 'the counter skips a number that is already held and takes the next one');
 
 -- ═══ A REPEATED UPLOAD OF AN EXISTING ROW ═══════════════════════════════════
 -- PowerSync sends a new row as an upsert, so the same id can arrive again.
@@ -148,6 +163,16 @@ SELECT throws_ok(
   format($f$INSERT INTO public."Events" (event_name, event_start, event_end, lenient, invoice_number)
             VALUES ('IN duplicate', '2026-07-01', '2026-07-02', false, %s)$f$, :n_a_before),
   '23505', NULL, 'the unique index still refuses a number held by another row');
+
+-- ═══ THE END OF THE RANGE ═══════════════════════════════════════════════════
+-- The counter does not wrap around: past 999999999 an insert fails (2200H) and leaves no row.
+
+SELECT setval('public.events_invoice_number_seq', 999999999);
+
+SELECT throws_ok(
+  $f$INSERT INTO public."Events" (event_name, event_start, event_end, lenient)
+     VALUES ('IN past the end', '2026-07-01', '2026-07-02', false)$f$,
+  '2200H', NULL, 'an insert fails once the counter has handed out 999999999');
 
 -- Put the counter back (a sequence is not rolled back with the rows).
 SELECT setval('public.events_invoice_number_seq',
