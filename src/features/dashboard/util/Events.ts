@@ -288,7 +288,7 @@ export class EventsUtil {
           eventStart: selected.eventStart,
           eventEnd: selected.eventEnd,
           hslHue: selected.hslHue ?? 220,
-          booked: (selected.selectedStatus ?? "quoted") === "booked",
+          booked: ["booked", "unsigned_changes"].includes(selected.selectedStatus ?? "quoted"),
           goodshuffleUrl: selected.goodshuffleUrl ?? null,
           isSelected: true,
         } as any; // BleacherEvent compatible
