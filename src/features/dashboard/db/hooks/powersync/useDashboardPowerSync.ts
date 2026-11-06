@@ -200,7 +200,7 @@ export function useDashboardPowerSync(opts?: {
             eventStart: ev.event_start ?? "",
             eventEnd: ev.event_end ?? "",
             hslHue: ev.hsl_hue,
-            booked: ev.event_status === "booked",
+            booked: ev.event_status === "booked" || ev.event_status === "unsigned_changes",
             goodshuffleUrl: ev.goodshuffle_url ?? null,
             address: addr?.street ?? "",
           };
