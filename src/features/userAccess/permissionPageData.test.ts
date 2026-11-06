@@ -36,6 +36,7 @@ describe("permission matrix", () => {
       expect(granted.sort()).toEqual([
         "Accounts Receivable",
         "Blocked Customer Emails",
+        "Collections",
         "Companies & Contacts",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
@@ -224,15 +225,18 @@ describe("permission matrix", () => {
         expect(row?.roles.viewer.note).toMatch(/Billing tab/);
       });
 
-      it("describes both tabs", () => {
-        expect(row?.description).toMatch(/AR tab/);
+      // The AR tab was taken off the page when Collections replaced it.
+      it("describes the AR Deposits tab and no longer an AR tab", () => {
         expect(row?.description).toMatch(/AR Deposits tab/);
+        expect(row?.description).not.toMatch(/\bAR tab/);
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(/its AR Deposits tab/);
+        expect(ROLE_DESCRIPTIONS.accountant).not.toMatch(/AR and AR Deposits/);
       });
 
       // docs/specs/qbo-invoice-10-need-attention-tab.md §5.
       it("describes the Need attention tab, which lists the quotes whose invoice no longer matches", () => {
         expect(row?.description).toContain(
-          "A third tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
+          "A second tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event.",
         );
       });
 
@@ -240,6 +244,103 @@ describe("permission matrix", () => {
         const payments = PERMISSIONS.find((p) => p.label === "Payment History");
         expect(payments?.description).not.toMatch(/AR Deposits/);
         expect(payments?.description).not.toMatch(/Quotes & Bookings/);
+      });
+    });
+
+    // docs/specs/accountant-collections-09-design.md §4: the Collections tab and the invoice page.
+    describe("Collections", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Collections");
+
+      it("sits in Day to Day Operations, right after Accounts Receivable", () => {
+        const index = PERMISSIONS.findIndex((p) => p.label === "Collections");
+        expect(PERMISSIONS[index - 1]?.label).toBe("Accounts Receivable");
+        expect(row?.category).toBe("Day to Day Operations");
+      });
+
+      it("is full for an admin and an accountant, and hidden from the other five roles", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "full",
+          accountant: "full",
+          account_manager: "none",
+          viewer: "none",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("answers for all seven roles, with a note for each", () => {
+        expect(Object.keys(row?.roles ?? {}).sort()).toEqual(Object.keys(ROLE_LABELS).sort());
+        for (const [role, access] of Object.entries(row?.roles ?? {})) {
+          expect(access.note, role).toBeTruthy();
+        }
+      });
+
+      it("describes the tab, the invoice page and the tasks", () => {
+        expect(row?.description).toMatch(/Collections tab of the Accountant page/);
+        expect(row?.description).toMatch(/Show Not Due Yet/);
+        expect(row?.description).toMatch(/invoice page/);
+        expect(row?.description).toMatch(/closes by itself when the payment arrives/);
+      });
+
+      // docs/specs/accountant-collections-12-tabs-and-messages.md §3.
+      it("says the invoice page has a Messages tab with the booking's internal chat", () => {
+        expect(row?.description).toContain(
+          "The page has a Messages tab with the booking's internal chat, the same as on the quote.",
+        );
+      });
+
+      // docs/specs/accountant-collections-13-task-history-and-files.md §3.
+      it("says Information shows the task history and the files, and who can change the files", () => {
+        expect(row?.description).toContain(
+          "Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand.",
+        );
+      });
+
+      // docs/specs/accountant-collections-16-customer-page-view.md §3.
+      it("says the invoice page can show the page the customer sees, and what signing and paying do there", () => {
+        expect(row?.description).toContain(
+          "A Customer view button shows the page the customer sees (Approved Quote, Signed Contract, Pay Invoice); signing there signs for the customer and Pay opens the online payment in a new tab.",
+        );
+      });
+
+      const CUSTOMER_PAGE_SENTENCE =
+        "Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.";
+
+      it("tells the accountant what they can do there", () => {
+        expect(accountant("Collections")?.note).toBe(
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE}`,
+        );
+      });
+
+      it("tells an admin the same", () => {
+        expect(row?.roles.admin.note).toBe(
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE}`,
+        );
+      });
+
+      it("does not give the other five roles the customer's page through this row", () => {
+        for (const role of [
+          "account_manager",
+          "viewer",
+          "developer",
+          "driver",
+          "maintainer",
+        ] as const) {
+          expect(row?.roles[role].note, role).not.toContain("customer's page");
+        }
+      });
+
+      it("is mentioned in the role description and in Accounts Receivable", () => {
+        expect(ROLE_DESCRIPTIONS.accountant).toMatch(
+          /Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks\./,
+        );
+        expect(PERMISSIONS.find((p) => p.label === "Accounts Receivable")?.description).toMatch(
+          /The Accountant page opens on the Collections tab\./,
+        );
       });
     });
 

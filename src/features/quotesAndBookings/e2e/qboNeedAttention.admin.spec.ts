@@ -41,7 +41,7 @@ test.describe("Need attention tab (admin who is not an accountant)", () => {
     await cleanupQuote(quote.eventId);
   });
 
-  test("S1: the page has the tab, still opens on AR, and ?tab=need_attention lists the quote", async ({
+  test("S1: the page has the tab, opens on Collections, and ?tab=need_attention lists the quote", async ({
     page,
   }) => {
     await updateEvent(quote.eventId, {
@@ -51,7 +51,7 @@ test.describe("Need attention tab (admin who is not an accountant)", () => {
     });
 
     await page.goto("/accountant");
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
+    await expect.poll(() => params(page).get("tab")).toBe("collections");
     await expect(page.getByRole("tab", { name: "Need attention" })).toBeVisible();
 
     await page.goto("/accountant?tab=need_attention");

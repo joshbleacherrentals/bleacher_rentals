@@ -1,3 +1,4 @@
+import { ABBREV_TO_NAME } from "@/app/zones/_components/mapData";
 import { readLeadSubmission } from "./leadSubmissionView";
 
 /**
@@ -25,10 +26,17 @@ const DISTRICT_OF_COLUMBIA = new Set([
   "district of columbia",
 ]);
 
-/** A state or province as a lookup key: trimmed, lowercase, single-spaced, D.C. in one spelling. */
+/**
+ * A state or province as a lookup key: trimmed, lowercase, single-spaced, D.C. in one spelling, and a
+ * state or province code (MT, ON) as its name (montana, ontario). A venue's state can be written
+ * either way, and so can the zone table's, so both sides are compared by name. A code the table does
+ * not know stays as it is.
+ */
 export function normalizeStateProvince(value: string | null | undefined): string {
   const key = (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-  return DISTRICT_OF_COLUMBIA.has(key) ? "district of columbia" : key;
+  if (DISTRICT_OF_COLUMBIA.has(key)) return "district of columbia";
+  const name = ABBREV_TO_NAME[key.toUpperCase()];
+  return name ? name.toLowerCase() : key;
 }
 
 /** state (normalized) → zone id, from the `ZoneStateProvinces` rows. */

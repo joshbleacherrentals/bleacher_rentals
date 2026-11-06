@@ -7,7 +7,7 @@ import type { QboErrorData } from "./interpretQboBillError";
  * Finds or creates the QuickBooks customer an invoice is billed to.
  * Server-only: reads and writes the ContactQboCustomers link with the service role (no policy,
  * not synced) and talks to the QuickBooks API of one connection.
- * Spec: docs/specs/qbo-invoice-02-customer.md
+ * Spec: docs/specs/qbo-invoice-02-customer.md, amended by docs/specs/qbo-invoice-02a-customer-matching.md
  */
 
 export type QboCustomerSummary = {
@@ -15,6 +15,8 @@ export type QboCustomerSummary = {
   displayName: string;
   companyName: string | null;
   email: string | null;
+  /** False for a customer that was switched off in QuickBooks; only a refused name offers one. */
+  active: boolean;
 };
 
 export type BilledContact = {
@@ -27,14 +29,18 @@ export type BilledContact = {
 
 export type CustomerChoice = { kind: "existing"; customerId: string } | { kind: "new" };
 
+/** Why the accountant is asked: several customers match, or QuickBooks refused the name as taken. */
+export type CustomerChoiceReason = "several" | "name_taken";
+
 export type CustomerResolution =
   | { kind: "customer"; customerId: string; how: "linked" | "found" | "chosen" | "created" }
-  | { kind: "choose"; candidates: QboCustomerSummary[] };
+  | { kind: "choose"; candidates: QboCustomerSummary[]; reason: CustomerChoiceReason };
 
 type QboContext = { accessToken: string; realmId: string; baseUrl: string };
 
 type RawQboCustomer = {
   Id: string;
+  SyncToken?: string;
   DisplayName: string;
   GivenName?: string;
   FamilyName?: string;
@@ -71,6 +77,7 @@ function toSummary(c: RawQboCustomer): QboCustomerSummary {
     displayName: c.DisplayName,
     companyName: c.CompanyName || null,
     email: c.PrimaryEmailAddr?.Address || null,
+    active: c.Active !== false,
   };
 }
 
@@ -78,8 +85,26 @@ function qboFault(data: QboErrorData | null) {
   return data?.Fault?.Error?.[0];
 }
 
-async function queryCustomers(ctx: QboContext, where: string): Promise<RawQboCustomer[]> {
-  const query = encodeURIComponent(`select * from Customer where ${where} and Active = true`);
+/** The create QuickBooks refused because the Display name is taken by a customer, vendor or employee. */
+export class QboDuplicateNameError extends Error {
+  constructor(readonly displayName: string) {
+    super(
+      `QuickBooks already has a customer, vendor or employee named ${displayName}; create the customer by hand and try again`,
+    );
+  }
+}
+
+/** The contact's full name: the same string `create` makes the Display name from. */
+function fullNameOf(contact: BilledContact): string {
+  return [contact.firstName.trim(), contact.lastName?.trim()].filter(Boolean).join(" ");
+}
+
+async function queryCustomers(
+  ctx: QboContext,
+  where: string,
+  active = true,
+): Promise<RawQboCustomer[]> {
+  const query = encodeURIComponent(`select * from Customer where ${where} and Active = ${active}`);
   const response = await fetch(
     `${ctx.baseUrl}/${ctx.realmId}/query?query=${query}&minorversion=${MINOR_VERSION}`,
     { headers: { Authorization: `Bearer ${ctx.accessToken}`, Accept: "application/json" } },
@@ -114,6 +139,15 @@ async function readCustomer(ctx: QboContext, id: string): Promise<RawQboCustomer
 const sameText = (a: string | null | undefined, b: string | null | undefined) =>
   (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 
+/** The contact's full name and its company's name: the two things a customer may be named after. */
+function namesToLookUp(contact: BilledContact): string[] {
+  const names: string[] = [];
+  for (const name of [fullNameOf(contact), contact.companyName?.trim() ?? ""]) {
+    if (name && !names.some((known) => sameText(known, name))) names.push(name);
+  }
+  return names;
+}
+
 async function findCandidates(
   ctx: QboContext,
   contact: BilledContact,
@@ -145,12 +179,61 @@ async function findCandidates(
     }
   }
 
+  // The accountants fill only a customer's Company name and Display name (spec 02a), so those two
+  // fields are compared with the contact's full name and with the contact's company.
+  for (const name of namesToLookUp(contact)) {
+    const quoted = escapeQboQueryValue(name);
+    for (const c of await queryCustomers(ctx, `DisplayName = '${quoted}'`)) {
+      if (sameText(c.DisplayName, name)) found.set(c.Id, toSummary(c));
+    }
+    for (const c of await queryCustomers(ctx, `CompanyName = '${quoted}'`)) {
+      if (sameText(c.CompanyName, name)) found.set(c.Id, toSummary(c));
+    }
+  }
+
   return [...found.values()];
+}
+
+/** The customers, active or not, whose Display name is this one: what a refused name collides with. */
+async function findCustomersNamed(ctx: QboContext, name: string): Promise<QboCustomerSummary[]> {
+  for (const active of [true, false]) {
+    const rows = await queryCustomers(ctx, `DisplayName = '${escapeQboQueryValue(name)}'`, active);
+    const same = rows.filter((c) => sameText(c.DisplayName, name));
+    if (same.length > 0) return same.map(toSummary);
+  }
+  return [];
+}
+
+/** Switches an inactive customer on; nothing else of it changes. */
+async function turnOn(ctx: QboContext, customer: RawQboCustomer): Promise<void> {
+  const response = await fetch(
+    `${ctx.baseUrl}/${ctx.realmId}/customer?minorversion=${MINOR_VERSION}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${ctx.accessToken}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        Id: customer.Id,
+        SyncToken: customer.SyncToken,
+        sparse: true,
+        Active: true,
+      }),
+    },
+  );
+  if (!response.ok) {
+    const err = qboFault(await response.json().catch(() => null));
+    throw new Error(
+      `QuickBooks could not turn the customer on: ${err?.Detail ?? err?.Message ?? response.status}`,
+    );
+  }
 }
 
 async function create(ctx: QboContext, contact: BilledContact): Promise<QboCustomerSummary> {
   const lastName = contact.lastName?.trim();
-  const displayName = [contact.firstName.trim(), lastName].filter(Boolean).join(" ");
+  const displayName = fullNameOf(contact);
   const body = {
     GivenName: contact.firstName.trim(),
     ...(lastName ? { FamilyName: lastName } : {}),
@@ -174,11 +257,7 @@ async function create(ctx: QboContext, contact: BilledContact): Promise<QboCusto
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const err = qboFault(data);
-    if (err?.code === QBO_DUPLICATE_NAME) {
-      throw new Error(
-        `QuickBooks already has a customer, vendor or employee named ${displayName}; create the customer by hand and try again`,
-      );
-    }
+    if (err?.code === QBO_DUPLICATE_NAME) throw new QboDuplicateNameError(displayName);
     throw new Error(
       `QuickBooks customer create failed: ${err?.Detail ?? err?.Message ?? response.status}`,
     );
@@ -255,8 +334,9 @@ async function deleteLink(contactId: string, connectionId: string): Promise<void
 
 /**
  * The QuickBooks customer an invoice for this contact is billed to:
- * linked → (stale link dropped) → chosen / new → found / choose / created.
- * Writes the link row; never writes Events.
+ * linked → (stale link dropped) → chosen / new → found / choose / created. A name QuickBooks
+ * refuses as taken offers the customer that holds it (spec 02a). Writes the link row; never writes
+ * Events.
  */
 export async function resolveInvoiceCustomer(
   connectionId: string,
@@ -281,6 +361,8 @@ export async function resolveInvoiceCustomer(
         `QuickBooks has no customer with id ${choice.customerId} in this connection.`,
       );
     }
+    // Only a refused name offers an inactive customer (spec 02a); using it switches it on first.
+    if (existing.Active === false) await turnOn(ctx, existing);
     const customerId = await link(contact.id, connectionId, existing.Id);
     return { kind: "customer", customerId, how: "chosen" };
   }
@@ -292,12 +374,23 @@ export async function resolveInvoiceCustomer(
   }
 
   const candidates = await findCandidates(ctx, contact);
-  if (candidates.length > 1) return { kind: "choose", candidates };
+  if (candidates.length > 1) return { kind: "choose", candidates, reason: "several" };
   if (candidates.length === 1) {
     const customerId = await link(contact.id, connectionId, candidates[0].id);
     return { kind: "customer", customerId, how: "found" };
   }
-  const created = await create(ctx, contact);
+
+  let created: QboCustomerSummary;
+  try {
+    created = await create(ctx, contact);
+  } catch (e) {
+    if (!(e instanceof QboDuplicateNameError)) throw e;
+    // The name belongs to a customer the search did not see (switched off, say): offer it. When no
+    // customer holds it, a vendor or an employee does, and the accountant has to sort that out.
+    const holders = await findCustomersNamed(ctx, e.displayName);
+    if (holders.length === 0) throw e;
+    return { kind: "choose", candidates: holders, reason: "name_taken" };
+  }
   const customerId = await link(contact.id, connectionId, created.id);
   return { kind: "customer", customerId, how: "created" };
 }

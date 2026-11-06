@@ -868,13 +868,29 @@ describe("updateInvoice — a failing step ends the request", () => {
 
   it("the customer step asking for a choice returns the candidates and writes nothing", async () => {
     const candidates = [
-      { id: "1", displayName: "Pat Lee", companyName: "Acme", email: "pat@example.com" },
-      { id: "2", displayName: "Pat Lee", companyName: null, email: null },
+      {
+        id: "1",
+        displayName: "Pat Lee",
+        companyName: "Acme",
+        email: "pat@example.com",
+        active: true,
+      },
+      { id: "2", displayName: "Pat Lee", companyName: null, email: null, active: true },
     ];
-    state.customer = { kind: "choose", candidates };
+    state.customer = { kind: "choose", candidates, reason: "several" };
 
-    expect(await run()).toEqual({ status: "choose_customer", candidates });
+    expect(await run()).toEqual({ status: "choose_customer", candidates, reason: "several" });
     expect(calls).toEqual(["load", "item", "qbo:read-invoice", "customer"]);
+    expectNothingWritten();
+  });
+
+  it("carries the reason when the customer step offers the customer that holds a taken name (spec 02a)", async () => {
+    const candidates = [
+      { id: "7", displayName: "Pat Lee", companyName: "Pat Lee", email: null, active: false },
+    ];
+    state.customer = { kind: "choose", candidates, reason: "name_taken" };
+
+    expect(await run()).toEqual({ status: "choose_customer", candidates, reason: "name_taken" });
     expectNothingWritten();
   });
 
@@ -1460,9 +1476,13 @@ describe("overwriteInvoice — case 2, overwriting the invoice found by number",
   });
 
   it("returns the candidates when the customer step asks, and writes nothing", async () => {
-    state.customer = { kind: "choose", candidates: [] };
+    state.customer = { kind: "choose", candidates: [], reason: "several" };
 
-    expect(await overwrite()).toEqual({ status: "choose_customer", candidates: [] });
+    expect(await overwrite()).toEqual({
+      status: "choose_customer",
+      candidates: [],
+      reason: "several",
+    });
     expectNothingWritten();
   });
 

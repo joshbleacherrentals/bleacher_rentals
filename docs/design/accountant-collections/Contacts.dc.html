@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Contact Card Variants</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0;background:#ffffff}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:32px;max-width:1040px;margin:0 auto;padding:{{ rootPad }};box-sizing:border-box;font-family:Geist,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827;background:#ffffff">
+
+  <sc-if value="{{ showBoth }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0;font-size:13px;line-height:18px;font-weight:500;color:#4b5563">Contact and finance contact, both with company info</p>
+      </sc-if>
+      <section aria-label="Contact and finance contact" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:1px;background:#e5e7eb;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+        <div style="background:#ffffff;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Contact</h3>
+          <div style="font-size:16px;line-height:24px;font-weight:600">{{ contactName }}</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ contactRows }}" as="r" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+          <div style="height:1px;background:#e5e7eb"></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ contactCompany }}" as="r" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#ffffff;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Finance Contact</h3>
+          <div style="font-size:16px;line-height:24px;font-weight:600">{{ financeName }}</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ financeRows }}" as="r" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+          <div style="height:1px;background:#e5e7eb"></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ financeCompany }}" as="r" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showNoFinance }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0;font-size:13px;line-height:18px;font-weight:500;color:#4b5563">No finance contact on the invoice</p>
+      </sc-if>
+      <section aria-label="Contact" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:1px;background:#e5e7eb;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+        <div style="background:#ffffff;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Contact</h3>
+          <div style="font-size:16px;line-height:24px;font-weight:600">{{ contactName }}</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ contactRows }}" as="r" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#ffffff;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Company</h3>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ contactCompany }}" as="r" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showNoCompany }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0;font-size:13px;line-height:18px;font-weight:500;color:#4b5563">Contacts without company info</p>
+      </sc-if>
+      <section aria-label="Contact and finance contact" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:1px;background:#e5e7eb;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+        <div style="background:#ffffff;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Contact</h3>
+          <div style="font-size:16px;line-height:24px;font-weight:600">{{ contactName }}</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ contactRows }}" as="r" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#ffffff;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Finance Contact</h3>
+          <div style="font-size:16px;line-height:24px;font-weight:600">{{ financeName }}</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ financeRows }}" as="r" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:14px;line-height:20px"><span style="color:#6b7280">{{ r.k }}</span><span style="overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","default":"all","options":["all","both","no-finance","no-company"]},"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const v = (this.props && this.props.variant) || 'all';
+    return {
+      showBoth: v === 'all' || v === 'both',
+      showNoFinance: v === 'all' || v === 'no-finance',
+      showNoCompany: v === 'all' || v === 'no-company',
+      showCaptions: v === 'all',
+      rootPad: v === 'all' ? '32px' : '0',
+      contactName: 'Dana Whitfield',
+      contactRows: [
+        { k: 'Phone number', v: '(416) 555-0142' },
+        { k: 'Email address', v: 'dana.whitfield@riverside.example' },
+      ],
+      contactCompany: [
+        { k: 'Company name', v: 'Riverside Charity Foundation' },
+        { k: 'Company number', v: '(416) 555-0100' },
+        { k: 'Company email', v: 'office@riverside.example' },
+      ],
+      financeName: 'Priya Raman',
+      financeRows: [
+        { k: 'Phone number', v: '(416) 555-0177' },
+        { k: 'Email address', v: 'priya.raman@ramanco.example' },
+      ],
+      financeCompany: [
+        { k: 'Company name', v: 'Raman & Co. Accounting' },
+        { k: 'Company number', v: '(416) 555-0190' },
+        { k: 'Company email', v: 'accounts@ramanco.example' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

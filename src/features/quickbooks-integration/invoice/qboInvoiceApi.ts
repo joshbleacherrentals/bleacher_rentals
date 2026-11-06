@@ -61,9 +61,14 @@ type RawQboInvoice = {
   BillAddr?: { Line1?: string };
   ShipAddr?: {
     Line1?: string;
+    Line2?: string;
+    Line3?: string;
+    Line4?: string;
+    Line5?: string;
     City?: string;
     CountrySubDivisionCode?: string;
     PostalCode?: string;
+    Country?: string;
   };
   PrivateNote?: string;
   Line?: RawQboLine[];
@@ -171,6 +176,13 @@ function snapshotOf(invoice: RawQboInvoice): QboInvoiceSnapshot {
       city: invoice.ShipAddr?.City ?? "",
       state: invoice.ShipAddr?.CountrySubDivisionCode ?? "",
       zip: invoice.ShipAddr?.PostalCode ?? "",
+      other: [
+        invoice.ShipAddr?.Line2,
+        invoice.ShipAddr?.Line3,
+        invoice.ShipAddr?.Line4,
+        invoice.ShipAddr?.Line5,
+        invoice.ShipAddr?.Country,
+      ].filter((part): part is string => !!part?.trim()),
     },
     memo: invoice.PrivateNote ?? "",
     lines: (invoice.Line ?? [])

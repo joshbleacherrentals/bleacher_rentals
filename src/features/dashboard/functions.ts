@@ -1,6 +1,3 @@
-import { toast } from "sonner";
-import React from "react";
-import { ErrorToast } from "@/components/toasts/ErrorToast";
 import {
   AddressData,
   CurrentEventState,
@@ -12,77 +9,6 @@ import { PROVINCES, ROW_OPTIONS, STATES } from "@/types/Constants";
 import { Tables } from "../../../database.types";
 import { DashboardBleacher } from "../dashboard/types";
 import type { PsEventRow } from "@/features/dashboard/db/hooks/powersync/usePsEvents";
-
-export function checkEventFormRules(
-  createEventPayload: CurrentEventStore,
-  user: UserResource | null,
-): boolean {
-  // check if all required fields are filled in
-  let missingFields = [];
-  // const error = isUserPermitted(createEventPayload.addressData?.state ?? "", user);
-  // if (error) {
-  //   missingFields.push(error);
-  // }
-  if (createEventPayload.eventName == "") {
-    missingFields.push("Missing: Event Name");
-  }
-  // "Venue" here just means an address is set — via a linked Venue or a
-  // manually-typed one ("detached", see docs/specs/venue-history.md §2.3).
-  // Only the label changed; addressData is populated either way.
-  if (createEventPayload.addressData == null || createEventPayload.addressData.address == "") {
-    missingFields.push("Missing: Venue");
-  }
-  if (!createEventPayload.eventStart || createEventPayload.eventStart == "") {
-    missingFields.push("Missing: Event Start");
-  }
-  if (!createEventPayload.eventEnd || createEventPayload.eventEnd == "") {
-    missingFields.push("Missing: Event End");
-  }
-  // if (!createEventPayload.setupStart || createEventPayload.setupStart == "") {
-  //   if (!createEventPayload.sameDaySetup) {
-  //     missingFields.push("Missing: Setup Start");
-  //   }
-  // }
-  // if (!createEventPayload.teardownEnd || createEventPayload.teardownEnd == "") {
-  //   if (!createEventPayload.sameDayTeardown) {
-  //     missingFields.push("Missing: Teardown End");
-  //   }
-  // }
-
-  // Lenient Conditions
-  // if (createEventPayload.lenient) {
-  //   if (!createEventPayload.seats || createEventPayload.seats == 0) {
-  //     missingFields.push("Need at least one seat");
-  //   }
-  // } else {
-  //   const totalBleachers =
-  //     (createEventPayload.sevenRow || 0) +
-  //     (createEventPayload.tenRow || 0) +
-  //     (createEventPayload.fifteenRow || 0);
-
-  //   if (totalBleachers == 0) {
-  //     missingFields.push("Select at least one bleacher");
-  //   }
-  // }
-  if (createEventPayload.bleacherUuids.length === 0) {
-    missingFields.push("Select at least one bleacher");
-  }
-  if (missingFields.length > 0) {
-    toast.custom(
-      (t) =>
-        React.createElement(ErrorToast, {
-          id: t,
-          lines: missingFields,
-        }),
-      {
-        duration: 10000, // 20 seconds
-      },
-    );
-    return false;
-  } else {
-    return true;
-  }
-}
 
 export const calculateNumDays = (start: string, end: string): number => {
   const startDate = new Date(start);

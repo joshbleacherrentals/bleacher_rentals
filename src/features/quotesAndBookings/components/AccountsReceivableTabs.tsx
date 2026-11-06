@@ -8,6 +8,7 @@ import type { AccountsReceivableEvent, QuotesBookingsEvent } from "../types";
 import type { Currency } from "../types/quoteTypes";
 import { useAccountsReceivableData } from "../hooks/useAccountsReceivableData";
 import type { InvoiceAttentionReason } from "../utils/invoiceAttention";
+import { formatInvoiceNumber } from "../utils/invoiceNumber";
 import { searchReceivables } from "../utils/searchEvents";
 import { sortEvents, type EventSort, type SortKey } from "../utils/sortEvents";
 import { clampPage, getTotalPages, slicePage, type PageSize } from "../utils/pagination";
@@ -127,7 +128,9 @@ function ReceivablesTable({
       header: "Invoice #",
       sortKey: "invoice_number",
       render: (event) => (
-        <CellSecondary>{event.invoice_number ? `#${event.invoice_number}` : "—"}</CellSecondary>
+        <CellSecondary>
+          {event.invoice_number ? `#${formatInvoiceNumber(event.invoice_number)}` : "—"}
+        </CellSecondary>
       ),
     },
     {

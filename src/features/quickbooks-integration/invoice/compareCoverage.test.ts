@@ -121,6 +121,7 @@ function snapshotOfBody(body: ReturnType<typeof buildInvoicePayload>["body"]): Q
       city: body.ShipAddr.City,
       state: body.ShipAddr.CountrySubDivisionCode,
       zip: body.ShipAddr.PostalCode,
+      other: [],
     },
     memo: body.PrivateNote,
     lines: [

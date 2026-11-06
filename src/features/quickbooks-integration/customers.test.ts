@@ -10,6 +10,7 @@ type FakeQboCustomer = {
   CompanyName?: string;
   PrimaryEmailAddr?: { Address: string };
   Active: boolean;
+  SyncToken?: string;
 };
 
 let qboCustomers: FakeQboCustomer[] = [];
@@ -17,6 +18,12 @@ let qboCalls: Array<{ method: string; url: string; body?: any }> = [];
 let nextCustomerId = 900;
 // Names already taken by a vendor/employee: creating a customer with one fails (QBO code 6240).
 let takenDisplayNames: string[] = [];
+// A customer that appears in QuickBooks just before our create reaches it (made by hand meanwhile).
+let appearsBeforeCreate: FakeQboCustomer | null = null;
+// QuickBooks refuses to turn a customer on.
+let refuseTurningOn = false;
+// QuickBooks refuses the create for another reason: the Detail it answers with.
+let refuseCreateWith: string | null = null;
 
 function unescapeQboValue(v: string) {
   return v.replace(/\\(.)/g, "$1");
@@ -28,6 +35,7 @@ function runCustomerQuery(query: string): FakeQboCustomer[] {
   );
   return qboCustomers.filter((c) => {
     if (!c.Active && /Active = true/.test(query)) return false;
+    if (c.Active && /Active = false/.test(query)) return false;
     return conditions.every(([field, value]) => {
       const actual = field === "PrimaryEmailAddr" ? c.PrimaryEmailAddr?.Address : (c as any)[field];
       return (actual ?? "").toLowerCase() === value.toLowerCase();
@@ -65,7 +73,24 @@ const fakeFetch = vi.fn(async (url: string, init?: RequestInit) => {
           `Object Not Found : Something you're trying to use has been made inactive.`,
         );
   }
+  if (method === "POST" && u.pathname.endsWith("/customer") && body.Id) {
+    // A sparse update (turning a customer on).
+    const c = qboCustomers.find((x) => x.Id === body.Id);
+    if (!c) return fault("610", "Object Not Found", "Object Not Found");
+    if (refuseTurningOn || c.SyncToken !== body.SyncToken) {
+      return fault("5010", "Stale Object Error", "Stale object", 400);
+    }
+    c.Active = body.Active ?? c.Active;
+    c.SyncToken = String(Number(c.SyncToken) + 1);
+    return new Response(JSON.stringify({ Customer: c }));
+  }
   if (method === "POST" && u.pathname.endsWith("/customer")) {
+    if (appearsBeforeCreate) {
+      qboCustomers.push(appearsBeforeCreate);
+      takenDisplayNames.push(appearsBeforeCreate.DisplayName);
+      appearsBeforeCreate = null;
+    }
+    if (refuseCreateWith) return fault("6000", "Business Validation Error", refuseCreateWith);
     if (takenDisplayNames.includes(body.DisplayName)) {
       return fault(
         "6240",
@@ -81,6 +106,7 @@ const fakeFetch = vi.fn(async (url: string, init?: RequestInit) => {
       CompanyName: body.CompanyName,
       PrimaryEmailAddr: body.PrimaryEmailAddr,
       Active: true,
+      SyncToken: "0",
     };
     qboCustomers.push(created);
     return new Response(JSON.stringify({ Customer: created }));
@@ -162,10 +188,14 @@ import {
   escapeQboQueryValue,
   findCustomerCandidates,
   createCustomer,
+  QboDuplicateNameError,
   readLinkedCustomerId,
   resolveInvoiceCustomer,
   type BilledContact,
 } from "./customers";
+
+const DUPLICATE_NAME_MESSAGE = (name: string) =>
+  `QuickBooks already has a customer, vendor or employee named ${name}; create the customer by hand and try again`;
 
 const CONN = "conn-1";
 
@@ -189,6 +219,19 @@ function qboCustomer(over: Partial<FakeQboCustomer> = {}): FakeQboCustomer {
     CompanyName: "Acme Inc",
     PrimaryEmailAddr: { Address: "ann@acme.com" },
     Active: true,
+    SyncToken: "0",
+    ...over,
+  };
+}
+
+/** A customer the way the accountants enter one: only a Company name and a Display name. */
+function enteredByHand(over: Partial<FakeQboCustomer> = {}): FakeQboCustomer {
+  return {
+    Id: "30",
+    DisplayName: "Jennifer Green",
+    CompanyName: "Jennifer Green",
+    Active: true,
+    SyncToken: "0",
     ...over,
   };
 }
@@ -207,6 +250,9 @@ beforeEach(() => {
   qboCalls = [];
   nextCustomerId = 900;
   takenDisplayNames = [];
+  appearsBeforeCreate = null;
+  refuseTurningOn = false;
+  refuseCreateWith = null;
   linkRows = [];
   tablesTouched = [];
   insertedLinks = [];
@@ -264,9 +310,22 @@ describe("resolveInvoiceCustomer", () => {
 
     expect(r).toEqual({
       kind: "choose",
+      reason: "several",
       candidates: [
-        { id: "10", displayName: "Ann Lee", companyName: "Acme Inc", email: "a1@x.com" },
-        { id: "11", displayName: "Ann Lee (Beta)", companyName: "Beta LLC", email: null },
+        {
+          id: "10",
+          displayName: "Ann Lee",
+          companyName: "Acme Inc",
+          email: "a1@x.com",
+          active: true,
+        },
+        {
+          id: "11",
+          displayName: "Ann Lee (Beta)",
+          companyName: "Beta LLC",
+          email: null,
+          active: true,
+        },
       ],
     });
     expect(insertedLinks).toHaveLength(0);
@@ -290,13 +349,15 @@ describe("resolveInvoiceCustomer", () => {
     ]);
   });
 
-  it("still creates the person when only their company exists (the company never matches alone)", async () => {
+  // docs/specs/qbo-invoice-02a-customer-matching.md §1: the company now matches by itself.
+  it("uses the customer named after the contact's company, without asking (spec 02a)", async () => {
     qboCustomers = [
       qboCustomer({
         Id: "20",
         DisplayName: "Acme Inc",
         GivenName: undefined,
         FamilyName: undefined,
+        CompanyName: undefined,
         PrimaryEmailAddr: undefined,
       }),
       qboCustomer({
@@ -304,15 +365,171 @@ describe("resolveInvoiceCustomer", () => {
         DisplayName: "Bob Ray",
         GivenName: "Bob",
         FamilyName: "Ray",
+        CompanyName: "Other Co",
         PrimaryEmailAddr: { Address: "bob@acme.com" },
       }),
     ];
 
     const r = await resolveInvoiceCustomer(CONN, contact());
 
-    expect(r).toEqual({ kind: "customer", customerId: "900", how: "created" });
-    expect(posts()).toHaveLength(1);
-    expect(posts()[0].body.CompanyName).toBe("Acme Inc");
+    expect(r).toEqual({ kind: "customer", customerId: "20", how: "found" });
+    expect(posts()).toHaveLength(0);
+    expect(insertedLinks).toEqual([
+      { contact_uuid: "contact-1", qbo_connection_uuid: CONN, qbo_customer_id: "20" },
+    ]);
+  });
+
+  describe("a customer entered the way the accountants enter one (spec 02a)", () => {
+    const jennifer = (over: Partial<BilledContact> = {}) =>
+      contact({
+        firstName: "Jennifer",
+        lastName: "Green",
+        email: "jennifer@example.com",
+        companyName: null,
+        ...over,
+      });
+
+    it("finds a customer that has only a Display name and a Company name equal to the contact's name", async () => {
+      qboCustomers = [enteredByHand()];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer());
+
+      expect(r).toEqual({ kind: "customer", customerId: "30", how: "found" });
+      expect(insertedLinks).toEqual([
+        { contact_uuid: "contact-1", qbo_connection_uuid: CONN, qbo_customer_id: "30" },
+      ]);
+      expect(posts()).toHaveLength(0);
+    });
+
+    it("finds it by the Display name alone", async () => {
+      qboCustomers = [enteredByHand({ CompanyName: undefined })];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer());
+
+      expect(r).toEqual({ kind: "customer", customerId: "30", how: "found" });
+    });
+
+    it("finds it by the Company name alone: another Display name, the company named like the contact", async () => {
+      qboCustomers = [enteredByHand({ DisplayName: "J. Green (Toronto)" })];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer());
+
+      expect(r).toEqual({ kind: "customer", customerId: "30", how: "found" });
+    });
+
+    it("finds a customer whose Display name is the contact's company", async () => {
+      qboCustomers = [enteredByHand({ DisplayName: "Alpine Canada", CompanyName: undefined })];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer({ companyName: "Alpine Canada" }));
+
+      expect(r).toEqual({ kind: "customer", customerId: "30", how: "found" });
+    });
+
+    it("finds a customer whose Company name is the contact's company", async () => {
+      qboCustomers = [
+        enteredByHand({ DisplayName: "Alpine Canada Inc", CompanyName: "Alpine Canada" }),
+      ];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer({ companyName: "Alpine Canada" }));
+
+      expect(r).toEqual({ kind: "customer", customerId: "30", how: "found" });
+    });
+
+    it("compares without regard to case", async () => {
+      qboCustomers = [
+        enteredByHand({ DisplayName: "JENNIFER GREEN", CompanyName: "JENNIFER GREEN" }),
+      ];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer());
+
+      expect(r).toEqual({ kind: "customer", customerId: "30", how: "found" });
+    });
+
+    it("does not find a customer whose Company name only contains the company", async () => {
+      qboCustomers = [
+        enteredByHand({ DisplayName: "Alpine Canada Inc", CompanyName: "Alpine Canada Inc" }),
+      ];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer({ companyName: "Alpine Canada" }));
+
+      expect(r).toEqual({ kind: "customer", customerId: "900", how: "created" });
+    });
+
+    it("matches a contact with no last name on the first name alone", async () => {
+      qboCustomers = [enteredByHand({ DisplayName: "Jennifer", CompanyName: undefined })];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer({ lastName: null }));
+
+      expect(r).toEqual({ kind: "customer", customerId: "30", how: "found" });
+    });
+
+    it("takes the same customer found by several rules as one candidate", async () => {
+      qboCustomers = [
+        enteredByHand({ GivenName: "Jennifer", FamilyName: "Green" }),
+        enteredByHand({ Id: "31", DisplayName: "Someone Else", CompanyName: "Someone Else" }),
+      ];
+
+      const found = await findCustomerCandidates(CONN, jennifer());
+
+      expect(found.map((c) => c.id)).toEqual(["30"]);
+    });
+
+    it("asks for a choice when two different customers match by two rules", async () => {
+      qboCustomers = [
+        enteredByHand({ Id: "30", DisplayName: "Jennifer Green", CompanyName: undefined }),
+        enteredByHand({ Id: "31", DisplayName: "Alpine Canada Inc", CompanyName: "Alpine Canada" }),
+      ];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer({ companyName: "Alpine Canada" }));
+
+      expect(r).toMatchObject({ kind: "choose", reason: "several" });
+      expect((r as { candidates: { id: string }[] }).candidates.map((c) => c.id)).toEqual([
+        "30",
+        "31",
+      ]);
+      expect(insertedLinks).toHaveLength(0);
+      expect(posts()).toHaveLength(0);
+    });
+
+    it("never finds an inactive customer in the search", async () => {
+      qboCustomers = [enteredByHand({ Active: false })];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer());
+
+      expect(r).toEqual({ kind: "customer", customerId: "900", how: "created" });
+      expect(queries().length).toBeGreaterThan(0);
+      expect(queries().every((q) => q.includes("Active = true"))).toBe(true);
+    });
+
+    it("asks nothing about a company the contact does not have, and asks once for a value that repeats", async () => {
+      await resolveInvoiceCustomer(CONN, jennifer({ email: null, lastName: null }));
+      expect(queries().some((q) => q.includes("Acme"))).toBe(false);
+      const byName = (field: string) =>
+        queries().filter((q) => q.startsWith(`select * from Customer where ${field} = `));
+      expect(byName("DisplayName")).toHaveLength(1);
+      expect(byName("CompanyName")).toHaveLength(1);
+
+      qboCalls = [];
+      await resolveInvoiceCustomer(
+        CONN,
+        jennifer({ id: "contact-2", companyName: "jennifer green" }),
+      );
+      expect(byName("DisplayName")).toHaveLength(1);
+      expect(byName("CompanyName")).toHaveLength(1);
+    });
+
+    it("sends the full name and the company to every new query escaped", async () => {
+      await resolveInvoiceCustomer(
+        CONN,
+        contact({ firstName: "Pat", lastName: "O'Brien", email: null, companyName: "Fred's Ltd" }),
+      );
+
+      const text = queries();
+      expect(text.some((q) => q.includes("DisplayName = 'Pat O\\'Brien'"))).toBe(true);
+      expect(text.some((q) => q.includes("DisplayName = 'Fred\\'s Ltd'"))).toBe(true);
+      expect(text.some((q) => q.includes("CompanyName = 'Pat O\\'Brien'"))).toBe(true);
+      expect(text.some((q) => q.includes("CompanyName = 'Fred\\'s Ltd'"))).toBe(true);
+    });
   });
 
   it("returns a linked customer that still exists without searching", async () => {
@@ -386,7 +603,11 @@ describe("resolveInvoiceCustomer", () => {
   it("searches by the given name alone, and creates without FamilyName, when there is no last name", async () => {
     qboCustomers = [qboCustomer({ Id: "10", GivenName: "Ann", FamilyName: "Lee" })];
 
-    const r = await resolveInvoiceCustomer(CONN, contact({ lastName: null, email: null }));
+    // No company either: the contact's company would match this customer's Company name (02a).
+    const r = await resolveInvoiceCustomer(
+      CONN,
+      contact({ lastName: null, email: null, companyName: null }),
+    );
 
     expect(queries().every((q) => !q.includes("FamilyName"))).toBe(true);
     // Ann Lee has a family name, so she is not the contact "Ann" with none.
@@ -394,7 +615,6 @@ describe("resolveInvoiceCustomer", () => {
     expect(posts()[0].body).toEqual({
       GivenName: "Ann",
       DisplayName: "Ann",
-      CompanyName: "Acme Inc",
     });
   });
 
@@ -430,9 +650,139 @@ describe("resolveInvoiceCustomer", () => {
     takenDisplayNames = ["Ann Lee"];
 
     await expect(resolveInvoiceCustomer(CONN, contact())).rejects.toThrow(
-      "QuickBooks already has a customer, vendor or employee named Ann Lee; create the customer by hand and try again",
+      DUPLICATE_NAME_MESSAGE("Ann Lee"),
     );
     expect(insertedLinks).toHaveLength(0);
+  });
+
+  describe("a name QuickBooks refuses as taken (spec 02a)", () => {
+    const jennifer = () =>
+      contact({ firstName: "Jennifer", lastName: "Green", email: null, companyName: null });
+
+    it("offers the active customer that holds the name, writing and linking nothing", async () => {
+      appearsBeforeCreate = enteredByHand({ Id: "40" });
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer());
+
+      expect(r).toEqual({
+        kind: "choose",
+        reason: "name_taken",
+        candidates: [
+          {
+            id: "40",
+            displayName: "Jennifer Green",
+            companyName: "Jennifer Green",
+            email: null,
+            active: true,
+          },
+        ],
+      });
+      expect(insertedLinks).toHaveLength(0);
+      // Only the refused create was sent: nothing was turned on, nothing else created.
+      expect(posts()).toHaveLength(1);
+      expect(posts()[0].body.Id).toBeUndefined();
+    });
+
+    it("offers an inactive customer that holds the name, marked inactive", async () => {
+      qboCustomers = [enteredByHand({ Id: "40", Active: false })];
+      takenDisplayNames = ["Jennifer Green"];
+
+      const r = await resolveInvoiceCustomer(CONN, jennifer());
+
+      expect(r).toEqual({
+        kind: "choose",
+        reason: "name_taken",
+        candidates: [
+          {
+            id: "40",
+            displayName: "Jennifer Green",
+            companyName: "Jennifer Green",
+            email: null,
+            active: false,
+          },
+        ],
+      });
+      expect(insertedLinks).toHaveLength(0);
+      expect(qboCustomers[0].Active).toBe(false);
+      expect(queries().at(-1)).toContain("DisplayName = 'Jennifer Green' and Active = false");
+    });
+
+    it("keeps the error when the name belongs to no customer (a vendor or an employee)", async () => {
+      takenDisplayNames = ["Jennifer Green"];
+
+      await expect(resolveInvoiceCustomer(CONN, jennifer())).rejects.toThrow(
+        DUPLICATE_NAME_MESSAGE("Jennifer Green"),
+      );
+      expect(insertedLinks).toHaveLength(0);
+    });
+
+    it("throws a QboDuplicateNameError carrying the name and today's message", async () => {
+      takenDisplayNames = ["Jennifer Green"];
+
+      const error = await createCustomer(CONN, jennifer()).catch((e) => e);
+
+      expect(error).toBeInstanceOf(QboDuplicateNameError);
+      expect(error.displayName).toBe("Jennifer Green");
+      expect(error.message).toBe(DUPLICATE_NAME_MESSAGE("Jennifer Green"));
+    });
+
+    it("does not look the name up when the accountant chose to create a new customer", async () => {
+      qboCustomers = [enteredByHand({ Id: "40", Active: false })];
+      takenDisplayNames = ["Jennifer Green"];
+
+      await expect(resolveInvoiceCustomer(CONN, jennifer(), { kind: "new" })).rejects.toThrow(
+        DUPLICATE_NAME_MESSAGE("Jennifer Green"),
+      );
+      expect(queries()).toHaveLength(0);
+    });
+
+    it("passes any other refusal of the create on as it is, with no look-up", async () => {
+      refuseCreateWith = "Nope";
+
+      await expect(resolveInvoiceCustomer(CONN, jennifer())).rejects.toThrow(
+        "QuickBooks customer create failed: Nope",
+      );
+      expect(queries().every((q) => q.includes("Active = true"))).toBe(true);
+    });
+  });
+
+  describe("a customer picked with choice existing (spec 02a)", () => {
+    it("turns an inactive customer on with its SyncToken, then links it", async () => {
+      qboCustomers = [enteredByHand({ Id: "40", Active: false, SyncToken: "3" })];
+
+      const r = await resolveInvoiceCustomer(CONN, contact(), {
+        kind: "existing",
+        customerId: "40",
+      });
+
+      expect(r).toEqual({ kind: "customer", customerId: "40", how: "chosen" });
+      expect(posts()).toHaveLength(1);
+      expect(posts()[0].body).toEqual({ Id: "40", SyncToken: "3", sparse: true, Active: true });
+      expect(qboCustomers[0].Active).toBe(true);
+      expect(insertedLinks).toEqual([
+        { contact_uuid: "contact-1", qbo_connection_uuid: CONN, qbo_customer_id: "40" },
+      ]);
+    });
+
+    it("sends no update for a customer that is already active", async () => {
+      qboCustomers = [enteredByHand({ Id: "40" })];
+
+      await resolveInvoiceCustomer(CONN, contact(), { kind: "existing", customerId: "40" });
+
+      expect(posts()).toHaveLength(0);
+      expect(insertedLinks).toHaveLength(1);
+    });
+
+    it("passes QuickBooks' refusal to turn it on and links nothing", async () => {
+      qboCustomers = [enteredByHand({ Id: "40", Active: false })];
+      refuseTurningOn = true;
+
+      await expect(
+        resolveInvoiceCustomer(CONN, contact(), { kind: "existing", customerId: "40" }),
+      ).rejects.toThrow(/turn .* on|Stale/i);
+      expect(insertedLinks).toHaveLength(0);
+      expect(linkRows).toHaveLength(0);
+    });
   });
 
   it("reads the winner's row when another attempt linked the contact first", async () => {

@@ -16,6 +16,7 @@ import { ContactHistorySheet } from "./ContactHistorySheet";
 import { VenueHistorySheet } from "./VenueHistorySheet";
 import { VenueCard } from "@/components/VenueCard";
 import { LineItemDescription } from "../../LineItemDescription";
+import { formatInvoiceNumber } from "../../../utils/invoiceNumber";
 
 function formatDate(d: string | null): string {
   if (!d) return "N/A";
@@ -254,7 +255,7 @@ export function ContractTab({ quote }: { quote: QuoteDetail }) {
                 <span className="text-gray-500">
                   {isInvoiceStatus(quote.eventStatus) ? "Invoice #:" : "Quote #:"}
                 </span>{" "}
-                <span className="font-medium">{quote.invoiceNumber}</span>
+                <span className="font-medium">{formatInvoiceNumber(quote.invoiceNumber)}</span>
               </div>
             )}
             <div>

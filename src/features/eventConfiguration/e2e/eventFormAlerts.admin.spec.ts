@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test } from "@playwright/test";
 import {
   seedSchedulingConflict,
   seedPriorLocation,
@@ -41,28 +41,9 @@ test.describe("Event form alerts (admin)", () => {
       await expectAlert(page, /overlapping with other events/i);
     });
 
-    test("S3: clearing the booked status clears the alert without a save or a reload", async ({
-      page,
-    }) => {
-      await openEventForm(page, fixture.eventUuid);
-      await openAlertsTab(page);
-      await expectAlert(page, /overlapping with other events/i);
-
-      // Only booked events compete for a bleacher. Changing the status is the
-      // input the alert depends on, so the recomputation must be immediate —
-      // that reactivity is the whole point of moving off the imperative
-      // `updateCurrentEventAlerts`.
-      await page.getByTestId("event-tab-Details").click();
-      // The status dropdown is labelled by its current value.
-      await page.getByRole("button", { name: "Booked", exact: true }).click();
-      await page
-        .getByRole("listitem")
-        .filter({ hasText: /^Quoted$/ })
-        .click();
-
-      await openAlertsTab(page);
-      await expect(page.getByTestId("event-alerts-empty")).toBeVisible();
-    });
+    // S3 (clearing the booked status clears the alert without a save) is gone: the status is
+    // read-only on the dashboard now, so nothing in the panel can be edited to move an alert.
+    // docs/specs/dashboard-events-read-only.md §10, R9.
   });
 
   test.describe("assigned seats do not meet the requirement", () => {
@@ -112,29 +93,6 @@ test.describe("Event form alerts (admin)", () => {
     });
   });
 
-  test.describe("deleting an event", () => {
-    let fixture: SeededEventAlert;
-
-    test.beforeAll(async () => {
-      fixture = await seedSchedulingConflict({ withoutConflict: true });
-    });
-
-    test.afterAll(async () => {
-      await fixture.cleanup();
-    });
-
-    test("S9: the event disappears without the hand-written store patch", async ({ page }) => {
-      await openEventForm(page, fixture.eventUuid);
-
-      // A Radix confirmation, not a native one.
-      await page.getByRole("button", { name: "Delete Event" }).click({ timeout: 60_000 });
-      await page.getByRole("button", { name: "Continue" }).click();
-
-      // `deleteEvent` used to patch the Zustand events store by hand so
-      // "non-PowerSync consumers reflect the change". There are none left; the
-      // PowerSync write has to drive every reader on its own.
-      await page.goto("/quotes-bookings");
-      await expect(page.getByText(fixture.eventName)).toHaveCount(0, { timeout: 30_000 });
-    });
-  });
+  // S9 (Delete Event on the dashboard removes the event) is gone with the Delete Event button.
+  // Deleting an event is done from its quote card. docs/specs/dashboard-events-read-only.md §10, R9.
 });

@@ -3,6 +3,7 @@ import type { AccountsReceivableEvent, QuotesBookingsEvent } from "../types";
 import type { Currency } from "../types/quoteTypes";
 import { eventSubtotalCents, eventTaxCents } from "./eventAmounts";
 import { formatMoney } from "./formatMoney";
+import { formatInvoiceNumber } from "./invoiceNumber";
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return "";
@@ -75,11 +76,9 @@ export function searchEvents<T extends QuotesBookingsEvent>(events: T[], query: 
       e.tax_amount_cents !== null ? formatCurrency(eventTaxCents(e)) : null,
     ];
 
-    if (
-      invoiceQuery &&
-      e.invoice_number !== null &&
-      String(e.invoice_number).includes(invoiceQuery)
-    ) {
+    // Compared with the number as it is printed (nine digits), so "000000042" finds it, and so does "42".
+    const printedNumber = formatInvoiceNumber(e.invoice_number);
+    if (invoiceQuery && printedNumber !== null && printedNumber.includes(invoiceQuery)) {
       return true;
     }
     // The same amounts as above, however the number was typed.

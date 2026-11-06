@@ -35,18 +35,28 @@ export const QUOTES_BOOKINGS_TABS: ListTabDeclaration = {
 };
 
 /**
- * /accountant: the two AR tabs narrow the list to booked events with money due, split by whether
- * the event has started (see `accountsReceivable.ts`). Each opens on the event closest to today:
- * AR walks back from today into the past, AR Deposits walks forward from tomorrow. They hold
- * booked events by definition, so Status is not offered.
+ * /accountant: AR Deposits narrows the list to booked events with money due after today (see
+ * `accountsReceivable.ts`) and opens on the event closest to today, walking forward from tomorrow.
+ * They are booked events by definition, so Status is not offered.
+ *
+ * The AR tab (money already due, walking back from today) was taken off the page when Collections
+ * replaced it. Its logic stays: `accountsReceivable.ts` is what Collections computes Amount Due
+ * with, and `useAccountsReceivableData` still works both lists out. To bring the tab back, add
+ * `{ id: "ar", startingSort: { key: "start_date", direction: "desc" }, offersStatus: false }`
+ * back here and its trigger in app/accountant/page.tsx. A bookmarked `?tab=ar` now opens Collections.
  *
  * Need attention is the third tab: the quotes whose QuickBooks invoice no longer matches the quote,
  * newest event first, whatever their status — so Status is not offered there either.
  * Spec: docs/specs/qbo-invoice-10-need-attention-tab.md §4
+ *
+ * Collections is the first tab and the one a bare /accountant opens: the open payment-chasing tasks
+ * of booked events. It keeps its own order and Show Not Due Yet in the URL (`csort`, `cdir`,
+ * `cnotdue`), so the `startingSort` here, which sorts events, is never used.
+ * Spec: docs/specs/accountant-collections-07-collections-list.md §3
  */
 export const ACCOUNTANT_TABS: ListTabDeclaration = {
   tabs: [
-    { id: "ar", startingSort: { key: "start_date", direction: "desc" }, offersStatus: false },
+    { id: "collections", startingSort: DEFAULT_SORT, offersStatus: false },
     {
       id: "ar_deposits",
       startingSort: { key: "start_date", direction: "asc" },
@@ -58,7 +68,7 @@ export const ACCOUNTANT_TABS: ListTabDeclaration = {
       offersStatus: false,
     },
   ],
-  openingTab: "ar",
+  openingTab: "collections",
   writeTabToUrl: true,
 };
 

@@ -10,6 +10,8 @@ type Props = {
   onNoteChange: (note: string) => void;
   /** The two screens style their labels differently; everything else is shared. */
   labelClassName?: string;
+  /** Shown as it is but cannot be changed (the dashboard's read-only event view). */
+  disabled?: boolean;
 };
 
 /**
@@ -23,6 +25,7 @@ export function LostReasonFields({
   onReasonChange,
   onNoteChange,
   labelClassName = "block text-sm font-medium text-gray-700 mb-1",
+  disabled = false,
 }: Props) {
   return (
     <div data-testid="lost-reason-fields">
@@ -34,6 +37,7 @@ export function LostReasonFields({
         selected={reason ?? undefined}
         onSelect={onReasonChange}
         placeholder="Why was it lost?"
+        disabled={disabled}
       />
       {reason === "other" && (
         <input
@@ -44,7 +48,10 @@ export function LostReasonFields({
           placeholder="Tell us why"
           aria-label="Lost Reason Note"
           data-testid="lost-reason-note"
-          className="mt-2 w-full h-[40px] px-3 border bg-white rounded text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
+          disabled={disabled}
+          className={`mt-2 w-full h-[40px] px-3 border rounded text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0 ${
+            disabled ? "bg-gray-50 cursor-default" : "bg-white"
+          }`}
         />
       )}
     </div>

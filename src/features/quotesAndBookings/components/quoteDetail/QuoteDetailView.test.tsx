@@ -126,7 +126,7 @@ describe("QuoteDetailView", () => {
   it("draws the event name and quote number as the heading, and the Contract tab", () => {
     mocks.state = { quote: quote({ invoiceNumber: 1042 }), isLoading: false, error: null };
     const html = render();
-    expect(html).toMatch(/<h1[^>]*>Spring Gala \(#1042\)<\/h1>/);
+    expect(html).toMatch(/<h1[^>]*>Spring Gala \(#000001042\)<\/h1>/);
     expect(html).toContain('data-tab="contract"');
     expect(html).not.toContain("Loading quote...");
   });

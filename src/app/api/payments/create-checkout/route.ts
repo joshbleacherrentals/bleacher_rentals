@@ -5,6 +5,7 @@ import { Database } from "../../../../../database.types";
 import { getEventStripeConfiguration } from "@/features/stripe-integration/getEventStripeConfiguration";
 import { stripeForAccount } from "@/features/stripe-integration/util";
 import { loadEventPaymentContext } from "@/features/quotesAndBookings/server/eventPaymentContext";
+import { formatInvoiceNumber } from "@/features/quotesAndBookings/utils/invoiceNumber";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -55,7 +56,8 @@ export async function POST(req: NextRequest) {
   }
 
   const origin = req.nextUrl.origin;
-  const invoiceLabel = event.invoice_number ? `#${event.invoice_number}` : event.id.slice(0, 8);
+  const invoiceNumberText = formatInvoiceNumber(event.invoice_number);
+  const invoiceLabel = invoiceNumberText ? `#${invoiceNumberText}` : event.id.slice(0, 8);
 
   if (typeof amountCents !== "number" || !Number.isInteger(amountCents) || amountCents < 50) {
     return NextResponse.json({ error: "Payment amount must be at least $0.50." }, { status: 400 });
