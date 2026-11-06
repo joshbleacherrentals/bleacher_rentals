@@ -63,6 +63,7 @@ test.describe("Collections tab (accountant)", () => {
       "Collections",
       "AR Deposits",
       "Need attention",
+      "Audit", // docs/specs/accountant-audit-01-tab.md: the fourth tab
     ]);
     await expect(page.getByPlaceholder(/^Search by name, invoice #/)).toHaveCount(0);
     await expect(page.getByRole("switch", { name: "Show Deleted" })).toHaveCount(0);

@@ -30,14 +30,25 @@ describe("the /quotes-bookings declaration", () => {
 
 describe("the /accountant declaration", () => {
   // docs/specs/accountant-collections-07-collections-list.md §3.
-  it("has Collections first, then AR Deposits and Need attention; opens on Collections; writes the tab to the URL", () => {
+  // docs/specs/accountant-audit-01-tab.md §5: Audit is the fourth and last tab.
+  it("has Collections first, then AR Deposits, Need attention and Audit; opens on Collections; writes the tab to the URL", () => {
     expect(ACCOUNTANT_TABS.tabs.map((tab) => tab.id)).toEqual([
       "collections",
       "ar_deposits",
       "need_attention",
+      "audit",
     ]);
     expect(ACCOUNTANT_TABS.openingTab).toBe("collections");
     expect(ACCOUNTANT_TABS.writeTabToUrl).toBe(true);
+  });
+
+  it("reads ?tab=audit back, and offers no Status filter on Audit", () => {
+    expect(parseListTab("audit", ACCOUNTANT_TABS)).toBe("audit");
+    expect(tabUsesStatusFilter("audit", ACCOUNTANT_TABS)).toBe(false);
+  });
+
+  it("gives Audit the default sort, which it never uses (it keeps its own order)", () => {
+    expect(defaultSortForTab("audit", ACCOUNTANT_TABS)).toEqual(DEFAULT_SORT);
   });
 
   it("gives Collections the default sort (it owns its own order) and no Status filter", () => {

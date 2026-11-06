@@ -8,6 +8,7 @@ import { CountBadge } from "@/components/CountBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination } from "@/components/Pagination";
 import { useLayoutContext } from "@/contexts/LayoutContexts";
+import { AuditTab } from "@/features/accountantAudit/components/AuditTab";
 import { CollectionsTab } from "@/features/accountantCollections/components/CollectionsTab";
 import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
 import {
@@ -39,9 +40,10 @@ import { nextSort, type SortKey } from "@/features/quotesAndBookings/utils/sortE
  * The Accountant page: the AR Deposits tab, taken out of /quotes-bookings, and Collections, the tab
  * it opens on. The AR tab is gone (Collections replaced it); its logic is kept, see `ACCOUNTANT_TABS`.
  * The filter sidebar, the Filter button, search, Show Deleted and the filter chips belong to the
- * receivables tabs and are not drawn on Collections.
+ * receivables tabs and are not drawn on Collections or on Audit, the last tab.
  * docs/specs/accountant-quotes-02-accountant-page.md
  * docs/specs/accountant-collections-09-design.md
+ * docs/specs/accountant-audit-01-tab.md
  */
 export default function AccountantPage() {
   const router = useRouter();
@@ -89,7 +91,11 @@ export default function AccountantPage() {
     return () => observer.disconnect();
   }, [scrollRef]);
 
+  // Collections and Audit are not receivables lists: the page's filter sidebar, Filter button, Show
+  // Deleted, search box and filter chips are not drawn on them.
   const onCollections = activeTab === "collections";
+  const onAudit = activeTab === "audit";
+  const hideReceivablesChrome = onCollections || onAudit;
 
   const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
 
@@ -152,7 +158,7 @@ export default function AccountantPage() {
   // sidebar, header and window edge; the content column puts its own padding back.
   return (
     <div className="-m-4 flex items-start">
-      {!onCollections && (
+      {!hideReceivablesChrome && (
         <FilterSidebar
           filters={filters}
           isOpen={filters.isOpen}
@@ -177,7 +183,7 @@ export default function AccountantPage() {
         <PageHeader
           title="Accountant"
           action={
-            onCollections ? undefined : (
+            hideReceivablesChrome ? undefined : (
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -211,7 +217,7 @@ export default function AccountantPage() {
           }
         />
 
-        {!onCollections && (
+        {!hideReceivablesChrome && (
           <div className="relative mt-4 mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -257,8 +263,9 @@ export default function AccountantPage() {
                   focusable={false}
                 />
               </TabsTrigger>
+              <TabsTrigger value="audit">Audit</TabsTrigger>
             </TabsList>
-            {!onCollections && (
+            {!hideReceivablesChrome && (
               <ActiveFilterChips
                 filters={filters}
                 searchQuery={searchQuery}
@@ -272,6 +279,10 @@ export default function AccountantPage() {
 
           <TabsContent value="collections">
             <CollectionsTab />
+          </TabsContent>
+
+          <TabsContent value="audit">
+            <AuditTab />
           </TabsContent>
 
           {/* Always mounted: the payment queries and the allocation run once for both tabs. */}

@@ -38,6 +38,7 @@ describe("permission matrix", () => {
         "Blocked Customer Emails",
         "Collections",
         "Companies & Contacts",
+        "Driver Audit",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
         "Edit Team Members",
@@ -340,6 +341,89 @@ describe("permission matrix", () => {
         );
         expect(PERMISSIONS.find((p) => p.label === "Accounts Receivable")?.description).toMatch(
           /The Accountant page opens on the Collections tab\./,
+        );
+      });
+    });
+
+    // docs/specs/accountant-audit-01-tab.md §3 and §5 (R4, R5): the Audit tab of the Accountant page.
+    describe("Driver Audit", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Driver Audit");
+
+      it("sits in Day to Day Operations, right after Collections", () => {
+        const index = PERMISSIONS.findIndex((p) => p.label === "Driver Audit");
+        expect(PERMISSIONS[index - 1]?.label).toBe("Collections");
+        expect(row?.category).toBe("Day to Day Operations");
+      });
+
+      it("is read for an admin and an accountant, and none for the other five roles", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "read",
+          accountant: "read",
+          account_manager: "none",
+          viewer: "none",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("answers for all seven roles, with a note for each", () => {
+        expect(Object.keys(row?.roles ?? {}).sort()).toEqual(Object.keys(ROLE_LABELS).sort());
+        for (const [role, access] of Object.entries(row?.roles ?? {})) {
+          expect(access.note, role).toBeTruthy();
+        }
+      });
+
+      it("describes the tab: the driver, the trackers, the paid status, and that it is read-only", () => {
+        expect(row?.description).toBe(
+          "The Audit tab of the Accountant page. The user picks a driver and reads all of that driver's work trackers: status, date, bleacher, type, pickup and dropoff, drive time, distance, and whether the tracker's week has been paid. Read-only: nothing on the tab changes a work tracker or a payment.",
+        );
+      });
+
+      it("tells an admin and an accountant what they can read, deactivated drivers included", () => {
+        expect(row?.roles.admin.note).toBe(
+          "Can open the Audit tab and read the work trackers of any driver, including drivers who are no longer active.",
+        );
+        expect(row?.roles.accountant.note).toBe(
+          "Can open the Audit tab and read the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
+        );
+      });
+
+      it("tells an account manager and a viewer where they still read work trackers", () => {
+        expect(row?.roles.account_manager.note).toBe(
+          "The Accountant page is for accountants and administrators. An account manager still reads their drivers' work trackers on the Work Trackers pages.",
+        );
+        expect(row?.roles.viewer.note).toBe(
+          "The Accountant page is for accountants and administrators. A viewer still reads work trackers on the Work Trackers pages.",
+        );
+      });
+
+      it("keeps the notes of the developer, driver and maintainer in the wording of the neighbouring rows", () => {
+        const collections = PERMISSIONS.find((p) => p.label === "Collections");
+        expect(row?.roles.developer.note).toBe(
+          "Developer is only meant to work on the developer roadmap and the Dev Tools pages.",
+        );
+        expect(row?.roles.driver.note).toBe(collections?.roles.driver.note);
+        expect(row?.roles.maintainer.note).toBe(collections?.roles.maintainer.note);
+      });
+
+      it("is named in the accountant's role description, before the line about what is hidden", () => {
+        expect(ROLE_DESCRIPTIONS.accountant).toContain(
+          "Also has the Audit tab of the Accountant page, where they pick a driver and read all of that driver's work trackers with their Paid or Not paid status.",
+        );
+        expect(
+          ROLE_DESCRIPTIONS.accountant.endsWith(
+            "Everything else on the web dashboard is hidden from this role.",
+          ),
+        ).toBe(true);
+      });
+
+      it("leaves the administrator's description as it was: full access", () => {
+        expect(ROLE_DESCRIPTIONS.admin).toBe(
+          "Full access to all features, settings, and team management.",
         );
       });
     });
