@@ -285,6 +285,26 @@ describe("POST /api/payments/create-checkout", () => {
     expect(mockCheckoutCreate).not.toHaveBeenCalled();
   });
 
+  it("names the payment with the nine-digit invoice number", async () => {
+    seedHappyPath({ event: { invoice_number: 42, event_name: "Game Day" } });
+    await POST(makeRequest({ eventId: "evt-1", amountCents: 5000, payerName: "Bob" }));
+    const sessionArgs = mockCheckoutCreate.mock.calls[0][0];
+    expect(sessionArgs.line_items[0].price_data.product_data.name).toBe(
+      "Invoice #000000042 — Game Day",
+    );
+  });
+
+  it("names the payment with the first eight characters of the id when there is no number", async () => {
+    seedHappyPath({
+      event: { id: "evt-uuid-123456", invoice_number: null, event_name: "Game Day" },
+    });
+    await POST(makeRequest({ eventId: "evt-uuid-123456", amountCents: 5000, payerName: "Bob" }));
+    const sessionArgs = mockCheckoutCreate.mock.calls[0][0];
+    expect(sessionArgs.line_items[0].price_data.product_data.name).toBe(
+      "Invoice evt-uuid — Game Day",
+    );
+  });
+
   it("uses eventId in success_url/cancel_url when invoice_number is null", async () => {
     seedHappyPath({ event: { id: "evt-uuid-123", invoice_number: null } });
     await POST(makeRequest({ eventId: "evt-uuid-123", amountCents: 5000, payerName: "Bob" }));

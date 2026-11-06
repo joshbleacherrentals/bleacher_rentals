@@ -108,6 +108,22 @@ describe("ContactHistorySheet", () => {
     expect(html).not.toContain("Loading events...");
   });
 
+  it("writes each event's number with nine digits, and a dash when it has none", () => {
+    mocks.contact = {
+      isLoading: false,
+      buckets: {
+        future: [
+          { ...event("f1", { invoiceNumber: 42 }), relation: "primary" },
+          { ...event("f2", { invoiceNumber: null }), relation: "primary" },
+        ],
+        past: [],
+      } as Buckets,
+    };
+    const html = contactSheet(true);
+    expect(html).toContain("(#000000042)");
+    expect(html).toContain("(#—)");
+  });
+
   it("says so when there are no events", () => {
     mocks.contact = { isLoading: false, buckets: { future: [], past: [] } as Buckets };
     const html = contactSheet(true);

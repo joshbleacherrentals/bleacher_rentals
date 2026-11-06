@@ -69,15 +69,33 @@ describe("queryStringToWrite", () => {
     expect(queryStringToWrite(state, "tab=ar&template=x", QB)).toBe("template=x");
   });
 
-  it("writes ?tab=ar on /accountant when the URL has none — the first sync rewrites it", () => {
-    const arState: UrlSyncedListState = {
+  // docs/specs/accountant-collections-07-collections-list.md §2: the Collections list keeps its
+  // state in csort / cdir / cnotdue, names the list hook does not know.
+  it("keeps the Collections list parameters when the list rewrites the URL", () => {
+    const collectionsState: UrlSyncedListState = { ...state, tab: "collections" };
+    const url = "tab=collections&csort=amount&cdir=desc&cnotdue=1";
+
+    expect(queryStringToWrite(collectionsState, url, ACCT)).toBeNull();
+    expect(queryStringToWrite({ ...collectionsState, searchQuery: "acme" }, url, ACCT)).toBe(
+      `${url}&q=acme`,
+    );
+    // From a URL with no tab yet the first sync adds it and leaves the Collections parameters.
+    expect(queryStringToWrite(collectionsState, "csort=amount&cdir=desc&cnotdue=1", ACCT)).toBe(
+      "csort=amount&cdir=desc&cnotdue=1&tab=collections",
+    );
+  });
+
+  it("writes ?tab=ar_deposits on /accountant when the URL has none — the first sync rewrites it", () => {
+    const depositsState: UrlSyncedListState = {
       ...state,
-      tab: "ar",
-      sort: { key: "start_date", direction: "desc" },
+      tab: "ar_deposits",
+      sort: { key: "start_date", direction: "asc" },
     };
-    expect(queryStringToWrite(arState, "", ACCT)).toBe("tab=ar");
-    expect(queryStringToWrite(arState, "tab=all&statuses=quoted", ACCT)).toBe("tab=ar");
-    expect(queryStringToWrite(arState, "tab=ar", ACCT)).toBeNull();
+    expect(queryStringToWrite(depositsState, "", ACCT)).toBe("tab=ar_deposits");
+    expect(queryStringToWrite(depositsState, "tab=all&statuses=quoted", ACCT)).toBe(
+      "tab=ar_deposits",
+    );
+    expect(queryStringToWrite(depositsState, "tab=ar_deposits", ACCT)).toBeNull();
   });
 });
 
@@ -103,7 +121,9 @@ describe("pageAfterChange", () => {
 
 describe("tabSwitchOutcome", () => {
   it("starts the new tab on its own sort", () => {
-    expect(tabSwitchOutcome("ar", false, ACCT).sort).toEqual(defaultSortForTab("ar", ACCT));
+    expect(tabSwitchOutcome("collections", false, ACCT).sort).toEqual(
+      defaultSortForTab("collections", ACCT),
+    );
     expect(tabSwitchOutcome("ar_deposits", false, ACCT).sort).toEqual(
       defaultSortForTab("ar_deposits", ACCT),
     );
@@ -111,7 +131,6 @@ describe("tabSwitchOutcome", () => {
   });
 
   it("drops a status filter when the tab does not offer one", () => {
-    expect(tabSwitchOutcome("ar", true, ACCT).dropStatuses).toBe(true);
     expect(tabSwitchOutcome("ar_deposits", true, ACCT).dropStatuses).toBe(true);
   });
 
@@ -120,6 +139,6 @@ describe("tabSwitchOutcome", () => {
   });
 
   it("has nothing to drop when no status is chosen", () => {
-    expect(tabSwitchOutcome("ar", false, ACCT).dropStatuses).toBe(false);
+    expect(tabSwitchOutcome("ar_deposits", false, ACCT).dropStatuses).toBe(false);
   });
 });

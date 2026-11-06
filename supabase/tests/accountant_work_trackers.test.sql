@@ -26,7 +26,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(60);
+SELECT plan(61);
 
 -- Rows affected by a statement, run as the current (RLS-bound) role.
 CREATE FUNCTION public.test_rows_affected(q text) RETURNS int
@@ -206,7 +206,9 @@ SELECT is((SELECT count(*)::int FROM public."BleacherEvents"), 0, 'an accountant
 SELECT is((SELECT count(*)::int FROM public."PaymentHistory" WHERE event_uuid = :'event'), 1, 'an accountant can now read PaymentHistory (Accountant page)');
 SELECT is((SELECT count(*)::int FROM public."DamageReports"), 0, 'an accountant still cannot read DamageReports');
 SELECT is((SELECT count(*)::int FROM public."AccountManagers"), 0, 'an accountant still cannot read AccountManagers');
-SELECT is((SELECT count(*)::int FROM public."Accountants"), 0, 'an accountant still cannot read who holds the role');
+-- An accountant reads their own row (migration 20261030120000) and nobody else's.
+SELECT is((SELECT count(*)::int FROM public."Accountants" WHERE user_uuid = :'user_acct'), 1, 'an accountant can read their own row of Accountants');
+SELECT is((SELECT count(*)::int FROM public."Accountants" WHERE user_uuid <> :'user_acct'), 0, 'an accountant still cannot read who else holds the role');
 SELECT is((SELECT count(*)::int FROM public."Contacts" WHERE id = :'contact'), 1, 'an accountant can now read Contacts (Accountant page)');
 SELECT is((SELECT count(*)::int FROM public."Notifications"), 0, 'an accountant still cannot read Notifications');
 

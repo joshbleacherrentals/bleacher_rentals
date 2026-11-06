@@ -21,7 +21,7 @@ test.describe("Accountant page (admin)", () => {
     await page.goto(ACCOUNTANT);
 
     await expect(page).toHaveURL(/\/accountant/);
-    await expect.poll(() => params(page).get("tab")).toBe("ar");
+    await expect.poll(() => params(page).get("tab")).toBe("collections");
     await expect(page.getByRole("heading", { name: "Accountant" })).toBeVisible();
     await expect(page.getByRole("tab", { name: /^AR Deposits/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Create Quote/ })).toHaveCount(0);
@@ -34,10 +34,12 @@ test.describe("Accountant page (admin)", () => {
     expect(accountant!.y).toBeLessThan(workTrackers!.y);
   });
 
-  test("S8: a click on an AR row opens that booking at /quotes-bookings/{id}", async ({ page }) => {
-    await page.goto(ACCOUNTANT);
+  test("S8: a click on an AR Deposits row opens that booking at /quotes-bookings/{id}", async ({
+    page,
+  }) => {
+    await page.goto(`${ACCOUNTANT}?tab=ar_deposits`);
 
-    // Needs at least one booked event with an amount due. For an accountant the same click opens
+    // Needs at least one booked event with an amount due after today. For an accountant the same click opens
     // the booking once docs/specs/accountant-quotes-04 is released with this spec.
     await page.locator("tbody tr").first().click({ timeout: 60_000 });
 

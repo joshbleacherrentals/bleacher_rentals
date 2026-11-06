@@ -3,3 +3,5 @@ node_modules
 database.types.ts
 public
 supabase/.temp
+docs/design/**/*.dc.html
+docs/design/**/canvas.json

@@ -126,6 +126,16 @@ describe("resolveZoneClass", () => {
     }
   });
 
+  // The quote's venue state is a code (MT) and the zone table holds the name (Montana): it is the
+  // same state, so the zone's class is found rather than reported as "no zone".
+  it("finds the class of a state written as a code when the zone table holds the name", async () => {
+    state.stateRows = [{ state_province: "Montana", zone_uuid: "zone-west" }];
+    state.classRows = [{ zone_uuid: "zone-west", qbo_connection_uuid: "usa", qbo_class_id: "41" }];
+
+    expect(await resolveZoneClass("usa", "MT")).toEqual({ classId: "41" });
+    expect(await resolveZoneClass("usa", "Montana")).toEqual({ classId: "41" });
+  });
+
   it("returns the one class of the Canadian connection for a province in a zone", async () => {
     expect(await resolveZoneClass("can", "ON")).toEqual({ classId: "3" });
   });

@@ -165,7 +165,12 @@ export type QboInvoiceSnapshot = {
   dueDate: string;
   customerId: string;
   billToLine1: string;
-  ship: { street: string; city: string; state: string; zip: string };
+  /**
+   * The ship-to address. `other` is the address lines after the first and the country, as QuickBooks
+   * holds them: an invoice saved by hand in QuickBooks has the city, province and postal code there
+   * and leaves `city`, `state` and `zip` empty.
+   */
+  ship: { street: string; city: string; state: string; zip: string; other: string[] };
   memo: string;
   lines: QboInvoiceLineSnapshot[];
   /** Null when QuickBooks sent no total, or one that is not an amount. */

@@ -1289,6 +1289,17 @@ const DevAllowedEmailsCols = {
 } satisfies PowerSyncColsFor<"DevAllowedEmails">;
 const DevAllowedEmails = new Table(DevAllowedEmailsCols);
 
+// Collections follow-up tasks (docs/specs/accountant-collections-01-backend.md). Open while
+// completed = 0; an event has at most one open task.
+const ArEventTasksCols = {
+  created_at: column.text,
+  due_date: column.text,
+  completed: column.integer,
+  note: column.text,
+  event_uuid: column.text,
+} satisfies PowerSyncColsFor<"ArEventTasks">;
+const ArEventTasks = new Table(ArEventTasksCols, { indexes: { event_uuid: ["event_uuid"] } });
+
 const EventEmailLogCols = {
   event_uuid: column.text,
   trigger: column.text,
@@ -1481,6 +1492,7 @@ export const AppSchema = new Schema({
   EmailTriggerBindings,
   EventEmailLog,
   DevAllowedEmails,
+  ArEventTasks,
 });
 
 export type PowerSyncDB = (typeof AppSchema)["types"];
@@ -1556,3 +1568,4 @@ export type ChangeLogRecord = PowerSyncDB["ChangeLog"];
 export type DriverSurveyRecord = PowerSyncDB["DriverSurveys"];
 export type DriverSurveyQuestionRecord = PowerSyncDB["DriverSurveyQuestions"];
 export type DriverSurveyResponseRecord = PowerSyncDB["DriverSurveyResponses"];
+export type ArEventTasksRecord = PowerSyncDB["ArEventTasks"];

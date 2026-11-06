@@ -71,9 +71,25 @@ const updatedAnswer = (quote: CreatedQuote, warnings: unknown[] = []): FakeAnswe
 });
 
 const CANDIDATES = [
-  { id: "C1", displayName: "Dana Whitfield", companyName: "Riverside High", email: "dana@r.edu" },
-  { id: "C2", displayName: "Dana W.", companyName: null, email: null },
+  {
+    id: "C1",
+    displayName: "Dana Whitfield",
+    companyName: "Riverside High",
+    email: "dana@r.edu",
+    active: true,
+  },
+  { id: "C2", displayName: "Dana W.", companyName: null, email: null, active: true },
 ];
+
+// docs/specs/qbo-invoice-02a-customer-matching.md §5: QuickBooks refused a new customer because the
+// name is taken, and the route offers the customer that holds it.
+const NAME_TAKEN = {
+  id: "C9",
+  displayName: "Jennifer Green",
+  companyName: "Jennifer Green",
+  email: null,
+  active: true,
+};
 
 test.describe("Create and Update invoice buttons (admin)", () => {
   let quote: CreatedQuote;
@@ -114,7 +130,7 @@ test.describe("Create and Update invoice buttons (admin)", () => {
     }) => {
       const sent = await fakeRoute(page, (body, n) =>
         n === 0
-          ? { json: { status: "choose_customer", candidates: CANDIDATES } }
+          ? { json: { status: "choose_customer", candidates: CANDIDATES, reason: "several" } }
           : createdAnswer(quote),
       );
       await page.goto(billing(quote));
@@ -137,7 +153,7 @@ test.describe("Create and Update invoice buttons (admin)", () => {
     test("S5: 'Create a new customer' sends { kind: 'new' }", async ({ page }) => {
       const sent = await fakeRoute(page, (body, n) =>
         n === 0
-          ? { json: { status: "choose_customer", candidates: CANDIDATES } }
+          ? { json: { status: "choose_customer", candidates: CANDIDATES, reason: "several" } }
           : createdAnswer(quote),
       );
       await page.goto(billing(quote));
@@ -153,7 +169,7 @@ test.describe("Create and Update invoice buttons (admin)", () => {
 
     test("S5: Cancel on the customer window sends nothing more", async ({ page }) => {
       const sent = await fakeRoute(page, () => ({
-        json: { status: "choose_customer", candidates: CANDIDATES },
+        json: { status: "choose_customer", candidates: CANDIDATES, reason: "several" },
       }));
       await page.goto(billing(quote));
       await createButton(page).click({ timeout: 60_000 });
@@ -163,6 +179,57 @@ test.describe("Create and Update invoice buttons (admin)", () => {
       await expect(dialog(page)).toHaveCount(0);
       await expect(createButton(page)).toBeVisible();
       expect(sent).toHaveLength(1);
+    });
+
+    test("02a S1: a taken name: the window offers the customer that holds it, with no 'Create a new customer'", async ({
+      page,
+    }) => {
+      const sent = await fakeRoute(page, (body, n) =>
+        n === 0
+          ? {
+              json: {
+                status: "choose_customer",
+                candidates: [NAME_TAKEN],
+                reason: "name_taken",
+              },
+            }
+          : createdAnswer(quote),
+      );
+      await page.goto(billing(quote));
+      await createButton(page).click({ timeout: 60_000 });
+
+      await expect(dialog(page)).toContainText(
+        "QuickBooks already has a customer named Jennifer Green",
+      );
+      await expect(dialog(page).getByRole("button", { name: "Create a new customer" })).toHaveCount(
+        0,
+      );
+      await expect(dialog(page)).not.toContainText("Inactive in QuickBooks");
+      await dialog(page).getByRole("button", { name: "Use this customer" }).click();
+
+      await expect(
+        page.getByText(`Invoice ${quote.invoiceNumber} created in QuickBooks`),
+      ).toBeVisible();
+      expect(sent[1]).toEqual({
+        eventId: quote.eventId,
+        customerChoice: { kind: "existing", customerId: "C9" },
+      });
+    });
+
+    test("02a S2: a taken name held by an inactive customer: the window says using it turns it on", async ({
+      page,
+    }) => {
+      await fakeRoute(page, () => ({
+        json: {
+          status: "choose_customer",
+          candidates: [{ ...NAME_TAKEN, active: false }],
+          reason: "name_taken",
+        },
+      }));
+      await page.goto(billing(quote));
+      await createButton(page).click({ timeout: 60_000 });
+
+      await expect(dialog(page)).toContainText("Inactive in QuickBooks. Using it turns it on.");
     });
 
     test("S6: the number is taken: the window shows number, customer and total, and Overwrite sends overwriteInvoiceId", async ({

@@ -132,6 +132,8 @@ export function buildInvoicePayload(
   };
 
   const body: QboInvoiceBody = {
+    // validateInvoiceSource has refused a quote without a number. Written as stored (43, not
+    // 000000043): QuickBooks must carry the same text the update check compares with.
     DocNumber: String(source.invoiceNumber),
     TxnDate: source.eventStart,
     DueDate: source.dueDate,

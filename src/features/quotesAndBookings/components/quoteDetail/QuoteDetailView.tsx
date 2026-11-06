@@ -36,6 +36,7 @@ import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { logQuoteSentLocal } from "../../db/logQuoteSentLocal";
 import { SendQuoteDialog } from "../sendQuote/SendQuoteDialog";
 import { cleanRecipients } from "../../utils/sendQuote";
+import { formatInvoiceNumber } from "../../utils/invoiceNumber";
 // import { requestReview } from "@/features/alerts/requestReview";
 // import { ClipboardCheck } from "lucide-react";
 import { DateTime } from "luxon";
@@ -243,7 +244,7 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
       <div className="bg-linear-to-r from-gray-800 to-gray-600 text-white px-6 py-4">
         <h1 className="text-xl font-bold">
           {quote.invoiceNumber != null
-            ? `${quote.eventName} (#${quote.invoiceNumber})`
+            ? `${quote.eventName} (#${formatInvoiceNumber(quote.invoiceNumber)})`
             : quote.eventName}
         </h1>
         {subtitle && <p className="text-sm text-white/70 mt-0 mb-4">{subtitle}</p>}

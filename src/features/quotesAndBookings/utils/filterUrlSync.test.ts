@@ -236,29 +236,29 @@ describe("tab in the URL — /quotes-bookings (one tab, never written)", () => {
   });
 });
 
-describe("tab in the URL — /accountant (AR and AR Deposits, always written)", () => {
-  const arState: UrlSyncedListState = {
+describe("tab in the URL — /accountant (always written)", () => {
+  const depositsState: UrlSyncedListState = {
     ...emptyState,
-    tab: "ar",
-    sort: { key: "start_date", direction: "desc" },
+    tab: "ar_deposits",
+    sort: { key: "start_date", direction: "asc" },
   };
 
   it("always writes ?tab, even for the opening tab, and keeps the tab's own sort out", () => {
-    const params = filtersToSearchParams(arState, ACCT);
-    expect(params.get("tab")).toBe("ar");
+    const params = filtersToSearchParams(depositsState, ACCT);
+    expect(params.get("tab")).toBe("ar_deposits");
     expect(params.get("sort")).toBeNull();
 
-    const deposits = filtersToSearchParams(
-      { ...arState, tab: "ar_deposits", sort: { key: "start_date", direction: "asc" } },
+    const attention = filtersToSearchParams(
+      { ...depositsState, tab: "need_attention", sort: { key: "start_date", direction: "desc" } },
       ACCT,
     );
-    expect(deposits.get("tab")).toBe("ar_deposits");
-    expect(deposits.get("sort")).toBeNull();
+    expect(attention.get("tab")).toBe("need_attention");
+    expect(attention.get("sort")).toBeNull();
   });
 
-  it("round-trips the AR tab", () => {
-    const parsed = searchParamsToFilters(filtersToSearchParams(arState, ACCT), ACCT);
-    expect(parsed).toEqual(arState);
+  it("round-trips the AR Deposits tab", () => {
+    const parsed = searchParamsToFilters(filtersToSearchParams(depositsState, ACCT), ACCT);
+    expect(parsed).toEqual(depositsState);
   });
 
   it("restores AR Deposits with its nearest-first default sort", () => {
@@ -269,7 +269,7 @@ describe("tab in the URL — /accountant (AR and AR Deposits, always written)", 
 
   it("writes a sort that differs from the tab's default", () => {
     const params = filtersToSearchParams(
-      { ...arState, sort: { key: "amount_due", direction: "desc" } },
+      { ...depositsState, sort: { key: "amount_due", direction: "desc" } },
       ACCT,
     );
     expect(params.get("sort")).toBe("amount_due:desc");
@@ -279,12 +279,14 @@ describe("tab in the URL — /accountant (AR and AR Deposits, always written)", 
     });
   });
 
-  it("opens AR for a missing, unknown or old ?tab and ignores a status in the URL", () => {
-    for (const raw of [undefined, "bogus", "all"]) {
+  // docs/specs/accountant-collections-07-collections-list.md §3: Collections is the opening tab.
+  // "ar" is the tab Collections replaced: a bookmark of it opens Collections.
+  it("opens Collections for a missing, unknown or old ?tab and ignores a status in the URL", () => {
+    for (const raw of [undefined, "bogus", "all", "ar"]) {
       const params = new URLSearchParams({ statuses: "quoted", am: "am-1" });
       if (raw) params.set("tab", raw);
       const parsed = searchParamsToFilters(params, ACCT);
-      expect(parsed.tab).toBe("ar");
+      expect(parsed.tab).toBe("collections");
       expect(parsed.filters.statuses).toEqual([]);
       expect(parsed.filters.accountManagerUserUuid).toBe("am-1");
     }
@@ -292,14 +294,14 @@ describe("tab in the URL — /accountant (AR and AR Deposits, always written)", 
 
   it("never writes a status filter", () => {
     const params = filtersToSearchParams(
-      { ...arState, filters: { ...emptyState.filters, statuses: ["quoted"] } },
+      { ...depositsState, filters: { ...emptyState.filters, statuses: ["quoted"] } },
       ACCT,
     );
     expect(params.get("statuses")).toBeNull();
   });
 
   it("counts ?tab as a synced parameter — it is always written there", () => {
-    expect(hasUrlSyncedFilterParams(new URLSearchParams({ tab: "ar" }), ACCT)).toBe(true);
+    expect(hasUrlSyncedFilterParams(new URLSearchParams({ tab: "ar_deposits" }), ACCT)).toBe(true);
     expect(hasUrlSyncedFilterParams(new URLSearchParams({ template: "revenue" }), ACCT)).toBe(
       false,
     );

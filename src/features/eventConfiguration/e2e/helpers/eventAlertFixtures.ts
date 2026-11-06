@@ -234,3 +234,17 @@ export async function seedPriorLocation(fixture: SeededEventAlert): Promise<() =
     await supabase.from("Addresses").delete().eq("id", address.id);
   };
 }
+
+/**
+ * `Events.hsl_hue` as Postgres has it. The dashboard writes the colour through PowerSync, so a spec
+ * polls this until the upload has landed; it is the proof the slider's release was saved.
+ */
+export async function readEventHue(eventUuid: string): Promise<number | null> {
+  const { data, error } = await adminClient()
+    .from("Events")
+    .select("hsl_hue")
+    .eq("id", eventUuid)
+    .single();
+  if (error || !data) throw new Error(`fixture hue read failed: ${error?.message}`);
+  return data.hsl_hue;
+}

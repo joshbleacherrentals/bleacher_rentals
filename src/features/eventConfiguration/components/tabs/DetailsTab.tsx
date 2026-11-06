@@ -1,15 +1,19 @@
-import React from "react";
 import { CheckCircle, TriangleAlert } from "lucide-react";
 import { Dropdown } from "@/components/DropDown";
 import { Textarea } from "@/components/TextArea";
 import { useCurrentEventStore } from "../../state/useCurrentEventStore";
-import { EventStatus } from "@/features/dashboard/types";
 import { useBleacherTypesActive } from "@/features/pricingMatrix/hooks/useBleacherTypesActive";
 import { useBleacherMismatch } from "../../hooks/useBleacherMismatch";
 import { LostReasonFields } from "@/features/quotesAndBookings/components/lostReason/LostReasonFields";
 
+const noop = () => {};
+
+const READ_ONLY_INPUT =
+  "w-full h-[40px] px-3 py-2 border bg-gray-50 rounded text-sm font-medium text-gray-700 cursor-default";
+
+// Every field below is read-only (docs/specs/dashboard-events-read-only.md §3.3): on screen,
+// greyed, and unable to take input.
 export const DetailsTab = () => {
-  const setField = useCurrentEventStore((s) => s.setField);
   const selectedStatus = useCurrentEventStore((s) => s.selectedStatus);
   const lostReason = useCurrentEventStore((s) => s.lostReason);
   const lostReasonNote = useCurrentEventStore((s) => s.lostReasonNote);
@@ -19,18 +23,6 @@ export const DetailsTab = () => {
   const bleacherRequirements = useCurrentEventStore((s) => s.bleacherRequirements);
   const { bleacherTypes } = useBleacherTypesActive();
   const { assignedCountByType } = useBleacherMismatch();
-
-  React.useEffect(() => {
-    if (selectedStatus === "booked") {
-      const currentBookedAt = useCurrentEventStore.getState().bookedAt;
-      if (!currentBookedAt) {
-        setField("bookedAt", new Date().toISOString().split("T")[0] + "T12:00:00Z");
-      }
-    } else {
-      setField("bookedAt", null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus]);
 
   return (
     <div className="grid grid-cols-2 gap-4">
@@ -104,8 +96,9 @@ export const DetailsTab = () => {
                 { label: "Lost", value: "lost" },
               ]}
               selected={selectedStatus}
-              onSelect={(e) => setField("selectedStatus", e as EventStatus)}
+              onSelect={noop}
               placeholder="Pick status"
+              disabled
             />
           </div>
           {selectedStatus === "lost" && (
@@ -113,9 +106,10 @@ export const DetailsTab = () => {
               <LostReasonFields
                 reason={lostReason}
                 note={lostReasonNote}
-                onReasonChange={(val) => setField("lostReason", val)}
-                onNoteChange={(val) => setField("lostReasonNote", val)}
+                onReasonChange={noop}
+                onNoteChange={noop}
                 labelClassName="block text-sm font-medium text-black/70"
+                disabled
               />
             </div>
           )}
@@ -124,11 +118,9 @@ export const DetailsTab = () => {
               <label className="block text-sm font-medium text-black/70">Booked At</label>
               <input
                 type="date"
-                className="w-full h-[40px] px-3 py-2 border bg-white rounded text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
+                className={READ_ONLY_INPUT}
                 value={bookedAt?.split("T")[0] ?? ""}
-                onChange={(e) =>
-                  setField("bookedAt", e.target.value ? e.target.value + "T12:00:00Z" : null)
-                }
+                disabled
               />
             </div>
           )}
@@ -136,11 +128,9 @@ export const DetailsTab = () => {
             <label className="block text-sm font-medium text-black/70">Created At</label>
             <input
               type="datetime-local"
-              className="w-full h-[40px] px-3 py-2 border bg-white rounded text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-greenAccent focus:border-0"
+              className={READ_ONLY_INPUT}
               value={createdAt ? createdAt.slice(0, 16) : ""}
-              onChange={(e) =>
-                setField("createdAt", e.target.value ? e.target.value + ":00Z" : null)
-              }
+              disabled
             />
           </div>
         </div>
@@ -149,10 +139,10 @@ export const DetailsTab = () => {
       <div>
         <label className="block text-sm font-medium text-black/70 mb-1">Notes</label>
         <Textarea
-          className="bg-white"
+          className="bg-gray-50 text-gray-700 disabled:opacity-100"
           placeholder="Type your message here."
           value={notes}
-          onChange={(e) => setField("notes", e.target.value)}
+          disabled
         />
       </div>
     </div>

@@ -12,6 +12,18 @@ amendment of 2026-10-24** (user's answer, after a sandbox run showed QuickBooks'
 tax 0 against the quote's 29,646.00 and 2,196.00): the `totals` reason compares the **total before
 tax** and the **tax**, each on its own (§4); it no longer compares `TotalAmt` with the quote's total
 including tax, which reported a tax QuickBooks had not saved twice.
+**A fourth amendment of 2026-11-03** (the user's choice "text of all parts", after a sandbox invoice
+that was only opened and Saved in the QuickBooks screen failed the check with City, State and ZIP
+empty on QuickBooks' side): the `address` reason reads the ship-to **as text**. QuickBooks keeps
+`Line1` after such a Save and moves the city, province and postal code into free-text lines, so the
+snapshot's `ship` gains `other` (`Line2`…`Line5` and `Country`) and each of the four parts of the
+quote's address (street, city, state, ZIP) must appear, as whole words and without regard to case,
+accents or punctuation, in the street, city, state, ZIP and `other` taken as one text. A state or
+province matches in its name or its code, a postal code with or without its space, a street with a
+unit after it. A part the quote has no value for is not looked for. A difference still names its
+field ("Street", "City", "State", "ZIP code") and shows QuickBooks' own value for it, or the whole
+address when that value is empty. Code: `invoice/addressText.ts`, `compareInvoice.ts`,
+`qboInvoiceApi.ts`, `invoiceTypes.ts`. §3 and §4 below say what they said before this amendment.
 Implementation order: **06** (see the plan, §3). Plan: [qbo-invoice-plan.md](qbo-invoice-plan.md).
 Branch: `q4-sprint1-finance-role`.
 Needs: [01](qbo-invoice-01-link-and-hash.md) (the flag and the reasons),

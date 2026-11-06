@@ -87,9 +87,9 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     // /work-trackers, and /accountant stays first so that it stays the landing page.
     // docs/specs/accountant-address-book.md §4: Companies & Contacts (/companies, /contacts)
     // follows /messages. docs/specs/accountant-team.md §6: /team follows it.
-    // docs/specs/accountant-address-book.md §4: /companies-contacts follows /messages.
-    // docs/specs/accountant-team.md §6: /team follows /companies-contacts.
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: /qbo-quote-types follows /team.
+    // docs/specs/accountant-collections-16-customer-page-view.md §3: /quote follows
+    // /qbo-quote-types.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
@@ -99,10 +99,26 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/contacts",
       "/team",
       "/qbo-quote-types",
+      "/quote",
       "/permissions",
       "/blocked-emails",
       "/changelog",
     ]);
+  });
+
+  // docs/specs/accountant-collections-16-customer-page-view.md §1 and §5: the customer's page,
+  // by its address and from the Show Customer View button of a quote.
+  it("lets an admin, an account manager and an accountant open the customer's page, and nobody else", () => {
+    for (const role of ["admin", "account_manager", "accountant"] as const) {
+      expect(canAccessPath([role], "/quote/evt-1"), role).toBe(true);
+    }
+    for (const role of ["viewer", "maintainer", "developer", "driver"] as const) {
+      expect(canAccessPath([role], "/quote/evt-1"), role).toBe(false);
+    }
+  });
+
+  it("keeps the accountant's landing page the Accountant page, whatever follows it", () => {
+    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
   });
 
   // Companies & Contacts is /companies and /contacts, and the contact profile at /contacts/<uuid>
@@ -153,6 +169,23 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
 
   it("lands an accountant-only user on the Accountant page — there is no dashboard for them", () => {
     expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
+  });
+
+  // docs/specs/accountant-collections-09-design.md §1: the invoice page is reached through the
+  // /accountant prefix, so no role gains or loses a path.
+  it("lets an accountant and an admin open the Collections invoice page, and no one else", () => {
+    expect(canAccessPath(["accountant"], "/accountant/invoice")).toBe(true);
+    expect(canAccessPath(["admin"], "/accountant/invoice")).toBe(true);
+    for (const role of [
+      "account_manager",
+      "developer",
+      "viewer",
+      "maintainer",
+      "driver",
+    ] as const) {
+      expect(canAccessPath([role], "/accountant/invoice"), role).toBe(false);
+      expect(canAccessPath([role], "/accountant"), role).toBe(false);
+    }
   });
 
   it("shows the sidebar to an accountant", () => {

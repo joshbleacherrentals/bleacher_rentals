@@ -66,8 +66,7 @@ async function createAddress(supabase: AdminClient, lead: ParsedLead): Promise<s
  * manager to fix. The contact is reused when the email is already known, and so is the venue when
  * its address is. The owner is `ownerUserUuid`
  * (the quote is unassigned when it is null). The submission is kept as received, for the quote's
- * Submission tab. The invoice number comes from the same database
- * function the app's own create flow uses.
+ * Submission tab. The invoice number is given by the database on the insert.
  */
 export async function createLeadQuote(
   supabase: AdminClient,
@@ -107,15 +106,8 @@ export async function createLeadQuote(
     .single();
   if (error) throw new Error(`Could not create the quote: ${error.message}`);
 
-  // Same step as the app's create flow. A failure here leaves a quote without a number, which is
-  // better than losing the lead.
-  const { data: invoiceNumber } = await supabase.rpc("generate_invoice_number" as never);
-  if (invoiceNumber != null) {
-    await supabase
-      .from("Events")
-      .update({ invoice_number: Number(invoiceNumber) })
-      .eq("id", event.id);
-  }
+  // No invoice number is asked for here: the database gives it to the row on this INSERT (trigger
+  // `events_assign_invoice_number`). Spec: docs/specs/invoice-number-01-assign-in-database.md
 
   return event.id;
 }
