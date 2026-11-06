@@ -76,7 +76,7 @@ export default function AccountantPage() {
     switchTab,
     removeFilter,
     clearAllFilters,
-  } = useListPageState(ACCOUNTANT_TABS);
+  } = useListPageState(ACCOUNTANT_TABS, undefined, true);
 
   // The sidebar is pinned inside the scrolling layout and fills the visible height, so its
   // contents scroll rather than the whole page.

@@ -27,14 +27,16 @@ export const emptyFilters: QuotesBookingsFilters = {
 export function useQuotesAndBookingsFilters(
   initialOverrides?: Partial<QuotesBookingsFilters>,
   initialFromUrl?: Partial<QuotesBookingsFilters>,
+  startClosed = false,
 ) {
   const [filters, setFilters] = useState<QuotesBookingsFilters>(() => {
+    const isOpen = !startClosed;
     if (initialFromUrl) {
       const merged = { ...emptyFilters, ...initialFromUrl };
-      return { ...merged, isOpen: true };
+      return { ...merged, isOpen };
     }
-    if (!initialOverrides) return emptyFilters;
-    return { ...emptyFilters, ...initialOverrides, isOpen: true };
+    if (!initialOverrides) return { ...emptyFilters, isOpen };
+    return { ...emptyFilters, ...initialOverrides, isOpen };
   });
 
   const toggleOpen = useCallback(() => {
