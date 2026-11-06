@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareInvoice, dollarsToCents } from "./compareInvoice";
-import type { QboInvoiceBody, QboInvoiceSnapshot } from "./invoiceTypes";
+import type { ClassPlacement, QboInvoiceBody, QboInvoiceSnapshot } from "./invoiceTypes";
 
 // docs/specs/qbo-invoice-06-totals-check.md §3, §4 and §10: the pure comparison of the invoice we
 // would write today (the builder's body) with the invoice QuickBooks holds.
@@ -45,6 +45,7 @@ const snapshot = (over: Partial<QboInvoiceSnapshot> = {}): QboInvoiceSnapshot =>
   billToLine1: "Pat Lee",
   ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631", other: [] },
   memo: "SC - CLEMSON - RALLY",
+  headerClassId: null,
   lines: [
     {
       amountCents: 750000,
@@ -61,8 +62,11 @@ const snapshot = (over: Partial<QboInvoiceSnapshot> = {}): QboInvoiceSnapshot =>
 
 const quote = { totalCents: 802500, taxCents: 52500 };
 
-const compare = (actual: QboInvoiceSnapshot, body: QboInvoiceBody = expected()) =>
-  compareInvoice({ expected: body, quote, actual });
+const compare = (
+  actual: QboInvoiceSnapshot,
+  body: QboInvoiceBody = expected(),
+  classPlacement: ClassPlacement = "line",
+) => compareInvoice({ expected: body, quote, actual, classPlacement });
 
 /** The first line of a snapshot with some of its values changed. */
 const withLine = (over: Partial<QboInvoiceSnapshot["lines"][number]>) => ({
@@ -295,6 +299,7 @@ describe("compareInvoice — each reason on its own", () => {
         totalCents: 750000,
         taxCents: 0,
       }),
+      classPlacement: "line",
     });
 
     expect(result).toEqual({ matches: true, reasons: [], differences: [] });
@@ -312,6 +317,134 @@ describe("compareInvoice — each reason on its own", () => {
   it("one cent apart is a difference: there is no tolerance", () => {
     expect(compare(snapshot({ totalCents: 802501, taxCents: 52501 })).reasons).toEqual(["totals"]);
     expect(compare(snapshot(withLine({ amountCents: 750001 }))).reasons).toEqual(["amount"]);
+  });
+});
+
+// docs/specs/qbo-invoice-03f-canadian-class-on-header.md §4 and §7: where the Class is read from
+// follows where it was written: the line, the invoice's own field (the header), or nowhere.
+describe("compareInvoice — the Class by the company's setting", () => {
+  /** The invoice the builder writes for a company whose Class is the invoice's own. */
+  const headerBody = (classId: string | null = "class-1"): QboInvoiceBody => {
+    const body = expected();
+    delete body.Line[0].SalesItemLineDetail.ClassRef;
+    if (classId) body.ClassRef = { value: classId };
+    return body;
+  };
+
+  describe("header", () => {
+    it("the same Class on the invoice's own field is no difference", () => {
+      const result = compare(
+        snapshot({ headerClassId: "class-1", ...withLine({ classId: null }) }),
+        headerBody(),
+        "header",
+      );
+
+      expect(result).toEqual({ matches: true, reasons: [], differences: [] });
+    });
+
+    it("QuickBooks holding none against a quote Class is one class difference", () => {
+      const result = compare(
+        snapshot({ headerClassId: null, ...withLine({ classId: null }) }),
+        headerBody("1000000001"),
+        "header",
+      );
+
+      expect(result.reasons).toEqual(["class"]);
+      expect(result.differences).toEqual([
+        { reason: "class", field: "Class", quote: "1000000001", qbo: "none" },
+      ]);
+    });
+
+    it("a Class on the line only still differs: the line is not looked at", () => {
+      const result = compare(
+        snapshot({ headerClassId: null, ...withLine({ classId: "class-1" }) }),
+        headerBody(),
+        "header",
+      );
+
+      expect(result.differences).toEqual([
+        { reason: "class", field: "Class", quote: "class-1", qbo: "none" },
+      ]);
+    });
+
+    it("a Class on the header the quote does not have is a difference ('none' against the id)", () => {
+      const result = compare(
+        snapshot({ headerClassId: "class-9", ...withLine({ classId: null }) }),
+        headerBody(null),
+        "header",
+      );
+
+      expect(result.differences).toEqual([
+        { reason: "class", field: "Class", quote: "none", qbo: "class-9" },
+      ]);
+    });
+
+    it("no Class on either side is no difference", () => {
+      expect(
+        compare(
+          snapshot({ headerClassId: null, ...withLine({ classId: null }) }),
+          headerBody(null),
+          "header",
+        ).matches,
+      ).toBe(true);
+    });
+
+    it("a wrong number of lines does not hide a header difference", () => {
+      const result = compare(
+        snapshot({ headerClassId: null, lines: [] }),
+        headerBody("class-1"),
+        "header",
+      );
+
+      expect(result.reasons).toEqual(["lines", "class"]);
+    });
+
+    it("a different Class on the line is not compared when the header is right", () => {
+      const result = compare(
+        snapshot({ headerClassId: "class-1", ...withLine({ classId: "class-9" }) }),
+        headerBody(),
+        "header",
+      );
+
+      expect(result.matches).toBe(true);
+    });
+  });
+
+  describe("line", () => {
+    it("a Class on the invoice's own field is ignored and the line's Class is compared", () => {
+      const same = compare(snapshot({ headerClassId: "class-9" }), expected(), "line");
+      const differs = compare(
+        snapshot({ headerClassId: "class-1", ...withLine({ classId: "class-9" }) }),
+        expected(),
+        "line",
+      );
+
+      expect(same.matches).toBe(true);
+      expect(differs.differences).toEqual([
+        { reason: "class", field: "Class", quote: "class-1", qbo: "class-9" },
+      ]);
+    });
+  });
+
+  describe("none", () => {
+    it.each([
+      ["a Class on the line", snapshot({ headerClassId: null })],
+      [
+        "a Class on the header",
+        snapshot({ headerClassId: "class-9", ...withLine({ classId: null }) }),
+      ],
+      ["a Class on both", snapshot({ headerClassId: "class-9" })],
+      ["no Class", snapshot({ headerClassId: null, ...withLine({ classId: null }) })],
+    ])("QuickBooks holding %s is no difference", (_label, actual) => {
+      expect(compare(actual, headerBody(null), "none").reasons).not.toContain("class");
+      expect(compare(actual, headerBody(null), "none").matches).toBe(true);
+    });
+
+    it("the other fields are still compared", () => {
+      const result = compare(snapshot({ memo: "something else" }), headerBody(null), "none");
+
+      expect(result.reasons).toEqual(["memo"]);
+    });
   });
 });
 

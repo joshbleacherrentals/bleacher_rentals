@@ -16,10 +16,17 @@ import {
 } from "./buildInvoicePayload";
 import { runInvoiceCheck } from "./checkInvoice";
 import { findQboItem } from "./findQboItem";
-import type { InvoiceBuildWarning, InvoiceCheck, InvoiceSource, QboItemRef } from "./invoiceTypes";
+import type {
+  ClassPlacement,
+  InvoiceBuildWarning,
+  InvoiceCheck,
+  InvoiceSource,
+  QboItemRef,
+} from "./invoiceTypes";
 import { loadInvoiceSource } from "./loadInvoiceSource";
 import { logInvoiceChange, logIsQboSet } from "./logInvoiceChange";
 import { createQboInvoice, findInvoiceByDocNumber, type ExistingInvoice } from "./qboInvoiceApi";
+import { readClassPlacement } from "./readClassPlacement";
 import { resolveNoTaxCode, resolveProvinceTaxCode } from "./resolveProvinceTaxCode";
 import { resolveZoneClass, type ClassMissingWarning } from "./resolveZoneClass";
 
@@ -37,8 +44,12 @@ export type PdfNotAttachedWarning = { code: "pdf_not_attached"; reason: string }
 
 export type InvoiceCheckFailedWarning = { code: "invoice_check_failed"; reason: string };
 
+/** The company tracks no Classes, so the invoice was made without one (spec 03f). */
+export type ClassNotTrackedWarning = { code: "class_not_tracked" };
+
 export type InvoiceWarning =
   | ClassMissingWarning
+  | ClassNotTrackedWarning
   | InvoiceBuildWarning
   | InvoiceCheckFailedWarning
   | PdfNotAttachedWarning;
@@ -173,12 +184,15 @@ export async function saveInvoiceLink(
 export async function checkInvoiceAfterWrite(
   source: InvoiceSource,
   link: { invoiceId: string },
+  /** What the write has just read from QuickBooks (spec 03f); the check does not read it again. */
+  classPlacement: ClassPlacement,
 ): Promise<{ check?: InvoiceCheck; warning?: InvoiceCheckFailedWarning }> {
   try {
-    const result = await runInvoiceCheck(source.eventId, {
-      ...source,
-      qboInvoiceId: link.invoiceId,
-    });
+    const result = await runInvoiceCheck(
+      source.eventId,
+      { ...source, qboInvoiceId: link.invoiceId },
+      { classPlacement },
+    );
     if (result.status === "missing") {
       return {
         warning: {
@@ -290,8 +304,17 @@ export async function createInvoiceFromSource(
     };
   }
 
-  // 8
-  const zoneClass = await resolveZoneClass(connectionId, source.venue.state);
+  // 8: where the company wants the Class comes first. Nothing has been written yet, so a failed read
+  // ends the request here (spec 03f).
+  let classPlacement: ClassPlacement;
+  try {
+    classPlacement = await readClassPlacement(connectionId);
+  } catch (e) {
+    return fail(502, messageOf(e));
+  }
+  // A company that tracks no Classes has none to look up; the warning says so instead.
+  const zoneClass =
+    classPlacement === "none" ? null : await resolveZoneClass(connectionId, source.venue.state);
   const canadianTaxCodeId =
     source.canadianProvince && source.taxCents > 0
       ? await resolveProvinceTaxCode(connectionId, source.canadianProvince)
@@ -303,12 +326,17 @@ export async function createInvoiceFromSource(
   const { body, warnings: buildWarnings } = buildInvoicePayload(source, {
     item,
     customerId: resolution.customerId,
-    classId: zoneClass.classId,
+    classId: zoneClass?.classId ?? null,
+    classPlacement,
     canadianTaxCodeId,
     noTaxCodeId,
   });
   const warnings: InvoiceWarning[] = [
-    ...("warning" in zoneClass ? [zoneClass.warning] : []),
+    ...(zoneClass === null
+      ? [{ code: "class_not_tracked" } as const]
+      : "warning" in zoneClass
+        ? [zoneClass.warning]
+        : []),
     ...buildWarnings,
   ];
 
@@ -349,9 +377,11 @@ export async function createInvoiceFromSource(
   if (!wasQbo) await logIsQboSet({ eventId, userUuid });
 
   // 11: the invoice check, which sets qbo_invoice_mismatch and its reasons (spec 06).
-  const { check, warning: checkWarning } = await checkInvoiceAfterWrite(source, {
-    invoiceId: invoice.id,
-  });
+  const { check, warning: checkWarning } = await checkInvoiceAfterWrite(
+    source,
+    { invoiceId: invoice.id },
+    classPlacement,
+  );
   if (checkWarning) warnings.push(checkWarning);
 
   // 12: the invoice stays whatever happens to the PDF.
