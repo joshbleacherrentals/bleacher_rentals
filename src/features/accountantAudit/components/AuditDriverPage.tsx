@@ -10,6 +10,7 @@ import type { AuditDriverInfo as AuditDriverInfoData } from "../db/auditDriverIn
 import { useAuditTrackers } from "../hooks/useAuditTrackers";
 import type { AuditRange } from "../utils/auditRange";
 import { parseAuditPaging, withAuditDriver, withAuditPaging } from "../utils/auditUrlState";
+import { AuditAvatar } from "./AuditAvatar";
 import { AuditDriverInfo } from "./AuditDriverInfo";
 import { AuditRangeControls } from "./AuditRangeControls";
 import { AuditTrackersTable } from "./AuditTrackersTable";
@@ -62,39 +63,43 @@ export function AuditDriverPage({ driver, info, range, onRangeChange, isInverted
 
   return (
     <div data-testid="audit-driver-page">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href={backHref}
-          data-testid="audit-back"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-darkBlue hover:bg-gray-50"
-        >
-          <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-          Back
-        </Link>
-        {info && (
-          <h2 data-testid="audit-driver-name" className="text-2xl font-bold text-darkBlue">
-            {name}
-          </h2>
-        )}
-        {info?.isInactive && (
-          <span
-            data-testid="audit-driver-inactive"
-            className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
-          >
-            Inactive
-          </span>
-        )}
-      </div>
-      {info && <AuditDriverInfo info={info} />}
-      <div className="mt-5">
+      <Link
+        href={backHref}
+        data-testid="audit-back"
+        className="-ml-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-darkBlue"
+      >
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+        Back
+      </Link>
+      {/* One card for who the driver is: initials and name, then the contact details. */}
+      {info && (
+        <div className="mt-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <AuditAvatar name={name} size="lg" />
+            <h2 data-testid="audit-driver-name" className="text-2xl font-bold text-darkBlue">
+              {name}
+            </h2>
+            {info.isInactive && (
+              <span
+                data-testid="audit-driver-inactive"
+                className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600"
+              >
+                Inactive
+              </span>
+            )}
+          </div>
+          <AuditDriverInfo info={info} />
+        </div>
+      )}
+      <div className="mt-4">
         <AuditRangeControls range={range} onChange={onRangeChange} />
       </div>
-      <div className="mt-5">
+      <div className="mt-4">
         {isInverted ? (
           <div
             data-testid="audit-driver-message"
             role="alert"
-            className="py-12 text-center text-sm text-red-600"
+            className="rounded-xl border border-gray-200 bg-white py-12 text-center text-sm text-red-600 shadow-sm"
           >
             The start date is after the end date.
           </div>

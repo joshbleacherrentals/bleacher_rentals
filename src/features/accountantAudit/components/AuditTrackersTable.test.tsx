@@ -251,3 +251,18 @@ describe("AuditTrackersTable states (R10)", () => {
     expect(html).toContain("Error loading work trackers: boom");
   });
 });
+
+describe("the distance cell's look (R6)", () => {
+  it("puts the miles and the bracketed kilometres on two lines, with the cell text unchanged", () => {
+    const cells = firstRowCells(render([row()]));
+    expect(cells[7]).toContain('<span class="block">21.4 mi</span>');
+    expect(cells[7]).toMatch(/<span class="block[^"]*">\(34\.4 km\)<\/span>/);
+    expect(text(cells[7])).toBe("21.4 mi (34.4 km)");
+  });
+});
+
+describe("the card", () => {
+  it("keeps the headers on one line", () => {
+    expect(render([row()])).toContain("[&amp;_th]:whitespace-nowrap");
+  });
+});

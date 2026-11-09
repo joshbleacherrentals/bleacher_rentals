@@ -28,7 +28,9 @@ function Message({ children, alert }: { children: string; alert?: boolean }) {
     <div
       data-testid="audit-drivers-message"
       role={alert ? "alert" : undefined}
-      className={`py-12 text-center text-sm ${alert ? "text-red-600" : "text-gray-500"}`}
+      className={`rounded-xl border border-gray-200 bg-white py-12 text-center text-sm shadow-sm ${
+        alert ? "text-red-600" : "text-gray-500"
+      }`}
     >
       {children}
     </div>
@@ -124,7 +126,7 @@ export function AuditDriversList({ range, onRangeChange, isInverted }: Props) {
         <AuditSearchBar value={text} onChange={handleSearch} />
         <AuditRangeControls range={range} onChange={onRangeChange} />
       </div>
-      <div className="mt-5">{body}</div>
+      <div className="mt-4">{body}</div>
     </div>
   );
 }

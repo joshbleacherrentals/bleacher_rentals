@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   auditStatusLabel,
+  driverInitials,
   formatAddressLines,
   formatDriverDistance,
   formatDriverDriveTime,
   formatPayAmount,
+  splitMileage,
 } from "./auditFormat";
 
 // docs/specs/accountant-audit-04-table.md §3 and §5 (R3, R5, R11).
@@ -150,5 +152,32 @@ describe("formatDriverDistance (D16)", () => {
   });
   it("rounds to one decimal", () => {
     expect(formatDriverDistance(1234)).toBe("1.2 km/0.8 mi");
+  });
+});
+
+describe("driverInitials", () => {
+  it("takes the first letter of the first and the last word, in capitals", () => {
+    expect(driverInitials("Matt Pilcher")).toBe("MP");
+    expect(driverInitials("anna maria de la cruz")).toBe("AC");
+  });
+  it("gives one letter for a one-word name", () => {
+    expect(driverInitials("Ann")).toBe("A");
+  });
+  it("ignores extra spaces", () => {
+    expect(driverInitials("  Ann   Lee ")).toBe("AL");
+  });
+  it("gives a question mark when there is no name", () => {
+    expect(driverInitials("")).toBe("?");
+    expect(driverInitials("   ")).toBe("?");
+  });
+});
+
+describe("splitMileage", () => {
+  it("splits '21.4 mi (34.4 km)' into the miles and the bracketed kilometres", () => {
+    expect(splitMileage("21.4 mi (34.4 km)")).toEqual({ miles: "21.4 mi", km: "(34.4 km)" });
+  });
+  it("returns null for text that does not have that shape, so the caller prints it whole", () => {
+    expect(splitMileage("21.4 mi")).toBeNull();
+    expect(splitMileage("")).toBeNull();
   });
 });

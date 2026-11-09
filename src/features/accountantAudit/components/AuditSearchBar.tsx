@@ -38,7 +38,7 @@ type Props = {
  */
 export function AuditSearchBar({ value, onChange }: Props) {
   return (
-    <div className="relative min-w-[240px] flex-1">
+    <div className="relative min-w-[240px] max-w-md flex-1">
       <Search
         aria-hidden="true"
         className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -50,7 +50,7 @@ export function AuditSearchBar({ value, onChange }: Props) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search by driver name..."
-        className="h-[40px] w-full rounded border pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-darkBlue"
+        className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 text-sm text-gray-900 shadow-sm transition-colors placeholder:text-gray-400 hover:border-gray-400 focus:border-darkBlue focus:outline-none focus:ring-1 focus:ring-darkBlue"
       />
     </div>
   );

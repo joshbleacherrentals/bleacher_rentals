@@ -295,3 +295,20 @@ describe("paging writes the URL (spec 04)", () => {
     expect(replacedUrl(1).params.has("apagesize")).toBe(false);
   });
 });
+
+describe("the driver card", () => {
+  it("holds the initials, the name and the details together", () => {
+    const html = render();
+    const card =
+      html.match(
+        /<div class="[^"]*rounded-xl[^"]*">(.*?)<div class="mt-4"><div data-testid="range-controls"/,
+      )?.[1] ?? "";
+    expect(card).toContain('data-testid="audit-avatar"');
+    expect(card).toContain('data-testid="audit-driver-name"');
+    expect(card).toContain('data-testid="audit-driver-info"');
+  });
+
+  it("is not drawn while the details load", () => {
+    expect(render({ info: null })).not.toContain('data-testid="audit-avatar"');
+  });
+});

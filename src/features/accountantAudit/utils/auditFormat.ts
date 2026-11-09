@@ -76,3 +76,26 @@ export function formatDriverDistance(distanceMeters: number): string {
   const miles = distanceMeters / METERS_PER_MILE;
   return `${km.toFixed(1)} km/${miles.toFixed(1)} mi`;
 }
+
+/**
+ * The letters in a driver's avatar: the first letter of the first and of the last word of the name,
+ * in capitals (`Matt Pilcher` is `MP`); one letter for a one-word name; `?` when there is no name.
+ * `Array.from` keeps a letter outside the basic plane in one piece.
+ */
+export function driverInitials(name: string): string {
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  const first = Array.from(words[0])[0] ?? "";
+  const last = words.length > 1 ? (Array.from(words[words.length - 1])[0] ?? "") : "";
+  return `${first}${last}`.toLocaleUpperCase();
+}
+
+/**
+ * `21.4 mi (34.4 km)` (what `formatMileage` prints) as `{ miles: "21.4 mi", km: "(34.4 km)" }`, so a
+ * cell can put the two on their own lines and never break inside the brackets. Null when the text
+ * has another shape; the caller then prints it whole.
+ */
+export function splitMileage(text: string): { miles: string; km: string } | null {
+  const match = /^(.+?) (\(.+\))$/.exec(text);
+  return match ? { miles: match[1], km: match[2] } : null;
+}

@@ -180,3 +180,34 @@ describe("the empty state", () => {
     expect(render([row("d1")])).not.toContain('data-testid="audit-drivers-empty"');
   });
 });
+
+describe("the look", () => {
+  it("left-aligns the Driver header and right-aligns the four number headers", () => {
+    const html = render([row("d1")]);
+    const classes = [...html.matchAll(/<th[^>]*class="([^"]*)"/g)].map((m) => m[1]);
+    expect(classes).toHaveLength(5);
+    expect(classes[0]).toContain("text-left");
+    for (const c of classes.slice(1)) expect(c).toContain("text-right");
+  });
+
+  it("puts the initials beside each name, hidden from screen readers", () => {
+    const html = render([row("d1", { firstName: "Matt", lastName: "Pilcher" })]);
+    expect(html).toMatch(/<span[^>]*aria-hidden="true"[^>]*data-initials="MP"[^>]*><\/span>/);
+  });
+
+  it("keeps the text of the name cell to the name alone, so the initials are not copied or tested as text", () => {
+    const html = render([row("d1", { firstName: "Matt", lastName: "Pilcher" })]);
+    const nameCell = html.match(/<td class="px-5 py-3">(.*?)<\/td>/)?.[1] ?? "";
+    expect(nameCell.replace(/<[^>]+>/g, "")).toBe("Matt Pilcher");
+  });
+
+  it("right-aligns the number cells and darkens only the column the rows are sorted by", () => {
+    const html = render([row("d1")], { key: "pay", direction: "desc" });
+    const cells = [...html.matchAll(/<td class="([^"]*)"/g)].map((m) => m[1]);
+    // The name cell has no number class; the four others are numbers.
+    const numbers = cells.filter((c) => c.includes("text-right"));
+    expect(numbers).toHaveLength(4);
+    expect(numbers.filter((c) => c.includes("text-darkBlue"))).toHaveLength(1);
+    expect(numbers[3]).toContain("text-darkBlue"); // Pay is the sorted column
+  });
+});

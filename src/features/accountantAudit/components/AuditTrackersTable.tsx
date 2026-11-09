@@ -1,7 +1,7 @@
 import { DataTable, type Column } from "@/components/DataTable";
 import WorkTrackerStatusBadge from "@/features/workTrackers/components/WorkTrackerStatusBadge";
 import { formatDriveTime, formatMileage } from "@/features/workTrackers/util";
-import { auditStatusLabel, formatAddressLines } from "../utils/auditFormat";
+import { auditStatusLabel, formatAddressLines, splitMileage } from "../utils/auditFormat";
 import type { AuditAddress, AuditTrackerRow } from "../utils/auditRows";
 import { AuditPaymentPill } from "./AuditPaymentPill";
 import { WorkTrackerTypeBadge } from "./WorkTrackerTypeBadge";
@@ -85,11 +85,22 @@ const COLUMNS: Column<AuditTrackerRow>[] = [
     header: "Distance",
     render: (row) => {
       const text = formatMileage(row.distanceMeters);
-      // Wraps at the space, so miles and kilometres sit on two lines as in the design (R6).
-      return text ? (
-        <div className="max-w-[104px] whitespace-normal text-sm text-gray-900">{text}</div>
-      ) : (
-        <Dash />
+      if (!text) return <Dash />;
+      // Miles on the first line and the bracketed kilometres under them (R6, as in the design),
+      // each in a block of its own so the line never breaks inside the brackets. The space between
+      // the two keeps the cell's text `21.4 mi (34.4 km)`.
+      const parts = splitMileage(text);
+      return (
+        <div className="max-w-[104px] whitespace-normal text-sm text-gray-900">
+          {parts ? (
+            <>
+              <span className="block">{parts.miles}</span>{" "}
+              <span className="block text-xs text-gray-500">{parts.km}</span>
+            </>
+          ) : (
+            text
+          )}
+        </div>
       );
     },
   },
@@ -114,7 +125,12 @@ export function AuditTrackersTable({ rows, isLoading, error }: Props) {
   }
 
   return (
-    <div data-testid="audit-table">
+    // The shared DataTable gets the drivers table's card (rounded corners, a soft shadow) and
+    // headers that stay on one line; below the width of the nine columns the table scrolls.
+    <div
+      data-testid="audit-table"
+      className="[&>div]:rounded-xl [&>div]:shadow-sm [&_th]:whitespace-nowrap"
+    >
       <DataTable<AuditTrackerRow>
         columns={COLUMNS}
         data={rows}
