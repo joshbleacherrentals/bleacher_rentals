@@ -127,7 +127,11 @@ export function buildInvoicePayload(
       Qty: 1,
       UnitPrice: amount,
       TaxCodeRef: { value: taxCode },
-      ...(refs.classId ? { ClassRef: { value: refs.classId } } : {}),
+      // The Class goes where the company's own setting says (spec 03f): on the line, on the invoice
+      // itself, or nowhere when the company tracks no Classes.
+      ...(refs.classId && refs.classPlacement === "line"
+        ? { ClassRef: { value: refs.classId } }
+        : {}),
     },
   };
 
@@ -147,6 +151,9 @@ export function buildInvoicePayload(
     },
     PrivateNote: source.title,
     GlobalTaxCalculation: "TaxExcluded",
+    ...(refs.classId && refs.classPlacement === "header"
+      ? { ClassRef: { value: refs.classId } }
+      : {}),
     Line: [line],
   };
 

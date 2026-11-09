@@ -85,6 +85,7 @@ describe("readQboInvoice — the snapshot", () => {
       billToLine1: "Pat Lee",
       ship: { street: "1 Main St", city: "Clemson", state: "SC", zip: "29631", other: [] },
       memo: "SC - CLEMSON - RALLY",
+      headerClassId: null,
       lines: [
         {
           amountCents: 750000,
@@ -97,6 +98,20 @@ describe("readQboInvoice — the snapshot", () => {
       totalCents: 802500,
       taxCents: 52500,
     });
+  });
+
+  // docs/specs/qbo-invoice-03f-canadian-class-on-header.md §4
+  it("reads the invoice's own Class as headerClassId, and still reads the line's", async () => {
+    const snapshot = (await read(rawInvoice({ ClassRef: { value: "class-9", name: "West" } })))!
+      .snapshot;
+
+    expect(snapshot.headerClassId).toBe("class-9");
+    expect(snapshot.lines[0].classId).toBe("class-1");
+  });
+
+  it("an invoice with no Class of its own has a headerClassId of null", async () => {
+    expect((await read(rawInvoice({ ClassRef: undefined })))!.snapshot.headerClassId).toBeNull();
+    expect((await read(rawInvoice({ ClassRef: {} })))!.snapshot.headerClassId).toBeNull();
   });
 
   it("leaves out the lines that are not sales-item lines (QuickBooks' subtotal, discount)", async () => {
@@ -186,6 +201,7 @@ describe("readQboInvoice — the snapshot", () => {
       billToLine1: "",
       ship: { street: "", city: "", state: "", zip: "", other: [] },
       memo: "",
+      headerClassId: null,
       lines: [],
       totalCents: null,
       taxCents: 0,

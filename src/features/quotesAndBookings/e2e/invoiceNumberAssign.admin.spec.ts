@@ -63,11 +63,13 @@ test.describe("Invoice number given by the database", () => {
     await expect(page.getByRole("heading", { level: 1 })).not.toContainText(event.eventId);
   });
 
-  test("S2: an event inserted without a number is not left without one", async () => {
+  test("S2: an event inserted without a number gets one from 300000001 to 999999999", async () => {
+    // The counter's range since docs/specs/invoice-number-03-start-at-300000001.md.
     const event = await insertEventWithoutNumber("E2E Number Present");
     created.push(event.eventId);
 
-    expect(event.invoiceNumber).toBeGreaterThan(0);
+    expect(event.invoiceNumber).toBeGreaterThanOrEqual(300_000_001);
+    expect(event.invoiceNumber).toBeLessThanOrEqual(999_999_999);
   });
 
   test("S3: two events created one after the other get consecutive numbers", async () => {

@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { buildInvoicePayload } from "./buildInvoicePayload";
 import { compareInvoice } from "./compareInvoice";
 import { INVOICE_REASONS } from "./invoiceTypes";
-import type { InvoiceReason, InvoiceRefs, InvoiceSource, QboInvoiceSnapshot } from "./invoiceTypes";
+import type {
+  ClassPlacement,
+  InvoiceReason,
+  InvoiceRefs,
+  InvoiceSource,
+  QboInvoiceSnapshot,
+} from "./invoiceTypes";
 
 /**
  * Spec 06 §10: the invoice check says "different" only for what it compares. Every member the
@@ -34,8 +40,22 @@ const COVERED_BY: Record<string, InvoiceReason> = {
   "Line[0].SalesItemLineDetail.Qty": "amount",
   "Line[0].SalesItemLineDetail.UnitPrice": "amount",
   "Line[0].SalesItemLineDetail.TaxCodeRef.value": "tax_code",
+  // Where the Class is written follows the company's setting (spec 03f): on the line or on the
+  // invoice itself. A body has one of the two, or neither.
   "Line[0].SalesItemLineDetail.ClassRef.value": "class",
+  "ClassRef.value": "class",
 };
+
+const LINE_CLASS = "Line[0].SalesItemLineDetail.ClassRef.value";
+const HEADER_CLASS = "ClassRef.value";
+
+/** The covered paths a body built for this placement is made of. */
+const coveredFor = (placement: ClassPlacement) =>
+  Object.keys(COVERED_BY).filter((path) => {
+    if (path === LINE_CLASS) return placement === "line";
+    if (path === HEADER_CLASS) return placement === "header";
+    return true;
+  });
 
 /** The members written directly: changing the invoice's own value for one must show as its reason. */
 const CHANGED_IN_QUICKBOOKS: Record<string, (s: QboInvoiceSnapshot) => QboInvoiceSnapshot> = {
@@ -63,7 +83,12 @@ const CHANGED_IN_QUICKBOOKS: Record<string, (s: QboInvoiceSnapshot) => QboInvoic
     ...s,
     lines: [{ ...s.lines[0], classId: "other" }],
   }),
+  "ClassRef.value": (s) => ({ ...s, headerClassId: "other" }),
 };
+
+/** The placement a member is written under. */
+const placementOf = (member: string): ClassPlacement =>
+  member === HEADER_CLASS ? "header" : "line";
 
 const source = (over: Partial<InvoiceSource> = {}): InvoiceSource => ({
   eventId: "event-1",
@@ -94,6 +119,7 @@ const refs: InvoiceRefs = {
   item: { id: "item-1", name: "Bleacher Rental - Corporate", description: "Seats" },
   customerId: "cust-1",
   classId: "class-1",
+  classPlacement: "line",
   canadianTaxCodeId: "5",
   noTaxCodeId: "2",
 };
@@ -124,6 +150,7 @@ function snapshotOfBody(body: ReturnType<typeof buildInvoicePayload>["body"]): Q
       other: [],
     },
     memo: body.PrivateNote,
+    headerClassId: body.ClassRef?.value ?? null,
     lines: [
       {
         amountCents: 750000,
@@ -146,12 +173,27 @@ const canadian = source({
 
 describe("the comparison covers every member the builder writes", () => {
   it.each([
-    ["a US quote", source()],
-    ["a Canadian quote", canadian],
-  ])("%s: no member of the body is missing from the list, and none is extra", (_label, src) => {
-    const { body } = buildInvoicePayload(src, refs);
+    ["a US quote, Class on the line", source(), "line"],
+    ["a US quote, Class on the header", source(), "header"],
+    ["a Canadian quote, Class on the line", canadian, "line"],
+    ["a Canadian quote, Class on the header", canadian, "header"],
+  ] as Array<[string, InvoiceSource, ClassPlacement]>)(
+    "%s: no member of the body is missing from the list, and none is extra",
+    (_label, src, classPlacement) => {
+      const { body } = buildInvoicePayload(src, { ...refs, classPlacement });
 
-    expect(paths(body).sort()).toEqual(Object.keys(COVERED_BY).sort());
+      expect(paths(body).sort()).toEqual(coveredFor(classPlacement).sort());
+    },
+  );
+
+  it("a company that tracks no Classes gets a body with no Class member at all", () => {
+    const { body } = buildInvoicePayload(source(), { ...refs, classPlacement: "none" });
+
+    expect(paths(body).sort()).toEqual(
+      coveredFor("line")
+        .filter((path) => path !== LINE_CLASS)
+        .sort(),
+    );
   });
 
   it("names only reasons the comparison has", () => {
@@ -161,14 +203,21 @@ describe("the comparison covers every member the builder writes", () => {
   it.each(Object.entries(CHANGED_IN_QUICKBOOKS))(
     "a change to %s in QuickBooks shows as the reason that covers it",
     (member, change) => {
-      const { body } = buildInvoicePayload(source(), refs);
+      const classPlacement = placementOf(member);
+      const { body } = buildInvoicePayload(source(), { ...refs, classPlacement });
       const quote = { totalCents: 802500, taxCents: 52500 };
 
-      const same = compareInvoice({ expected: body, quote, actual: snapshotOfBody(body) });
+      const same = compareInvoice({
+        expected: body,
+        quote,
+        actual: snapshotOfBody(body),
+        classPlacement,
+      });
       const changed = compareInvoice({
         expected: body,
         quote,
         actual: change(snapshotOfBody(body)),
+        classPlacement,
       });
 
       expect(same.matches).toBe(true);
