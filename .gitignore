@@ -53,3 +53,7 @@ playwright-report/
 
 # Editor/AI tooling
 .cursor/
+
+# Python
+.venv/
+__pycache__/

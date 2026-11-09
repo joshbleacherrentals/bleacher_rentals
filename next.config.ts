@@ -24,6 +24,14 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [{ source: "/companies-contacts", destination: "/contacts", permanent: false }];
   },
+  // Python endpoints live under /api/py (FastAPI app in api/index.py).
+  // Locally `next dev` can't run Python, so proxy to the dev server (npm run dev:py).
+  // On Vercel, send them to the Python function.
+  async rewrites() {
+    const destination =
+      process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000/api/py/:path*" : "/api/index";
+    return [{ source: "/api/py/:path*", destination }];
+  },
 };
 
 export default nextConfig;
