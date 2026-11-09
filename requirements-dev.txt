@@ -1,2 +1,5 @@
+# Local-only Python tools, on top of the production pins.
 -r requirements.txt
+click==8.5.1
+h11==0.16.0
 uvicorn==0.54.0

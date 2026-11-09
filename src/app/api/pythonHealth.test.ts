@@ -16,6 +16,22 @@ describe("python (FastAPI) health endpoint", () => {
     expect(read("requirements.txt")).toMatch(/^fastapi==/m);
   });
 
+  it("pins every Python dependency exactly, so local and Vercel installs match", () => {
+    for (const file of ["requirements.txt", "requirements-dev.txt"]) {
+      const lines = read(file)
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("#") && !l.startsWith("-r "));
+      expect(lines.length, file).toBeGreaterThan(0);
+      for (const line of lines) expect(line, `${file}: ${line}`).toMatch(/^[A-Za-z0-9_.-]+==\S+$/);
+    }
+  });
+
+  it("pins the Python minor version Vercel and the local venv both use", () => {
+    expect(read(".python-version").trim()).toMatch(/^3\.\d+$/);
+    expect(read("scripts/setupPython.sh")).toContain(".python-version");
+  });
+
   it("routes /api/py to the Python dev server locally and the function on Vercel", () => {
     const cfg = read("next.config.ts");
     expect(cfg).toContain("/api/py/:path*");
