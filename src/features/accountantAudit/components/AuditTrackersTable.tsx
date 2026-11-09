@@ -121,7 +121,7 @@ export function AuditTrackersTable({ rows, isLoading, error }: Props) {
         keyExtractor={(row) => row.id}
         isLoading={isLoading}
         loadingMessage="Loading work trackers..."
-        emptyMessage="This driver has no work trackers"
+        emptyMessage="This driver has no work trackers in this range"
       />
     </div>
   );

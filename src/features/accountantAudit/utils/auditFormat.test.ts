@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { auditStatusLabel, formatAddressLines } from "./auditFormat";
+import {
+  auditStatusLabel,
+  formatAddressLines,
+  formatDriverDistance,
+  formatDriverDriveTime,
+  formatPayAmount,
+} from "./auditFormat";
 
 // docs/specs/accountant-audit-04-table.md §3 and §5 (R3, R5, R11).
 
@@ -99,5 +105,50 @@ describe("auditStatusLabel", () => {
 
   it("falls back to the raw value for a status it does not know (R11)", () => {
     expect(auditStatusLabel("on_hold")).toBe("on_hold");
+  });
+});
+
+// docs/specs/accountant-audit-05-drivers-table.md R24, R25.
+
+describe("formatDriverDriveTime", () => {
+  it("is a dash for no time", () => {
+    expect(formatDriverDriveTime(0)).toBe("—");
+  });
+  it("is minutes under an hour", () => {
+    expect(formatDriverDriveTime(45)).toBe("45m");
+  });
+  it("is whole hours when the minutes are 0", () => {
+    expect(formatDriverDriveTime(120)).toBe("2h");
+    expect(formatDriverDriveTime(60)).toBe("1h");
+  });
+  it("is hours and minutes", () => {
+    expect(formatDriverDriveTime(125)).toBe("2h 5m");
+  });
+});
+
+describe("formatPayAmount (D17)", () => {
+  it("writes the dollars, two decimals, thousands separators and the currency code", () => {
+    expect(formatPayAmount(123400, "USD")).toBe("$1,234.00 USD");
+    expect(formatPayAmount(56700, "CAD")).toBe("$567.00 CAD");
+  });
+  it("writes zero and cents", () => {
+    expect(formatPayAmount(0, "USD")).toBe("$0.00 USD");
+    expect(formatPayAmount(5, "CAD")).toBe("$0.05 CAD");
+  });
+  it("writes large amounts", () => {
+    expect(formatPayAmount(123456789, "USD")).toBe("$1,234,567.89 USD");
+  });
+});
+
+describe("formatDriverDistance (D16)", () => {
+  it("writes kilometres first, then miles, with one decimal each", () => {
+    expect(formatDriverDistance(27726000)).toBe("27726.0 km/17228.2 mi");
+    expect(formatDriverDistance(34400)).toBe("34.4 km/21.4 mi");
+  });
+  it("writes zero", () => {
+    expect(formatDriverDistance(0)).toBe("0.0 km/0.0 mi");
+  });
+  it("rounds to one decimal", () => {
+    expect(formatDriverDistance(1234)).toBe("1.2 km/0.8 mi");
   });
 });

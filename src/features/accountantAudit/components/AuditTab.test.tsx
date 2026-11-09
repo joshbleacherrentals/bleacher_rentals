@@ -1,347 +1,227 @@
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-// docs/specs/accountant-audit-01-tab.md §3 and §5 (the shell: empty state until a driver is
-// chosen) and accountant-audit-02-driver-select.md §3 and §5 (the select, the driver in the URL,
-// the details block, R6) and accountant-audit-04-table.md §3 and §5 (the table, the pager, D6).
+// docs/specs/accountant-audit-05-drivers-table.md §2.3, §4 (D4, D12, D13, R8, R11, R14, R20) over
+// accountant-audit-01-tab.md §3: the tab shows the drivers list, or the page of one driver, and
+// owns the range, the driver in the URL and the removal of an unknown driver.
 
 const router = { replace: vi.fn() };
 let search = "";
-let options: any[] = [];
-let optionsLoading = false;
 let info: any = null;
 let infoLoading = false;
-let trackers: {
-  rows: AuditTrackerRow[];
-  total: number;
-  page: number;
-  isLoading: boolean;
-  error: Error | undefined;
-} = { rows: [], total: 0, page: 1, isLoading: false, error: undefined };
-const trackerCalls: unknown[][] = [];
-let selectProps: any = null;
-let paginationProps: any = null;
-const scrollTo = vi.fn();
+let listProps: any = null;
+let pageProps: any = null;
+const infoCalls: unknown[][] = [];
 
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
   usePathname: () => "/accountant",
   useSearchParams: () => new URLSearchParams(search),
 }));
-// The effect of R6 must run in a static render.
+// The effects (the opening write, the unknown driver) must run in a static render.
 vi.mock("react", async (orig) => ({
   ...(await orig<typeof import("react")>()),
   useEffect: (f: () => void) => f(),
 }));
-vi.mock("../hooks/useAuditDriverOptions", () => ({
-  useAuditDriverOptions: () => ({ options, isLoading: optionsLoading }),
-}));
 vi.mock("../hooks/useAuditDriverInfo", () => ({
-  useAuditDriverInfo: () => ({ info, isLoading: infoLoading }),
-}));
-vi.mock("../hooks/useAuditTrackers", () => ({
-  useAuditTrackers: (...args: unknown[]) => {
-    trackerCalls.push(args);
-    return trackers;
+  useAuditDriverInfo: (...args: unknown[]) => {
+    infoCalls.push(args);
+    return { info, isLoading: infoLoading };
   },
 }));
-vi.mock("./AuditDriverSelect", () => ({
-  AuditDriverSelect: (p: any) => {
-    selectProps = p;
-    return <div data-testid="select" data-value={p.value ?? ""} />;
+vi.mock("./AuditDriversList", () => ({
+  AuditDriversList: (p: any) => {
+    listProps = p;
+    return <div data-testid="list" />;
   },
 }));
-// The real pager is covered by its own tests; here only what the tab hands it matters.
-vi.mock("@/components/Pagination", () => ({
-  Pagination: (p: any) => {
-    paginationProps = p;
-    return (
-      <div
-        data-testid="pager"
-        data-page={p.page}
-        data-size={p.pageSize}
-        data-total={p.totalItems}
-      />
-    );
+vi.mock("./AuditDriverPage", () => ({
+  AuditDriverPage: (p: any) => {
+    pageProps = p;
+    return <div data-testid="driver-page" data-driver={p.driver} />;
   },
-}));
-vi.mock("@/contexts/LayoutContexts", () => ({
-  useLayoutContext: () => ({ scrollRef: { current: { scrollTo } } }),
 }));
 
-import type { AuditTrackerRow } from "../utils/auditRows";
+import { openingRange } from "../utils/auditRange";
+import { DateTime } from "luxon";
 import { AuditTab } from "./AuditTab";
 
-const trackerRow = (id: string): AuditTrackerRow => ({
-  id,
-  status: "completed",
-  date: "2026-10-30",
-  bleacherNumber: 1204,
-  typeCode: "trip",
-  typeName: "Trip",
-  pickup: null,
-  dropoff: null,
-  driveMinutes: null,
-  distanceMeters: null,
-  payment: "paid",
-});
+const INFO = {
+  address: null,
+  phone: null,
+  email: null,
+  firstName: "Ann",
+  lastName: "Lee",
+  isInactive: false,
+};
 
-/** The URL of the n-th router.replace call, parsed. */
 const replacedUrl = (n = 0) => {
   const url = new URL(router.replace.mock.calls[n][0] as string, "http://localhost");
   return { pathname: url.pathname, params: url.searchParams };
 };
 
-const opt = {
-  id: "d1",
-  driverUuid: "d1",
-  clerkUserId: "c",
-  firstName: "A",
-  lastName: "B",
-  email: "e",
-  isInactive: false,
-};
-
 beforeEach(() => {
   router.replace.mockReset();
-  search = "tab=audit";
-  options = [opt];
-  optionsLoading = false;
-  info = { address: "1 Main St", phone: "555", email: "a@x.com" };
+  search = "tab=audit&from=2026-11-01&to=2026-11-30";
+  info = null;
   infoLoading = false;
-  trackers = { rows: [trackerRow("t1")], total: 1, page: 1, isLoading: false, error: undefined };
-  trackerCalls.length = 0;
-  selectProps = null;
-  paginationProps = null;
-  scrollTo.mockReset();
+  listProps = null;
+  pageProps = null;
+  infoCalls.length = 0;
 });
 
-describe("AuditTab with no driver", () => {
-  it("shows the select first, then the empty state, and no details block", () => {
+describe("which view", () => {
+  it("shows the drivers list when there is no driver, and not the driver page", () => {
     const html = renderToStaticMarkup(<AuditTab />);
     expect(html).toContain('data-testid="audit-tab"');
-    expect(html.indexOf('data-testid="select"')).toBeLessThan(
-      html.indexOf('data-testid="audit-empty-state"'),
-    );
-    expect(html).toContain(">Choose a driver<");
-    expect(html).toContain(
-      ">Pick a driver above to see all of their work trackers and whether each one has been paid.<",
-    );
-    expect(html).not.toContain('data-testid="audit-driver-info"');
+    expect(html).toContain('data-testid="list"');
+    expect(html).not.toContain('data-testid="driver-page"');
+    expect(html).not.toContain("Choose a driver");
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("draws the truck icon, hidden from assistive technology, and no table", () => {
+  it("shows the driver page when there is a known driver, and not the list", () => {
+    search += "&driver=d1";
+    info = INFO;
     const html = renderToStaticMarkup(<AuditTab />);
-    const icon = html.match(/<svg[^>]*lucide-truck[^>]*>/)?.[0] ?? "";
-    expect(icon).toContain('aria-hidden="true"');
-    expect(html).not.toContain("<table");
-  });
-});
-
-describe("AuditTab with a driver", () => {
-  it("shows the select's value and the details block, and not the empty state", () => {
-    search = "tab=audit&driver=d1";
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(html).toContain('data-value="d1"');
-    expect(html).toContain('data-testid="audit-driver-info"');
-    expect(html).not.toContain('data-testid="audit-empty-state"');
+    expect(html).toContain('data-testid="driver-page"');
+    expect(html).toContain('data-driver="d1"');
+    expect(html).not.toContain('data-testid="list"');
+    expect(pageProps.info).toEqual(INFO);
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("draws no block while the details load", () => {
-    search = "tab=audit&driver=d1";
+  it("asks for the driver's details only for the driver in the URL", () => {
+    renderToStaticMarkup(<AuditTab />);
+    expect(infoCalls.at(-1)).toEqual([null]);
+    search += "&driver=d1";
+    info = INFO;
+    renderToStaticMarkup(<AuditTab />);
+    expect(infoCalls.at(-1)).toEqual(["d1"]);
+  });
+
+  it("keeps the driver page while the details load, with no details yet", () => {
+    search += "&driver=d1";
     infoLoading = true;
     const html = renderToStaticMarkup(<AuditTab />);
-    expect(html).not.toContain('data-testid="audit-driver-info"');
-  });
-
-  it("removes an unknown driver from the URL once the list has loaded", () => {
-    search = "tab=audit&driver=ghost";
-    renderToStaticMarkup(<AuditTab />);
-    expect(router.replace).toHaveBeenCalledWith("/accountant?tab=audit", { scroll: false });
-  });
-
-  it("keeps the driver while the list is loading", () => {
-    search = "tab=audit&driver=d1";
-    options = [];
-    optionsLoading = true;
-    renderToStaticMarkup(<AuditTab />);
+    expect(html).toContain('data-testid="driver-page"');
+    expect(pageProps.info).toBeNull();
     expect(router.replace).not.toHaveBeenCalled();
   });
 });
 
-describe("AuditTab and the tracker query", () => {
-  it("gives the hook null while no driver is chosen, and shows no table and no pager", () => {
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(trackerCalls.at(-1)).toEqual([null, 1, 25]);
-    expect(html).not.toContain('data-testid="audit-table"');
-    expect(html).not.toContain('data-testid="pager"');
-  });
-
-  it("gives the hook the chosen driver, and the page and size read from the URL", () => {
-    search = "tab=audit&driver=d1&apage=3&apagesize=50";
-    renderToStaticMarkup(<AuditTab />);
-    expect(trackerCalls.at(-1)).toEqual(["d1", 3, 50]);
-  });
-
-  it("defaults to page 1 and size 25", () => {
-    search = "tab=audit&driver=d1";
-    renderToStaticMarkup(<AuditTab />);
-    expect(trackerCalls.at(-1)).toEqual(["d1", 1, 25]);
-  });
-
-  it("ignores the page-level page and pageSize parameters", () => {
-    search = "tab=audit&driver=d1&page=7&pageSize=100";
-    renderToStaticMarkup(<AuditTab />);
-    expect(trackerCalls.at(-1)).toEqual(["d1", 1, 25]);
-  });
-});
-
-describe("AuditTab table and pager", () => {
+describe("an unknown driver (R14)", () => {
   beforeEach(() => {
-    search = "tab=audit&driver=d1";
+    search = "tab=audit&from=2026-11-01&to=2026-11-30&driver=ghost&asearch=ann&apage=2";
   });
 
-  it("shows the details block, then the table, then the pager", () => {
-    const html = renderToStaticMarkup(<AuditTab />);
-    const info = html.indexOf('data-testid="audit-driver-info"');
-    const table = html.indexOf('data-testid="audit-table"');
-    const pager = html.indexOf('data-testid="pager"');
-    expect(info).toBeGreaterThan(-1);
-    expect(table).toBeGreaterThan(info);
-    expect(pager).toBeGreaterThan(table);
-    expect(html).toContain('data-testid="audit-row-status"');
-  });
-
-  it("gives the pager the effective page, the page size and the total", () => {
-    search = "tab=audit&driver=d1&apage=2&apagesize=50";
-    trackers = { ...trackers, rows: [trackerRow("t1")], total: 120, page: 2 };
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(html).toContain('data-page="2"');
-    expect(html).toContain('data-size="50"');
-    expect(html).toContain('data-total="120"');
-  });
-
-  it("shows the table without a pager when the total is 0", () => {
-    trackers = { ...trackers, rows: [], total: 0 };
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(html).toContain('data-testid="audit-table"');
-    expect(html).toContain("This driver has no work trackers");
-    expect(html).not.toContain('data-testid="pager"');
-  });
-
-  it("hides the pager and shows the loading message while the data loads", () => {
-    trackers = { ...trackers, rows: [], total: 0, isLoading: true };
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(html).toContain("Loading work trackers...");
-    expect(html).not.toContain('data-testid="pager"');
-  });
-
-  it("hides the pager and shows the alert when the query fails", () => {
-    trackers = { ...trackers, total: 5, error: new Error("nope") };
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(html).toContain("Error loading work trackers: nope");
-    expect(html).not.toContain('data-testid="pager"');
-    expect(html).not.toContain("<table");
-  });
-
-  it("shows the last page for a page past the end, and does not rewrite the URL", () => {
-    search = "tab=audit&driver=d1&apage=9";
-    trackers = { ...trackers, total: 60, page: 3 };
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(trackerCalls.at(-1)).toEqual(["d1", 9, 25]);
-    expect(html).toContain('data-page="3"');
-    expect(router.replace).not.toHaveBeenCalled();
-  });
-
-  it("is read-only: the table has no link and no pointer cursor (D9)", () => {
-    const html = renderToStaticMarkup(<AuditTab />);
-    expect(html).not.toContain("<a ");
-    expect(html).not.toContain("cursor-pointer");
-  });
-});
-
-describe("AuditTab paging writes the URL", () => {
-  beforeEach(() => {
-    search = "tab=audit&driver=d1";
-    trackers = { ...trackers, total: 120, page: 1 };
-  });
-
-  it("a click on page 2 writes apage=2 in one replace, keeps the driver, and scrolls to the top", () => {
+  it("is removed from the URL once the details have settled with no row, keeping the rest", () => {
     renderToStaticMarkup(<AuditTab />);
-    paginationProps.onPageChange(2);
-
     expect(router.replace).toHaveBeenCalledTimes(1);
     expect(router.replace.mock.calls[0][1]).toEqual({ scroll: false });
     const { pathname, params } = replacedUrl();
     expect(pathname).toBe("/accountant");
-    expect(params.get("apage")).toBe("2");
-    expect(params.get("driver")).toBe("d1");
-    expect(params.get("tab")).toBe("audit");
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
-  });
-
-  it("going back to page 1 removes apage", () => {
-    search = "tab=audit&driver=d1&apage=2";
-    renderToStaticMarkup(<AuditTab />);
-    paginationProps.onPageChange(1);
-    expect(replacedUrl().params.has("apage")).toBe(false);
-  });
-
-  it("keeps the page size when the page changes", () => {
-    search = "tab=audit&driver=d1&apagesize=50";
-    renderToStaticMarkup(<AuditTab />);
-    paginationProps.onPageChange(2);
-    expect(replacedUrl().params.get("apagesize")).toBe("50");
-  });
-
-  it("a new size writes apagesize and drops apage, in one replace", () => {
-    search = "tab=audit&driver=d1&apage=3";
-    renderToStaticMarkup(<AuditTab />);
-    paginationProps.onPageSizeChange(50);
-
-    expect(router.replace).toHaveBeenCalledTimes(1);
-    const { params } = replacedUrl();
-    expect(params.get("apagesize")).toBe("50");
-    expect(params.has("apage")).toBe(false);
-    expect(params.get("driver")).toBe("d1");
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
-  });
-
-  it("going back to size 25 removes apagesize", () => {
-    search = "tab=audit&driver=d1&apagesize=50";
-    renderToStaticMarkup(<AuditTab />);
-    paginationProps.onPageSizeChange(25);
-    expect(replacedUrl().params.has("apagesize")).toBe(false);
-  });
-
-  it("keeps the other parameters of the page", () => {
-    search = "tab=audit&driver=d1&csort=x";
-    renderToStaticMarkup(<AuditTab />);
-    paginationProps.onPageChange(2);
-    expect(replacedUrl().params.get("csort")).toBe("x");
-  });
-
-  it("a driver change drops apage in the same write and keeps the size", () => {
-    search = "tab=audit&driver=d1&apage=3&apagesize=50";
-    options = [opt, { ...opt, id: "d2", driverUuid: "d2" }];
-    renderToStaticMarkup(<AuditTab />);
-    selectProps.onChange("d2");
-
-    expect(router.replace).toHaveBeenCalledTimes(1);
-    const { params } = replacedUrl();
-    expect(params.get("driver")).toBe("d2");
-    expect(params.has("apage")).toBe(false);
-    expect(params.get("apagesize")).toBe("50");
-  });
-
-  it("clearing the driver drops the driver and apage", () => {
-    search = "tab=audit&driver=d1&apage=3";
-    renderToStaticMarkup(<AuditTab />);
-    selectProps.onChange(null);
-    const { params } = replacedUrl();
     expect(params.has("driver")).toBe(false);
     expect(params.has("apage")).toBe(false);
+    expect(params.get("asearch")).toBe("ann");
+    expect(params.get("from")).toBe("2026-11-01");
+    expect(params.get("tab")).toBe("audit");
+  });
+
+  it("shows the list, not the driver page", () => {
+    const html = renderToStaticMarkup(<AuditTab />);
+    expect(html).toContain('data-testid="list"');
+    expect(html).not.toContain('data-testid="driver-page"');
+  });
+
+  it("is kept while the details are still loading", () => {
+    infoLoading = true;
+    renderToStaticMarkup(<AuditTab />);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("the range (D4, D12, D13, R8, R11)", () => {
+  it("reads the dates from the URL and gives them to the list", () => {
+    renderToStaticMarkup(<AuditTab />);
+    expect(listProps.range).toEqual({ from: "2026-11-01", to: "2026-11-30" });
+    expect(listProps.isInverted).toBe(false);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("gives the same range to the driver page", () => {
+    search += "&driver=d1";
+    info = INFO;
+    renderToStaticMarkup(<AuditTab />);
+    expect(pageProps.range).toEqual({ from: "2026-11-01", to: "2026-11-30" });
+  });
+
+  it("writes the opening range once when the URL has no range parameter (D4)", () => {
+    search = "tab=audit";
+    renderToStaticMarkup(<AuditTab />);
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(router.replace.mock.calls[0][1]).toEqual({ scroll: false });
+    const { pathname, params } = replacedUrl();
+    const expected = openingRange(DateTime.now());
+    expect(pathname).toBe("/accountant");
+    expect(params.get("from")).toBe(expected.from);
+    expect(params.get("to")).toBe(expected.to);
+    expect(params.get("tab")).toBe("audit");
+    // And the list already shows that range, before the URL catches up.
+    expect(listProps.range).toEqual(expected);
+  });
+
+  it("writes it for a driver link with no dates too, keeping the driver (D13)", () => {
+    search = "tab=audit&driver=cc4a22ba-80dc-44c9-bbd8-c40b406c2c0c";
+    info = INFO;
+    renderToStaticMarkup(<AuditTab />);
+    const { params } = replacedUrl();
+    expect(params.get("driver")).toBe("cc4a22ba-80dc-44c9-bbd8-c40b406c2c0c");
+    expect(params.get("from")).toBe(openingRange(DateTime.now()).from);
+  });
+
+  it("does not write when from= and to= are present but empty: that is All time (D12)", () => {
+    search = "tab=audit&from=&to=";
+    renderToStaticMarkup(<AuditTab />);
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(listProps.range).toEqual({ from: null, to: null });
+  });
+
+  it("does not write when only one end is in the URL; the other has no limit", () => {
+    search = "tab=audit&from=2026-11-01";
+    renderToStaticMarkup(<AuditTab />);
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(listProps.range).toEqual({ from: "2026-11-01", to: null });
+  });
+
+  it("flags From after To, for both views", () => {
+    search = "tab=audit&from=2026-11-30&to=2026-11-01";
+    renderToStaticMarkup(<AuditTab />);
+    expect(listProps.isInverted).toBe(true);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("a change of the range is written by replace, drops apage, keeps the rest", () => {
+    search = "tab=audit&from=2026-11-01&to=2026-11-30&driver=d1&apage=3&asearch=ann";
+    info = INFO;
+    renderToStaticMarkup(<AuditTab />);
+    pageProps.onRangeChange({ from: "2026-10-01", to: null });
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(router.replace.mock.calls[0][1]).toEqual({ scroll: false });
+    const { params } = replacedUrl();
+    expect(params.get("from")).toBe("2026-10-01");
+    expect(params.get("to")).toBe(""); // present but empty: no limit
+    expect(params.has("apage")).toBe(false);
+    expect(params.get("driver")).toBe("d1");
+    expect(params.get("asearch")).toBe("ann");
+  });
+
+  it("choosing All time writes from=&to=", () => {
+    renderToStaticMarkup(<AuditTab />);
+    listProps.onRangeChange({ from: null, to: null });
+    const { params } = replacedUrl();
+    expect(params.get("from")).toBe("");
+    expect(params.get("to")).toBe("");
+    expect(params.has("from")).toBe(true);
   });
 });

@@ -1,0 +1,182 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+
+// docs/specs/accountant-audit-05-drivers-table.md §2.3, §4 (D16-D19, R2, R5, R22, R24, R25).
+const router = { push: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
+import type { AuditDriverRow } from "../utils/auditDriverRows";
+import type { AuditSort } from "../utils/auditSort";
+import { AuditDriversTable } from "./AuditDriversTable";
+
+const row = (id: string, over: Partial<AuditDriverRow> = {}): AuditDriverRow => ({
+  driverUuid: id,
+  firstName: "Ann",
+  lastName: "Lee",
+  distanceMeters: 34400,
+  driveMinutes: 125,
+  payCents: 123400,
+  payCurrency: "USD",
+  tripCount: 7,
+  ...over,
+});
+
+const PAY_DESC: AuditSort = { key: "pay", direction: "desc" };
+const render = (
+  rows: AuditDriverRow[],
+  sort: AuditSort = PAY_DESC,
+  empty = "No driver data for this range.",
+) =>
+  renderToStaticMarkup(
+    <AuditDriversTable
+      rows={rows}
+      sort={sort}
+      onSort={() => {}}
+      getRowHref={(r) => `/accountant?tab=audit&driver=${r.driverUuid}`}
+      emptyMessage={empty}
+    />,
+  );
+
+beforeEach(() => router.push.mockReset());
+
+describe("the headers", () => {
+  it("are Driver, Distance, Drive Time, Trips, Pay, and there is no # column (D18)", () => {
+    const html = render([row("d1")]);
+    const headers = [...html.matchAll(/<th[^>]*>.*?<span>([^<]*)<\/span>/g)].map((m) => m[1]);
+    expect(headers).toEqual(["Driver", "Distance", "Drive Time", "Trips", "Pay"]);
+    expect(html).not.toContain(">#<");
+  });
+
+  it("every header is a button (D19)", () => {
+    const html = render([row("d1")]);
+    for (const key of ["driver", "distance", "time", "trips", "pay"]) {
+      expect(html).toContain(`data-testid="audit-sort-${key}"`);
+    }
+    expect(html.match(/<button type="button"/g)).toHaveLength(5);
+  });
+
+  it("the sorted header carries aria-sort, the others none (R22)", () => {
+    const html = render([row("d1")], { key: "pay", direction: "desc" });
+    expect(html).toMatch(/<th[^>]*aria-sort="descending"[^>]*>.*?Pay/);
+    expect(html.match(/aria-sort="none"/g)).toHaveLength(4);
+    const asc = render([row("d1")], { key: "driver", direction: "asc" });
+    expect(asc).toMatch(/<th[^>]*aria-sort="ascending"[^>]*>.*?Driver/);
+  });
+
+  it("shows an arrow on the sorted column and the both-ways icon on the others", () => {
+    const html = render([row("d1")], { key: "pay", direction: "desc" });
+    expect(html.match(/lucide-arrow-down/g)).toHaveLength(1);
+    expect(html.match(/lucide-arrow-up-down/g)).toHaveLength(4);
+  });
+
+  it("a click on a header calls onSort with its key", () => {
+    const keys: string[] = [];
+    const t: any = AuditDriversTable({
+      rows: [],
+      sort: PAY_DESC,
+      onSort: (k) => keys.push(k),
+      getRowHref: () => "",
+      emptyMessage: "",
+    });
+    // The header cells are the five children of the first table row: each gets the sort key it
+    // stands for and the table's onSort, which it calls on a click.
+    const headerRow =
+      t.props.children.props.children.props.children[0].props.children.props.children;
+    expect(headerRow.map((th: any) => th.props.sortKey)).toEqual([
+      "driver",
+      "distance",
+      "time",
+      "trips",
+      "pay",
+    ]);
+    for (const th of headerRow) th.props.onSort(th.props.sortKey);
+    expect(keys).toEqual(["driver", "distance", "time", "trips", "pay"]);
+  });
+});
+
+describe("the cells (R24, R25)", () => {
+  it("shows the name as a link to the driver page", () => {
+    const html = render([row("d1")]);
+    expect(html).toMatch(/<a [^>]*href="\/accountant\?tab=audit&amp;driver=d1"[^>]*>Ann Lee<\/a>/);
+  });
+
+  it("shows Unknown Driver for a driver with no name", () => {
+    expect(render([row("d1", { firstName: null, lastName: null })])).toContain("Unknown Driver");
+    expect(render([row("d1", { firstName: "Ann", lastName: null })])).toContain(">Ann<");
+  });
+
+  it("shows the distance in kilometres, then miles, in one cell", () => {
+    expect(render([row("d1", { distanceMeters: 34400 })])).toContain("34.4 km/21.4 mi");
+    expect(render([row("d1", { distanceMeters: 27726000 })])).toContain("27726.0 km/17228.2 mi");
+    expect(render([row("d1", { distanceMeters: 0 })])).toContain("0.0 km/0.0 mi");
+  });
+
+  it("shows the drive time as 2h 5m, 45m, 2h or a dash", () => {
+    expect(render([row("d1", { driveMinutes: 125 })])).toContain(">2h 5m<");
+    expect(render([row("d1", { driveMinutes: 45 })])).toContain(">45m<");
+    expect(render([row("d1", { driveMinutes: 120 })])).toContain(">2h<");
+    expect(render([row("d1", { driveMinutes: 0 })])).toContain(">—<");
+  });
+
+  it("shows the trips as a plain number", () => {
+    expect(render([row("d1", { tripCount: 7 })])).toContain(">7<");
+  });
+
+  it("shows the pay with the driver's currency (D17)", () => {
+    expect(render([row("d1", { payCents: 123400, payCurrency: "USD" })])).toContain(
+      "$1,234.00 USD",
+    );
+    expect(render([row("d1", { payCents: 56700, payCurrency: "CAD" })])).toContain("$567.00 CAD");
+  });
+
+  it("keeps the order of the rows it is given", () => {
+    const html = render([row("a", { firstName: "Zed" }), row("b", { firstName: "Amy" })]);
+    expect(html.indexOf("Zed")).toBeLessThan(html.indexOf("Amy"));
+  });
+});
+
+describe("a row (D9, R5)", () => {
+  it("has the pointer cursor and the hover", () => {
+    const html = render([row("d1")]);
+    expect(html).toContain("cursor-pointer");
+    expect(html).toContain("hover:bg-gray-50");
+  });
+
+  function rowOf(rows: AuditDriverRow[]) {
+    const t: any = AuditDriversTable({
+      rows,
+      sort: PAY_DESC,
+      onSort: () => {},
+      getRowHref: (r) => `/x?driver=${r.driverUuid}`,
+      emptyMessage: "",
+    });
+    const tbody = t.props.children.props.children.props.children[1];
+    return tbody.props.children[0][0]; // the first <tr>
+  }
+
+  it("a click on the row pushes the driver page", () => {
+    const tr = rowOf([row("d1")]);
+    tr.props.onClick({ target: { closest: () => null } });
+    expect(router.push).toHaveBeenCalledWith("/x?driver=d1");
+  });
+
+  it("a click that already hit the name link is not handled twice", () => {
+    const tr = rowOf([row("d1")]);
+    tr.props.onClick({ target: { closest: () => ({}) } });
+    expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+describe("the empty state", () => {
+  it("shows the message it is given, in one cell across the table, and no rows", () => {
+    const html = render([], PAY_DESC, "No driver found.");
+    expect(html).toContain('data-testid="audit-drivers-empty"');
+    expect(html).toContain("No driver found.");
+    expect(html).toContain('colSpan="5"');
+    expect(html).not.toContain('data-testid="audit-driver-row"');
+  });
+
+  it("shows no message when there are rows", () => {
+    expect(render([row("d1")])).not.toContain('data-testid="audit-drivers-empty"');
+  });
+});

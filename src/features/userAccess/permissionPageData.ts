@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they pick a driver and read all of that driver's work trackers with their Paid or Not paid status. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -243,11 +243,11 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Driver Audit",
     description:
-      "The Audit tab of the Accountant page. The user picks a driver and reads all of that driver's work trackers: status, date, bleacher, type, pickup and dropoff, drive time, distance, and whether the tracker's week has been paid. Read-only: nothing on the tab changes a work tracker or a payment.",
+      "The Audit tab of the Accountant page. It lists every driver with their distance (in kilometres and miles), drive time, trips and pay (in the driver's own currency, USD or CAD) for a date range the user chooses (a preset such as This month, or any From and To dates). Any column can be sorted, and a search bar finds a driver by name. Clicking a driver opens that driver's work trackers inside the same range: status, date, bleacher, type, pickup and dropoff, drive time, distance, and whether the tracker's week has been paid. Read-only: nothing on the tab changes a work tracker or a payment.",
     category: "Day to Day Operations",
     roles: {
       admin: read(
-        "Can open the Audit tab and read the work trackers of any driver, including drivers who are no longer active.",
+        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active.",
       ),
       account_manager: none(
         "The Accountant page is for accountants and administrators. An account manager still reads their drivers' work trackers on the Work Trackers pages.",
@@ -261,7 +261,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: read(
-        "Can open the Audit tab and read the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
+        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
       ),
     },
   },

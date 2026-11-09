@@ -80,21 +80,31 @@ const rawRow = {
 
 let out: ReturnType<typeof useAuditTrackers>;
 
+type Range = { from: string | null; to: string | null };
+const ALL_TIME: Range = { from: null, to: null };
+
 function Probe({
   driver,
+  range,
   page,
   pageSize,
 }: {
   driver: string | null;
+  range: Range;
   page: number;
   pageSize: PageSize;
 }) {
-  out = useAuditTrackers(driver, page, pageSize);
+  out = useAuditTrackers(driver, range, page, pageSize);
   return null;
 }
 
-function render(driver: string | null, page: number, pageSize: PageSize = 25) {
-  renderToString(<Probe driver={driver} page={page} pageSize={pageSize} />);
+function render(
+  driver: string | null,
+  page: number,
+  pageSize: PageSize = 25,
+  range: Range = ALL_TIME,
+) {
+  renderToString(<Probe driver={driver} range={range} page={page} pageSize={pageSize} />);
 }
 
 const pageCall = () => state.calls.find((c) => !c.sql.includes("count("))!;
@@ -169,6 +179,31 @@ describe("useAuditTrackers: a driver and a page", () => {
     expect(out.rows).toEqual([]);
     expect(out.total).toBe(0);
     expect(out.page).toBe(1);
+  });
+});
+
+describe("useAuditTrackers: the date range (spec 05, D8)", () => {
+  it("passes the range to both queries, after the driver", () => {
+    state.count = result({ data: [{ total: 120 }] });
+    render("d1", 2, 50, { from: "2026-11-01", to: "2026-11-30" });
+
+    expect(countCall().parameters).toEqual(["d1", "2026-11-01", "2026-11-30"]);
+    expect(pageCall().parameters).toEqual(["d1", "2026-11-01", "2026-11-30", 50, 50]);
+  });
+
+  it("leaves a missing end out of the SQL parameters (no limit)", () => {
+    render("d1", 1, 25, { from: "2026-11-01", to: null });
+
+    expect(countCall().parameters).toEqual(["d1", "2026-11-01"]);
+    expect(pageCall().parameters).toEqual(["d1", "2026-11-01", 25, 0]);
+  });
+
+  it("is still inert with no driver, whatever the range", () => {
+    render(null, 1, 25, { from: "2026-11-01", to: "2026-11-30" });
+
+    expect(out.rows).toEqual([]);
+    expect(out.total).toBe(0);
+    expect(out.isLoading).toBe(false);
   });
 });
 

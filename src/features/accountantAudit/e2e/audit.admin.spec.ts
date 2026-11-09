@@ -2,7 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * The Audit tab of /accountant as an administrator sees it
- * (docs/specs/accountant-audit-01-tab.md §4, S4: the same as S1 to S3 for an admin).
+ * (docs/specs/accountant-audit-01-tab.md §4, S4: the same as S1 to S3 for an admin; since
+ * accountant-audit-05-drivers-table.md the tab opens on the drivers list, not on an empty state).
  *
  * Written, not run locally (project rule). The seeded E2E admin user has no `Users` row in the
  * local database, so this spec cannot run there anyway (see CLAUDE.md, E2E test users & roles).
@@ -25,7 +26,7 @@ test.describe("Audit tab (admin)", () => {
     expect(await tabNames(page)).toEqual(["Collections", "AR Deposits", "Need attention", "Audit"]);
   });
 
-  test("S4/S2: clicking Audit puts tab=audit in the URL, shows the empty state and hides the receivables controls", async ({
+  test("S4/S2: clicking Audit puts tab=audit in the URL, shows the drivers list and hides the receivables controls", async ({
     page,
   }) => {
     await page.goto("/accountant");
@@ -35,14 +36,14 @@ test.describe("Audit tab (admin)", () => {
 
     await expect(page).toHaveURL(/[?&]tab=audit(&|$)/);
     await expect(page.getByTestId("audit-tab")).toBeVisible();
-    await expect(page.getByTestId("audit-empty-state")).toBeVisible();
-    await expect(page.getByText("Choose a driver", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("audit-drivers-list")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Choose a driver", { exact: true })).toHaveCount(0);
     await expect(page.getByPlaceholder(/^Search by name, invoice #/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^Filters/ })).toHaveCount(0);
     await expect(page.getByRole("switch", { name: "Show Deleted" })).toHaveCount(0);
   });
 
-  test("S4/S3: /accountant?tab=audit opens Audit directly, on the empty state", async ({
+  test("S4/S3: /accountant?tab=audit opens Audit directly, on the drivers list", async ({
     page,
   }) => {
     await page.goto("/accountant?tab=audit");
@@ -52,6 +53,6 @@ test.describe("Audit tab (admin)", () => {
       "true",
       { timeout: 60_000 },
     );
-    await expect(page.getByTestId("audit-empty-state")).toBeVisible();
+    await expect(page.getByTestId("audit-drivers-list")).toBeVisible({ timeout: 60_000 });
   });
 });

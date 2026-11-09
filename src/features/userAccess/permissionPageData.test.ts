@@ -377,18 +377,18 @@ describe("permission matrix", () => {
         }
       });
 
-      it("describes the tab: the driver, the trackers, the paid status, and that it is read-only", () => {
+      it("describes the tab: the drivers table, the range, the trackers, the paid status, and that it is read-only", () => {
         expect(row?.description).toBe(
-          "The Audit tab of the Accountant page. The user picks a driver and reads all of that driver's work trackers: status, date, bleacher, type, pickup and dropoff, drive time, distance, and whether the tracker's week has been paid. Read-only: nothing on the tab changes a work tracker or a payment.",
+          "The Audit tab of the Accountant page. It lists every driver with their distance (in kilometres and miles), drive time, trips and pay (in the driver's own currency, USD or CAD) for a date range the user chooses (a preset such as This month, or any From and To dates). Any column can be sorted, and a search bar finds a driver by name. Clicking a driver opens that driver's work trackers inside the same range: status, date, bleacher, type, pickup and dropoff, drive time, distance, and whether the tracker's week has been paid. Read-only: nothing on the tab changes a work tracker or a payment.",
         );
       });
 
       it("tells an admin and an accountant what they can read, deactivated drivers included", () => {
         expect(row?.roles.admin.note).toBe(
-          "Can open the Audit tab and read the work trackers of any driver, including drivers who are no longer active.",
+          "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active.",
         );
         expect(row?.roles.accountant.note).toBe(
-          "Can open the Audit tab and read the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
+          "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
         );
       });
 
@@ -412,7 +412,7 @@ describe("permission matrix", () => {
 
       it("is named in the accountant's role description, before the line about what is hidden", () => {
         expect(ROLE_DESCRIPTIONS.accountant).toContain(
-          "Also has the Audit tab of the Accountant page, where they pick a driver and read all of that driver's work trackers with their Paid or Not paid status.",
+          "Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status.",
         );
         expect(
           ROLE_DESCRIPTIONS.accountant.endsWith(

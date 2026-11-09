@@ -153,11 +153,18 @@ function addAddress(id: string, street: string, city: string) {
     .run(id, street, city);
 }
 
-const page = (driver: string | null, pageNumber = 1, pageSize = 25) =>
-  run(buildAuditTrackersQuery(driver, pageNumber, pageSize)).map(toAuditRow);
+// Spec 05: the queries take the date range. Most of the older cases run on All time (no limit).
+type Range = { from: string | null; to: string | null };
+const ALL_TIME: Range = { from: null, to: null };
 
-const idsOf = (driver: string | null, pageNumber = 1, pageSize = 25) =>
-  page(driver, pageNumber, pageSize).map((r) => r.id);
+const page = (driver: string | null, pageNumber = 1, pageSize = 25, range: Range = ALL_TIME) =>
+  run(buildAuditTrackersQuery(driver, range, pageNumber, pageSize)).map(toAuditRow);
+
+const idsOf = (driver: string | null, pageNumber = 1, pageSize = 25, range: Range = ALL_TIME) =>
+  page(driver, pageNumber, pageSize, range).map((r) => r.id);
+
+const countOf = (driver: string | null, range: Range = ALL_TIME) =>
+  run(buildAuditTrackerCountQuery(driver, range));
 
 describe("which trackers are listed (D1)", () => {
   it("returns only the chosen driver's trackers", () => {
@@ -226,13 +233,12 @@ describe("which trackers are listed (D1)", () => {
 });
 
 describe("the order (D5, R3)", () => {
-  it("puts the newest date first and a tracker with no date at the end", () => {
+  it("puts the newest date first", () => {
     addTracker({ id: "old", date: "2026-09-01" });
-    addTracker({ id: "nodate", date: null });
     addTracker({ id: "new", date: "2026-09-20" });
     addTracker({ id: "mid", date: "2026-09-10" });
 
-    expect(idsOf("d1")).toEqual(["new", "mid", "old", "nodate"]);
+    expect(idsOf("d1")).toEqual(["new", "mid", "old"]);
   });
 
   it("orders one day by pickup time, Any Time (no pickup time) last in the day", () => {
@@ -276,9 +282,9 @@ describe("paging (D6, R3)", () => {
   });
 
   it("counts the driver's trackers, not the page and not other drivers'", () => {
-    expect(run(buildAuditTrackerCountQuery("d1"))).toEqual([{ total: 5 }]);
-    expect(run(buildAuditTrackerCountQuery("d2"))).toEqual([{ total: 2 }]);
-    expect(run(buildAuditTrackerCountQuery("nobody"))).toEqual([{ total: 0 }]);
+    expect(countOf("d1")).toEqual([{ total: 5 }]);
+    expect(countOf("d2")).toEqual([{ total: 2 }]);
+    expect(countOf("nobody")).toEqual([{ total: 0 }]);
   });
 });
 
@@ -304,9 +310,9 @@ describe("Paid / Not paid through the tracker's own group link (D2, R1, R5, A1)"
     expect(page("d1")[0].payment).toBe("not_paid");
   });
 
-  it("is none for a tracker with a null worktracker_group_uuid (no date)", () => {
+  it("is none for a tracker with a null worktracker_group_uuid", () => {
     addGroup("g1", "d1", "2026-09-21", 1);
-    addTracker({ id: "t1", date: null, group: null });
+    addTracker({ id: "t1", group: null });
 
     expect(page("d1")[0].payment).toBe("none");
   });
@@ -400,7 +406,61 @@ describe("no driver chosen", () => {
   it("returns no rows and a count of 0 for the sentinel driver", () => {
     addTracker({ id: "t1", driver: "d1" });
 
-    expect(run(buildAuditTrackersQuery(null, 1, 25))).toEqual([]);
-    expect(run(buildAuditTrackerCountQuery(null))).toEqual([{ total: 0 }]);
+    expect(run(buildAuditTrackersQuery(null, ALL_TIME, 1, 25))).toEqual([]);
+    expect(countOf(null)).toEqual([{ total: 0 }]);
+  });
+});
+
+describe("the date range (spec 05, D8, D15)", () => {
+  beforeEach(() => {
+    addTracker({ id: "before", date: "2026-10-31" });
+    addTracker({ id: "first", date: "2026-11-01" });
+    addTracker({ id: "mid", date: "2026-11-15" });
+    addTracker({ id: "last", date: "2026-11-30" });
+    addTracker({ id: "after", date: "2026-12-01" });
+    addTracker({ id: "other-driver", driver: "d2", date: "2026-11-15" });
+  });
+  const NOVEMBER: Range = { from: "2026-11-01", to: "2026-11-30" };
+
+  it("lists only the trackers inside the range, both ends included", () => {
+    expect(idsOf("d1", 1, 25, NOVEMBER)).toEqual(["last", "mid", "first"]);
+  });
+
+  it("with only From there is no upper limit, with only To no lower one", () => {
+    expect(idsOf("d1", 1, 25, { from: "2026-11-15", to: null })).toEqual(["after", "last", "mid"]);
+    expect(idsOf("d1", 1, 25, { from: null, to: "2026-11-01" })).toEqual(["first", "before"]);
+  });
+
+  it("counts the same trackers the page lists", () => {
+    expect(countOf("d1", NOVEMBER)).toEqual([{ total: 3 }]);
+    expect(countOf("d1", { from: "2026-11-15", to: null })).toEqual([{ total: 3 }]);
+    expect(countOf("d1", ALL_TIME)).toEqual([{ total: 5 }]);
+    expect(countOf("d1", { from: "2027-01-01", to: null })).toEqual([{ total: 0 }]);
+  });
+
+  it("pages inside the range: the total is the range's, not the driver's", () => {
+    expect(idsOf("d1", 1, 2, NOVEMBER)).toEqual(["last", "mid"]);
+    expect(idsOf("d1", 2, 2, NOVEMBER)).toEqual(["first"]);
+    expect(idsOf("d1", 3, 2, NOVEMBER)).toEqual([]);
+  });
+
+  it("never lists a tracker with no date, with or without a range, and never counts it", () => {
+    addTracker({ id: "nodate", date: null });
+
+    expect(idsOf("d1")).not.toContain("nodate");
+    expect(idsOf("d1", 1, 25, NOVEMBER)).not.toContain("nodate");
+    expect(countOf("d1", ALL_TIME)).toEqual([{ total: 5 }]);
+    expect(countOf("d1", NOVEMBER)).toEqual([{ total: 3 }]);
+  });
+
+  it("an inverted range lists and counts nothing", () => {
+    const inverted: Range = { from: "2026-11-30", to: "2026-11-01" };
+    expect(idsOf("d1", 1, 25, inverted)).toEqual([]);
+    expect(countOf("d1", inverted)).toEqual([{ total: 0 }]);
+  });
+
+  it("the page's rows and the count agree for the same range (the Trips figure of the table)", () => {
+    const total = (countOf("d1", NOVEMBER)[0] as { total: number }).total;
+    expect(idsOf("d1", 1, 100, NOVEMBER)).toHaveLength(total);
   });
 });

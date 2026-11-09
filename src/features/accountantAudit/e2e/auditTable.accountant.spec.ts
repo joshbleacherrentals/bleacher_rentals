@@ -8,7 +8,7 @@ import { DateTime } from "luxon";
  * Written, not run locally (project rule). This project only exists once E2E_ACCOUNTANT_EMAIL is
  * configured (see playwright.config.ts). Nothing is written. Several scenarios need seed data (a
  * driver with more than 25 trackers, with Paid and Not paid weeks, with none): each one looks
- * through the drivers of the select for a fit and skips with a message when the seed has none.
+ * through the drivers of the table for a fit and skips with a message when the seed has none.
  */
 
 const params = (page: Page) => new URL(page.url()).searchParams;
@@ -18,16 +18,19 @@ const bodyRows = (page: Page) => table(page).locator("tbody tr");
 const pager = (page: Page) => page.getByRole("navigation", { name: "Pagination" });
 const MAX_DRIVERS = 25;
 
-/** Opens the Audit tab and chooses the driver at `index`; its name, or false past the list's end. */
+/**
+ * Opens the Audit tab on All time (`from=&to=`, so no tracker is cut by a range) and opens the
+ * driver at `index` of the drivers table (accountant-audit-05-drivers-table.md); its name, or
+ * false past the table's end.
+ */
 async function chooseDriver(page: Page, index: number): Promise<string | false> {
-  await page.goto("/accountant?tab=audit");
-  const select = page.getByRole("combobox");
-  await expect(select).toBeEnabled({ timeout: 60_000 });
-  await select.click();
-  const options = page.getByRole("option");
-  if (index >= (await options.count())) return false;
-  const name = ((await options.nth(index).innerText()).split("\n")[0] ?? "").trim();
-  await options.nth(index).click();
+  await page.goto("/accountant?tab=audit&from=&to=");
+  await expect(page.getByTestId("audit-drivers-list")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Loading drivers...")).toHaveCount(0, { timeout: 60_000 });
+  const driverRows = page.getByTestId("audit-driver-row");
+  if (index >= (await driverRows.count())) return false;
+  const name = (await driverRows.nth(index).locator("td").first().innerText()).trim();
+  await driverRows.nth(index).getByRole("link").click();
   await expect(table(page)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("Loading work trackers...")).toHaveCount(0, { timeout: 60_000 });
   return name;
@@ -187,8 +190,14 @@ test.describe("Audit table (accountant)", () => {
     expect(params(page).get("apage")).toBe("2");
     await expect.poll(() => bodyRows(page).allInnerTexts()).toEqual(secondPage);
 
-    await page.getByRole("combobox").click();
-    await page.getByRole("option").filter({ hasNotText: name! }).first().click();
+    await page.getByTestId("audit-back").click();
+    await expect(page.getByTestId("audit-drivers-list")).toBeVisible({ timeout: 60_000 });
+    await page
+      .getByTestId("audit-driver-row")
+      .filter({ hasNotText: name! })
+      .first()
+      .getByRole("link")
+      .click();
     await expect.poll(() => params(page).get("driver")).not.toBe(driver);
     expect(params(page).has("apage")).toBe(false);
   });
@@ -230,14 +239,15 @@ test.describe("Audit table (accountant)", () => {
     await expect(button).toHaveAttribute("data-paid", payment === "paid" ? "true" : "false");
   });
 
-  test("S9: a driver with no trackers shows the empty message and no pager", async ({ page }) => {
-    const name = await findDriver(
-      page,
-      async (p) => (await p.getByText("This driver has no work trackers").count()) > 0,
-    );
-    test.skip(name === null, "No driver without work trackers in the seed.");
+  test("S9: a range with no trackers shows the empty message and no pager", async ({ page }) => {
+    // A driver in the drivers table has trackers by definition; an old range empties the page.
+    const name = await findDriver(page, hasRows);
+    test.skip(name === null, "No driver with work trackers in the seed.");
 
-    await expect(page.getByText("This driver has no work trackers")).toBeVisible();
+    await page.getByLabel("From").fill("1999-01-01");
+    await page.getByLabel("To").fill("1999-01-02");
+
+    await expect(page.getByText("This driver has no work trackers in this range")).toBeVisible();
     await expect(pager(page)).toHaveCount(0);
   });
 });

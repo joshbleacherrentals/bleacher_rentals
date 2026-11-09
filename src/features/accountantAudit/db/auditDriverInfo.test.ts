@@ -24,6 +24,7 @@ vi.mock("@/components/providers/SystemProvider", () => ({
   },
 }));
 
+import { STATUSES } from "@/features/manageTeam/constants";
 import { buildAuditDriverInfoQuery, toAuditDriverInfo } from "./auditDriverInfo";
 
 let sqlite: DatabaseSync;
@@ -35,12 +36,12 @@ const run = (id: string | null) => {
 beforeEach(() => {
   sqlite = new DatabaseSync(":memory:");
   sqlite.exec(`
-    create table Users (id text primary key, email text, phone text);
+    create table Users (id text primary key, email text, phone text, first_name text, last_name text, status_uuid text);
     create table Addresses (id text primary key, street text, city text, state_province text, zip_postal text);
-    create table Drivers (id text primary key, user_uuid text, address_uuid text, phone_number text);
-    insert into Users values ('u1','a@x.com','111'), ('u2','b@x.com','222');
+    create table Drivers (id text primary key, user_uuid text, address_uuid text, phone_number text, is_active integer);
+    insert into Users values ('u1','a@x.com','111','Ann','Lee','active'), ('u2','b@x.com','222','Bob','Stone','inactive-status');
     insert into Addresses values ('a1','1 Main St','Springfield','IL','62701');
-    insert into Drivers values ('d1','u1','a1','999'), ('d2','u2',null,null);
+    insert into Drivers values ('d1','u1','a1','999',1), ('d2','u2',null,null,0);
   `);
 });
 
@@ -48,6 +49,10 @@ describe("buildAuditDriverInfoQuery", () => {
   it("reads the driver's phone, email and address", () => {
     const [r] = run("d1");
     expect(r).toMatchObject({
+      id: "d1",
+      first_name: "Ann",
+      last_name: "Lee",
+      is_active: 1,
       phone_number: "999",
       phone: "111",
       email: "a@x.com",
@@ -56,6 +61,10 @@ describe("buildAuditDriverInfoQuery", () => {
       state_province: "IL",
       zip_postal: "62701",
     });
+  });
+  it("reads the name and the active flag of a deactivated driver", () => {
+    const [r] = run("d2");
+    expect(r).toMatchObject({ first_name: "Bob", last_name: "Stone", is_active: 0 });
   });
   it("returns a driver with no address row, with null address parts", () => {
     const [r] = run("d2");
@@ -71,6 +80,11 @@ describe("buildAuditDriverInfoQuery", () => {
 
 describe("toAuditDriverInfo", () => {
   const row = (o = {}) => ({
+    id: "d1",
+    first_name: null,
+    last_name: null,
+    is_active: 1,
+    status_uuid: null,
     phone_number: null,
     phone: null,
     email: null,
@@ -100,13 +114,38 @@ describe("toAuditDriverInfo", () => {
     expect(toAuditDriverInfo(row({ phone_number: "  ", phone: "111" })).phone).toBe("111");
   });
   it("counts empty strings as missing", () => {
-    expect(toAuditDriverInfo(row({ email: "", street: "", phone: "" }))).toEqual({
+    expect(toAuditDriverInfo(row({ email: "", street: "", phone: "" }))).toMatchObject({
       address: null,
       phone: null,
       email: null,
     });
   });
-  it("is all null for no row", () => {
-    expect(toAuditDriverInfo(undefined)).toEqual({ address: null, phone: null, email: null });
+  it("is all null and empty for no row", () => {
+    expect(toAuditDriverInfo(undefined)).toEqual({
+      address: null,
+      phone: null,
+      email: null,
+      firstName: "",
+      lastName: "",
+      isInactive: false,
+    });
+  });
+  it("carries the name, trimmed, empty when missing (spec 05 R13)", () => {
+    expect(toAuditDriverInfo(row({ first_name: " Ann ", last_name: "Lee" }))).toMatchObject({
+      firstName: "Ann",
+      lastName: "Lee",
+    });
+    expect(toAuditDriverInfo(row({ first_name: null, last_name: "" }))).toMatchObject({
+      firstName: "",
+      lastName: "",
+    });
+  });
+  it("flags a deactivated driver: is_active 0 or null, or the inactive user status", () => {
+    expect(toAuditDriverInfo(row({ is_active: 1 })).isInactive).toBe(false);
+    expect(toAuditDriverInfo(row({ is_active: 0 })).isInactive).toBe(true);
+    expect(toAuditDriverInfo(row({ is_active: null })).isInactive).toBe(true);
+    expect(
+      toAuditDriverInfo(row({ is_active: 1, status_uuid: STATUSES.inactive })).isInactive,
+    ).toBe(true);
   });
 });

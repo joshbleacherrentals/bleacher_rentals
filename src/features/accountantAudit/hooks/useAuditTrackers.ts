@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import type { PageSize } from "@/features/quotesAndBookings/utils/pagination";
 import { buildAuditTrackerCountQuery, buildAuditTrackersQuery } from "../db/auditTrackers";
+import type { AuditRange } from "../utils/auditRange";
 import {
   clampPage,
   toAuditRow,
@@ -14,12 +15,13 @@ import {
 type CountRow = { total: number };
 
 /**
- * One page of a driver's work trackers with each one's Paid / Not paid, and the total behind the
- * pager. Two watchers per driver: the count and the page (R2).
- * docs/specs/accountant-audit-03-tracker-data.md §3.
+ * One page of a driver's work trackers inside a date range, with each one's Paid / Not paid, and
+ * the total behind the pager. Two watchers per driver: the count and the page (R2).
+ * docs/specs/accountant-audit-03-tracker-data.md §3; the range: accountant-audit-05 (D8, D15).
  */
 export function useAuditTrackers(
   driverUuid: string | null,
+  range: AuditRange,
   page: number,
   pageSize: PageSize,
 ): {
@@ -31,7 +33,11 @@ export function useAuditTrackers(
 } {
   const hasDriver = driverUuid !== null;
 
-  const countCompiled = useMemo(() => buildAuditTrackerCountQuery(driverUuid), [driverUuid]);
+  const { from, to } = range;
+  const countCompiled = useMemo(
+    () => buildAuditTrackerCountQuery(driverUuid, { from, to }),
+    [driverUuid, from, to],
+  );
   const {
     data: countData,
     isLoading: countLoading,
@@ -43,8 +49,8 @@ export function useAuditTrackers(
   const effectivePage = clampPage(page, total, pageSize);
 
   const pageCompiled = useMemo(
-    () => buildAuditTrackersQuery(driverUuid, effectivePage, pageSize),
-    [driverUuid, effectivePage, pageSize],
+    () => buildAuditTrackersQuery(driverUuid, { from, to }, effectivePage, pageSize),
+    [driverUuid, from, to, effectivePage, pageSize],
   );
   const {
     data: pageData,

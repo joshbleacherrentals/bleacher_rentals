@@ -1,14 +1,16 @@
 import { Mail, MapPin, Phone, type LucideIcon } from "lucide-react";
 import type { AuditDriverInfo as AuditDriverInfoData } from "../db/auditDriverInfo";
 
-const ITEMS: { key: keyof AuditDriverInfoData; label: string; Icon: LucideIcon }[] = [
+type Contact = Pick<AuditDriverInfoData, "address" | "phone" | "email">;
+
+const ITEMS: { key: keyof Contact; label: string; Icon: LucideIcon }[] = [
   { key: "address", label: "Address", Icon: MapPin },
   { key: "phone", label: "Phone", Icon: Phone },
   { key: "email", label: "Email", Icon: Mail },
 ];
 
 /** The driver's Address, Phone and Email. docs/specs/accountant-audit-02-driver-select.md §3 (D7, R9) */
-export function AuditDriverInfo({ info }: { info: AuditDriverInfoData }) {
+export function AuditDriverInfo({ info }: { info: Contact }) {
   return (
     <div data-testid="audit-driver-info" className="mt-5 flex flex-wrap gap-x-10 gap-y-3">
       {ITEMS.map(({ key, label, Icon }) => (
