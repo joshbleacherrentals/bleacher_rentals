@@ -1,1 +1,2 @@
-# Python deps for Vercel functions in /api (none needed yet).
+# Python deps for the FastAPI app in api/index.py (Vercel installs these).
+fastapi==0.162.2
