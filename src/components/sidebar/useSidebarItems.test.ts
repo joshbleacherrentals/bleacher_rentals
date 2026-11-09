@@ -382,6 +382,7 @@ describe("useSidebarItems", () => {
       "/dev-tools/damage-photos",
       "/dev-tools/qbo-get-sales-tax",
       "/dev-tools/allowed-emails",
+      "/dev-tools/python-health",
     ]);
   });
 
