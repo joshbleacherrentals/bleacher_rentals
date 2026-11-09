@@ -3,17 +3,28 @@
 import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Truck } from "lucide-react";
+import { Pagination } from "@/components/Pagination";
+import { useLayoutContext } from "@/contexts/LayoutContexts";
+import type { PageSize } from "@/features/quotesAndBookings/utils/pagination";
 import { useAuditDriverOptions } from "../hooks/useAuditDriverOptions";
 import { useAuditDriverInfo } from "../hooks/useAuditDriverInfo";
-import { parseAuditDriver, withAuditDriver } from "../utils/auditUrlState";
+import { useAuditTrackers } from "../hooks/useAuditTrackers";
+import {
+  parseAuditDriver,
+  parseAuditPaging,
+  withAuditDriver,
+  withAuditPaging,
+} from "../utils/auditUrlState";
 import { AuditDriverSelect } from "./AuditDriverSelect";
 import { AuditDriverInfo } from "./AuditDriverInfo";
+import { AuditTrackersTable } from "./AuditTrackersTable";
 
 /**
  * The body of the Audit tab: the history of one driver's work trackers. It shows the driver select,
- * the chosen driver's details, and the empty state until a driver is chosen. Specs 03 (the data) and
- * 04 (the table) fill the area below the details.
- * docs/specs/accountant-audit-01-tab.md §3, accountant-audit-02-driver-select.md §3
+ * the chosen driver's details, the table of the driver's trackers with its pager, and the empty
+ * state until a driver is chosen.
+ * docs/specs/accountant-audit-01-tab.md §3, accountant-audit-02-driver-select.md §3,
+ * accountant-audit-04-table.md §3
  */
 export function AuditTab() {
   const router = useRouter();
@@ -28,6 +39,16 @@ export function AuditTab() {
 
   const { info, isLoading: infoLoading } = useAuditDriverInfo(driver);
 
+  const { page, pageSize } = parseAuditPaging(searchParams);
+  const {
+    rows,
+    total,
+    page: effectivePage,
+    isLoading: trackersLoading,
+    error: trackersError,
+  } = useAuditTrackers(driver, page, pageSize);
+  const { scrollRef } = useLayoutContext();
+
   const setDriver = (id: string | null) =>
     router.replace(
       `${pathname}?${withAuditDriver(new URLSearchParams(searchParams.toString()), id)}`,
@@ -35,6 +56,15 @@ export function AuditTab() {
         scroll: false,
       },
     );
+
+  // One write for the page and the size together, then back to the top of the layout (R9).
+  const setPaging = (next: { page: number; pageSize: PageSize }) => {
+    router.replace(
+      `${pathname}?${withAuditPaging(new URLSearchParams(searchParams.toString()), next)}`,
+      { scroll: false },
+    );
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   useEffect(() => {
     if (isUnknown) setDriver(null);
@@ -50,6 +80,20 @@ export function AuditTab() {
         onChange={setDriver}
       />
       {driver && !infoLoading && info && <AuditDriverInfo info={info} />}
+      {driver && (
+        <div className="mt-5">
+          <AuditTrackersTable rows={rows} isLoading={trackersLoading} error={trackersError} />
+          {!trackersLoading && !trackersError && total > 0 && (
+            <Pagination
+              page={effectivePage}
+              pageSize={pageSize}
+              totalItems={total}
+              onPageChange={(next) => setPaging({ page: next, pageSize })}
+              onPageSizeChange={(size) => setPaging({ page: 1, pageSize: size })}
+            />
+          )}
+        </div>
+      )}
       {!driver && (
         <div
           data-testid="audit-empty-state"

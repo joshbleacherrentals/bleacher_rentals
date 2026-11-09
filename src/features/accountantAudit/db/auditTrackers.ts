@@ -61,9 +61,12 @@ export function buildAuditTrackersQuery(driverUuid: string | null, page: number,
 
 /** How many trackers the driver has: the total behind the pager. */
 export function buildAuditTrackerCountQuery(driverUuid: string | null) {
-  return db
-    .selectFrom("WorkTrackers")
-    .select(db.fn.countAll<number>().as("total"))
-    .where("driver_uuid", "=", driverUuid ?? NO_DRIVER)
-    .compile();
+  return (
+    db
+      .selectFrom("WorkTrackers")
+      // The callback form: `db` is the app's bound lazy proxy, which strips the methods off `db.fn`.
+      .select(({ fn }) => fn.countAll<number>().as("total"))
+      .where("driver_uuid", "=", driverUuid ?? NO_DRIVER)
+      .compile()
+  );
 }

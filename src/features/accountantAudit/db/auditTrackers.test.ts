@@ -22,6 +22,17 @@ const testDb = new Kysely<any>({
   },
 });
 
+// The app's `db` is not a bare Kysely: SystemProvider hands out a lazy proxy that `bind`s every
+// function it returns. That strips the helper methods off `db.fn` (`db.fn.countAll` is undefined
+// there), so the module has to be tested through the same proxy, or a query that only works on a
+// bare Kysely passes here and throws in the browser.
+const boundDb = new Proxy({} as Kysely<any>, {
+  get(_target, prop) {
+    const value = (testDb as any)[prop];
+    return typeof value === "function" ? value.bind(testDb) : value;
+  },
+});
+
 let sqlite: DatabaseSync;
 
 function run(compiled: CompiledQuery) {
@@ -30,7 +41,7 @@ function run(compiled: CompiledQuery) {
 
 vi.mock("@/components/providers/SystemProvider", () => ({
   get db() {
-    return testDb;
+    return boundDb;
   },
 }));
 

@@ -1,7 +1,7 @@
 # Accountant Audit 04: the table
 
-Status: **DRAFT 2026-11-06, waiting for "Approved"** (0 open decisions; readings to confirm in
-§1). Build order: **04 of 04**. Needs: [01](accountant-audit-01-tab.md) (the tab),
+Status: **IMPLEMENTED 2026-11-06, uncommitted** (APPROVED 2026-11-06; 0 open decisions; readings
+R1-R11 in §1 approved with the spec; e2e written, not run; details in §9). Build order: **04 of 04**. Needs: [01](accountant-audit-01-tab.md) (the tab),
 [02](accountant-audit-02-driver-select.md) (the chosen driver and `auditUrlState.ts`),
 [03](accountant-audit-03-tracker-data.md) (`useAuditTrackers`). Needed by: nothing.
 Plan: [accountant-audit-plan.md](accountant-audit-plan.md). Branch: `q4-sprint3-finance`.
@@ -342,3 +342,47 @@ Tests: the six of §5, and `accountantAudit/e2e/auditTable.accountant.spec.ts`,
 - The attention mark and the Inspections link of /work-trackers.
 - Marking a week paid or unpaid, or editing a tracker, from this tab.
 - The actual bleacher of a swap (D3).
+
+## 9. Implementation notes (2026-11-06)
+
+No contract of §3 changed: the six production files, the exported names and the signatures are as
+written, and `AuditTab` still reads `useAuditTrackers(driverUuid, page, pageSize)` as spec 03
+built it. Where the spec left a detail open, this is what was built:
+
+- **Spec 03 was committed during the work** (`fe54216e`), so 01, 02 and 03 are all in the branch.
+- **A bug of spec 03 surfaced once the tab mounted the hook** (user's screenshot, 2026-11-06:
+  `db.fn.countAll is not a function` in `buildAuditTrackerCountQuery`). The app's `db` is a lazy
+  proxy that `bind`s every function it returns, which strips the methods off `db.fn`. Fixed with
+  the callback form `.select(({ fn }) => fn.countAll<number>()...)`; the name, the signature and
+  the SQL are unchanged. The test of `db/auditTrackers.test.ts` now provides `db` through the same
+  bound proxy (it failed before the fix), because its bare Kysely had hidden the error.
+- **Type with no name** renders a plain "–" and no badge (R4: "No type shows –"). A name with an
+  unknown or null code keeps the badge in the fallback style.
+- **The payment pill for `none`** carries `data-testid="audit-payment"` and `data-payment="none"`
+  too, so S4 can find the dashes the same way it finds the pills.
+- **Own-key lookups.** `WorkTrackerTypeBadge` and `auditStatusLabel` look their key up with
+  `Object.hasOwn`, so a code such as `constructor` falls back instead of reading an inherited
+  member. `formatAddressLines` trims each part, so a part of only spaces counts as empty.
+- **Styling the spec left open (R1 sets no column widths):** the status wrapper is `inline-flex`
+  so the badge keeps the size of its icon instead of stretching to the column; a location block is
+  `min-w-[180px] max-w-[260px]` and the distance block `max-w-[104px]`, both `whitespace-normal`,
+  so that long streets wrap and miles and km fall on two lines (R6) inside the table's nowrap
+  cells.
+- **The pager is also hidden when the query failed** (§7), not only while loading or at a total of
+  0 (R9).
+- **Tests of `AuditTab`** replace `Pagination`, `AuditDriverSelect`, `useAuditTrackers` and the
+  layout context with probes, to read the props the tab hands them and to call `onPageChange`,
+  `onPageSizeChange` and `onChange` directly. The table is the real one.
+- **E2E.** The accountant and the admin file hold the same S1 to S9 (§6 names two files, so no
+  shared helper file was added). Every scenario that needs seed data (more than 25 trackers, Paid
+  and Not paid together, a Cancelled / Declined, a Repair, none at all) looks through the drivers of
+  the select and skips with a message when the seed has no fit. S8 opens the driver's week on
+  `/work-trackers/<week start>` (the Monday of the row's date), finds the driver's row by name and
+  compares `data-paid`; the admin file first presses "See All Drivers" when it is offered.
+- **Not done:** no Playwright run (the user's rule), and no look at the finished tab in a browser
+  (it needs a Clerk sign-in and synced PowerSync data), so the look of the table (row height,
+  badge size, wrapping) is checked by markup tests only.
+- **Sync buckets read again** (R-C): the Accountant bucket and the Admin bucket of
+  `br_powersync/config/sync_rules.yaml` serve `WorkTrackers`, `WorkTrackerGroups`,
+  `WorkTrackerTypes`, `Drivers`, `Users`, `Addresses` and `Bleachers`. No sync-rule change.
+- **Permissions matrix:** unchanged, as §3 says (the row "Driver Audit" is from spec 01).
