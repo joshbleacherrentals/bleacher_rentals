@@ -451,6 +451,21 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Auto Work Trackers",
+    description:
+      "The Auto Work Trackers page in the sidebar, where you pick one zone and one week (Monday to Sunday). It is being built: for now it only holds your selection and creates nothing.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can open the page and pick a zone and a week."),
+      account_manager: full("Can open the page and pick a zone and a week."),
+      developer: none("Does not have this page."),
+      viewer: none("Does not have this page."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
     label: "Driver Payments & QuickBooks Bills",
     description:
       "The Payment Details window on a driver's week (Work Trackers page): the payment status of the week, and the QuickBooks bill created from it.",

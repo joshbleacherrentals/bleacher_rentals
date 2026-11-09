@@ -188,6 +188,14 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     }
   });
 
+  it("lets an admin and an account manager open Auto Work Trackers, and nobody else", () => {
+    expect(canAccessPath(["admin"], "/auto-work-trackers")).toBe(true);
+    expect(canAccessPath(["account_manager"], "/auto-work-trackers")).toBe(true);
+    for (const role of ["developer", "viewer", "maintainer", "accountant", "driver"] as const) {
+      expect(canAccessPath([role], "/auto-work-trackers"), role).toBe(false);
+    }
+  });
+
   it("shows the sidebar to an accountant", () => {
     expect(mergeRoleConfigs(["accountant"]).showSidebar).toBe(true);
   });

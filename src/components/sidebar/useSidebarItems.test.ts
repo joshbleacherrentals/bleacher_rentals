@@ -49,6 +49,22 @@ describe("useSidebarItems", () => {
     expect(keys.indexOf("accountant")).toBe(keys.indexOf("work-trackers") - 1);
   });
 
+  it("admin and account manager see Auto Work Trackers right after Work Trackers", () => {
+    for (const role of ["admin", "account_manager"] as const) {
+      const keys = useSidebarItems([role]).map((i) => i.key);
+      expect(keys.indexOf("auto-work-trackers"), role).toBe(keys.indexOf("work-trackers") + 1);
+    }
+  });
+
+  it("no other role sees Auto Work Trackers", () => {
+    for (const role of ["viewer", "developer", "maintainer", "accountant"] as const) {
+      expect(
+        useSidebarItems([role]).map((i) => i.key),
+        role,
+      ).not.toContain("auto-work-trackers");
+    }
+  });
+
   // ═══ Viewer ═══
 
   it("viewer sees team page", () => {
