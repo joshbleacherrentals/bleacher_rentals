@@ -40,10 +40,14 @@ export function sumByCurrency<T>(
   return ORDER.filter((c) => totals.has(c)).map((c) => ({ currency: c, cents: totals.get(c)! }));
 }
 
+/** `$120,000 + C$45,000` — the amounts of a header total, whole dollars, one per currency. */
+export function formatTotalsAmounts(totals: readonly CurrencyTotal[]): string {
+  return totals
+    .map((t) => `${currencySymbol(t.currency)}${Math.round(t.cents / 100).toLocaleString("en-US")}`)
+    .join(" + ");
+}
+
 /** `Subtotal ($120,000 + C$45,000)` — whole dollars, as the header always showed. */
 export function formatTotalsLabel(label: string, totals: readonly CurrencyTotal[]): string {
-  const parts = totals.map(
-    (t) => `${currencySymbol(t.currency)}${Math.round(t.cents / 100).toLocaleString("en-US")}`,
-  );
-  return `${label} (${parts.join(" + ")})`;
+  return `${label} (${formatTotalsAmounts(totals)})`;
 }

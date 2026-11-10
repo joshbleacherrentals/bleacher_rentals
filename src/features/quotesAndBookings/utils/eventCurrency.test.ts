@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { pickEventCurrency, sumByCurrency, formatTotalsLabel } from "./eventCurrency";
+import {
+  pickEventCurrency,
+  sumByCurrency,
+  formatTotalsLabel,
+  formatTotalsAmounts,
+} from "./eventCurrency";
 import type { Currency } from "../types/quoteTypes";
 
 const OFFICES = new Map<string, Currency>([
@@ -64,5 +69,20 @@ describe("formatTotalsLabel", () => {
         { currency: "CAD", cents: 4500000 },
       ]),
     ).toBe("Subtotal ($120,000 + C$45,000)");
+  });
+});
+
+describe("formatTotalsAmounts", () => {
+  it("is the amounts of a header total without the label or the brackets", () => {
+    expect(
+      formatTotalsAmounts([
+        { currency: "USD", cents: 12000000 },
+        { currency: "CAD", cents: 4500000 },
+      ]),
+    ).toBe("$120,000 + C$45,000");
+  });
+
+  it("rounds to whole dollars, as the header always showed", () => {
+    expect(formatTotalsAmounts([{ currency: "USD", cents: 123456 }])).toBe("$1,235");
   });
 });

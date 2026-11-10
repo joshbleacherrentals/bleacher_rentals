@@ -211,3 +211,52 @@ describe("the look", () => {
     expect(numbers[3]).toContain("text-darkBlue"); // Pay is the sorted column
   });
 });
+
+describe("the Pay total", () => {
+  const totalOf = (html: string) =>
+    html.match(/data-testid="audit-pay-total"[^>]*>([^<]*)</)?.[1] ?? null;
+
+  it("sums the pay of every row in whole dollars under the Pay header", () => {
+    const html = render([
+      row("a", { payCents: 123400 }),
+      row("b", { payCents: 56700 }),
+      row("c", { payCents: 100 }),
+    ]);
+    expect(totalOf(html)).toBe("$1,802");
+  });
+
+  it("keeps the two currencies apart, USD first, as the Subtotal header does", () => {
+    const html = render([
+      row("a", { payCents: 123400, payCurrency: "USD" }),
+      row("b", { payCents: 56700, payCurrency: "CAD" }),
+      row("c", { payCents: 100000, payCurrency: "CAD" }),
+    ]);
+    expect(totalOf(html)).toBe("$1,234 + C$1,567");
+  });
+
+  it("adds up only the rows it is given, so a search narrows the total", () => {
+    const all = [row("a", { payCents: 100000 }), row("b", { payCents: 50000 })];
+    expect(totalOf(render(all))).toBe("$1,500");
+    expect(totalOf(render(all.slice(1)))).toBe("$500");
+  });
+
+  it("is $0 when there are no rows", () => {
+    expect(totalOf(render([], PAY_DESC, "No driver found."))).toBe("$0");
+  });
+
+  it("sits in the Pay header cell, below the sort button and not inside it", () => {
+    const html = render([row("d1", { payCents: 123400 })]);
+    const payTh = html.match(/<th[^>]*>(?:(?!<\/th>).)*audit-sort-pay.*?<\/th>/)?.[0] ?? "";
+    expect(payTh).toContain('data-testid="audit-pay-total"');
+    const button = payTh.match(/<button.*?<\/button>/)?.[0] ?? "";
+    expect(button).not.toContain("audit-pay-total");
+  });
+
+  it("is only under Pay: the other four headers carry no total", () => {
+    expect(render([row("d1")]).match(/data-testid="audit-pay-total"/g)).toHaveLength(1);
+  });
+
+  it("is told apart from the row amounts by a title that says what it is", () => {
+    expect(render([row("d1")])).toMatch(/title="Total pay of the drivers listed"[^>]*data-testid/);
+  });
+});

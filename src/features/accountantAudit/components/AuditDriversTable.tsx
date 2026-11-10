@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from "lucide-react";
+import {
+  formatTotalsAmounts,
+  sumByCurrency,
+} from "@/features/quotesAndBookings/utils/eventCurrency";
 import type { AuditDriverRow } from "../utils/auditDriverRows";
 import { formatDriverDistance, formatDriverDriveTime, formatPayAmount } from "../utils/auditFormat";
 import type { AuditSort, AuditSortKey } from "../utils/auditSort";
@@ -38,19 +42,24 @@ function numberTone(sort: AuditSort, key: AuditSortKey): string {
   return sort.key === key ? "font-semibold text-darkBlue" : "text-gray-600";
 }
 
-/** A header: a button in the `<th>`, `aria-sort`, an arrow (R22), as Collections' `SortHeader`. */
+/**
+ * A header: a button in the `<th>`, `aria-sort`, an arrow (R22), as Collections' `SortHeader`. A
+ * `caption` goes under the button, outside it, so a click on it does not sort.
+ */
 function SortHeader({
   label,
   sortKey,
   sort,
   align,
   onSort,
+  caption,
 }: {
   label: string;
   sortKey: AuditSortKey;
   sort: AuditSort;
   align: Align;
   onSort: (key: AuditSortKey) => void;
+  caption?: string;
 }) {
   const active = sort.key === sortKey;
   const ariaSort = !active ? "none" : sort.direction === "asc" ? "ascending" : "descending";
@@ -72,6 +81,15 @@ function SortHeader({
         <span>{label}</span>
         <Icon className={`size-3 ${active ? "" : "opacity-45"}`} aria-hidden="true" />
       </button>
+      {caption && (
+        <div
+          title="Total pay of the drivers listed"
+          data-testid="audit-pay-total"
+          className="mt-0.5 whitespace-nowrap text-xs font-medium normal-case tabular-nums tracking-normal text-gray-700"
+        >
+          {caption}
+        </div>
+      )}
     </th>
   );
 }
@@ -86,6 +104,15 @@ function SortHeader({
  */
 export function AuditDriversTable({ rows, sort, onSort, getRowHref, emptyMessage }: Props) {
   const router = useRouter();
+  // The total of the rows listed (so a search narrows it), one per currency: USD and CAD do not add
+  // up. Whole dollars, as the Subtotal and Tax headers of /quotes-bookings.
+  const payTotal = formatTotalsAmounts(
+    sumByCurrency(
+      rows,
+      (r) => r.payCents,
+      (r) => r.payCurrency,
+    ),
+  );
 
   return (
     <div
@@ -104,6 +131,7 @@ export function AuditDriversTable({ rows, sort, onSort, getRowHref, emptyMessage
                   sort={sort}
                   align={c.align}
                   onSort={onSort}
+                  caption={c.key === "pay" ? payTotal : undefined}
                 />
               ))}
             </tr>
