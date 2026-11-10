@@ -19,7 +19,7 @@ Published canvas (private, owner-only until shared): https://claude.ai/artifact/
 These are the canvas source files, copied from the published version. They open only in the Design editor and are not part of the app build. Prettier skips them (see `.prettierignore`); do not reformat them by hand.
 
 - `canvas.json`: the index (artboard positions, order, titles).
-- `Main.dc.html`: Collections tab. Interactive: Show Not Due Yet, sorting by Next Follow Up, Payment Overdue and Amount Overdue.
+- `Main.dc.html`: Collections tab. The tab bar is Collections, AR Deposits, Need attention (the AR tab was dropped on 2026-11-10, as in the app). Interactive: the amount button (Full amount, Deposits, All), Show Not Due Yet, sorting by Next Follow Up, Payment Overdue and Amount Overdue.
 - `CollectionsNotDue.dc.html`: `Main` with Show Not Due Yet on.
 - `Invoice.dc.html`: invoice page. Header (Open Q/I, Open PDF, Customer view, Record Payment, Status), the Information and Messages tabs, the New Task button with its floating window, the delete-task confirmation, the Previous / Next Task margin buttons, and the customer view (Approved Quote, Signed Contract, Pay Invoice). Interactive: Yes on the confirmation removes the task row and renumbers the table.
 - `InvoiceDeleteTask.dc.html`: `Invoice` with the delete confirmation open for task #2.
@@ -36,5 +36,6 @@ These are the canvas source files, copied from the published version. They open 
 - Copy kept as written in the sketch, for example "3 months after".
 - The Task History rows follow the same story: overdue since Nov 7, the first task finished 2 days ago, the second yesterday, the third is open and due today. The Signed line uses the contact's name and the Signed_Contract.pdf date; the time zone shown is the viewer's own.
 - The sketch also draws a delete icon on the open task; the request says the open task has none, so the design follows the request.
+- The amount button on the Collections tab sits left of Show Not Due Yet. Like the status button on `/quotes-bookings` it is one button that steps through its values on every click (Full amount, Deposits, All) and shows the current one; it opens on Full amount. The design draws only its place, label and colour change: the rows and the Amount Overdue column do not change with it, because what each mode lists is not defined yet.
 - With five buttons in the header the name truncates with an ellipsis at 1040 px.
 - The margin buttons are a pointer shortcut: they repeat the footer buttons, so they are hidden from assistive technology and skipped by Tab.
