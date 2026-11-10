@@ -16,10 +16,32 @@ body{margin:0;background:#ffffff}
 .iv-btn:focus-visible{outline:2px solid #1d62a3;outline-offset:2px}
 .iv-icon:hover{background:#f3f4f6}
 @media (max-width:820px){.iv-head,.iv-actions{flex-wrap:wrap !important}}
+.iv-row{position:relative;cursor:pointer}
+.iv-row:hover{background:#f9fafb}
+.iv-rowlink::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0}
+.iv-row:hover .iv-rowlink{text-decoration:underline}
+.iv-rowlink:focus-visible{outline:none}
+.iv-row:has(.iv-rowlink:focus-visible){outline:2px solid #1d62a3;outline-offset:-2px}
+.iv-rowact{position:relative;z-index:1}
+.iv-rail{display:none}
+@media (min-width:1440px){.iv-rail{display:block;flex:0 0 168px;box-sizing:border-box;padding-top:48px}}
 </style>
 </helmet>
 <div style="position:relative;min-height:100vh;background:#ffffff;font-family:Geist,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827">
-  <div style="max-width:1040px;margin:0 auto;padding:16px 32px 56px;box-sizing:border-box">
+  <div style="display:flex;justify-content:center;align-items:stretch;gap:16px">
+
+    <div class="iv-rail" aria-hidden="true">
+      <sc-if value="{{ internalView }}" hint-placeholder-val="{{ true }}">
+        <div style="position:sticky;top:24px">
+          <button type="button" tabindex="-1" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:48px;padding:0 12px;box-sizing:border-box;border:1px solid #10365a;border-radius:8px;background:#ffffff;box-shadow:0 1px 3px rgba(15,42,68,.12);font-family:inherit;font-size:15px;font-weight:500;color:#10365a;white-space:nowrap;cursor:pointer">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+            Previous Task
+          </button>
+        </div>
+      </sc-if>
+    </div>
+
+  <div style="flex:0 1 1040px;min-width:0;padding:16px 32px 56px;box-sizing:border-box">
 
     <a href="Main.dc.html" class="iv-btn" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;font-size:14px;line-height:20px;font-weight:500;color:#10365a;text-decoration:none">
       <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
@@ -33,6 +55,10 @@ body{margin:0;background:#ffffff}
           <span style="flex-shrink:0;white-space:nowrap;font-size:14px;line-height:20px;font-weight:600;color:#fecaca">3 days overdue</span>
         </div>
         <div class="iv-actions" style="display:flex;align-items:center;flex:0 0 auto;gap:8px">
+          <button type="button" class="iv-btn" title="Opens the quote and invoice page of this event in a new tab" style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border:1px solid rgba(255,255,255,.55);border-radius:6px;background:transparent;font-family:inherit;font-size:14px;font-weight:500;color:#ffffff;white-space:nowrap;cursor:pointer">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+            Open Q/I
+          </button>
           <button type="button" class="iv-btn" title="Opens the signed invoice PDF, or the quote PDF if there is no signed invoice" style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border:1px solid rgba(255,255,255,.55);border-radius:6px;background:transparent;font-family:inherit;font-size:14px;font-weight:500;color:#ffffff;white-space:nowrap;cursor:pointer">
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
             Open PDF
@@ -76,29 +102,41 @@ body{margin:0;background:#ffffff}
           <section aria-label="Task History" style="padding:20px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff">
             <h3 style="margin:0 0 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">Task History</h3>
             <div style="overflow-x:auto">
-              <table style="width:100%;min-width:480px;border-collapse:collapse;font-size:14px;line-height:20px">
+              <table style="width:100%;min-width:640px;border-collapse:collapse;font-size:14px;line-height:20px">
                 <thead>
                   <tr style="text-align:left;font-size:12px;line-height:16px;letter-spacing:.05em;text-transform:uppercase;color:#6b7280">
                     <th scope="col" style="width:40px;padding:8px 8px 8px 0;border-bottom:1px solid #e5e7eb;font-weight:500">#</th>
-                    <th scope="col" style="width:140px;padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500">Date</th>
-                    <th scope="col" style="padding:8px 0 8px 8px;border-bottom:1px solid #e5e7eb;font-weight:500">Note</th>
+                    <th scope="col" style="width:132px;padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500">Finished at</th>
+                    <th scope="col" style="width:132px;padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500">Due Date</th>
+                    <th scope="col" style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:500">Note</th>
+                    <th scope="col" style="width:40px;padding:8px 0 8px 8px;border-bottom:1px solid #e5e7eb;font-weight:500"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td style="padding:12px 8px 12px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;vertical-align:top">1</td>
-                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top">11 days ago</td>
-                    <td style="padding:12px 0 12px 8px;border-bottom:1px solid #f3f4f6">Call to the customer and ask about payment</td>
+                  <tr style="display:{{ t1.display }}">
+                    <td style="padding:12px 8px 12px 0;border-bottom:{{ t1.border }};color:#6b7280;vertical-align:top">{{ t1.n }}</td>
+                    <td style="padding:12px 8px;border-bottom:{{ t1.border }};vertical-align:top">2 days ago</td>
+                    <td style="padding:12px 8px;border-bottom:{{ t1.border }};vertical-align:top">3 days ago</td>
+                    <td style="padding:12px 8px;border-bottom:{{ t1.border }}">Call to the customer and ask about payment</td>
+                    <td style="padding:6px 0 6px 8px;border-bottom:{{ t1.border }};text-align:right;vertical-align:top">
+                      <button type="button" aria-label="{{ t1.deleteLabel }}" onClick="{{ t1.askDelete }}" class="iv-btn iv-icon" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:6px;background:none;color:#a8403a;cursor:pointer"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg></button>
+                    </td>
+                  </tr>
+                  <tr style="display:{{ t2.display }}">
+                    <td style="padding:12px 8px 12px 0;border-bottom:{{ t2.border }};color:#6b7280;vertical-align:top">{{ t2.n }}</td>
+                    <td style="padding:12px 8px;border-bottom:{{ t2.border }};vertical-align:top">Yesterday</td>
+                    <td style="padding:12px 8px;border-bottom:{{ t2.border }};vertical-align:top">2 days ago</td>
+                    <td style="padding:12px 8px;border-bottom:{{ t2.border }}">Call to the customer and ask about payment and wish him a great holiday</td>
+                    <td style="padding:6px 0 6px 8px;border-bottom:{{ t2.border }};text-align:right;vertical-align:top">
+                      <button type="button" aria-label="{{ t2.deleteLabel }}" onClick="{{ t2.askDelete }}" class="iv-btn iv-icon" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:6px;background:none;color:#a8403a;cursor:pointer"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg></button>
+                    </td>
                   </tr>
                   <tr>
-                    <td style="padding:12px 8px 12px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;vertical-align:top">2</td>
-                    <td style="padding:12px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top">4 days ago</td>
-                    <td style="padding:12px 0 12px 8px;border-bottom:1px solid #f3f4f6">Call to the customer and ask about payment and wish him a great holiday</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:12px 8px 12px 0;color:#6b7280;vertical-align:top">3</td>
-                    <td style="padding:12px 8px;vertical-align:top">2 days ago</td>
-                    <td style="padding:12px 0 12px 8px">Call to the customer and ask about payment</td>
+                    <td style="padding:12px 8px 12px 0;color:#6b7280;vertical-align:top">{{ t3.n }}</td>
+                    <td style="padding:12px 8px;color:#6b7280;vertical-align:top">—</td>
+                    <td style="padding:12px 8px;vertical-align:top">Due today</td>
+                    <td style="padding:12px 8px">Call to the customer and ask about payment<span style="margin-left:8px;padding:1px 6px;border-radius:4px;background:#eff6ff;font-size:12px;line-height:16px;font-weight:500;color:#1d62a3">Open</span></td>
+                    <td style="padding:6px 0 6px 8px"></td>
                   </tr>
                 </tbody>
               </table>
@@ -106,7 +144,10 @@ body{margin:0;background:#ffffff}
           </section>
 
           <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px 24px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;font-size:14px;line-height:20px">
-            <div><span style="color:#6b7280">Invoice</span><span style="margin-left:8px;font-weight:600">123456</span></div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div><span style="color:#6b7280">Invoice</span><span style="margin-left:8px;font-weight:600">123456</span></div>
+              <div><span style="color:#6b7280">Signed</span><span style="margin-left:8px">Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield</span></div>
+            </div>
             <div><span style="color:#6b7280">Account Manager</span><span style="margin-left:8px;font-weight:600">Max Gavryshkiv</span></div>
           </div>
 
@@ -319,24 +360,24 @@ body{margin:0;background:#ffffff}
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
+                  <tr class="iv-row">
                     <td style="padding:8px 8px 8px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">1</td>
-                    <td style="padding:8px;border-bottom:1px solid #f3f4f6">Signed_Contract.pdf</td>
+                    <td style="padding:8px;border-bottom:1px solid #f3f4f6"><button type="button" class="iv-btn iv-rowlink" title="Click to open or download the file" style="padding:0;border:0;background:none;font-family:inherit;font-size:inherit;line-height:inherit;color:inherit;text-align:left;cursor:pointer">Signed_Contract.pdf</button></td>
                     <td style="padding:8px;border-bottom:1px solid #f3f4f6">PDF</td>
                     <td style="padding:8px;border-bottom:1px solid #f3f4f6">Oct 22, 2026</td>
                     <td style="padding:8px 0 8px 8px;border-bottom:1px solid #f3f4f6;text-align:right">
-                      <span style="display:inline-flex;gap:4px">
+                      <span class="iv-rowact" style="display:inline-flex;gap:4px">
                         <button type="button" class="iv-btn iv-icon" aria-label="Download Signed_Contract.pdf" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:6px;background:none;color:#374151;cursor:pointer"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg></button>
                       </span>
                     </td>
                   </tr>
-                  <tr>
+                  <tr class="iv-row">
                     <td style="padding:8px 8px 8px 0;color:#6b7280">2</td>
-                    <td style="padding:8px">Check_Scan.pdf</td>
+                    <td style="padding:8px"><button type="button" class="iv-btn iv-rowlink" title="Click to open or download the file" style="padding:0;border:0;background:none;font-family:inherit;font-size:inherit;line-height:inherit;color:inherit;text-align:left;cursor:pointer">Check_Scan.pdf</button></td>
                     <td style="padding:8px">PDF</td>
                     <td style="padding:8px">Oct 22, 2026</td>
                     <td style="padding:8px 0 8px 8px;text-align:right">
-                      <span style="display:inline-flex;gap:4px">
+                      <span class="iv-rowact" style="display:inline-flex;gap:4px">
                         <button type="button" class="iv-btn iv-icon" aria-label="Download Check_Scan.pdf" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:6px;background:none;color:#374151;cursor:pointer"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg></button>
                         <button type="button" class="iv-btn iv-icon" aria-label="Delete Check_Scan.pdf" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:6px;background:none;color:#a8403a;cursor:pointer"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg></button>
                       </span>
@@ -627,6 +668,19 @@ body{margin:0;background:#ffffff}
     </div>
   </div>
 
+    <div class="iv-rail" aria-hidden="true">
+      <sc-if value="{{ internalView }}" hint-placeholder-val="{{ true }}">
+        <div style="position:sticky;top:24px">
+          <button type="button" tabindex="-1" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:48px;padding:0 12px;box-sizing:border-box;border:1px solid #10365a;border-radius:8px;background:#ffffff;box-shadow:0 1px 3px rgba(15,42,68,.12);font-family:inherit;font-size:15px;font-weight:500;color:#10365a;white-space:nowrap;cursor:pointer">
+            Next Task
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+          </button>
+        </div>
+      </sc-if>
+    </div>
+
+  </div>
+
   <sc-if value="{{ winOpen }}" hint-placeholder-val="{{ false }}">
     <div role="dialog" aria-modal="false" aria-labelledby="iv-win-title" style="position:fixed;left:{{ winX }}px;top:{{ winY }}px;width:{{ winW }}px;height:{{ winH }}px;z-index:40;display:flex;flex-direction:column;box-sizing:border-box;border:1px solid #9ca3af;border-radius:10px;background:#ffffff;box-shadow:0 8px 24px rgba(15,42,68,.14),0 24px 64px -16px rgba(15,42,68,.4)">
       <div onMouseDown="{{ startDrag }}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;padding:8px 8px 8px 12px;border-radius:9px 9px 0 0;background:linear-gradient(to right,#1f2937,#4b5563);color:#ffffff;cursor:move;user-select:none">
@@ -675,15 +729,33 @@ body{margin:0;background:#ffffff}
       </button>
     </div>
   </sc-if>
+
+  <sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+    <div onKeyDown="{{ confirmKey }}" style="position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box">
+      <button type="button" tabindex="-1" aria-label="Close the dialog" onClick="{{ closeConfirm }}" style="position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;padding:0;border:0;background:rgba(17,24,39,.45);cursor:default"></button>
+      <div role="dialog" aria-modal="true" aria-labelledby="iv-confirm-title" aria-describedby="iv-confirm-text" style="position:relative;width:400px;max-width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff;box-shadow:0 8px 24px rgba(15,42,68,.14),0 24px 64px -16px rgba(15,42,68,.4)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 12px 0 20px">
+          <h2 id="iv-confirm-title" style="margin:0;font-size:16px;line-height:24px;font-weight:600;color:#111827">Are you sure?</h2>
+          <button type="button" aria-label="Close" onClick="{{ closeConfirm }}" class="iv-btn iv-icon" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:6px;background:none;color:#6b7280;cursor:pointer"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+        </div>
+        <p id="iv-confirm-text" style="margin:4px 20px 0;font-size:14px;line-height:20px;color:#4b5563">{{ confirmText }}</p>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding:20px">
+          <button id="iv-confirm-no" type="button" onClick="{{ closeConfirm }}" class="iv-btn" style="height:38px;padding:0 20px;border:1px solid #10365a;border-radius:6px;background:#ffffff;font-family:inherit;font-size:14px;font-weight:600;color:#10365a;cursor:pointer">No</button>
+          <button type="button" onClick="{{ confirmDelete }}" class="iv-btn" style="height:38px;padding:0 20px;border:0;border-radius:6px;background:#a8403a;font-family:inherit;font-size:14px;font-weight:600;color:#ffffff;cursor:pointer">Yes</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"internal","options":["internal","customer"]},"tab":{"editor":"enum","default":"info","options":["info","messages"]},"custTab":{"editor":"enum","default":"quote","options":["quote","contract","pay"]},"contacts":{"editor":"enum","default":"both","options":["both","no-finance","no-company"]},"taskWindow":{"editor":"boolean","default":false},"pickerOpen":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":2400}}'>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"internal","options":["internal","customer"]},"tab":{"editor":"enum","default":"info","options":["info","messages"]},"custTab":{"editor":"enum","default":"quote","options":["quote","contract","pay"]},"contacts":{"editor":"enum","default":"both","options":["both","no-finance","no-company"]},"taskWindow":{"editor":"boolean","default":false},"pickerOpen":{"editor":"boolean","default":false},"confirmTask":{"editor":"int","default":0,"min":0,"max":3},"$preview":{"width":1280,"height":2400}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = {
       view: null, tab: null, cust: null, msg: 'internal',
       win: null, picker: null, day: 12, deleted: false,
+      confirm: undefined, removed: [],
       wx: 730, wy: 250, ww: 430, wh: 360,
     };
     this._op = null;
@@ -693,6 +765,18 @@ class Component extends DCLogic {
 
   componentWillUnmount() {
     this.endOp();
+  }
+
+  // Opening the confirmation with a click moves focus to "No", so Esc reaches the dialog's onKeyDown.
+  componentDidUpdate() {
+    const open = typeof this.state.confirm === 'number';
+    if (open && !this._askFocused) {
+      this._askFocused = true;
+      const no = document.getElementById('iv-confirm-no');
+      if (no) no.focus({ preventScroll: true });
+    } else if (!open) {
+      this._askFocused = false;
+    }
   }
 
   startOp(kind, e) {
@@ -740,6 +824,22 @@ class Component extends DCLogic {
     const cust = s.cust || p.custTab || 'quote';
     const winOpen = s.win === null ? !!p.taskWindow : s.win;
     const pickerOpen = winOpen && (s.picker === null ? !!p.pickerOpen : s.picker);
+
+    // Task History: rows 1 and 2 are closed (they can be deleted), row 3 is the open one (it cannot).
+    const TASKS = [{ id: 1, open: false }, { id: 2, open: false }, { id: 3, open: true }];
+    const kept = TASKS.filter((t) => !s.removed.includes(t.id));
+    const rowVals = (t) => {
+      const i = kept.findIndex((k) => k.id === t.id);
+      return {
+        display: i === -1 ? 'none' : 'table-row',
+        n: i === -1 ? '' : i + 1,
+        border: t.open ? 'none' : '1px solid #f3f4f6',
+        deleteLabel: 'Delete task ' + (i + 1),
+        askDelete: () => this.setState({ confirm: t.id }),
+      };
+    };
+    const confirmId = s.confirm === undefined ? (p.confirmTask || null) : s.confirm;
+    const confirmIndex = confirmId === null ? -1 : kept.findIndex((k) => k.id === confirmId);
 
     // The mockup's "today" is Nov 10, 2026.
     const TODAY = 10;
@@ -825,6 +925,20 @@ class Component extends DCLogic {
       startResizeSE: (e) => this.startOp('se', e),
       dueLabel,
       days,
+
+      t1: rowVals(TASKS[0]),
+      t2: rowVals(TASKS[1]),
+      t3: rowVals(TASKS[2]),
+      confirmOpen: confirmIndex !== -1,
+      confirmText: 'Task #' + (confirmIndex + 1) + ' will be deleted from the history.',
+      closeConfirm: () => this.setState({ confirm: null }),
+      confirmDelete: () => this.setState({ removed: [...s.removed, confirmId], confirm: null }),
+      confirmKey: (e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          this.setState({ confirm: null });
+        }
+      },
 
       showDeleted: s.deleted,
       hideDeleted: !s.deleted,
