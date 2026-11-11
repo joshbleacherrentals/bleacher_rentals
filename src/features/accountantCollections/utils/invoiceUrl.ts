@@ -35,6 +35,14 @@ export function invoiceHref({
   return `/accountant/invoice?${params}`;
 }
 
+/**
+ * The quote card of an event (`/quotes-bookings/{id}`), for the Open Q/I button. It opens the card
+ * as it opens by itself, so no tab is added. docs/specs/accountant-collections-17-open-qi-button.md §3.
+ */
+export function quoteCardHref(eventId: string): string {
+  return `/quotes-bookings/${encodeURIComponent(eventId)}`;
+}
+
 export function collectionsHref(listState: CollectionsListState): string {
   const params = new URLSearchParams({
     tab: "collections",

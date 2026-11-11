@@ -60,6 +60,7 @@ vi.mock("./InvoiceFiles", () => ({
 }));
 // Open PDF reads the local signatures and asks Supabase Storage; its own test covers it.
 vi.mock("./OpenPdfButton", () => ({
+  HEADER_BUTTON: "stand-in-header-button",
   OpenPdfButton: (props: unknown) => {
     mockOpenPdf(props);
     return <button type="button">Open PDF</button>;

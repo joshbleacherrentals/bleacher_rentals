@@ -4,6 +4,7 @@ import {
   collectionsHref,
   invoiceHref,
   parseInvoiceTab,
+  quoteCardHref,
   withCollectionsListState,
 } from "./invoiceUrl";
 
@@ -48,6 +49,19 @@ describe("collectionsHref", () => {
     expect(collectionsHref(CHANGED)).toBe(
       "/accountant?tab=collections&csort=amount&cdir=desc&cnotdue=1",
     );
+  });
+});
+
+// docs/specs/accountant-collections-17-open-qi-button.md §3 and §5: the address Open Q/I opens.
+describe("quoteCardHref", () => {
+  it("is the quote card of the event, with no tab and no list parameters", () => {
+    expect(quoteCardHref("0b5a3c1e-7d2f-4c8a-9e61-3f4d5a6b7c8d")).toBe(
+      "/quotes-bookings/0b5a3c1e-7d2f-4c8a-9e61-3f4d5a6b7c8d",
+    );
+  });
+
+  it("encodes an id that needs it", () => {
+    expect(quoteCardHref("a b/c?d#e")).toBe("/quotes-bookings/a%20b%2Fc%3Fd%23e");
   });
 });
 
