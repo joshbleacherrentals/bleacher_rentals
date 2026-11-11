@@ -1297,6 +1297,7 @@ const ArEventTasksCols = {
   completed: column.integer,
   note: column.text,
   event_uuid: column.text,
+  finished_at: column.text,
 } satisfies PowerSyncColsFor<"ArEventTasks">;
 const ArEventTasks = new Table(ArEventTasksCols, { indexes: { event_uuid: ["event_uuid"] } });
 

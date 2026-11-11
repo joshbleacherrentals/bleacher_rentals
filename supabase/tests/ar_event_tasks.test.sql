@@ -9,7 +9,8 @@
 -- Everything runs in a transaction that is ROLLED BACK at the end.
 --
 -- What it pins down:
---   * the shape: exactly six columns, their types, NOT NULLs and defaults;
+--   * the shape: exactly seven columns (finished_at came with spec 18), their types, NOT NULLs and
+--     defaults;
 --   * the constraints: a blank note is refused (23514), a second OPEN task for one event is
 --     refused (23505) while completed ones pile up, a task for a missing event is refused (23503)
 --     and deleting an event takes its tasks with it;
@@ -26,7 +27,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(91);
+SELECT plan(93);
 
 -- Rows affected by a statement, run as the current (RLS-bound) role.
 CREATE FUNCTION public.test_rows_affected(q text) RETURNS int
@@ -109,20 +110,22 @@ RETURNING id AS user_norole \gset
 -- ═══ SHAPE (spec §3) ════════════════════════════════════════════════════════
 
 SELECT has_table('public', 'ArEventTasks', 'the table ArEventTasks exists');
-SELECT columns_are('public', 'ArEventTasks', ARRAY['id','created_at','due_date','completed','note','event_uuid'],
-  'ArEventTasks has exactly the six columns of the spec');
+SELECT columns_are('public', 'ArEventTasks', ARRAY['id','created_at','due_date','completed','note','event_uuid','finished_at'],
+  'ArEventTasks has exactly the seven columns of the specs (finished_at: spec 18)');
 SELECT col_type_is('public', 'ArEventTasks', 'id', 'uuid', 'id is uuid');
 SELECT col_type_is('public', 'ArEventTasks', 'created_at', 'timestamp with time zone', 'created_at is timestamp with time zone');
 SELECT col_type_is('public', 'ArEventTasks', 'due_date', 'date', 'due_date is date');
 SELECT col_type_is('public', 'ArEventTasks', 'completed', 'boolean', 'completed is boolean');
 SELECT col_type_is('public', 'ArEventTasks', 'note', 'text', 'note is text');
 SELECT col_type_is('public', 'ArEventTasks', 'event_uuid', 'uuid', 'event_uuid is uuid');
+SELECT col_type_is('public', 'ArEventTasks', 'finished_at', 'timestamp with time zone', 'finished_at is timestamp with time zone');
 SELECT col_not_null('public', 'ArEventTasks', 'id', 'id is NOT NULL');
 SELECT col_not_null('public', 'ArEventTasks', 'created_at', 'created_at is NOT NULL');
 SELECT col_not_null('public', 'ArEventTasks', 'due_date', 'due_date is NOT NULL');
 SELECT col_not_null('public', 'ArEventTasks', 'completed', 'completed is NOT NULL');
 SELECT col_not_null('public', 'ArEventTasks', 'note', 'note is NOT NULL');
 SELECT col_not_null('public', 'ArEventTasks', 'event_uuid', 'event_uuid is NOT NULL');
+SELECT col_is_null('public', 'ArEventTasks', 'finished_at', 'finished_at is nullable');
 SELECT col_default_is('public', 'ArEventTasks', 'completed', 'false', 'completed defaults to false');
 SELECT col_default_is('public', 'ArEventTasks', 'created_at', 'now()', 'created_at defaults to now()');
 SELECT col_default_is('public', 'ArEventTasks', 'id', 'gen_random_uuid()', 'id is generated');

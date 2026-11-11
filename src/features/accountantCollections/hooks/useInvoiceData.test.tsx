@@ -162,6 +162,7 @@ function taskRow(over: Record<string, unknown> & { id: string }) {
     due_date: "2026-11-15",
     note: "Remind the customer about payment",
     completed: 0,
+    finished_at: null,
     ...over,
   };
 }
@@ -440,6 +441,28 @@ describe("useInvoiceData: the page's data", () => {
     const { tasks } = drawn();
     expect(tasks.open).toMatchObject({ id: "t-open", note: "Call the accountant" });
     expect(tasks.completed.map((t: { id: string }) => t.id)).toEqual(["t-done"]);
+  });
+
+  // docs/specs/accountant-collections-18-task-finished-at.md §3 and §5.
+  it("asks for finished_at with the tasks", () => {
+    setHappyPath();
+    drawn();
+
+    const { sql } = mocks.compiled.find((c) => which(c.sql) === "ArEventTasks")!;
+    expect(sql).toContain('"finished_at"');
+  });
+
+  it("passes the finish time through as a date in the office's time zone", () => {
+    setHappyPath();
+    mocks.answers.ArEventTasks = done([
+      // 03:30 UTC on the 10th is 22:30 of the 9th in Toronto.
+      taskRow({ id: "t-done", completed: 1, finished_at: "2026-11-10T03:30:00.000Z" }),
+      taskRow({ id: "t-open", due_date: "2026-11-17" }),
+    ]);
+
+    const { tasks } = drawn();
+    expect(tasks.completed[0].finishedLabel).toBe("09/11/2026");
+    expect(tasks.open.finishedLabel).toBe("—");
   });
 
   it("takes the newest as the open task if two exist", () => {

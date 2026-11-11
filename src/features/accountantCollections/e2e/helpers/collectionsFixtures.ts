@@ -189,10 +189,27 @@ export async function payInFull(eventId: string, amountCents = 100_000): Promise
   if (error) throw new Error(`payInFull: ${error.message}`);
 }
 
-/** A task of the event, completed or open, `dueInDays` from today (negative for the past). */
+/**
+ * 17:00 UTC, `daysAgo` days before today: noon in Toronto, so the office's calendar day is the same
+ * as the UTC one however the clocks stand (docs/specs/accountant-collections-18-task-finished-at.md).
+ */
+export function finishedMoment(daysAgo: number): Date {
+  const d = new Date();
+  d.setUTCHours(17, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d;
+}
+
+/**
+ * A task of the event, completed or open, `dueInDays` from today (negative for the past).
+ * `finishedDaysAgo` writes an explicit `finished_at` for a completed task, which the trigger keeps.
+ * Without it a completed task is stamped by the trigger with the moment of this insert: the API
+ * cannot write a closed task that has no finish time (only a database session with the trigger off
+ * can), so that case is covered by the SQL and unit tests, not by Playwright.
+ */
 export async function addTask(
   eventId: string,
-  options: { dueInDays: number; note: string; completed: boolean },
+  options: { dueInDays: number; note: string; completed: boolean; finishedDaysAgo?: number },
 ): Promise<void> {
   const { error } = await admin()
     .from("ArEventTasks")
@@ -201,6 +218,9 @@ export async function addTask(
       due_date: isoDate(options.dueInDays),
       completed: options.completed,
       note: options.note,
+      ...(options.finishedDaysAgo === undefined
+        ? {}
+        : { finished_at: finishedMoment(options.finishedDaysAgo).toISOString() }),
     });
   if (error) throw new Error(`addTask: ${error.message}`);
 }

@@ -144,7 +144,7 @@ export function useInvoiceData(eventId: string): InvoiceData {
     () =>
       db
         .selectFrom("ArEventTasks")
-        .select(["id", "created_at", "due_date", "note", "completed"])
+        .select(["id", "created_at", "due_date", "note", "completed", "finished_at"])
         .where("event_uuid", "=", eventId)
         .compile(),
     [eventId],
@@ -283,7 +283,7 @@ export function useInvoiceData(eventId: string): InvoiceData {
     payments,
     allocation: balances.allocation,
     staffNames,
-    tasks: buildTaskLists(tasks.data ?? [], today),
+    tasks: buildTaskLists(tasks.data ?? [], today, timezone),
     currency,
     today,
   };

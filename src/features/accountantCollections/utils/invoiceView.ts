@@ -78,6 +78,17 @@ export function zonedDate(value: string | null, timezone: string): string {
   return dt.isValid ? dt.toFormat("MMM d, yyyy") : "—";
 }
 
+/**
+ * When a task was finished, as a date: `09/11/2026` (DD/MM/YYYY), the day taken in the office's
+ * time zone. No value, an empty text or a text that is not a date is a dash, never an error.
+ * docs/specs/accountant-collections-18-task-finished-at.md §1 (D3) and §3.
+ */
+export function finishedLabel(value: string | null, timezone: string): string {
+  if (!value || !value.trim()) return "—";
+  const dt = inZone(value, timezone);
+  return dt.isValid ? dt.toFormat("dd/MM/yyyy") : "—";
+}
+
 function zonedTime(value: string | null, timezone: string): string {
   if (!value) return "";
   const dt = inZone(value, timezone);
@@ -171,6 +182,8 @@ export type InvoiceTaskRow = {
   due_date: string | null;
   note: string | null;
   completed: number | null;
+  /** Written by the database when the task is closed; empty for an open or an old task. */
+  finished_at: string | null;
 };
 
 export type TaskView = {
@@ -179,11 +192,19 @@ export type TaskView = {
   dueDate: string;
   note: string;
   followUpLabel: string;
+  /** The day the task was finished, `DD/MM/YYYY`; a dash for an open task or one with no time. */
+  finishedLabel: string;
 };
 
-function toTaskView(t: InvoiceTaskRow, today: string): TaskView {
+function toTaskView(t: InvoiceTaskRow, today: string, timezone: string): TaskView {
   const dueDate = (t.due_date ?? "").slice(0, 10);
-  return { id: t.id, dueDate, note: t.note ?? "", followUpLabel: followUpLabel(dueDate, today) };
+  return {
+    id: t.id,
+    dueDate,
+    note: t.note ?? "",
+    followUpLabel: followUpLabel(dueDate, today),
+    finishedLabel: t.completed ? finishedLabel(t.finished_at, timezone) : "—",
+  };
 }
 
 /** Of two tasks, the one created last; the id breaks a tie so the order never flips. */
@@ -193,27 +214,30 @@ function newestFirst(a: InvoiceTaskRow, b: InvoiceTaskRow): number {
 }
 
 /**
- * The open task, and the completed ones newest due date first. The table has no completion date,
- * so a completed task shows its due date in words.
+ * The open task, and the completed ones newest due date first. Each task has its due date in words
+ * and, when it is completed and the database stamped it, the day it was finished.
  */
 export function buildTaskLists(
   tasks: readonly InvoiceTaskRow[],
   today: string,
+  timezone: string,
 ): { open: TaskView | null; completed: TaskView[] } {
   const open = tasks.filter((t) => !t.completed).sort(newestFirst)[0];
   const completed = tasks
     .filter((t) => !!t.completed)
     .sort((a, b) => (b.due_date ?? "").localeCompare(a.due_date ?? "") || newestFirst(a, b));
   return {
-    open: open ? toTaskView(open, today) : null,
-    completed: completed.map((t) => toTaskView(t, today)),
+    open: open ? toTaskView(open, today, timezone) : null,
+    completed: completed.map((t) => toTaskView(t, today, timezone)),
   };
 }
 
 export type TaskHistoryRow = {
   number: number;
   id: string;
-  /** The task's date in words, as the Collections list writes it. */
+  /** The day the task was finished, `DD/MM/YYYY`, or a dash. */
+  finishedLabel: string;
+  /** The task's due date in words, as the Collections list writes it. */
   dateLabel: string;
   note: string;
   isOpen: boolean;
@@ -235,6 +259,7 @@ export function buildTaskHistory(tasks: {
   return ordered.map(({ task, isOpen }, i) => ({
     number: i + 1,
     id: task.id,
+    finishedLabel: task.finishedLabel,
     dateLabel: task.followUpLabel,
     note: task.note,
     isOpen,

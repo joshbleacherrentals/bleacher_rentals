@@ -121,14 +121,14 @@ isOneToOne: false
                   ]
                 },"ArEventTasks": {
                   Row: {
-                    "completed": boolean,"created_at": string,"due_date": string,"event_uuid": string,"id": string,"note": string
+                    "completed": boolean,"created_at": string,"due_date": string,"event_uuid": string,"finished_at": string | null,"id": string,"note": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "completed"?: boolean,"created_at"?: string,"due_date": string,"event_uuid": string,"id"?: string,"note": string
+                    "completed"?: boolean,"created_at"?: string,"due_date": string,"event_uuid": string,"finished_at"?: string | null,"id"?: string,"note": string
                   }
                   Update: {
-                    "completed"?: boolean,"created_at"?: string,"due_date"?: string,"event_uuid"?: string,"id"?: string,"note"?: string
+                    "completed"?: boolean,"created_at"?: string,"due_date"?: string,"event_uuid"?: string,"finished_at"?: string | null,"id"?: string,"note"?: string
                   }
                   Relationships: [
                     {

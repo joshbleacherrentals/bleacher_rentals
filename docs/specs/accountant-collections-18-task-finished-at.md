@@ -1,7 +1,7 @@
 # Accountant Collections 18: when a task was finished (Finished at) and the Due Date header
 
-Status: **Draft**, written 2026-11-11, waiting for "Approved". 0 open decisions (two answered,
-§1); readings to confirm in §1.
+Status: **Approved** 2026-11-11, with one correction by the user (D3, §1): Finished at shows a
+date, `DD/MM/YYYY`, not words. 0 open decisions (three answered, §1).
 Build order: **18**. Needs: [11](accountant-collections-11-task-sync.md),
 [13](accountant-collections-13-task-history-and-files.md). Needed by: 19. Branch:
 `q4-sprint3-finance`.
@@ -102,7 +102,8 @@ amount switch, remembering the switch in the browser.
 
 **From the user's own words (not options):**
 
-- **Task History gets a Finished at column:** the date when the task became closed.
+- **Task History gets a Finished at column:** the date when the task became closed, written as
+  a date, `DD/MM/YYYY` (D3).
 - **`ArEventTasks` gets a new column `finished_at`,** and it is written when the task is
   finished.
 - **The header Date becomes Due Date.**
@@ -122,8 +123,14 @@ amount switch, remembering the switch in the browser.
   task's `created_at`. The user's answer: **leave them empty.** The migration does not touch
   them; the table shows a dash for them.
 
+- **D3 The wording of Finished at (a correction of the first draft, 2026-11-11).** The draft
+  wrote Finished at in words, like the Due Date column. The user's correction: **Finished at
+  does not follow the Due Date column's style; it shows dates, not words, in the format
+  `DD/MM/YYYY`** (for example `09/11/2026`). The Due Date column stays as spec 13 built it, in
+  words.
+
 **Replaces in spec 13:** §1 and §3, the Task History columns `#`, `Date`, `Note` (now `#`,
-`Finished at`, `Due Date`, `Note`); `TaskView` and `TaskHistoryRow` gain a finish label.
+`Finished at`, `Due Date`, `Note`); `TaskView` and `TaskHistoryRow` gain a finish label (the date).
 **Replaces in spec 08:** the comment of `buildTaskLists`, "the table has no completion date".
 
 **Readings to confirm at review:**
@@ -137,10 +144,10 @@ amount switch, remembering the switch in the browser.
   edit of an old completed row (spec 19's delete) does not stamp it. `now()` is the start of the
   transaction: all tasks closed by one nightly run, or by one payment's transaction, share that
   moment.
-- **Wording of Finished at** follows the Due Date column's style (words, not dates): `Today`,
-  `Yesterday`, `N days ago`, `Month ago`, `N Months ago` (the 30-day months of spec 07). The
-  design draws `2 days ago` and `Yesterday`. A finish day after today (the server's clock a
-  little ahead of the browser's) reads `Today`.
+- **Wording of Finished at** is a date, `DD/MM/YYYY` (D3): day and month with two digits, the
+  year with four, the day taken in the office's time zone. The design draws words (`2 days ago`,
+  `Yesterday`); the user's correction replaces that. A finish day after today (the server's
+  clock a little ahead of the browser's) is shown as it is, as its date.
 - **A dash** (`—`) stands for the open task and for any closed task without a finish time.
 - **Until the server's stamp arrives** the closed row shows a dash: after Done / Next Task the
   row is closed locally at once, and `finished_at` comes back with the synchronisation (seconds
@@ -221,15 +228,13 @@ amount switch, remembering the switch in the browser.
 - **`database.types.ts`** (hand edit): `finished_at: string | null` in `Row`,
   `finished_at?: string | null` in `Insert` and `Update`, in the generator's alphabetical place.
 - **`src/lib/powersync/AppSchema.ts`:** `finished_at: column.text` in `ArEventTasksCols`.
-- **`utils/relativeDays.ts`** (changed): `finishedLabel(finishedOn, today)`. `finishedOn` is a
-  `YYYY-MM-DD` or null: null gives `—`; the same day or later gives `Today`; one day ago
-  `Yesterday`; otherwise `${span(days)} ago`.
 - **`utils/invoiceView.ts`** (changed): `InvoiceTaskRow` gains `finished_at: string | null`.
-  `TaskView` gains `finishedLabel`. `buildTaskLists(tasks, today, timezone)` turns `finished_at`
-  into the office's calendar day
-  (`DateTime.fromISO(value.trim().replace(" ", "T"), { zone }).toISODate()`) and then into
-  `finishedLabel`; the open task gets `—`. `TaskHistoryRow` gains `finishedLabel`. The comment
-  about "no completion date" goes.
+  New `finishedLabel(value, timezone)`, beside `zonedDate` and built on the same `inZone`: null,
+  an empty text or a text that does not parse gives `—`; otherwise the instant in the office's
+  zone formatted `dd/MM/yyyy`. `TaskView` gains `finishedLabel`. `buildTaskLists` takes the
+  time zone as a third argument, after `today`, and fills the label for the completed tasks; the
+  open task gets `—`. `TaskHistoryRow` gains `finishedLabel`. The comment about "no completion
+  date" goes. `utils/relativeDays.ts` is not touched.
 - **`hooks/useInvoiceData.ts`** (changed): the tasks query also selects `finished_at`; the call
   passes the time zone it already holds.
 - **`components/TaskHistoryTable.tsx`** (changed): columns `#`, `Finished at`, `Due Date`,
@@ -241,20 +246,28 @@ amount switch, remembering the switch in the browser.
   `test:db:artaskfinished` in `package.json` and in `test:db:all` (same style as
   `ar_task_sync.test.sql`: everything in a transaction that is rolled back).
 - **E2E fixtures:** `addTask` in `e2e/helpers/collectionsFixtures.ts` gets an optional
-  `finishedDaysAgo` (inserted as an explicit `finished_at`, which the trigger keeps).
+  `finishedDaysAgo` (inserted as an explicit `finished_at`, which the trigger keeps; the helper
+  `finishedMoment` makes it 17:00 UTC, noon in Toronto, so the office's day is stable). A closed
+  task seeded without it is stamped with the moment of the insert.
 
 ## 4. Behaviour scenarios
 
-Playwright, written, **not run**. Roles: accountant, admin. S51 to S54. The existing S24 is
-changed for the new headers.
+Playwright, written, **not run**. Roles: accountant, admin: the scenarios are written once in
+`e2e/helpers/finishedAtTests.ts` and run by `finishedAt.accountant.spec.ts` and
+`finishedAt.admin.spec.ts`, as spec 17 did. S51 to S54. The existing S24 (accountant file) is
+changed for the new headers and the date.
 
 - **S51** Task History has the columns `#`, `Finished at`, `Due Date`, `Note`, in that order.
-- **S52** A closed task with a finish time shows it in words (`Yesterday`, `3 days ago`); the
-  open task shows a dash; a closed task without a finish time shows a dash.
-- **S53** New Task closes the open task: after the synchronisation its row says `Today` in
-  Finished at, and the new Open row shows a dash.
-- **S54** A payment that closes the open task (the system's path): its row says `Today` after
-  the synchronisation.
+- **S52** A closed task with a finish time shows its date, `DD/MM/YYYY` (for example the date of
+  yesterday and of three days ago); the open task shows a dash. A closed task without a finish
+  time (a dash) has no Playwright scenario: the trigger stamps every closed row the API can
+  write, so only a database session with the trigger off makes such a row. It is covered by the
+  SQL test (a legacy row stays empty) and by the unit tests (`buildTaskLists`,
+  `TaskHistoryTable`).
+- **S53** New Task closes the open task: after the synchronisation its row shows today's date,
+  `DD/MM/YYYY`, in Finished at, and the new Open row shows a dash.
+- **S54** A payment that closes the open task (the system's path): its row shows today's date,
+  `DD/MM/YYYY`, after the synchronisation.
 
 ## 5. Tests
 
@@ -268,14 +281,14 @@ Red first.
   returns `completed` and the row has a finish time; an accountant's own update that closes a
   task is stamped (the policies are unchanged).
 - **`ar_event_tasks.test.sql`:** the shape assertions of the seven columns.
-- **`relativeDays.test.ts`:** `finishedLabel` for null, today, a later day, yesterday, 2 to 29
-  days, 30 days (`Month ago`), 60 days (`2 Months ago`).
-- **`invoiceView.test.ts`:** `buildTaskLists` with a `finished_at` near midnight (the same
-  instant is two different office days in two zones), a value with `Z`, with `+00` and with a
-  space instead of `T`; the open task gets a dash; a closed task without a value gets a dash;
+- **`invoiceView.test.ts`:** `finishedLabel` for null, an empty text, a text that does not
+  parse (a dash), a value with `Z`, with `+00` and with a space instead of `T`, a single-digit
+  day and month (`05/01/2026`, two digits each), and a `finished_at` near midnight (the same
+  instant is two different office days in two zones); `buildTaskLists` gives the completed
+  tasks their date and the open task a dash, a closed task without a value a dash;
   `buildTaskHistory` carries the label.
-- **`TaskHistoryTable.test.tsx`:** the four headers, the rows with the new cell, the empty row
-  with `colSpan="4"`.
+- **`TaskHistoryTable.test.tsx`:** the four headers, the rows with the new cell (dates, not
+  words), a dash grey, the empty row with `colSpan="4"`.
 - **`useInvoiceData.test.tsx`:** the tasks query selects `finished_at` and the figures pass
   through.
 - **Gate:** `npm run tc`, `npx vitest run`, `npm run test:db:artaskfinished` and
@@ -285,7 +298,7 @@ Red first.
 
 ## 6. Files
 
-**Counted: 5 files** (limit 10): the migration, `utils/relativeDays.ts`, `utils/invoiceView.ts`,
+**Counted: 4 files** (limit 10): the migration, `utils/invoiceView.ts`,
 `hooks/useInvoiceData.ts`, `components/TaskHistoryTable.tsx`. **Not counted:** the tests, the SQL
 tests, the Playwright specs and fixtures, `database.types.ts`, `AppSchema.ts`,
 `components/invoiceFixtures.ts`, `package.json`. No sync-rule change.
@@ -298,7 +311,7 @@ tests, the Playwright specs and fixtures, `database.types.ts`, `AppSchema.ts`,
 - **A closed task from before the change:** a dash for good (D2); it never gets a time later.
 - **The day boundary:** a task closed at 23:30 in Toronto is that Toronto day even if UTC has
   already turned; the label is computed in the office's zone.
-- **A finish moment in the future** (clock differences): `Today`.
+- **A finish moment in the future** (clock differences): shown as its own date.
 - **A text that does not parse** as a date: a dash, never an error.
 - **The column does not reach a device** (the PowerSync note in §2): closed rows show a dash;
   nothing breaks; redeploying the sync rules fixes it.

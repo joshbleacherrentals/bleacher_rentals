@@ -23,14 +23,17 @@ export function TaskHistoryTable({
         Task History
       </h3>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[480px] border-collapse text-sm">
+        <table className="w-full min-w-[560px] border-collapse text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
               <th scope="col" className={`${TH} w-10 pl-0`}>
                 #
               </th>
-              <th scope="col" className={`${TH} w-[140px]`}>
-                Date
+              <th scope="col" className={`${TH} w-[132px]`}>
+                Finished at
+              </th>
+              <th scope="col" className={`${TH} w-[132px]`}>
+                Due Date
               </th>
               <th scope="col" className={`${TH} pr-0`}>
                 Note
@@ -40,7 +43,7 @@ export function TaskHistoryTable({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={3} className="py-4 text-center text-gray-400">
+                <td colSpan={4} className="py-4 text-center text-gray-400">
                   No tasks yet.
                 </td>
               </tr>
@@ -48,6 +51,11 @@ export function TaskHistoryTable({
               rows.map((row) => (
                 <tr key={row.id} className="border-b border-gray-100 last:border-b-0">
                   <td className="py-3 pr-2 align-top text-gray-500">{row.number}</td>
+                  <td
+                    className={`p-3 align-top ${row.finishedLabel === "—" ? "text-gray-500" : ""}`}
+                  >
+                    {row.finishedLabel}
+                  </td>
                   <td className="p-3 align-top">{row.dateLabel}</td>
                   <td className="py-3 pl-2">
                     {row.note}

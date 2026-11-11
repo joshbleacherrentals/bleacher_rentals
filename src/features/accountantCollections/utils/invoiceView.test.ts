@@ -9,6 +9,7 @@ import {
   buildScheduleRows,
   buildTaskHistory,
   buildTaskLists,
+  finishedLabel,
   type InvoiceTaskRow,
 } from "./invoiceView";
 
@@ -240,6 +241,7 @@ describe("buildTaskLists", () => {
     due_date: "2026-11-15",
     note: "Remind the customer about payment",
     completed: 0,
+    finished_at: null,
     ...over,
   });
 
@@ -251,17 +253,18 @@ describe("buildTaskLists", () => {
   ];
 
   it("puts the open task apart, with its date in words", () => {
-    const { open } = buildTaskLists(tasks, TODAY);
+    const { open } = buildTaskLists(tasks, TODAY, TZ);
     expect(open).toEqual({
       id: "t-open",
       dueDate: "2026-11-17",
       note: "Call the accountant",
       followUpLabel: "2 days after",
+      finishedLabel: "—",
     });
   });
 
   it("lists the completed tasks newest due date first, each with its date in words", () => {
-    const { completed } = buildTaskLists(tasks, TODAY);
+    const { completed } = buildTaskLists(tasks, TODAY, TZ);
     expect(completed.map((t) => [t.id, t.followUpLabel])).toEqual([
       ["t-new", "14 days ago"],
       ["t-mid", "Month ago"],
@@ -270,7 +273,7 @@ describe("buildTaskLists", () => {
   });
 
   it("has no open task when every task is completed", () => {
-    expect(buildTaskLists(tasks.slice(0, 3), TODAY).open).toBeNull();
+    expect(buildTaskLists(tasks.slice(0, 3), TODAY, TZ).open).toBeNull();
   });
 
   it("takes the newest as the open task if two exist", () => {
@@ -278,11 +281,100 @@ describe("buildTaskLists", () => {
       task({ id: "t-a", created_at: "2026-10-01T05:20:00.000Z" }),
       task({ id: "t-b", created_at: "2026-10-02T05:20:00.000Z" }),
     ];
-    expect(buildTaskLists(two, TODAY).open?.id).toBe("t-b");
+    expect(buildTaskLists(two, TODAY, TZ).open?.id).toBe("t-b");
   });
 
   it("is empty for an event with no tasks", () => {
-    expect(buildTaskLists([], TODAY)).toEqual({ open: null, completed: [] });
+    expect(buildTaskLists([], TODAY, TZ)).toEqual({ open: null, completed: [] });
+  });
+
+  // docs/specs/accountant-collections-18-task-finished-at.md §1 (D1, D3) and §5.
+  it("gives each completed task its finish date as DD/MM/YYYY, in the office's time zone", () => {
+    const { completed } = buildTaskLists(
+      [
+        task({
+          id: "t-a",
+          completed: 1,
+          due_date: "2026-11-01",
+          finished_at: "2026-11-09T15:00:00Z",
+        }),
+        task({
+          id: "t-b",
+          completed: 1,
+          due_date: "2026-10-01",
+          finished_at: "2026-10-02 09:30:00+00",
+        }),
+      ],
+      TODAY,
+      TZ,
+    );
+    expect(completed.map((t) => [t.id, t.finishedLabel])).toEqual([
+      ["t-a", "09/11/2026"],
+      ["t-b", "02/10/2026"],
+    ]);
+  });
+
+  it("shows a dash for a completed task that has no finish time (D2)", () => {
+    const { completed } = buildTaskLists(
+      [task({ id: "t-old", completed: 1, finished_at: null })],
+      TODAY,
+      TZ,
+    );
+    expect(completed[0].finishedLabel).toBe("—");
+  });
+
+  it("shows a dash for the open task, even if a value were there", () => {
+    const { open } = buildTaskLists(
+      [task({ id: "t-open", finished_at: "2026-11-09T15:00:00Z" })],
+      TODAY,
+      TZ,
+    );
+    expect(open?.finishedLabel).toBe("—");
+  });
+
+  it("takes the day in the zone it is given: the same instant is two office days", () => {
+    const rows = [task({ id: "t-1", completed: 1, finished_at: "2026-11-10T03:30:00Z" })];
+    // 03:30 UTC is 22:30 of the 9th in Toronto (EST, UTC-5) and already the 10th in UTC.
+    expect(buildTaskLists(rows, TODAY, "America/Toronto").completed[0].finishedLabel).toBe(
+      "09/11/2026",
+    );
+    expect(buildTaskLists(rows, TODAY, "UTC").completed[0].finishedLabel).toBe("10/11/2026");
+  });
+});
+
+// docs/specs/accountant-collections-18-task-finished-at.md §3 and §5: D3, the date, not words.
+describe("finishedLabel", () => {
+  it("is a dash for no value, an empty text and a text that is not a date", () => {
+    expect(finishedLabel(null, TZ)).toBe("—");
+    expect(finishedLabel("", TZ)).toBe("—");
+    expect(finishedLabel("   ", TZ)).toBe("—");
+    expect(finishedLabel("not a date", TZ)).toBe("—");
+  });
+
+  it("writes day, month and year as DD/MM/YYYY", () => {
+    expect(finishedLabel("2026-11-09T15:00:00.000Z", TZ)).toBe("09/11/2026");
+  });
+
+  it("pads a single-digit day and month to two digits", () => {
+    expect(finishedLabel("2026-01-05T17:00:00Z", TZ)).toBe("05/01/2026");
+  });
+
+  it("reads the instant with Z, with +00 and with a space instead of T", () => {
+    expect(finishedLabel("2026-11-09T15:00:00Z", TZ)).toBe("09/11/2026");
+    expect(finishedLabel("2026-11-09T15:00:00+00", TZ)).toBe("09/11/2026");
+    expect(finishedLabel("2026-11-09 15:00:00+00", TZ)).toBe("09/11/2026");
+  });
+
+  it("takes the office's day, not UTC's, near midnight", () => {
+    // 23:30 in Toronto on the 9th is 04:30 UTC on the 10th (EST, UTC-5).
+    expect(finishedLabel("2026-11-10T04:30:00Z", "America/Toronto")).toBe("09/11/2026");
+    expect(finishedLabel("2026-11-10T04:30:00Z", "UTC")).toBe("10/11/2026");
+    // 00:30 in Toronto on the 10th is 05:30 UTC the same day: both agree.
+    expect(finishedLabel("2026-11-10T05:30:00Z", "America/Toronto")).toBe("10/11/2026");
+  });
+
+  it("shows a moment later than today as its own date", () => {
+    expect(finishedLabel("2026-11-20T15:00:00Z", TZ)).toBe("20/11/2026");
   });
 });
 
@@ -293,9 +385,10 @@ describe("buildTaskHistory", () => {
     due_date: "2026-11-15",
     note: "Remind the customer about payment",
     completed: 1,
+    finished_at: null,
     ...over,
   });
-  const history = (tasks: InvoiceTaskRow[]) => buildTaskHistory(buildTaskLists(tasks, TODAY));
+  const history = (tasks: InvoiceTaskRow[]) => buildTaskHistory(buildTaskLists(tasks, TODAY, TZ));
 
   it("lists the completed tasks oldest first and the open task last, numbered 1 to n", () => {
     const rows = history([
@@ -339,6 +432,19 @@ describe("buildTaskHistory", () => {
     expect(labelOf("2026-11-12", 0)).toBe("3 days ago");
   });
 
+  it("carries the finish date of each completed task and a dash for the open one (spec 18)", () => {
+    const rows = history([
+      task({ id: "t-old", due_date: "2026-10-01", finished_at: "2026-10-02T14:00:00Z" }),
+      task({ id: "t-none", due_date: "2026-10-15", finished_at: null }),
+      task({ id: "t-open", due_date: "2026-11-17", completed: 0 }),
+    ]);
+    expect(rows.map((r) => [r.id, r.finishedLabel])).toEqual([
+      ["t-old", "02/10/2026"],
+      ["t-none", "—"],
+      ["t-open", "—"],
+    ]);
+  });
+
   it("carries the note of each task", () => {
     const [row] = history([task({ id: "t-1", note: "Call the accountant" })]);
     expect(row.note).toBe("Call the accountant");
@@ -367,6 +473,7 @@ describe("buildTaskHistory", () => {
         task({ id: "t-old", due_date: "2026-09-01" }),
       ],
       TODAY,
+      TZ,
     );
     buildTaskHistory(lists);
     expect(lists.completed.map((t) => t.id)).toEqual(["t-new", "t-old"]);

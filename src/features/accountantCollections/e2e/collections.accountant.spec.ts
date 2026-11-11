@@ -6,6 +6,7 @@ import {
   cleanupBookings,
   createOverdueBooking,
   eventFilesOf,
+  finishedMoment,
   payInFull,
   tasksOf,
   type SeededBooking,
@@ -20,7 +21,9 @@ import {
  * and S12 and the paths of S13–S19 now that the Tasks tab is gone; and
  * accountant-collections-14-new-task-window.md §4, S30–S37, which also rewrote the modal steps of
  * S6, S17 and S23 for the New Task window; and
- * accountant-collections-15-open-pdf.md §4, S38–S40).
+ * accountant-collections-15-open-pdf.md §4, S38–S40; and
+ * accountant-collections-18-task-finished-at.md §4, which changes S24 for the Finished at column;
+ * its own scenarios S51–S54 are in finishedAt.accountant.spec.ts).
  *
  * Written, not run locally (project rule). This project only exists once E2E_ACCOUNTANT_EMAIL is
  * configured (see playwright.config.ts). The data is written with the service role by
@@ -28,6 +31,14 @@ import {
  */
 
 const params = (page: Page) => new URL(page.url()).searchParams;
+/** A day as the Finished at column writes it: DD/MM/YYYY, in the office's time zone. */
+const officeDate = (moment: Date) =>
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Toronto",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(moment);
 const stamp = Date.now();
 const seeded: SeededBooking[] = [];
 
@@ -543,17 +554,32 @@ test.describe("Task History and Files (accountant)", () => {
     page,
   }) => {
     const booking = await seed("history", { taskDueInDays: 0, taskNote: "Third call" });
-    await addTask(booking.eventId, { dueInDays: -9, note: "First call", completed: true });
-    await addTask(booking.eventId, { dueInDays: -4, note: "Second call", completed: true });
+    await addTask(booking.eventId, {
+      dueInDays: -9,
+      note: "First call",
+      completed: true,
+      finishedDaysAgo: 8,
+    });
+    await addTask(booking.eventId, {
+      dueInDays: -4,
+      note: "Second call",
+      completed: true,
+      finishedDaysAgo: 3,
+    });
     const empty = await seed("history-empty", { taskDueInDays: 0, withOpenTask: false });
 
     await open(page, booking);
-    await expect(history(page).locator("th")).toHaveText(["#", "Date", "Note"]);
+    // Spec 18: Finished at (a date, DD/MM/YYYY; a dash for the open task) and Due Date (in words).
+    await expect(history(page).locator("th")).toHaveText(["#", "Finished at", "Due Date", "Note"]);
     const rows = await rowTexts(history(page));
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toMatch(/^1 \| \d+ days ago \| First call$/);
-    expect(rows[1]).toMatch(/^2 \| \d+ days ago \| Second call$/);
-    expect(rows[2]).toMatch(/^3 \| Due Today \| Third call\s*Open$/);
+    expect(rows[0]).toMatch(
+      new RegExp(`^1 \\| ${officeDate(finishedMoment(8))} \\| \\d+ days ago \\| First call$`),
+    );
+    expect(rows[1]).toMatch(
+      new RegExp(`^2 \\| ${officeDate(finishedMoment(3))} \\| \\d+ days ago \\| Second call$`),
+    );
+    expect(rows[2]).toMatch(/^3 \| — \| Due Today \| Third call\s*Open$/);
     await expect(history(page).getByText("Open", { exact: true })).toHaveCount(1);
     // Task History is the first section of Information.
     const sections = page
