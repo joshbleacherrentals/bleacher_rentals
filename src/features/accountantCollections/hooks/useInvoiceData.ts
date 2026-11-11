@@ -146,6 +146,8 @@ export function useInvoiceData(eventId: string): InvoiceData {
         .selectFrom("ArEventTasks")
         .select(["id", "created_at", "due_date", "note", "completed", "finished_at"])
         .where("event_uuid", "=", eventId)
+        // A deleted task still synchronises but is never shown (spec 19).
+        .where("deleted_at", "is", null)
         .compile(),
     [eventId],
   );

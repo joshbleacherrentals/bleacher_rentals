@@ -301,6 +301,13 @@ describe("permission matrix", () => {
         );
       });
 
+      // docs/specs/accountant-collections-19-task-delete.md §3.
+      it("says a closed task can be deleted from the task history and the open task cannot, right after the Information sentence", () => {
+        expect(row?.description).toContain(
+          "Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand. A closed task can be deleted from the task history; the open task cannot.",
+        );
+      });
+
       // docs/specs/accountant-collections-16-customer-page-view.md §3.
       it("says the invoice page can show the page the customer sees, and what signing and paying do there", () => {
         expect(row?.description).toContain(

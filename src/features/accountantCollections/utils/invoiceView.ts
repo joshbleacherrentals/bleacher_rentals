@@ -241,12 +241,16 @@ export type TaskHistoryRow = {
   dateLabel: string;
   note: string;
   isOpen: boolean;
+  /** True for every row but the open one: only a closed task can be deleted (spec 19). */
+  canDelete: boolean;
 };
 
 /**
  * The Task History table: the completed tasks oldest first, then the open one, numbered from 1.
- * `buildTaskLists` gives the completed newest first, so they are reversed.
- * docs/specs/accountant-collections-13-task-history-and-files.md §3.
+ * `buildTaskLists` gives the completed newest first, so they are reversed. Every row but the open
+ * one can be deleted.
+ * docs/specs/accountant-collections-13-task-history-and-files.md §3;
+ * docs/specs/accountant-collections-19-task-delete.md §3.
  */
 export function buildTaskHistory(tasks: {
   open: TaskView | null;
@@ -263,6 +267,7 @@ export function buildTaskHistory(tasks: {
     dateLabel: task.followUpLabel,
     note: task.note,
     isOpen,
+    canDelete: !isOpen,
   }));
 }
 

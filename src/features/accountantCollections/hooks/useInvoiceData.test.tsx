@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
 // Spec: docs/specs/accountant-collections-08-invoice-data.md §3 and §4. The hook is rendered on
 // the server with `useTypedQuery` replaced: what is under test is the questions it asks the
@@ -329,6 +330,17 @@ describe("useInvoiceData: the queries", () => {
     }
   });
 
+  // docs/specs/accountant-collections-19-task-delete.md §3 and §5.
+  it("asks for the tasks that are not deleted (spec 19)", () => {
+    setHappyPath();
+    drawn();
+
+    const { sql, parameters } = mocks.compiled.find((c) => which(c.sql) === "ArEventTasks")!;
+    expect(sql).toMatch(/"deleted_at" is null/i);
+    expect(sql).toMatch(/"event_uuid" = \?/);
+    expect(parameters).toEqual([EVENT_ID]);
+  });
+
   it("leaves deleted line items out of the sum", () => {
     setHappyPath();
     drawn();
@@ -344,6 +356,62 @@ describe("useInvoiceData: the queries", () => {
     drawn();
 
     expect(asked().filter((sql) => which(sql) === "contactCompanies")).toHaveLength(1);
+  });
+});
+
+// docs/specs/accountant-collections-19-task-delete.md §3 and §5: the question the hook asks for the
+// tasks is run on a real SQLite table, and the page is drawn from what it answers.
+describe("useInvoiceData: a deleted task (spec 19)", () => {
+  const TASK_SQL_ROWS = [
+    // id, due_date, completed, note, finished_at, deleted_at
+    ["t-kept", "2026-11-01", 1, "Kept", "2026-11-02T14:00:00.000Z", null],
+    [
+      "t-gone",
+      "2026-11-05",
+      1,
+      "Deleted by mistake",
+      "2026-11-06T14:00:00.000Z",
+      "2026-11-07T09:00:00.000Z",
+    ],
+    ["t-open", "2026-11-17", 0, "Still open", null, null],
+  ] as const;
+
+  /** The tasks the hook's own query gives from a table that holds a deleted task. */
+  function tasksFromTheLocalTable() {
+    setHappyPath();
+    drawn();
+    const { sql, parameters } = mocks.compiled.find((c) => which(c.sql) === "ArEventTasks")!;
+
+    const sqlite = new DatabaseSync(":memory:");
+    sqlite.exec(`create table "ArEventTasks" (id text primary key, created_at text, due_date text,
+      completed integer, note text, event_uuid text, finished_at text, deleted_at text)`);
+    const insert = sqlite.prepare(
+      `insert into "ArEventTasks" values (?, '2026-10-01T05:20:00.000Z', ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const [id, due, completed, note, finished, deleted] of TASK_SQL_ROWS) {
+      insert.run(id, due, completed, note, EVENT_ID, finished, deleted);
+    }
+    // Another event's tasks, deleted or not, are never part of the answer.
+    insert.run("t-other", "2026-11-01", 1, "Other event", "other", null, null);
+
+    const rows = sqlite.prepare(sql).all(...(parameters as SQLInputValue[]));
+    mocks.answers.ArEventTasks = done(rows);
+    return drawn().tasks as {
+      open: { id: string } | null;
+      completed: { id: string }[];
+    };
+  }
+
+  it("does not put a deleted task in tasks", () => {
+    const tasks = tasksFromTheLocalTable();
+    expect(tasks.completed.map((t) => t.id)).toEqual(["t-kept"]);
+    expect(JSON.stringify(tasks)).not.toContain("Deleted by mistake");
+  });
+
+  it("keeps the open task and the tasks that were not deleted", () => {
+    const tasks = tasksFromTheLocalTable();
+    expect(tasks.open?.id).toBe("t-open");
+    expect(tasks.completed).toHaveLength(1);
   });
 });
 

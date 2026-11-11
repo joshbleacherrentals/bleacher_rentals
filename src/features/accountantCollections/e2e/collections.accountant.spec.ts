@@ -542,10 +542,12 @@ test.describe("Task History and Files (accountant)", () => {
   }
 
   /** The text of each row of a table body, cells joined by " | ". */
+  // The first four cells: spec 19 adds a last Actions cell (a button, no text) that is not compared.
   const rowTexts = async (region: ReturnType<typeof history>) =>
     (await region.locator("tbody tr").allInnerTexts()).map((row) =>
       row
         .split("\t")
+        .slice(0, 4)
         .map((cell) => cell.trim())
         .join(" | "),
     );
@@ -570,7 +572,14 @@ test.describe("Task History and Files (accountant)", () => {
 
     await open(page, booking);
     // Spec 18: Finished at (a date, DD/MM/YYYY; a dash for the open task) and Due Date (in words).
-    await expect(history(page).locator("th")).toHaveText(["#", "Finished at", "Due Date", "Note"]);
+    // Spec 19: a last, visually hidden Actions column holds the delete buttons.
+    await expect(history(page).locator("th")).toHaveText([
+      "#",
+      "Finished at",
+      "Due Date",
+      "Note",
+      "Actions",
+    ]);
     const rows = await rowTexts(history(page));
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatch(

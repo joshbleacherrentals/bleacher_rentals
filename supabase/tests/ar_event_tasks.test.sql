@@ -9,8 +9,8 @@
 -- Everything runs in a transaction that is ROLLED BACK at the end.
 --
 -- What it pins down:
---   * the shape: exactly seven columns (finished_at came with spec 18), their types, NOT NULLs and
---     defaults;
+--   * the shape: exactly eight columns (finished_at came with spec 18, deleted_at with spec 19), their
+--     types, NOT NULLs and defaults;
 --   * the constraints: a blank note is refused (23514), a second OPEN task for one event is
 --     refused (23505) while completed ones pile up, a task for a missing event is refused (23503)
 --     and deleting an event takes its tasks with it;
@@ -110,8 +110,8 @@ RETURNING id AS user_norole \gset
 -- ═══ SHAPE (spec §3) ════════════════════════════════════════════════════════
 
 SELECT has_table('public', 'ArEventTasks', 'the table ArEventTasks exists');
-SELECT columns_are('public', 'ArEventTasks', ARRAY['id','created_at','due_date','completed','note','event_uuid','finished_at'],
-  'ArEventTasks has exactly the seven columns of the specs (finished_at: spec 18)');
+SELECT columns_are('public', 'ArEventTasks', ARRAY['id','created_at','due_date','completed','note','event_uuid','finished_at','deleted_at'],
+  'ArEventTasks has exactly the eight columns of the specs (finished_at: spec 18, deleted_at: spec 19)');
 SELECT col_type_is('public', 'ArEventTasks', 'id', 'uuid', 'id is uuid');
 SELECT col_type_is('public', 'ArEventTasks', 'created_at', 'timestamp with time zone', 'created_at is timestamp with time zone');
 SELECT col_type_is('public', 'ArEventTasks', 'due_date', 'date', 'due_date is date');

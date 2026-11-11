@@ -450,6 +450,34 @@ describe("buildTaskHistory", () => {
     expect(row.note).toBe("Call the accountant");
   });
 
+  // docs/specs/accountant-collections-19-task-delete.md §3 and §5.
+  it("lets every completed task be deleted and the open task not (spec 19)", () => {
+    const rows = history([
+      task({ id: "t-old", due_date: "2026-09-01" }),
+      task({ id: "t-new", due_date: "2026-11-01" }),
+      task({ id: "t-open", due_date: "2026-11-17", completed: 0 }),
+    ]);
+    expect(rows.map((r) => [r.id, r.canDelete])).toEqual([
+      ["t-old", true],
+      ["t-new", true],
+      ["t-open", false],
+    ]);
+  });
+
+  it("lets a completed task with no finish time be deleted, and a lone open task not (spec 19)", () => {
+    expect(history([task({ id: "t-1", finished_at: null })])[0].canDelete).toBe(true);
+    expect(history([task({ id: "t-open", completed: 0 })])[0].canDelete).toBe(false);
+  });
+
+  it("says canDelete exactly when the row is not the open one (spec 19)", () => {
+    const rows = history([
+      task({ id: "t-1", due_date: "2026-10-01" }),
+      task({ id: "t-2", due_date: "2026-10-15" }),
+      task({ id: "t-open", completed: 0 }),
+    ]);
+    expect(rows.map((r) => r.canDelete)).toEqual(rows.map((r) => !r.isOpen));
+  });
+
   it("is only the open task when nothing is completed", () => {
     const rows = history([task({ id: "t-open", completed: 0 })]);
     expect(rows).toHaveLength(1);

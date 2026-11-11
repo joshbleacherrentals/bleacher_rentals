@@ -161,13 +161,17 @@ export async function cleanupBookings(eventIds: string[]): Promise<void> {
   }
 }
 
-/** The event's tasks, open ones first. */
+/**
+ * The event's tasks, open ones first, with the hidden ones too: `deleted_at` is the moment a closed
+ * task was deleted from Task History, and null for every task that is still shown
+ * (docs/specs/accountant-collections-19-task-delete.md §3).
+ */
 export async function tasksOf(
   eventId: string,
-): Promise<{ note: string; completed: boolean; due_date: string }[]> {
+): Promise<{ note: string; completed: boolean; due_date: string; deleted_at: string | null }[]> {
   const { data, error } = await admin()
     .from("ArEventTasks")
-    .select("note, completed, due_date")
+    .select("note, completed, due_date, deleted_at")
     .eq("event_uuid", eventId)
     .order("completed", { ascending: true });
   if (error) throw new Error(`tasksOf: ${error.message}`);

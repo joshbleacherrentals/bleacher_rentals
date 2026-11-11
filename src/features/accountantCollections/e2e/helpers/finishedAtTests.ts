@@ -68,7 +68,7 @@ export function defineFinishedAtTests(role: "accountant" | "admin") {
   }
 
   test.describe(`Finished at (${role})`, () => {
-    test("S51: Task History has the columns #, Finished at, Due Date, Note, in that order", async ({
+    test("S51: Task History has the columns #, Finished at, Due Date, Note, in that order (and, since spec 19, a last hidden Actions column)", async ({
       page,
     }) => {
       const booking = await seed("columns");
@@ -79,6 +79,7 @@ export function defineFinishedAtTests(role: "accountant" | "admin") {
         "Finished at",
         "Due Date",
         "Note",
+        "Actions",
       ]);
     });
 
