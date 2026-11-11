@@ -6,11 +6,12 @@ Build order: **19**. Needs: [18](accountant-collections-18-task-finished-at.md) 
 the Task History table and the table `ArEventTasks`). Needed by: none. Branch:
 `q4-sprint3-finance`.
 
-## 0. The change request of 2026-11-10 (the same in all seven specs)
+## 0. The change request of 2026-11-10, amended 2026-11-11 (the same in all eight specs)
 
-This spec is one of seven (17 to 23). They change the Collections tab and the invoice page
+This spec is one of eight (17 to 24). They change the Collections tab and the invoice page
 (`/accountant/invoice`) that specs 06 to 16 built, after the author redrew the design on
-2026-11-10. Each is built in its own chat, so this section is repeated in every spec.
+2026-11-10 and amended item 8 of the request on 2026-11-11. Each is built in its own chat, so
+this section is repeated in every spec.
 
 **The series** (`docs/specs/`, in build order):
 
@@ -21,13 +22,18 @@ This spec is one of seven (17 to 23). They change the Collections tab and the in
 - **20** `accountant-collections-20-signed-booked-line.md`: the Signed / Booked line under Invoice.
 - **21** `accountant-collections-21-files-row-click.md`: the whole Files row opens the file.
 - **22** `accountant-collections-22-side-task-buttons.md`: Previous / Next Task beside the page.
-- **23** `accountant-collections-23-amount-type-switch.md`: the Full amount / Deposits / All switch
+- **23** `accountant-collections-23-amount-type-switch.md`: the Collections / Deposits / All switch
   on the Collections tab.
+- **24** `accountant-collections-24-no-schedule-due-on-start-day.md`: an event with no payment
+  schedule is overdue from its start day, not 7 days before it (the rule the lists of 23 rest
+  on).
 
-Build order: 17, 18, 19, then 20 to 23 in any order. 19 needs 18 (both change the Task History
+Build order: 17, 18, 19, then 20 to 22 and 24 in any order, then 23: 23 needs 24, because its
+lists and examples rest on the new overdue rule. 19 needs 18 (both change the Task History
 table); the others do not touch each other.
 
-**The request** (the author's numbered list of 2026-11-10, in English):
+**The request** (the author's numbered list of 2026-11-10, in English; item 8 as amended on
+2026-11-11):
 
 1. Add a button to the header, **Open Q/I**, that opens `/quotes-bookings/{id}` in a separate tab.
 2. Add a delete button to the Task History table, to delete a task that was added by accident,
@@ -48,18 +54,21 @@ table); the others do not touch each other.
    also add them outside the main window, in the layout, and make them sticky. If there is not
    enough room, leave them as they are now. The buttons at the bottom of the window stay; where
    possible, side buttons are added as well.
-8. Collections gets a toggle button that switches between **Full amount**, **Deposits** and
-   **All**. When the page opens it shows Full amount; a click goes to the next one (Full amount,
-   Deposits, All, then Full amount again). Another mode may open first only when the address
-   carries another type in its query. How the list works now: an event with an overdue payment,
-   whether one payment (a part of the invoice) or the whole invoice amount, is in the Collections
-   list; a payment is overdue when (a) it follows the payment schedule, had to be paid today or
-   earlier and the money is not there, or (b) there is no payment schedule and the quote was not
-   fully paid 7 days before the event starts. After the change: **All** shows the full list, as
-   now (`type=all` in the address); **Full amount** shows only the events whose overdue payment
-   equals the quote's amount (`type=full`); **Deposits** shows only the events whose overdue
-   payment does not equal the quote's amount (`type=deposits`). The author's four example
-   events for each mode, and what "equals" came to mean, are in spec 23.
+8. Collections gets a toggle button that switches between **Collections**, **Deposits** and
+   **All** (the author called the first value Full amount on 2026-11-10 and renamed it on
+   2026-11-11). When the page opens it shows Collections; a click goes to the next one
+   (Collections, Deposits, All, then Collections again). Another mode may open first only when
+   the address carries another type in its query. How the list works now: an event with an
+   overdue payment, whether one payment (a part of the invoice) or the whole invoice amount, is
+   in the Collections list; a payment is overdue when (a) it follows the payment schedule, had to
+   be paid today or earlier and the money is not there, or (b) there is no payment schedule and
+   the quote was not fully paid 7 days before the event starts. After the change: **All** shows
+   the full list, as now (`type=all` in the address); **Collections** shows only the events whose
+   overdue amount equals what is missing to the full payment of the quote; **Deposits** shows
+   only the events whose overdue amount is above 0 but less than what is missing to the full
+   payment (`type=deposits` in the address), so the two never overlap. And (b) changes: an event
+   with no payment schedule becomes overdue only on the day it starts, not 7 days before. The
+   author's examples for each mode are in spec 23; the new overdue rule is spec 24.
 
 **Where the work is.** Branch `q4-sprint3-finance`. Design: `docs/design/accountant-collections/`
 (`README.md`, `Invoice.dc.html`, its boards `InvoiceDeleteTask.dc.html` and `InvoiceWide.dc.html`,
@@ -70,18 +79,22 @@ and Next Task, 13 Task History and Files, 14 the New Task window, 15 Open PDF, 1
 view).
 
 **What stays as built:** the Collections list's sorting and Show Not Due Yet, the figures of
-`useInvoiceData`, the Information cards, Messages, the New Task window, the Customer view, the
-Previous / Next Task buttons at the bottom of the page, the rules of the table `ArEventTasks`
-(one open task per event, the sync of spec 11), access for admin and accountant only. Earlier
-specs are not edited; each spec of this series says which of their points it replaces.
+`useInvoiceData` (apart from the no-schedule rule of spec 24), the Information cards, Messages,
+the New Task window, the Customer view, the Previous / Next Task buttons at the bottom of the
+page, the rules of the table `ArEventTasks` (one open task per event, the sync of spec 11),
+access for admin and accountant only. Earlier specs are not edited; each spec of this series
+says which of their points it replaces.
 
 **Decisions taken by the user (they hold for the whole series; asked one by one, 2026-11-11):**
 
-1. **Full amount and Deposits** (spec 23). Asked what an event with a partly paid, fully overdue
+1. **Collections and Deposits** (spec 23). Asked what an event with a partly paid, fully overdue
    schedule is. The user's answer: "full amount, because that is the amount that is missing to
    full payment; even if the first payment were fully paid and the other two not, it must also be
    Full. So Full is for events that owe up to the full payment; Deposits is for those that must
-   pay but not the whole invoice amount."
+   pay but not the whole invoice amount." On 2026-11-11 the author renamed Full amount to
+   **Collections** and wrote the rule out with examples: Collections is the events whose overdue
+   amount equals what is missing to the full payment; Deposits is the events whose overdue amount
+   is above 0 but less than that; the two lists never overlap.
 2. **Deleting a task is soft** (spec 19): a new column marks the row, the row stays in the
    database and is hidden. Not a physical delete.
 3. **The finish time is written only by the database** (spec 18), by a trigger; the app never
@@ -92,11 +105,19 @@ specs are not edited; each spec of this series says which of their points it rep
    Download icon really downloads it.
 6. **The side buttons are as drawn** (spec 22): 168 px wide, "enough room" measured on the room
    the page itself has, not on the window.
-7. **Seven specs**, one logic each, in the order above.
+7. **Eight specs**, one logic each, in the order above (seven were agreed; the eighth, spec 24,
+   holds the overdue rule that the author's amendment of item 8 changes).
+8. **An event with no payment schedule is overdue from its start day** (spec 24), not 7 days
+   before it. From that day it stays overdue until it is paid, its days overdue count from the
+   start day, and the migration closes at once the open tasks that this makes not overdue.
+9. **The address carries no `type` for Collections** (spec 23): the first value is the default
+   and is left out, like the other list parameters; Deposits writes `type=deposits` and All
+   writes `type=all`.
+10. **Previous / Next Task and Back to tasks follow the chosen type** (spec 23).
 
 **Not built in this series:** anything the request does not list: a log row for a deleted task,
 restoring a deleted task in the interface, a tooltip with the exact finish time, counts on the
-amount switch, remembering the switch in the browser.
+type switch, remembering the switch in the browser.
 
 ## 1. What this spec decides
 
