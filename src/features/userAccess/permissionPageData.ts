@@ -102,6 +102,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
     },
   },
+  // The Booked button on a booked quote's Contract tab (BookedAtButton). Edit and Delete's rule.
+  {
+    label: "Booked Date",
+    description:
+      "The Booked button on the Contract tab of a booked quote, which shows the day the quote was booked and lets you change it. Use it to put the date back when an event moved between statuses and lost it. Picking a day saves it at once, at 12:00 in the timezone chosen in the app, and adds an 'Updated: Booked At' line to the quote's Log. The date drives the Booked column and filter on the Quotes & Bookings list, the weekly booked leaderboard and the Sales Scorecard.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can change the booked date of any booked quote."),
+      account_manager: custom(
+        "Can change the booked date only on booked quotes they created, the same rule as Edit and Delete. On other account managers' quotes the button is not shown.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Can read a quote but cannot change its booked date."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(
+        "Can read a quote but cannot change its booked date. Apart from payments and the QuickBooks Invoice Flag and invoice, an accountant changes nothing on a quote.",
+      ),
+    },
+  },
   {
     label: "QuickBooks Invoice Flag",
     description:
