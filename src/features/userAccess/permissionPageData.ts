@@ -470,6 +470,21 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Schedule Validator",
+    description:
+      "The Schedule Validator page in the sidebar, which checks the schedule for one week (Monday to Sunday). Its Event Bleacher Requirements tab lists the events that start that week and whether the bleachers selected match what each requires, its Overbooked Bleachers tab lists bleachers booked on two events that overlap, and its Bleacher Deliveries tab checks that each bleacher on an event starting that week was last left at the event's street, and its Driver Availability tab checks that no driver on a work tracker that week has marked that date as unavailable, and its Driver Workload tab shows each driver's driving hours per day and flags any day over 12 hours. It only reads: it changes nothing.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can open the page and see every tab for any week."),
+      account_manager: full("Can open the page and see every tab for any week."),
+      developer: none("Does not have this page."),
+      viewer: none("Does not have this page."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
     label: "Driver Payments & QuickBooks Bills",
     description:
       "The Payment Details window on a driver's week (Work Trackers page): the payment status of the week, and the QuickBooks bill created from it.",

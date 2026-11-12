@@ -196,6 +196,14 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     }
   });
 
+  it("lets an admin and an account manager open Schedule Validator, and nobody else", () => {
+    expect(canAccessPath(["admin"], "/schedule-validator")).toBe(true);
+    expect(canAccessPath(["account_manager"], "/schedule-validator")).toBe(true);
+    for (const role of ["developer", "viewer", "maintainer", "accountant", "driver"] as const) {
+      expect(canAccessPath([role], "/schedule-validator"), role).toBe(false);
+    }
+  });
+
   it("shows the sidebar to an accountant", () => {
     expect(mergeRoleConfigs(["accountant"]).showSidebar).toBe(true);
   });
