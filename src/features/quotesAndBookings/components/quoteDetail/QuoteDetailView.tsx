@@ -17,6 +17,7 @@ import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
 import { SubmissionTab } from "./tabs/SubmissionTab";
 import { useLeadSubmission } from "../../hooks/useLeadSubmission";
+import { BookedAtButton } from "./BookedAtButton";
 import { OpenApButton } from "./OpenApButton";
 import { QuoteActionBar } from "./QuoteActionBar";
 import { QuoteStatusButton } from "./QuoteStatusButton";
@@ -262,6 +263,16 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
         <div className="bg-white px-6 py-6 rounded-b-lg">
           <TabsContent value="contract">
             <div className="flex items-center justify-end gap-3 mb-6">
+              {/* Booked quotes only, for whoever may edit the quote: puts back a booked date that
+                  was lost when the event moved between statuses. */}
+              {quote.eventStatus === "booked" && can.manageQuote && !isDeleted && (
+                <BookedAtButton
+                  eventId={eventId}
+                  bookedAt={quote.bookedAt}
+                  supabase={supabase}
+                  userId={perms.userId}
+                />
+              )}
               <QuoteStatusButton
                 eventId={eventId}
                 status={quote.eventStatus}

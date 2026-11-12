@@ -81,6 +81,9 @@ export const FIELD_LABELS: Record<string, string> = {
   contract_revenue_cents: "Contract Total",
   po_number: "PO Number",
   created_by_user_uuid: "Account Manager",
+  // Written by the date button on the quote page (changeBookedAt), never by the edit page, so it is
+  // not in TRACKED_FIELDS.
+  booked_at: "Booked At",
   line_item: "Line Item",
   signature: "Contract Signature",
   email_sent: "Email Sent",

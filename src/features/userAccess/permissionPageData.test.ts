@@ -133,6 +133,28 @@ describe("permission matrix", () => {
       expect(row?.roles.account_manager.note).toMatch(/quote PDF always stays attached/i);
     });
 
+    // The Booked button on a booked quote's Contract tab (BookedAtButton): it follows Edit and
+    // Delete's rule, so an account manager changes the date only on a quote they created.
+    it("has a Booked Date row: full for an admin, custom for an account manager, none for everyone else", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Booked Date");
+      expect(row?.category).toBe("Day to Day Operations");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "custom",
+        accountant: "none",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+      expect(row?.roles.account_manager.note).toMatch(/only .* they created/i);
+      expect(row?.description).toMatch(/12:00/);
+    });
+
     // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose QuickBooks invoice needs
     // attention. Only an accountant sees it; an admin who is not an accountant does not.
     it("has a QuickBooks Invoice Alerts row: full for an accountant, none for everyone else", () => {
