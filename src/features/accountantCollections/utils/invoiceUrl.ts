@@ -1,4 +1,8 @@
-import { collectionsListStateToParams, type CollectionsListState } from "./collectionsListState";
+import {
+  collectionsListStateToParams,
+  DEFAULT_LIST_STATE,
+  type CollectionsListState,
+} from "./collectionsListState";
 
 /**
  * The links between the Collections list and the invoice page. The list's state (`csort`, `cdir`,
@@ -33,6 +37,14 @@ export function invoiceHref({
     ...collectionsListStateToParams(listState),
   });
   return `/accountant/invoice?${params}`;
+}
+
+/**
+ * The invoice page of an event on its Information tab, for the Open AP button on the quote card.
+ * It carries no list state: the page was not reached from the Collections list.
+ */
+export function openApHref(eventId: string): string {
+  return invoiceHref({ eventId, tab: "info", listState: DEFAULT_LIST_STATE });
 }
 
 /**

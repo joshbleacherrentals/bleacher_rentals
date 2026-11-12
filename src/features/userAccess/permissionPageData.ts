@@ -217,25 +217,25 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Collections",
     description:
-      "The Collections tab of the Accountant page lists the bookings with an overdue payment, one open task each, with a Collections / Deposits / All switch, Show Not Due Yet and sorting. Opening one leads to its invoice page, where the accountant reads the booking, records payments, and writes the next task. Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand. A closed task can be deleted from the task history; the open task cannot. The page has a Messages tab with the booking's internal chat, the same as on the quote. A Customer view button shows the page the customer sees (Approved Quote, Signed Contract, Pay Invoice); signing there signs for the customer and Pay opens the online payment in a new tab. A task is created every morning for each overdue booking and closes by itself when the payment arrives.",
+      "The Collections tab of the Accountant page lists the bookings with an overdue payment, one open task each, with a Collections / Deposits / All switch, Show Not Due Yet and sorting. Opening one leads to its invoice page, where the accountant reads the booking, records payments, and writes the next task. Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand. A closed task can be deleted from the task history; the open task cannot. The page has a Messages tab with the booking's internal chat, the same as on the quote. A Customer view button shows the page the customer sees (Approved Quote, Signed Contract, Pay Invoice); signing there signs for the customer and Pay opens the online payment in a new tab. On a quote's page, an Open AP button in the header opens that booking's invoice page in a new tab. A task is created every morning for each overdue booking and closes by itself when the payment arrives.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.",
+        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AP button on a quote, which opens that booking's invoice page in a new tab.",
       ),
       account_manager: none(
-        "The Collections tab and the invoice page are for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote.",
+        "The Collections tab and the invoice page are for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote, but not the Open AP button.",
       ),
       developer: none(
         "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: none(
-        "The Collections tab and the invoice page are for accountants and administrators. A viewer still sees a booking's balance on the Billing tab of the quote.",
+        "The Collections tab and the invoice page are for accountants and administrators. A viewer still sees a booking's balance on the Billing tab of the quote, but not the Open AP button.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
-        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.",
+        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AP button on a quote, which opens that booking's invoice page in a new tab.",
       ),
     },
   },

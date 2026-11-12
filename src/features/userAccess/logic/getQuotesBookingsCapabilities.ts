@@ -67,6 +67,12 @@ export type QuotesBookingsCapabilities = {
   useInternalChat: boolean;
   /** Open in Dashboard. */
   openInDashboard: boolean;
+  /**
+   * Open AP, the header button that opens the booking's invoice page (/accountant/invoice) in a new
+   * tab: drawn when true, not drawn when false. An admin or an accountant, on any quote — whoever
+   * the invoice page itself lets in, so the button never leads to a page that turns the user away.
+   */
+  openAp: boolean;
 };
 
 export function getQuotesBookingsCapabilities(input: {
@@ -122,5 +128,6 @@ export function getQuotesBookingsCapabilities(input: {
     seeInvoiceAlerts: isAccountant,
     useInternalChat: getInternalChatCapabilities({ roles, isSubscribed: false }).useInternalChat,
     openInDashboard: canAccessPath(roles, "/dashboard"),
+    openAp: canAccessPath(roles, "/accountant/invoice"),
   };
 }

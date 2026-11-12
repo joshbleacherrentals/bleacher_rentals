@@ -3,6 +3,7 @@ import { DEFAULT_LIST_STATE, type CollectionsListState } from "./collectionsList
 import {
   collectionsHref,
   invoiceHref,
+  openApHref,
   parseInvoiceTab,
   quoteCardHref,
   withCollectionsListState,
@@ -57,6 +58,16 @@ describe("invoiceHref", () => {
     expect(invoiceHref({ eventId: "a b&c", tab: "info", listState: DEFAULT })).toBe(
       "/accountant/invoice?id=a+b%26c&tab=info",
     );
+  });
+});
+
+describe("openApHref", () => {
+  it("opens the invoice page of the event on its Information tab, with no list parameters", () => {
+    expect(openApHref("evt-1")).toBe("/accountant/invoice?id=evt-1&tab=info");
+  });
+
+  it("encodes an id that needs it", () => {
+    expect(openApHref("a b&c")).toBe("/accountant/invoice?id=a+b%26c&tab=info");
   });
 });
 
