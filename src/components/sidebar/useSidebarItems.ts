@@ -31,6 +31,7 @@ import {
   MailCheck,
   MailX,
   Tags,
+  Terminal,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -337,6 +338,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
         label: "Allowed Emails",
         href: "/dev-tools/allowed-emails",
         icon: MailCheck,
+      },
+      {
+        type: "button",
+        key: "python-health",
+        label: "Python Health",
+        href: "/dev-tools/python-health",
+        icon: Terminal,
       },
     ],
   },
