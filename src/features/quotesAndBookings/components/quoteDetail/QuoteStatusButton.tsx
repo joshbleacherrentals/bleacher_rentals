@@ -157,7 +157,9 @@ export function QuoteStatusButton({
 
   return (
     <>
-      <DropdownMenu>
+      {/* modal={false}: a modal menu that opens a Dialog from onSelect leaves
+          `pointer-events: none` stuck on <body> after the Dialog closes (the page freezes). */}
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           disabled={saving}
           className={`${badge} cursor-pointer disabled:opacity-50`}

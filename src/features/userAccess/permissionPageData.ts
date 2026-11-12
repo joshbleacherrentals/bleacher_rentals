@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -67,7 +67,8 @@ const MAINTAINER_NO_ACCESS_NOTE =
 // docs/specs/accountant-role.md, accountant-work-trackers.md, accountant-quotes-02 and -04: the
 // Accountant has the Work Trackers pages, the driver payment window, the Accountant page and
 // Quotes & Bookings read-only; docs/specs/accountant-address-book.md adds Companies & Contacts;
-// docs/specs/accountant-team.md adds the Team page. It has nothing else.
+// docs/specs/accountant-team.md adds the Team page; docs/specs/accountant-audit-01-tab.md adds the
+// Audit tab of the Accountant page. It has nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
   "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
 
@@ -216,25 +217,51 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Collections",
     description:
-      "The Collections tab of the Accountant page lists the bookings with an overdue payment, one open task each, with Show Not Due Yet and sorting. Opening one leads to its invoice page, where the accountant reads the booking, records payments, and writes the next task. Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand. The page has a Messages tab with the booking's internal chat, the same as on the quote. A Customer view button shows the page the customer sees (Approved Quote, Signed Contract, Pay Invoice); signing there signs for the customer and Pay opens the online payment in a new tab. A task is created every morning for each overdue booking and closes by itself when the payment arrives.",
+      "The Collections tab of the Accountant page lists the bookings with an overdue payment, one open task each, with a Collections / Deposits / All switch, Show Not Due Yet and sorting. Opening one leads to its invoice page, where the accountant reads the booking, records payments, and writes the next task. Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand. A closed task can be deleted from the task history; the open task cannot. The page has a Messages tab with the booking's internal chat, the same as on the quote. A Customer view button shows the page the customer sees (Approved Quote, Signed Contract, Pay Invoice); signing there signs for the customer and Pay opens the online payment in a new tab. On a quote's page, an Open AR button in the header opens that booking's invoice page in a new tab. A task is created every morning for each overdue booking and closes by itself when the payment arrives.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.",
+        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab.",
       ),
       account_manager: none(
-        "The Collections tab and the invoice page are for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote.",
+        "The Collections tab and the invoice page are for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote, but not the Open AR button.",
       ),
       developer: none(
         "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: none(
-        "The Collections tab and the invoice page are for accountants and administrators. A viewer still sees a booking's balance on the Billing tab of the quote.",
+        "The Collections tab and the invoice page are for accountants and administrators. A viewer still sees a booking's balance on the Billing tab of the quote, but not the Open AR button.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
-        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.",
+        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab.",
+      ),
+    },
+  },
+  // docs/specs/accountant-audit-01-tab.md: the Audit tab of the Accountant page.
+  {
+    label: "Driver Audit",
+    description:
+      "The Audit tab of the Accountant page. It lists every driver with their distance (in kilometres and miles), drive time, trips and pay (in the driver's own currency, USD or CAD) for a date range the user chooses (a preset such as This month, or any From and To dates). Any column can be sorted, and a search bar finds a driver by name. Clicking a driver opens that driver's work trackers inside the same range: status, date, bleacher, type, pickup and dropoff, drive time, distance, and whether the tracker's week has been paid. Read-only: nothing on the tab changes a work tracker or a payment.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: read(
+        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active.",
+      ),
+      account_manager: none(
+        "The Accountant page is for accountants and administrators. An account manager still reads their drivers' work trackers on the Work Trackers pages.",
+      ),
+      developer: none(
+        "Developer is only meant to work on the developer roadmap and the Dev Tools pages.",
+      ),
+      viewer: none(
+        "The Accountant page is for accountants and administrators. A viewer still reads work trackers on the Work Trackers pages.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: read(
+        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
       ),
     },
   },

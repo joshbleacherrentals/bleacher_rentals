@@ -22,11 +22,15 @@ import {
   buildContactCard,
   buildMoney,
   buildScheduleRows,
+  buildSignedLine,
   buildTaskLists,
+  type BookedLogRow,
   type ContactCard,
   type InvoiceTaskRow,
   type MoneyView,
   type ScheduleRow,
+  type SignatureRow,
+  type SignedLine,
   type TaskView,
 } from "../utils/invoiceView";
 
@@ -44,6 +48,11 @@ import {
  *
  * `notFound` is true when there is no quote to show once the quote has answered — a missing event,
  * and also a failed read, which the output has no field for.
+ *
+ * `event.signedLine` is the Signed / Booked line under Invoice: two narrow queries (the event's
+ * active signatures and the log rows that set it to booked) go to `buildSignedLine`. A failed read
+ * of either counts as no rows.
+ * docs/specs/accountant-collections-20-signed-booked-line.md §3.
  */
 
 export type InvoiceData = {
@@ -56,6 +65,8 @@ export type InvoiceData = {
     /** The twin's figure; the page shows it for Collections only. */
     daysOverdue: number | null;
     accountManager: string | null;
+    /** `Signed` or `Booked`, when and by whom; null when the event has neither. */
+    signedLine: SignedLine | null;
   };
   contacts: { contact: ContactCard | null; financeContact: ContactCard | null };
   venue: { name: string | null; address: string | null };
@@ -144,8 +155,35 @@ export function useInvoiceData(eventId: string): InvoiceData {
     () =>
       db
         .selectFrom("ArEventTasks")
-        .select(["id", "created_at", "due_date", "note", "completed"])
+        .select(["id", "created_at", "due_date", "note", "completed", "finished_at"])
         .where("event_uuid", "=", eventId)
+        // A deleted task still synchronises but is never shown (spec 19).
+        .where("deleted_at", "is", null)
+        .compile(),
+    [eventId],
+  );
+
+  // Every active signature and every log row that set the event to booked; the builder picks the
+  // latest. An invalidated signature (the contract was edited after signing) does not count.
+  const signaturesCompiled = useMemo(
+    () =>
+      db
+        .selectFrom("ContractSignatures")
+        .select(["signer_name", "signed_at"])
+        .where("event_uuid", "=", eventId)
+        .where("status", "=", "active")
+        .compile(),
+    [eventId],
+  );
+
+  const bookedLogCompiled = useMemo(
+    () =>
+      db
+        .selectFrom("EventChangeLog")
+        .select(["changed_by_user_uuid", "changed_at"])
+        .where("event_uuid", "=", eventId)
+        .where("field_name", "=", "event_status")
+        .where("next_value", "=", "booked")
         .compile(),
     [eventId],
   );
@@ -169,6 +207,8 @@ export function useInvoiceData(eventId: string): InvoiceData {
   const venueAddress = useTypedQuery(venueAddressCompiled, expect<VenueAddressRow>());
   const tasks = useTypedQuery(tasksCompiled, expect<InvoiceTaskRow>());
   const lineTotal = useTypedQuery(lineTotalCompiled, expect<{ line_total_cents: number }>());
+  const signatures = useTypedQuery(signaturesCompiled, expect<SignatureRow>());
+  const bookedLogs = useTypedQuery(bookedLogCompiled, expect<BookedLogRow>());
   const { installments: terms, isLoading: installmentsLoading } = usePaymentInstallments(eventId);
   const { payments, isLoading: paymentsLoading } = usePaymentHistory(eventId);
   const { currency, isResolved: currencyResolved } = useEventCurrencyState(eventId);
@@ -218,6 +258,8 @@ export function useInvoiceData(eventId: string): InvoiceData {
       venueAddress.isLoading ||
       tasks.isLoading ||
       lineTotal.isLoading ||
+      signatures.isLoading ||
+      bookedLogs.isLoading ||
       installmentsLoading ||
       paymentsLoading ||
       !currencyResolved);
@@ -264,6 +306,14 @@ export function useInvoiceData(eventId: string): InvoiceData {
       }),
       daysOverdue: balances.daysOverdue,
       accountManager,
+      signedLine: buildSignedLine({
+        signatures: signatures.data ?? [],
+        bookedLogs: bookedLogs.data ?? [],
+        eventStatus: quote?.eventStatus ?? null,
+        bookedAt: quote?.bookedAt ?? null,
+        staffNames,
+        timezone,
+      }),
     },
     contacts: {
       contact: buildContactCard(quote?.contact ?? null, companyOf(quote?.contact?.id)),
@@ -283,7 +333,7 @@ export function useInvoiceData(eventId: string): InvoiceData {
     payments,
     allocation: balances.allocation,
     staffNames,
-    tasks: buildTaskLists(tasks.data ?? [], today),
+    tasks: buildTaskLists(tasks.data ?? [], today, timezone),
     currency,
     today,
   };

@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { FIELD_LABELS } from "../../../db/logEventChanges";
 import {
+  ChangeDetailModal,
+  FILE_ADD_DETAIL,
   isClientEvent,
   getClientTitle,
   getTitle as logTitle,
@@ -357,5 +361,160 @@ describe("payment rows — getDetail", () => {
     };
     expect(logTitle(row, [])).toBe("File added: site plan.pdf");
     expect(logDetail(row, [])).toBe("Attached to the email and saved to Files");
+  });
+});
+
+// ── payment_add rows (docs/specs/event-change-log-01-payment-recorded.md §3, §5) ──
+
+const addedRow = (over: Partial<LogRow> = {}): LogRow =>
+  paymentRow({
+    action_type: "payment_add",
+    prev_value: null,
+    next_value: "$25.00 · Check · Aug 14, 2026",
+    ...over,
+  });
+
+describe("payment_add rows — getTitle", () => {
+  it("reads 'Payment recorded: ' and the text saved in the row", () => {
+    expect(logTitle(addedRow(), [])).toBe("Payment recorded: $25.00 · Check · Aug 14, 2026");
+  });
+
+  it("keeps the minus sign of a refund", () => {
+    expect(logTitle(addedRow({ next_value: "-$50.00 · Check · Aug 14, 2026" }), [])).toBe(
+      "Payment recorded: -$50.00 · Check · Aug 14, 2026",
+    );
+  });
+
+  // R5: the title is the history of the moment, so an edit made later does not rewrite it.
+  it("R5: does not change when the payment is edited, or is gone", () => {
+    const row = addedRow();
+    const title = "Payment recorded: $25.00 · Check · Aug 14, 2026";
+    expect(logTitle(row, [])).toBe(title);
+    expect(logTitle(row, [PAYMENT])).toBe(title);
+    expect(logTitle(row, [{ ...PAYMENT, amountCents: 99900 }])).toBe(title);
+    expect(logTitle(row, [{ ...PAYMENT, paymentMethodType: "cash" }])).toBe(title);
+  });
+
+  it("falls back to naming the payment from the list when the row saved no text", () => {
+    expect(logTitle(addedRow({ next_value: null }), [PAYMENT])).toBe(
+      "Payment recorded: $120.00 · ACH Payment · Aug 14, 2026",
+    );
+    expect(logTitle(addedRow({ next_value: null }), [])).toBe("Payment recorded: Payment 11111111");
+  });
+
+  it("never prints the raw payment:<id> field name", () => {
+    expect(logTitle(addedRow(), [])).not.toContain("payment:");
+    expect(logTitle(addedRow({ next_value: null }), [])).not.toContain(PAYMENT.id);
+  });
+
+  it("leaves the edit and delete titles as they were", () => {
+    expect(logTitle(paymentRow({}), [PAYMENT])).toBe(
+      "Payment edited: $120.00 · ACH Payment · Aug 14, 2026",
+    );
+    expect(
+      logTitle(paymentRow({ action_type: "payment_delete", next_value: null }), [PAYMENT]),
+    ).toBe("Payment deleted: $120.00 · ACH Payment · Aug 14, 2026");
+  });
+});
+
+describe("payment_add rows — getDetail", () => {
+  it("has no second line: the title carries it", () => {
+    expect(logDetail(addedRow(), [])).toBeNull();
+    expect(logDetail(addedRow(), [PAYMENT])).toBeNull();
+    expect(logDetail(addedRow({ next_value: null }), [PAYMENT])).toBeNull();
+  });
+});
+
+// ── file_upload and file_delete rows (docs/specs/event-change-log-02-file-upload-delete.md §3, §5) ──
+
+const fileRow = (over: Partial<LogRow> = {}): LogRow =>
+  paymentRow({
+    action_type: "file_upload",
+    field_name: "file",
+    prev_value: null,
+    next_value: "Check_Scan.pdf",
+    ...over,
+  });
+
+const deletedFileRow = (over: Partial<LogRow> = {}): LogRow =>
+  fileRow({
+    action_type: "file_delete",
+    prev_value: "Check_Scan.pdf",
+    next_value: null,
+    ...over,
+  });
+
+describe("file_upload and file_delete rows — getTitle", () => {
+  it("names an uploaded file from the next value", () => {
+    expect(logTitle(fileRow(), [])).toBe("File uploaded: Check_Scan.pdf");
+  });
+
+  it("names a deleted file from the previous value", () => {
+    expect(logTitle(deletedFileRow(), [])).toBe("File deleted: Check_Scan.pdf");
+  });
+
+  it("falls back to 'file' when the row saved no name", () => {
+    expect(logTitle(fileRow({ next_value: null }), [])).toBe("File uploaded: file");
+    expect(logTitle(deletedFileRow({ prev_value: null }), [])).toBe("File deleted: file");
+  });
+
+  it("D4: file_add, for the send dialog, keeps its title", () => {
+    expect(logTitle(fileRow({ action_type: "file_add" }), [])).toBe("File added: Check_Scan.pdf");
+    expect(logTitle(fileRow({ action_type: "file_add", next_value: null }), [])).toBe(
+      "File added: file",
+    );
+  });
+});
+
+describe("file_upload and file_delete rows — getDetail", () => {
+  it("has no second line for either: the title carries the name", () => {
+    expect(logDetail(fileRow(), [])).toBeNull();
+    expect(logDetail(deletedFileRow(), [])).toBeNull();
+    expect(logDetail(fileRow(), [PAYMENT])).toBeNull();
+  });
+
+  it("D4: file_add still carries 'Attached to the email and saved to Files'", () => {
+    expect(logDetail(fileRow({ action_type: "file_add" }), [])).toBe(FILE_ADD_DETAIL);
+    expect(FILE_ADD_DETAIL).toBe("Attached to the email and saved to Files");
+  });
+});
+
+describe("file_upload and file_delete rows — the detail modal", () => {
+  const modal = (log: LogRow) =>
+    renderToStaticMarkup(
+      createElement(ChangeDetailModal, { log, payments: [], onClose: () => {} }),
+    );
+
+  it("shows one 'File' block with the name for an upload, and no e-mail note", () => {
+    const html = modal(fileRow());
+    expect(html).toContain("File uploaded: Check_Scan.pdf");
+    expect(html).toMatch(/>File<\/span>/);
+    expect(html).toMatch(/<p[^>]*>Check_Scan\.pdf<\/p>/);
+    expect(html).not.toContain("Attached to the email");
+  });
+
+  it("shows one 'File' block with the name for a delete, read from the previous value", () => {
+    const html = modal(deletedFileRow());
+    expect(html).toContain("File deleted: Check_Scan.pdf");
+    expect(html).toMatch(/>File<\/span>/);
+    expect(html).toMatch(/<p[^>]*>Check_Scan\.pdf<\/p>/);
+    expect(html).not.toContain("Attached to the email");
+  });
+
+  it("shows a dash when the row has no name", () => {
+    expect(modal(fileRow({ next_value: null }))).toMatch(/<p[^>]*>—<\/p>/);
+    expect(modal(deletedFileRow({ prev_value: null }))).toMatch(/<p[^>]*>—<\/p>/);
+  });
+
+  it("names who did it and when, as every row does", () => {
+    const html = modal(fileRow({ first_name: "Dana", last_name: "Whitfield" }));
+    expect(html).toContain("Changed by");
+    expect(html).toContain("Dana Whitfield");
+  });
+
+  it("D4: the modal of a file_add row is unchanged, with its note", () => {
+    const html = modal(fileRow({ action_type: "file_add" }));
+    expect(html).toContain("File added: Check_Scan.pdf");
+    expect(html).toContain("Attached to the email and saved to Files");
   });
 });

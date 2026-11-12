@@ -185,6 +185,7 @@ describe("useCollectionsData: the rows", () => {
           dueDate: "2026-11-15",
           note: "Remind the customer about payment",
           amountDueCents: 100000,
+          remainingCents: 100000,
           currency: "CAD",
           daysOverdue: 10,
         },

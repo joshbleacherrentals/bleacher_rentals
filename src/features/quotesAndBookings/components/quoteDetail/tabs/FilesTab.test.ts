@@ -1,4 +1,78 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+
+// Spec: docs/specs/event-change-log-02-file-upload-delete.md §3 and §5 (A1). The first part of this
+// file re-implements the tab's pure helpers; the last part calls `FilesTab` itself, because the
+// Log rows of an upload and of a delete are written by the helpers it calls and the tab has to hand
+// them the event, the user's Users.id and the file's name. The project has no DOM environment and no
+// testing-library, and `renderToStaticMarkup` cannot press a button, so the component is called as a
+// function with stubbed hooks and its handlers are taken from the element tree.
+type HookStubs = Partial<
+  Record<"useState" | "useMemo" | "useRef" | "useCallback" | "useEffect", unknown>
+>;
+
+const mocks = vi.hoisted(() => ({
+  supabase: {} as object,
+  /** `Users.id` of the signed-in user, as `usePermissionsStore` holds it. */
+  userUuid: "user-uuid-5" as string | null,
+  uploadEventFile: vi.fn(),
+  removeEventFile: vi.fn(),
+  /** While set, the component's hooks are these stubs (see `callComponent`); otherwise the real ones. */
+  hooks: null as HookStubs | null,
+}));
+
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  const hook =
+    (name: keyof HookStubs) =>
+    (...args: unknown[]) =>
+      ((mocks.hooks?.[name] ?? actual[name]) as (...a: unknown[]) => unknown)(...args);
+  return {
+    ...actual,
+    useState: hook("useState"),
+    useMemo: hook("useMemo"),
+    useRef: hook("useRef"),
+    useCallback: hook("useCallback"),
+    useEffect: hook("useEffect"),
+  };
+});
+vi.mock("@/components/providers/SystemProvider", async () => {
+  const { DummyDriver, Kysely, SqliteAdapter, SqliteIntrospector, SqliteQueryCompiler } =
+    await import("kysely");
+  return {
+    db: new Kysely({
+      dialect: {
+        createAdapter: () => new SqliteAdapter(),
+        createDriver: () => new DummyDriver(),
+        createIntrospector: (kysely) => new SqliteIntrospector(kysely),
+        createQueryCompiler: () => new SqliteQueryCompiler(),
+      },
+    }),
+  };
+});
+vi.mock("@/lib/powersync/typedQuery", () => ({
+  expect: () => undefined,
+  useTypedQuery: () => ({ data: [], isLoading: false }),
+}));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: "user_clerk_7" }) }));
+vi.mock("@/utils/supabase/useClerkSupabaseClient", () => ({
+  useClerkSupabaseClient: () => mocks.supabase,
+}));
+vi.mock("@/features/userAccess/state/usePermissionsStore", () => ({
+  usePermissionsStore: (select: (s: { userId: string | null }) => unknown) =>
+    select({ userId: mocks.userUuid }),
+}));
+vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToast: vi.fn() }));
+vi.mock("../../../utils/eventFileUpload", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../utils/eventFileUpload")>()),
+  uploadEventFile: (p: unknown) => mocks.uploadEventFile(p),
+}));
+vi.mock("../../../utils/eventFileStorage", () => ({
+  createEventFileUrl: vi.fn(),
+  removeEventFile: (...args: unknown[]) => mocks.removeEventFile(...args),
+}));
+
+import { AlertDialogAction } from "@/components/ui/alert-dialog";
+import { FilesTab } from "./FilesTab";
 
 // Re-implement pure helpers from FilesTab for unit testing
 // (they're module-scoped, so we test the logic directly)
@@ -24,8 +98,7 @@ const ACCEPTED_TYPES = [
 
 const MAX_SIZE_MB = 20;
 
-const isImageType = (mime: string | null) =>
-  !!mime && IMAGE_TYPES.includes(mime);
+const isImageType = (mime: string | null) => !!mime && IMAGE_TYPES.includes(mime);
 
 const isImagePath = (path: string) => {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -137,5 +210,145 @@ describe("ACCEPTED_TYPES", () => {
 describe("MAX_SIZE_MB", () => {
   it("is 20MB", () => {
     expect(MAX_SIZE_MB).toBe(20);
+  });
+});
+
+// ── The Log row of an upload and of a delete (spec 02, §3 and §5, A1) ──
+
+/** Every element of the tree that `matches`, without rendering any child component. */
+function findAll(node: unknown, matches: (el: any) => boolean): any[] {
+  if (Array.isArray(node)) return node.flatMap((child) => findAll(child, matches));
+  if (!node || typeof node !== "object") return [];
+  const el = node as { props?: { children?: unknown } };
+  return [...(matches(el) ? [el] : []), ...findAll(el.props?.children, matches)];
+}
+
+function textOf(node: unknown): string {
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (node && typeof node === "object") return textOf((node as any).props?.children);
+  return "";
+}
+
+/**
+ * Calls `FilesTab` as a function with its hooks stubbed: `useState` returns the given values by the
+ * order of the component's `useState` calls (0 staged, 1 saving, 2 dragging, 3 deleteTarget,
+ * 4 deleting, 5 lightboxUrl), and its setters do nothing.
+ */
+function callComponent(state: Record<number, unknown>) {
+  let next = 0;
+  mocks.hooks = {
+    useState: (initial: unknown) => {
+      const index = next++;
+      return [index in state ? state[index] : initial, vi.fn()];
+    },
+    useMemo: (compute: () => unknown) => compute(),
+    useRef: (initial: unknown) => ({ current: initial }),
+    useCallback: (fn: unknown) => fn,
+    useEffect: () => undefined,
+  };
+  try {
+    return FilesTab({ quoteId: "evt-1" });
+  } finally {
+    mocks.hooks = null;
+  }
+}
+
+const pdf = (name: string) => new File(["x"], name, { type: "application/pdf" });
+
+beforeEach(() => {
+  mocks.userUuid = "user-uuid-5";
+  mocks.uploadEventFile.mockReset();
+  mocks.uploadEventFile.mockResolvedValue("new-file-id");
+  mocks.removeEventFile.mockReset();
+  mocks.removeEventFile.mockResolvedValue(undefined);
+});
+
+describe("FilesTab: Save writes the Log row through uploadEventFile", () => {
+  const save = (state: Record<number, unknown>) => {
+    const [button] = findAll(
+      callComponent(state),
+      (el) => el.type === "button" && textOf(el).trim() === "Save",
+    );
+    return button.props.onClick() as Promise<void>;
+  };
+
+  it("hands the event, the user's Users.id and the file to uploadEventFile, once per file", async () => {
+    const a = pdf("a.pdf");
+    const b = pdf("b.pdf");
+    await save({
+      0: [
+        { id: "s-1", file: a },
+        { id: "s-2", file: b },
+      ],
+    });
+    expect(mocks.uploadEventFile).toHaveBeenCalledTimes(2);
+    expect(mocks.uploadEventFile).toHaveBeenNthCalledWith(1, {
+      supabase: mocks.supabase,
+      eventId: "evt-1",
+      file: a,
+      source: "upload",
+      uploadedBy: "user_clerk_7",
+      changedByUserUuid: "user-uuid-5",
+    });
+    expect(mocks.uploadEventFile).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ file: b, changedByUserUuid: "user-uuid-5" }),
+    );
+  });
+
+  it("keeps the Clerk id for EventFiles.uploaded_by and the Users.id for the Log, as two different values", async () => {
+    await save({ 0: [{ id: "s-1", file: pdf("a.pdf") }] });
+    const call = mocks.uploadEventFile.mock.calls[0][0];
+    expect(call.uploadedBy).toBe("user_clerk_7");
+    expect(call.changedByUserUuid).toBe("user-uuid-5");
+  });
+
+  it("passes a null author when the user id is not loaded", async () => {
+    mocks.userUuid = null;
+    await save({ 0: [{ id: "s-1", file: pdf("a.pdf") }] });
+    expect(mocks.uploadEventFile.mock.calls[0][0].changedByUserUuid).toBeNull();
+  });
+});
+
+describe("FilesTab: Delete writes the Log row through removeEventFile", () => {
+  const target = {
+    id: "f-scan",
+    event_uuid: "evt-1",
+    file_name: "Check_Scan.pdf",
+    storage_path: "evt-1/s.pdf",
+    mime_type: "application/pdf",
+    file_size_bytes: 1,
+    source: "upload",
+    uploaded_by: "user_clerk_7",
+    created_at: "2026-10-22T16:00:00.000Z",
+  };
+  const confirmDelete = (state: Record<number, unknown>) => {
+    const [action] = findAll(callComponent(state), (el) => el.type === AlertDialogAction);
+    return action.props.onClick() as Promise<void>;
+  };
+
+  it("hands the file, with its name, and the quote and the user's Users.id to removeEventFile", async () => {
+    await confirmDelete({ 3: target });
+    expect(mocks.removeEventFile).toHaveBeenCalledTimes(1);
+    expect(mocks.removeEventFile).toHaveBeenCalledWith(
+      mocks.supabase,
+      { id: "f-scan", storage_path: "evt-1/s.pdf", file_name: "Check_Scan.pdf" },
+      { eventId: "evt-1", changedByUserUuid: "user-uuid-5" },
+    );
+  });
+
+  it("passes a null author when the user id is not loaded", async () => {
+    mocks.userUuid = null;
+    await confirmDelete({ 3: target });
+    expect(mocks.removeEventFile.mock.calls[0][2]).toEqual({
+      eventId: "evt-1",
+      changedByUserUuid: null,
+    });
+  });
+
+  it("deletes nothing for a file with no storage path", async () => {
+    await confirmDelete({ 3: { ...target, storage_path: null } });
+    expect(mocks.removeEventFile).not.toHaveBeenCalled();
   });
 });

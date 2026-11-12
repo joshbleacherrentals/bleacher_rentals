@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { CollectionsListState } from "../utils/collectionsListState";
+import { DEFAULT_LIST_STATE, type CollectionsListState } from "../utils/collectionsListState";
 import type { CollectionsRow } from "../utils/collectionsRows";
 import { CollectionsTable } from "./CollectionsTable";
 
@@ -14,7 +14,7 @@ vi.mock("next/link", () => ({
 }));
 
 const TODAY = "2026-11-10";
-const DEFAULT: CollectionsListState = { sort: "followUp", dir: "asc", showNotDue: false };
+const DEFAULT: CollectionsListState = DEFAULT_LIST_STATE;
 
 function row(over: Partial<CollectionsRow> = {}): CollectionsRow {
   return {
@@ -24,6 +24,7 @@ function row(over: Partial<CollectionsRow> = {}): CollectionsRow {
     dueDate: TODAY,
     note: "Called again to follow up.",
     amountDueCents: 173575,
+    remainingCents: 173575,
     currency: "CAD",
     daysOverdue: 3,
     ...over,
@@ -95,10 +96,18 @@ describe("CollectionsTable", () => {
   });
 
   it("carries the list's parameters into the row link", () => {
-    const html = unescape(render({ state: { sort: "amount", dir: "desc", showNotDue: true } }));
+    const html = unescape(
+      render({ state: { sort: "amount", dir: "desc", showNotDue: true, type: "collections" } }),
+    );
     expect(html).toContain(
       'href="/accountant/invoice?id=evt-1&tab=info&csort=amount&cdir=desc&cnotdue=1"',
     );
+  });
+
+  // docs/specs/accountant-collections-23-amount-type-switch.md §1 (D4).
+  it("carries the type into the row link when it is not Collections", () => {
+    const html = unescape(render({ state: { ...DEFAULT, type: "deposits" } }));
+    expect(html).toContain('href="/accountant/invoice?id=evt-1&tab=info&type=deposits"');
   });
 
   describe("sorting", () => {

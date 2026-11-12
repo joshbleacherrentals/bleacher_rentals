@@ -29,7 +29,7 @@ export function calculateFinancialTotals(WorkTrackersResult: WorkTrackersResult)
 }
 
 /** Meters per mile — matches the conversion already used for driver pay (tripValue). */
-const METERS_PER_MILE = 1609.34;
+export const METERS_PER_MILE = 1609.34;
 
 /** e.g. "21.4 mi (34.4 km)". Empty string when there is nothing to show. */
 export function formatMileage(distanceMeters: number | null | undefined): string {

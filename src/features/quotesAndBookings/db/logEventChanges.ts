@@ -17,7 +17,15 @@ export type ActionType =
   // A manual payment edited or soft-deleted (docs/specs/accountant-quotes-09). `field_name` carries
   // `payment:<id>`; a deletion's row names the payment and never the reason.
   | "payment_edit"
-  | "payment_delete";
+  | "payment_delete"
+  // A manual payment recorded (docs/specs/event-change-log-01). `field_name` carries
+  // `payment:<id>`; `next_value` is "$100.00 · Check · Aug 14, 2026", and there is no previous value.
+  | "payment_add"
+  // A file the person uploaded by hand on the Files tab or the invoice page, and one they deleted
+  // (docs/specs/event-change-log-02). `field_name` is `file`; the file's name is `next_value` of an
+  // upload and `prev_value` of a delete. `file_add` stays for the send dialog only.
+  | "file_upload"
+  | "file_delete";
 
 export const TRACKED_FIELDS = [
   "event_name",

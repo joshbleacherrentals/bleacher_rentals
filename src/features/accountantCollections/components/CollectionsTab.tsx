@@ -11,12 +11,14 @@ import {
 } from "../utils/collectionsListState";
 import { filterCollectionsRows, sortCollectionsRows } from "../utils/collectionsSort";
 import { withCollectionsListState } from "../utils/invoiceUrl";
+import { AmountTypeButton } from "./AmountTypeButton";
 import { CollectionsTable } from "./CollectionsTable";
 
 /**
- * The body of the Collections tab: Show Not Due Yet and the table. The state of the list lives in
- * the URL (`csort`, `cdir`, `cnotdue`), so a reload and the invoice page's Back to tasks keep it.
- * docs/specs/accountant-collections-09-design.md §3.
+ * The body of the Collections tab: the Collections / Deposits / All switch, Show Not Due Yet and the
+ * table. The state of the list lives in the URL (`csort`, `cdir`, `cnotdue`, `type`), so a reload and
+ * the invoice page's Back to tasks keep it.
+ * docs/specs/accountant-collections-09-design.md §3 and accountant-collections-23-amount-type-switch.md §3.
  */
 export function CollectionsTab() {
   const router = useRouter();
@@ -41,7 +43,8 @@ export function CollectionsTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-3">
+        <AmountTypeButton type={state.type} onChange={(type) => update({ ...state, type })} />
         <button
           type="button"
           role="switch"
