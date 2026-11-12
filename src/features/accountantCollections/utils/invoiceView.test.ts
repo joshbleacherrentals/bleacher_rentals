@@ -8,9 +8,13 @@ import {
   buildPaymentRows,
   buildScheduleRows,
   buildTaskHistory,
+  buildSignedLine,
   buildTaskLists,
   finishedLabel,
+  zonedMoment,
+  type BookedLogRow,
   type InvoiceTaskRow,
+  type SignatureRow,
 } from "./invoiceView";
 
 // Spec: docs/specs/accountant-collections-08-invoice-data.md §3 and §4. The numbers are the
@@ -544,5 +548,228 @@ describe("buildContactCard", () => {
       email: null,
       company: null,
     });
+  });
+});
+
+// docs/specs/accountant-collections-20-signed-booked-line.md §3 and §5: the time of the Signed /
+// Booked line, in the office's zone with the zone's short name.
+describe("zonedMoment", () => {
+  it("writes 'MMM d, yyyy at h:mm a' and the zone's short name in summer (EDT)", () => {
+    expect(zonedMoment("2026-07-15T18:00:00.000Z", "America/Toronto")).toBe(
+      "Jul 15, 2026 at 2:00 PM EDT",
+    );
+  });
+
+  it("writes the winter name (EST) for a winter moment", () => {
+    expect(zonedMoment("2026-01-15T18:00:00.000Z", "America/Toronto")).toBe(
+      "Jan 15, 2026 at 1:00 PM EST",
+    );
+  });
+
+  it("takes the office's day and clock near midnight, not UTC's", () => {
+    // 04:30 UTC on the 10th is 23:30 on the 9th in Toronto (EST, UTC-5).
+    expect(zonedMoment("2026-11-10T04:30:00.000Z", "America/Toronto")).toBe(
+      "Nov 9, 2026 at 11:30 PM EST",
+    );
+    expect(zonedMoment("2026-11-10T04:30:00.000Z", "UTC")).toBe("Nov 10, 2026 at 4:30 AM UTC");
+    // One minute before and exactly at the office's midnight in summer (EDT, UTC-4).
+    expect(zonedMoment("2026-07-01T03:59:00.000Z", "America/Toronto")).toBe(
+      "Jun 30, 2026 at 11:59 PM EDT",
+    );
+    expect(zonedMoment("2026-07-01T04:00:00.000Z", "America/Toronto")).toBe(
+      "Jul 1, 2026 at 12:00 AM EDT",
+    );
+  });
+
+  it("reads both spellings of a stored time", () => {
+    expect(zonedMoment("2026-11-03 14:15:00+00", "America/Toronto")).toBe(
+      "Nov 3, 2026 at 9:15 AM EST",
+    );
+    expect(zonedMoment("2026-11-03T14:15:00.000Z", "America/Toronto")).toBe(
+      "Nov 3, 2026 at 9:15 AM EST",
+    );
+  });
+
+  it("gives an empty text for no value, an empty text and a text that is not a time", () => {
+    expect(zonedMoment(null, TZ)).toBe("");
+    expect(zonedMoment("", TZ)).toBe("");
+    expect(zonedMoment("   ", TZ)).toBe("");
+    expect(zonedMoment("not a time", TZ)).toBe("");
+  });
+
+  it("never throws for a zone with no short name; luxon writes an offset", () => {
+    expect(zonedMoment("2026-07-15T18:00:00.000Z", "Europe/Kyiv")).toMatch(
+      /^Jul 15, 2026 at 9:00 PM GMT\+3$/,
+    );
+  });
+});
+
+describe("buildSignedLine", () => {
+  const staffNames = new Map([
+    ["user-7", "Max Gavryshkiv"],
+    ["user-8", "Sam Lee"],
+  ]);
+  const signature = (over: Partial<SignatureRow> = {}): SignatureRow => ({
+    signer_name: "Dana Whitfield",
+    signed_at: "2026-10-22T19:14:00.000Z",
+    ...over,
+  });
+  const bookedLog = (over: Partial<BookedLogRow> = {}): BookedLogRow => ({
+    changed_by_user_uuid: "user-7",
+    changed_at: "2026-11-03T14:15:00.000Z",
+    ...over,
+  });
+  const build = (over: Partial<Parameters<typeof buildSignedLine>[0]> = {}) =>
+    buildSignedLine({
+      signatures: [],
+      bookedLogs: [],
+      eventStatus: "booked",
+      bookedAt: null,
+      staffNames,
+      timezone: TZ,
+      ...over,
+    });
+
+  it("is Signed with the date, the time with its zone and the signer, for an active signature", () => {
+    expect(build({ signatures: [signature()] })).toEqual({
+      label: "Signed",
+      text: "Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield",
+    });
+  });
+
+  it("is Signed whatever the event's status is: the signature is what counts", () => {
+    for (const eventStatus of ["booked", "unsigned_changes", "quoted", "lost", null]) {
+      expect(build({ signatures: [signature()], eventStatus })?.label).toBe("Signed");
+    }
+  });
+
+  it("is Booked for a booked event with no signature: the time and the manager of the log row", () => {
+    expect(build({ bookedLogs: [bookedLog()] })).toEqual({
+      label: "Booked",
+      text: "Nov 3, 2026 at 9:15 AM EST by Max Gavryshkiv",
+    });
+  });
+
+  it("is Signed when both exist: the user's wording", () => {
+    expect(build({ signatures: [signature()], bookedLogs: [bookedLog()] })).toEqual({
+      label: "Signed",
+      text: "Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield",
+    });
+  });
+
+  it("has no line for an event with neither a signature nor a booking", () => {
+    expect(build({ eventStatus: "quoted" })).toBeNull();
+    expect(build({ eventStatus: "draft" })).toBeNull();
+    expect(build({ eventStatus: null })).toBeNull();
+  });
+
+  it("has no line for an event that is not booked, even with a booked log row of the past", () => {
+    for (const eventStatus of ["lost", "quoted", "unsigned_changes", "draft", null]) {
+      expect(
+        build({ eventStatus, bookedLogs: [bookedLog()], bookedAt: "2026-08-01T12:00:00+00:00" }),
+        String(eventStatus),
+      ).toBeNull();
+    }
+  });
+
+  it("takes the latest of several signatures by time, in both spellings of a time", () => {
+    // As text "…T10:00…" sorts after "… 18:00…" ('T' is after a space), but 18:00 is later.
+    const earlier = signature({
+      signer_name: "Early Signer",
+      signed_at: "2026-10-22T10:00:00.000Z",
+    });
+    const later = signature({ signer_name: "Late Signer", signed_at: "2026-10-22 18:00:00+00" });
+
+    expect(build({ signatures: [earlier, later] })?.text).toBe(
+      "Oct 22, 2026 at 2:00 PM EDT by Late Signer",
+    );
+    expect(build({ signatures: [later, earlier] })?.text).toBe(
+      "Oct 22, 2026 at 2:00 PM EDT by Late Signer",
+    );
+  });
+
+  it("takes the latest of several booked log rows by time, in both spellings, with its own manager", () => {
+    const earlier = bookedLog({
+      changed_by_user_uuid: "user-7",
+      changed_at: "2026-11-03T10:00:00.000Z",
+    });
+    const later = bookedLog({
+      changed_by_user_uuid: "user-8",
+      changed_at: "2026-11-03 18:00:00+00",
+    });
+
+    expect(build({ bookedLogs: [earlier, later] })?.text).toBe(
+      "Nov 3, 2026 at 1:00 PM EST by Sam Lee",
+    );
+    expect(build({ bookedLogs: [later, earlier] })?.text).toBe(
+      "Nov 3, 2026 at 1:00 PM EST by Sam Lee",
+    );
+  });
+
+  it("prefers a row with a readable time to one without when it picks the latest", () => {
+    const unreadable = signature({ signer_name: "No Time", signed_at: "not a time" });
+    const readable = signature({ signer_name: "Has Time" });
+
+    expect(build({ signatures: [unreadable, readable] })?.text).toContain("by Has Time");
+    expect(build({ signatures: [readable, unreadable] })?.text).toContain("by Has Time");
+  });
+
+  it("leaves 'by' out when the signer's name is missing or blank", () => {
+    for (const signer_name of [null, "", "   "]) {
+      expect(build({ signatures: [signature({ signer_name })] })).toEqual({
+        label: "Signed",
+        text: "Oct 22, 2026 at 3:14 PM EDT",
+      });
+    }
+  });
+
+  it("trims the signer's name as it was typed", () => {
+    expect(build({ signatures: [signature({ signer_name: "  Dana Whitfield  " })] })?.text).toBe(
+      "Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield",
+    );
+  });
+
+  it("leaves 'by' out for a manager the Users table does not know, and for no manager at all", () => {
+    expect(build({ bookedLogs: [bookedLog({ changed_by_user_uuid: "user-gone" })] })).toEqual({
+      label: "Booked",
+      text: "Nov 3, 2026 at 9:15 AM EST",
+    });
+    expect(build({ bookedLogs: [bookedLog({ changed_by_user_uuid: null })] })).toEqual({
+      label: "Booked",
+      text: "Nov 3, 2026 at 9:15 AM EST",
+    });
+  });
+
+  it("falls back to booked_at, with no 'by', when no log row exists", () => {
+    expect(build({ bookedAt: "2026-08-01T12:00:00+00:00" })).toEqual({
+      label: "Booked",
+      text: "Aug 1, 2026 at 8:00 AM EDT",
+    });
+  });
+
+  it("uses the log row, not booked_at, when both exist, and does not mix their times and names", () => {
+    expect(build({ bookedLogs: [bookedLog()], bookedAt: "2026-08-01T12:00:00+00:00" })).toEqual({
+      label: "Booked",
+      text: "Nov 3, 2026 at 9:15 AM EST by Max Gavryshkiv",
+    });
+  });
+
+  it("has no line when a booked event has no log row and no time at all", () => {
+    expect(build({ bookedAt: null })).toBeNull();
+    expect(build({ bookedAt: "" })).toBeNull();
+    expect(build({ bookedAt: "not a time" })).toBeNull();
+  });
+
+  it("writes the time in the zone it is given", () => {
+    expect(build({ signatures: [signature()], timezone: "UTC" })?.text).toBe(
+      "Oct 22, 2026 at 7:14 PM UTC by Dana Whitfield",
+    );
+  });
+
+  it("does not change the rows it was given", () => {
+    const signatures = [signature({ signed_at: "2026-10-22T10:00:00.000Z" }), signature()];
+    const copy = structuredClone(signatures);
+    build({ signatures });
+    expect(signatures).toEqual(copy);
   });
 });

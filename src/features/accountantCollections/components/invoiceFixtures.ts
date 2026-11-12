@@ -66,6 +66,7 @@ export function invoiceDataFixture(over: Partial<InvoiceData> = {}): InvoiceData
       status: "collections",
       daysOverdue: 3,
       accountManager: "Max Gavryshkiv",
+      signedLine: { label: "Signed", text: "Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield" },
     },
     contacts: {
       contact: {

@@ -308,11 +308,13 @@ describe("useInvoiceData: the queries", () => {
   // compiled twice: the distinct ones are what the screen asks.
   const asked = () => [...new Set(mocks.compiled.map((c) => c.sql))];
 
-  it("keeps the query count small: at most the 15 of the spec", () => {
+  // Spec 08 allowed 15 distinct queries; spec 20 adds two narrow ones (the active signatures and the
+  // log rows that set the event to booked), so the budget is 17 and not one more.
+  it("keeps the query count small: the 15 of spec 08 and the 2 of spec 20", () => {
     setHappyPath();
     drawn();
 
-    expect(asked().length).toBeLessThanOrEqual(15);
+    expect(asked().length).toBeLessThanOrEqual(17);
   });
 
   it("reads only the rows of the event it is asked about", () => {
@@ -415,6 +417,201 @@ describe("useInvoiceData: a deleted task (spec 19)", () => {
   });
 });
 
+// docs/specs/accountant-collections-20-signed-booked-line.md §3 and §5: the Signed / Booked line.
+describe("useInvoiceData: the Signed / Booked line (spec 20)", () => {
+  const signatureAnswer = (rows: { signer_name: string | null; signed_at: string | null }[]) =>
+    done(rows);
+  const logAnswer = (rows: { changed_by_user_uuid: string | null; changed_at: string }[]) =>
+    done(rows);
+  const ask = (name: string) => {
+    setHappyPath();
+    drawn();
+    return mocks.compiled.find((c) => which(c.sql) === name)!;
+  };
+
+  it("asks for the active signatures of the event: signer and time only", () => {
+    const { sql, parameters } = ask("ContractSignatures");
+
+    expect(sql).toMatch(/^select "signer_name", "signed_at" from "ContractSignatures" where/i);
+    expect(sql).toMatch(/"event_uuid" = \?/);
+    expect(sql).toMatch(/"status" = \?/);
+    expect(parameters).toEqual([EVENT_ID, "active"]);
+  });
+
+  it("asks for the event's status log rows that moved it to booked: manager and time only", () => {
+    const { sql, parameters } = ask("EventChangeLog");
+
+    expect(sql).toMatch(
+      /^select "changed_by_user_uuid", "changed_at" from "EventChangeLog" where/i,
+    );
+    expect(sql).toMatch(/"event_uuid" = \?/);
+    expect(sql).toMatch(/"field_name" = \?/);
+    expect(sql).toMatch(/"next_value" = \?/);
+    expect(parameters).toEqual([EVENT_ID, "event_status", "booked"]);
+  });
+
+  // The builder is given every matching row and picks the latest, so the queries carry no limit.
+  it("reads every matching row: no limit, the builder picks the latest", () => {
+    expect(ask("ContractSignatures").sql).not.toMatch(/limit/i);
+    expect(ask("EventChangeLog").sql).not.toMatch(/limit/i);
+  });
+
+  describe("on a real SQLite table", () => {
+    function runBoth() {
+      setHappyPath();
+      drawn();
+      const signatures = mocks.compiled.find((c) => which(c.sql) === "ContractSignatures")!;
+      const logs = mocks.compiled.find((c) => which(c.sql) === "EventChangeLog")!;
+
+      const sqlite = new DatabaseSync(":memory:");
+      sqlite.exec(`create table "ContractSignatures" (id text primary key, event_uuid text,
+        signer_name text, signed_at text, status text);
+        create table "EventChangeLog" (id text primary key, event_uuid text, field_name text,
+        prev_value text, next_value text, changed_by_user_uuid text, changed_at text)`);
+      const sign = sqlite.prepare(`insert into "ContractSignatures" values (?, ?, ?, ?, ?)`);
+      sign.run("s-active", EVENT_ID, "Dana Whitfield", "2026-10-22T19:14:00.000Z", "active");
+      sign.run("s-old", EVENT_ID, "Old Signer", "2026-09-01T10:00:00.000Z", "invalidated");
+      sign.run("s-other", "ev-other", "Other Signer", "2026-10-30T10:00:00.000Z", "active");
+      const log = sqlite.prepare(`insert into "EventChangeLog" values (?, ?, ?, ?, ?, ?, ?)`);
+      log.run(
+        "l-booked",
+        EVENT_ID,
+        "event_status",
+        "quoted",
+        "booked",
+        "user-7",
+        "2026-11-03 14:15:00+00",
+      );
+      log.run(
+        "l-lost",
+        EVENT_ID,
+        "event_status",
+        "booked",
+        "lost",
+        "user-7",
+        "2026-11-04 10:00:00+00",
+      );
+      log.run("l-field", EVENT_ID, "event_name", "A", "booked", "user-7", "2026-11-05 10:00:00+00");
+      log.run(
+        "l-other",
+        "ev-other",
+        "event_status",
+        "quoted",
+        "booked",
+        "user-7",
+        "2026-11-06 10:00:00+00",
+      );
+
+      return {
+        signatures: sqlite
+          .prepare(signatures.sql)
+          .all(...(signatures.parameters as SQLInputValue[])),
+        logs: sqlite.prepare(logs.sql).all(...(logs.parameters as SQLInputValue[])),
+      };
+    }
+
+    it("does not return an invalidated signature or another event's", () => {
+      expect(runBoth().signatures).toEqual([
+        { signer_name: "Dana Whitfield", signed_at: "2026-10-22T19:14:00.000Z" },
+      ]);
+    });
+
+    it("returns only the rows that set this event to booked", () => {
+      expect(runBoth().logs).toEqual([
+        { changed_by_user_uuid: "user-7", changed_at: "2026-11-03 14:15:00+00" },
+      ]);
+    });
+  });
+
+  it("is loading while either query has not answered", () => {
+    for (const name of ["ContractSignatures", "EventChangeLog"]) {
+      setHappyPath();
+      mocks.answers[name] = { data: [], isLoading: true, isFetching: true, error: undefined };
+      expect(drawn().isLoading, name).toBe(true);
+    }
+  });
+
+  it("builds Signed from the signature rows", () => {
+    setHappyPath();
+    mocks.answers.ContractSignatures = signatureAnswer([
+      { signer_name: "Dana Whitfield", signed_at: "2026-10-22T19:14:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine).toEqual({
+      label: "Signed",
+      text: "Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield",
+    });
+  });
+
+  it("builds Booked from the log row, with the manager's name from the staff names", () => {
+    setHappyPath();
+    mocks.answers.EventChangeLog = logAnswer([
+      { changed_by_user_uuid: "user-1", changed_at: "2026-11-03T14:15:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine).toEqual({
+      label: "Booked",
+      text: "Nov 3, 2026 at 9:15 AM EST by Sam Lee",
+    });
+  });
+
+  it("builds Signed when both kinds of row exist", () => {
+    setHappyPath();
+    mocks.answers.ContractSignatures = signatureAnswer([
+      { signer_name: "Dana Whitfield", signed_at: "2026-10-22T19:14:00.000Z" },
+    ]);
+    mocks.answers.EventChangeLog = logAnswer([
+      { changed_by_user_uuid: "user-1", changed_at: "2026-11-03T14:15:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine.label).toBe("Signed");
+  });
+
+  it("has no line for an event that is not booked and has no signature", () => {
+    setHappyPath();
+    mocks.answers.event = done([eventRow({ event_status: "quoted" })]);
+    mocks.answers.EventChangeLog = logAnswer([
+      { changed_by_user_uuid: "user-1", changed_at: "2026-11-03T14:15:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine).toBeNull();
+  });
+
+  it("has no line for a booked event with no row and no booked_at", () => {
+    setHappyPath();
+    mocks.answers.event = done([eventRow({ booked_at: null })]);
+
+    expect(drawn().event.signedLine).toBeNull();
+  });
+
+  it("treats a failed read of either query as no rows: the page still draws", () => {
+    setHappyPath();
+    const failed = {
+      data: undefined as unknown as unknown[],
+      isLoading: false,
+      isFetching: false,
+      error: new Error("read failed"),
+    };
+    mocks.answers.ContractSignatures = failed;
+    mocks.answers.EventChangeLog = failed;
+
+    const data = drawn();
+    expect(data.isLoading).toBe(false);
+    expect(data.notFound).toBe(false);
+    expect(data.event.signedLine).toEqual({ label: "Booked", text: "Aug 1, 2026 at 8:00 AM EDT" });
+  });
+
+  it("writes the time in the office's zone, not UTC's", () => {
+    setHappyPath();
+    // 03:30 UTC on the 23rd is 23:30 on the 22nd in Toronto (EDT).
+    mocks.answers.ContractSignatures = signatureAnswer([
+      { signer_name: "Dana Whitfield", signed_at: "2026-10-23T03:30:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine.text).toBe("Oct 22, 2026 at 11:30 PM EDT by Dana Whitfield");
+  });
+});
+
 describe("useInvoiceData: the page's data", () => {
   it("builds the header: name, number, status, days overdue and account manager", () => {
     setHappyPath();
@@ -425,6 +622,8 @@ describe("useInvoiceData: the page's data", () => {
       status: "collections",
       daysOverdue: 45,
       accountManager: "Sam Lee",
+      // No signature and no booked log row: the booked_at of the event, with no name (spec 20).
+      signedLine: { label: "Booked", text: "Aug 1, 2026 at 8:00 AM EDT" },
     });
   });
 

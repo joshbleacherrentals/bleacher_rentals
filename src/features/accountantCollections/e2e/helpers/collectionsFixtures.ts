@@ -97,7 +97,9 @@ const E2E_FRENCH_CONTACT_LAST_NAME = "E2E Collections French";
  * Removes the events; their tasks, line items and payments go with them (cascade). The objects
  * that `addEventFile` stored in `event-files` are removed first, since the rows that name them go
  * with the events. A signature does not cascade (its foreign key has no ON DELETE), so the
- * signatures that `addSignature` wrote go first, with their PDFs and their terms template.
+ * signatures that `addSignature` wrote go first, with their PDFs and their terms template. The
+ * activity log does not cascade either: the rows `addBookedLog` wrote (and any the app wrote) go
+ * before the events.
  */
 export async function cleanupBookings(eventIds: string[]): Promise<void> {
   if (eventIds.length === 0) return;
@@ -130,6 +132,7 @@ export async function cleanupBookings(eventIds: string[]): Promise<void> {
       )
       .like("name", `${E2E_TERMS_PREFIX}%`);
   }
+  await db.from("EventChangeLog").delete().in("event_uuid", eventIds);
   // The terms and contacts that `addContractTerms` and `addFrenchContact` gave the events: the
   // events refer to them, so they go after the events.
   const { data: given } = await db
@@ -274,11 +277,16 @@ export async function addEventFile(
  *   `signed_pdf_path`;
  * - `none`: no path (the signature was saved, the upload failed);
  * - `missing`: a path with no object behind it.
+ * `signedAt` (an ISO time) is when it was signed; without it the database stamps the insert.
  * Returns the signature's id and the path it wrote (`null` for `none`).
  */
 export async function addSignature(
   eventId: string,
-  options: { status: "active" | "invalidated"; pdf: "stored" | "none" | "missing" },
+  options: {
+    status: "active" | "invalidated";
+    pdf: "stored" | "none" | "missing";
+    signedAt?: string;
+  },
 ): Promise<{ id: string; path: string | null }> {
   const db = admin();
   const id = crypto.randomUUID();
@@ -306,6 +314,7 @@ export async function addSignature(
     event_uuid: eventId,
     terms_and_conditions_uuid: terms.id as string,
     signer_name: "E2E Signer",
+    ...(options.signedAt ? { signed_at: options.signedAt } : {}),
     status: options.status,
     signed_pdf_path: path,
     invalidated_at: options.status === "invalidated" ? new Date().toISOString() : null,
@@ -394,4 +403,44 @@ export async function activeSignaturesOf(eventId: string): Promise<number> {
     .eq("status", "active");
   if (error) throw new Error(`activeSignaturesOf: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * The log row the status button on the quote card (or the edit page's save) leaves when it moves an
+ * event to booked: `field_name = 'event_status'`, `next_value = 'booked'`, the manager's
+ * `Users.id` and the time `at` (an ISO time)
+ * (docs/specs/accountant-collections-20-signed-booked-line.md §3). `cleanupBookings` removes it with
+ * the event.
+ */
+export async function addBookedLog(
+  eventId: string,
+  options: { userUuid: string; at: string },
+): Promise<void> {
+  const { error } = await admin().from("EventChangeLog").insert({
+    event_uuid: eventId,
+    changed_by_user_uuid: options.userUuid,
+    field_name: "event_status",
+    prev_value: "quoted",
+    next_value: "booked",
+    action_type: "status_change",
+    changed_at: options.at,
+  });
+  if (error) throw new Error(`addBookedLog: ${error.message}`);
+}
+
+/**
+ * A member of staff with a name, to be the manager of `addBookedLog`; `name` is written the way the
+ * page writes it (first and last name, spaced). Any user the seed has will do.
+ */
+export async function aStaffMember(): Promise<{ id: string; name: string }> {
+  const { data, error } = await admin()
+    .from("Users")
+    .select("id, first_name, last_name")
+    .not("first_name", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) throw new Error(`aStaffMember: no user with a name: ${error?.message}`);
+  const name = [data.first_name, data.last_name].filter(Boolean).join(" ");
+  return { id: data.id as string, name };
 }
