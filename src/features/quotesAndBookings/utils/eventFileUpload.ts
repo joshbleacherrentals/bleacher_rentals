@@ -51,8 +51,34 @@ export function errorMessage(e: unknown, fallback = "unknown error"): string {
 }
 
 /**
- * Uploads one file to `event-files` and inserts its EventFiles row. Returns the new row's id.
- * Throws an Error on a storage or insert error; after an insert error the stored object is removed.
+ * Writes the `file_upload` Log row of a file that is already stored and recorded. Never throws: a
+ * row that cannot be written must not undo the file, so it is reported with a toast and the upload
+ * goes on (docs/specs/event-change-log-02-file-upload-delete.md R4).
+ *
+ * The Log helper and the toast are imported when this runs, not at the top of the file: this file
+ * is also imported by the send route on the server (`isOwnEventFilePath` and the limits), and the
+ * Log helper writes through the browser's PowerSync database.
+ */
+async function writeUploadLog(p: {
+  eventId: string;
+  fileName: string;
+  changedByUserUuid: string | null;
+}): Promise<void> {
+  try {
+    const { logFileUploaded } = await import("../db/logEventFile");
+    await logFileUploaded(p);
+  } catch (error) {
+    console.error("Could not write the Log row of an uploaded file:", error);
+    const { createErrorToastNoThrow } = await import("@/components/toasts/ErrorToast");
+    createErrorToastNoThrow(["The file was saved, but its Log row could not be written"]);
+  }
+}
+
+/**
+ * Uploads one file to `event-files`, inserts its EventFiles row and writes the `file_upload` Log row.
+ * Returns the new row's id. Throws an Error on a storage or insert error; after an insert error the
+ * stored object is removed and no Log row is written. A Log row that fails does not throw.
+ * `changedByUserUuid` is the user's `Users.id` for the Log, not the Clerk id of `uploadedBy`.
  */
 export async function uploadEventFile(params: {
   supabase: SupabaseClient<any>;
@@ -60,8 +86,9 @@ export async function uploadEventFile(params: {
   file: File;
   source: string;
   uploadedBy: string | null | undefined;
+  changedByUserUuid: string | null;
 }): Promise<string> {
-  const { supabase, eventId, file, source, uploadedBy } = params;
+  const { supabase, eventId, file, source, uploadedBy, changedByUserUuid } = params;
   const ext = file.name.split(".").pop() ?? "bin";
   const storagePath = `${eventId}/${crypto.randomUUID()}.${ext}`;
 
@@ -90,6 +117,7 @@ export async function uploadEventFile(params: {
     }
     throw new Error(errorMessage(insertError, "could not save the file record"));
   }
+  await writeUploadLog({ eventId, fileName: file.name, changedByUserUuid });
   return id;
 }
 

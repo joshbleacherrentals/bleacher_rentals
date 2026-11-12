@@ -66,6 +66,7 @@ export function invoiceDataFixture(over: Partial<InvoiceData> = {}): InvoiceData
       status: "collections",
       daysOverdue: 3,
       accountManager: "Max Gavryshkiv",
+      signedLine: { label: "Signed", text: "Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield" },
     },
     contacts: {
       contact: {
@@ -145,6 +146,7 @@ export function invoiceDataFixture(over: Partial<InvoiceData> = {}): InvoiceData
         dueDate: "2026-11-10",
         note: "Called again to follow up and he said the check was sent yesterday.",
         followUpLabel: "Due Today",
+        finishedLabel: "—",
       },
       completed: [
         {
@@ -152,12 +154,14 @@ export function invoiceDataFixture(over: Partial<InvoiceData> = {}): InvoiceData
           dueDate: "2026-11-07",
           note: "Call to the customer and ask about payment",
           followUpLabel: "3 days ago",
+          finishedLabel: "08/11/2026",
         },
         {
           id: "task-2",
           dueDate: "2026-10-31",
           note: "Send a follow up message to the customer",
           followUpLabel: "10 days ago",
+          finishedLabel: "—",
         },
       ],
     },

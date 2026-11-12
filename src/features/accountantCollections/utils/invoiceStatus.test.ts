@@ -144,8 +144,15 @@ describe("invoiceStatus: from the twin's figures", () => {
     expect(statusOf("booked", b)).toBe("schedule");
   });
 
-  it("is Collections for an event with no schedule that starts in 7 days", () => {
+  it("is Schedule for an event with no schedule that starts in 7 days", () => {
     const b = balances({ event: { event_start: "2026-11-22" } });
+    expect(b.amountDueCents).toBe(0);
+    expect(b.remainingCents).toBe(100000);
+    expect(statusOf("booked", b)).toBe("schedule");
+  });
+
+  it("is Collections for an event with no schedule that starts today", () => {
+    const b = balances({ event: { event_start: TODAY } });
     expect(b.amountDueCents).toBe(100000);
     expect(statusOf("booked", b)).toBe("collections");
   });

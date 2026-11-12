@@ -26,6 +26,8 @@ const OLDEST_FIRST: EventSort = { key: "created_at", direction: "asc" };
 export function useListPageState(
   tabs: ListTabDeclaration,
   initialOverrides?: Partial<QuotesBookingsFilters>,
+  /** The filter sidebar starts collapsed (the user can still open it). */
+  startClosed = false,
 ) {
   const router = useRouter();
   const pathname = usePathname();
@@ -55,7 +57,11 @@ export function useListPageState(
     setZoneUuids,
     clearFilter,
     clearFilters,
-  } = useQuotesAndBookingsFilters(initialOverrides, hasUrlFilters ? urlState.filters : undefined);
+  } = useQuotesAndBookingsFilters(
+    initialOverrides,
+    hasUrlFilters ? urlState.filters : undefined,
+    startClosed,
+  );
 
   const [showDeleted, setShowDeleted] = useState(urlState.showDeleted);
   const [searchQuery, setSearchQuery] = useState(urlState.searchQuery);

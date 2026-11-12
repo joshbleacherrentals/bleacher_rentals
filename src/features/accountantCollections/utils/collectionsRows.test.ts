@@ -99,6 +99,7 @@ describe("buildCollectionsRows: an event with a payment schedule", () => {
         dueDate: "2026-11-15",
         note: "Remind the customer about payment",
         amountDueCents: 100000,
+        remainingCents: 100000,
         currency: "USD",
         daysOverdue: 10,
       },
@@ -139,29 +140,120 @@ describe("buildCollectionsRows: an event with a payment schedule", () => {
   });
 });
 
+// docs/specs/accountant-collections-23-amount-type-switch.md §3: the row keeps Remaining, the other
+// figure the Collections / Deposits split compares Amount Due with.
+describe("buildCollectionsRows: remainingCents", () => {
+  it("is the total minus the payments received, next to the Amount Due that it caps", () => {
+    const [row] = build([task("a")], {
+      lineTotals: [lineTotal("a", 100000)],
+      installments: [
+        installment("a", 1, "2026-11-05", 4000),
+        installment("a", 2, "2026-12-05", 6000),
+      ],
+      payments: [payment("a", 10000)],
+    });
+
+    expect(row.remainingCents).toBe(90000);
+    expect(row.amountDueCents).toBe(30000);
+  });
+
+  it("includes the tax the event carries, like the total does", () => {
+    const [row] = build([task("a", { tax_percent: 10 })], {
+      lineTotals: [lineTotal("a", 100000)],
+      installments: [installment("a", 1, "2026-11-05", 10000)],
+    });
+
+    expect(row.remainingCents).toBe(110000);
+  });
+
+  it("is the whole total for an event with no schedule, due or not", () => {
+    const [due] = build([task("a", { event_start: "2026-11-10" })], {
+      lineTotals: [lineTotal("a", 50000)],
+    });
+    const [notDue] = build([task("b", { event_start: "2026-12-10" })], {
+      lineTotals: [lineTotal("b", 50000)],
+    });
+
+    expect(due.remainingCents).toBe(50000);
+    expect(notDue.remainingCents).toBe(50000);
+    expect(notDue.amountDueCents).toBe(0);
+  });
+
+  it("is 0 for an event paid in full and never below 0 for one overpaid", () => {
+    const [paid] = build([task("a")], {
+      lineTotals: [lineTotal("a", 100000)],
+      installments: [installment("a", 1, "2026-11-05", 10000)],
+      payments: [payment("a", 100000)],
+    });
+    const [over] = build([task("b")], {
+      lineTotals: [lineTotal("b", 100000)],
+      installments: [installment("b", 1, "2026-11-05", 10000)],
+      payments: [payment("b", 150000)],
+    });
+
+    expect(paid.remainingCents).toBe(0);
+    expect(over.remainingCents).toBe(0);
+  });
+
+  it("counts only the payments in the event's own currency", () => {
+    const [row] = build(
+      [task("a", { sales_office_uuid: "office-ca" })],
+      {
+        lineTotals: [lineTotal("a", 100000)],
+        installments: [installment("a", 1, "2026-11-05", 10000)],
+        payments: [
+          payment("a", 30000, { currency: "CAD" }),
+          payment("a", 99999, { currency: "USD" }),
+        ],
+      },
+      (source) => (source.sales_office_uuid === "office-ca" ? "CAD" : "USD"),
+    );
+
+    expect(row.remainingCents).toBe(70000);
+  });
+});
+
 describe("buildCollectionsRows: an event with no payment schedule", () => {
-  it("owes everything from 7 days before the start; the days count from there", () => {
-    // Starts 2026-11-20: due 2026-11-13, so 2 days overdue on the 15th. Booked long before.
-    const [row] = build([task("a", { event_start: "2026-11-20" })], {
+  it("owes everything from the start day; the days count from there", () => {
+    // Starts 2026-11-12: due that day, so 3 days overdue on the 15th. Booked long before.
+    const [row] = build([task("a", { event_start: "2026-11-12" })], {
       lineTotals: [lineTotal("a", 50000)],
     });
 
     expect(row.amountDueCents).toBe(50000);
-    expect(row.daysOverdue).toBe(2);
+    expect(row.daysOverdue).toBe(3);
   });
 
-  it("counts from the booking day when the event was booked inside the 7 days", () => {
+  it("owes everything on the day the event starts, 0 days overdue", () => {
+    const [row] = build([task("a", { event_start: TODAY })], {
+      lineTotals: [lineTotal("a", 50000)],
+    });
+
+    expect(row.amountDueCents).toBe(50000);
+    expect(row.daysOverdue).toBe(0);
+  });
+
+  it("ignores the booking day: a booked_at after the start changes nothing", () => {
     const [row] = build(
-      [task("a", { event_start: "2026-11-20", booked_at: "2026-11-14T12:00:00+00:00" })],
+      [task("a", { event_start: "2026-11-12", booked_at: "2026-11-14T12:00:00+00:00" })],
       { lineTotals: [lineTotal("a", 50000)] },
     );
 
     expect(row.amountDueCents).toBe(50000);
-    expect(row.daysOverdue).toBe(1);
+    expect(row.daysOverdue).toBe(3);
   });
 
-  it("owes nothing yet when the start is more than 7 days away, but the row stays", () => {
-    const [row] = build([task("a", { event_start: "2026-11-23" })], {
+  it("owes nothing yet when the start is in the future, but the row stays", () => {
+    const [row] = build([task("a", { event_start: "2026-11-16" })], {
+      lineTotals: [lineTotal("a", 50000)],
+    });
+
+    expect(row.amountDueCents).toBe(0);
+    expect(row.daysOverdue).toBeNull();
+  });
+
+  it("owes nothing 7 days before the start either (the old rule's day)", () => {
+    const [row] = build([task("a", { event_start: "2026-11-22" })], {
       lineTotals: [lineTotal("a", 50000)],
     });
 

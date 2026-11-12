@@ -78,6 +78,17 @@ export function zonedDate(value: string | null, timezone: string): string {
   return dt.isValid ? dt.toFormat("MMM d, yyyy") : "—";
 }
 
+/**
+ * When a task was finished, as a date: `09/11/2026` (DD/MM/YYYY), the day taken in the office's
+ * time zone. No value, an empty text or a text that is not a date is a dash, never an error.
+ * docs/specs/accountant-collections-18-task-finished-at.md §1 (D3) and §3.
+ */
+export function finishedLabel(value: string | null, timezone: string): string {
+  if (!value || !value.trim()) return "—";
+  const dt = inZone(value, timezone);
+  return dt.isValid ? dt.toFormat("dd/MM/yyyy") : "—";
+}
+
 function zonedTime(value: string | null, timezone: string): string {
   if (!value) return "";
   const dt = inZone(value, timezone);
@@ -171,6 +182,8 @@ export type InvoiceTaskRow = {
   due_date: string | null;
   note: string | null;
   completed: number | null;
+  /** Written by the database when the task is closed; empty for an open or an old task. */
+  finished_at: string | null;
 };
 
 export type TaskView = {
@@ -179,11 +192,19 @@ export type TaskView = {
   dueDate: string;
   note: string;
   followUpLabel: string;
+  /** The day the task was finished, `DD/MM/YYYY`; a dash for an open task or one with no time. */
+  finishedLabel: string;
 };
 
-function toTaskView(t: InvoiceTaskRow, today: string): TaskView {
+function toTaskView(t: InvoiceTaskRow, today: string, timezone: string): TaskView {
   const dueDate = (t.due_date ?? "").slice(0, 10);
-  return { id: t.id, dueDate, note: t.note ?? "", followUpLabel: followUpLabel(dueDate, today) };
+  return {
+    id: t.id,
+    dueDate,
+    note: t.note ?? "",
+    followUpLabel: followUpLabel(dueDate, today),
+    finishedLabel: t.completed ? finishedLabel(t.finished_at, timezone) : "—",
+  };
 }
 
 /** Of two tasks, the one created last; the id breaks a tie so the order never flips. */
@@ -193,36 +214,43 @@ function newestFirst(a: InvoiceTaskRow, b: InvoiceTaskRow): number {
 }
 
 /**
- * The open task, and the completed ones newest due date first. The table has no completion date,
- * so a completed task shows its due date in words.
+ * The open task, and the completed ones newest due date first. Each task has its due date in words
+ * and, when it is completed and the database stamped it, the day it was finished.
  */
 export function buildTaskLists(
   tasks: readonly InvoiceTaskRow[],
   today: string,
+  timezone: string,
 ): { open: TaskView | null; completed: TaskView[] } {
   const open = tasks.filter((t) => !t.completed).sort(newestFirst)[0];
   const completed = tasks
     .filter((t) => !!t.completed)
     .sort((a, b) => (b.due_date ?? "").localeCompare(a.due_date ?? "") || newestFirst(a, b));
   return {
-    open: open ? toTaskView(open, today) : null,
-    completed: completed.map((t) => toTaskView(t, today)),
+    open: open ? toTaskView(open, today, timezone) : null,
+    completed: completed.map((t) => toTaskView(t, today, timezone)),
   };
 }
 
 export type TaskHistoryRow = {
   number: number;
   id: string;
-  /** The task's date in words, as the Collections list writes it. */
+  /** The day the task was finished, `DD/MM/YYYY`, or a dash. */
+  finishedLabel: string;
+  /** The task's due date in words, as the Collections list writes it. */
   dateLabel: string;
   note: string;
   isOpen: boolean;
+  /** True for every row but the open one: only a closed task can be deleted (spec 19). */
+  canDelete: boolean;
 };
 
 /**
  * The Task History table: the completed tasks oldest first, then the open one, numbered from 1.
- * `buildTaskLists` gives the completed newest first, so they are reversed.
- * docs/specs/accountant-collections-13-task-history-and-files.md §3.
+ * `buildTaskLists` gives the completed newest first, so they are reversed. Every row but the open
+ * one can be deleted.
+ * docs/specs/accountant-collections-13-task-history-and-files.md §3;
+ * docs/specs/accountant-collections-19-task-delete.md §3.
  */
 export function buildTaskHistory(tasks: {
   open: TaskView | null;
@@ -235,10 +263,98 @@ export function buildTaskHistory(tasks: {
   return ordered.map(({ task, isOpen }, i) => ({
     number: i + 1,
     id: task.id,
+    finishedLabel: task.finishedLabel,
     dateLabel: task.followUpLabel,
     note: task.note,
     isOpen,
+    canDelete: !isOpen,
   }));
+}
+
+// ------------------------------------------------------- signed / booked
+
+/** A row of the signature query of `useInvoiceData`: an active `ContractSignatures` row. */
+export type SignatureRow = { signer_name: string | null; signed_at: string | null };
+
+/** A row of the booking query: an `EventChangeLog` row that set the event's status to booked. */
+export type BookedLogRow = { changed_by_user_uuid: string | null; changed_at: string | null };
+
+/** The line under Invoice: `Signed` or `Booked`, and when and by whom, already written out. */
+export type SignedLine = { label: "Signed" | "Booked"; text: string };
+
+/**
+ * A moment as the Signed / Booked line writes it, in the office's zone with the zone's short name:
+ * `Oct 22, 2026 at 3:14 PM EDT`. No value, an empty text or a text that is not a time is an empty
+ * string, never an error. The word "at" is outside the format string: in luxon `a` is the meridiem.
+ * docs/specs/accountant-collections-20-signed-booked-line.md §1 and §3.
+ */
+export function zonedMoment(value: string | null, timezone: string): string {
+  if (!value || !value.trim()) return "";
+  const dt = inZone(value, timezone);
+  if (!dt.isValid) return "";
+  return `${dt.toFormat("MMM d, yyyy")} at ${dt.toFormat("h:mm a ZZZZ")}`;
+}
+
+/**
+ * Of the rows, the one with the latest time. Times come in two spellings, so they are compared as
+ * instants, not as text; a row whose time cannot be read loses to any row whose time can.
+ */
+function latestRow<T>(rows: readonly T[], timeOf: (row: T) => string | null): T | null {
+  let best: T | null = null;
+  let bestMs = Number.NEGATIVE_INFINITY;
+  for (const row of rows) {
+    const ms = toEpochMs(timeOf(row)) ?? Number.NEGATIVE_INFINITY;
+    if (best === null || ms > bestMs) {
+      best = row;
+      bestMs = ms;
+    }
+  }
+  return best;
+}
+
+function momentBy(moment: string, name: string | null | undefined): string {
+  const by = name?.trim();
+  return [moment, by ? `by ${by}` : ""].filter(Boolean).join(" ");
+}
+
+/**
+ * The line under `Invoice: {number}`: who signed the contract and when, or, with no active
+ * signature, who booked the event and when.
+ * - An active signature gives Signed, the latest by time; it wins over a booking whatever the
+ *   event's status is.
+ * - With none, an event whose status is `booked` gives Booked, from the latest log row that set it
+ *   to booked (its time and its manager, both from the one row), or, with no such row, from
+ *   `booked_at` with no "by".
+ * - Any other event has no line. A manager the staff names do not know gives no "by".
+ * - A line with nothing to say (no readable time and no name) is no line.
+ * docs/specs/accountant-collections-20-signed-booked-line.md §1 and §3.
+ */
+export function buildSignedLine(input: {
+  signatures: readonly SignatureRow[];
+  bookedLogs: readonly BookedLogRow[];
+  eventStatus: string | null;
+  bookedAt: string | null;
+  staffNames: ReadonlyMap<string, string>;
+  timezone: string;
+}): SignedLine | null {
+  const { timezone } = input;
+
+  const signature = latestRow(input.signatures, (row) => row.signed_at);
+  if (signature) {
+    const text = momentBy(zonedMoment(signature.signed_at, timezone), signature.signer_name);
+    return text ? { label: "Signed", text } : null;
+  }
+
+  if (input.eventStatus !== "booked") return null;
+
+  const log = latestRow(input.bookedLogs, (row) => row.changed_at);
+  const text = log
+    ? momentBy(
+        zonedMoment(log.changed_at, timezone),
+        log.changed_by_user_uuid ? input.staffNames.get(log.changed_by_user_uuid) : null,
+      )
+    : zonedMoment(input.bookedAt, timezone);
+  return text ? { label: "Booked", text } : null;
 }
 
 // -------------------------------------------------------------- contacts

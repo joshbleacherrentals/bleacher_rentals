@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Audit - searching for a driver</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+button{font-family:inherit}
+input{font-family:inherit}
+</style>
+</helmet>
+<div style="max-width: 1360px; margin: 0 auto; padding: 24px; box-sizing: border-box; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; color: #111827; background: #ffffff;">
+
+<h1 style="margin: 0 0 16px 0; font-size: 24px; line-height: 32px; font-weight: 700; color: #10365a;">Accountant</h1>
+
+<div role="tablist" aria-label="Accountant sections" style="display: inline-flex; align-items: center; height: 36px; padding: 3px; box-sizing: border-box; border-radius: 8px; background: #f4f4f5; width: fit-content;">
+<button type="button" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #18181b; font-size: 14px; line-height: 20px; font-weight: 500; white-space: nowrap; cursor: pointer;">Collections</button>
+<button type="button" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #18181b; font-size: 14px; line-height: 20px; font-weight: 500; white-space: nowrap; cursor: pointer;">AR Deposits<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+<button type="button" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #18181b; font-size: 14px; line-height: 20px; font-weight: 500; white-space: nowrap; cursor: pointer;">Need attention<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+<button type="button" role="tab" aria-selected="true" style="display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; background: #ffffff; color: #18181b; font-size: 14px; line-height: 20px; font-weight: 500; white-space: nowrap; cursor: pointer; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);">Audit</button>
+</div>
+
+<div style="position: relative; margin-top: 20px; width: 360px; max-width: 100%;">
+<button type="button" role="combobox" aria-haspopup="listbox" aria-expanded="true" aria-label="Driver" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 36px; padding: 8px 16px; box-sizing: border-box; border: 1px solid #1d62a3; border-radius: 6px; background: #ffffff; box-shadow: 0 0 0 3px rgba(29,98,163,0.25); font-size: 14px; line-height: 20px; font-weight: 400; color: #6b7280; text-align: left; cursor: pointer;">
+<span>Choose driver</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5; flex-shrink: 0;"><path d="m7 15 5 5 5-5"></path><path d="m7 9 5-5 5 5"></path></svg>
+</button>
+
+<div style="position: absolute; left: 0; top: 42px; z-index: 5; width: 100%; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 6px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); overflow: hidden;">
+
+<div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; box-sizing: border-box; border-bottom: 1px solid #e5e7eb;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5; flex-shrink: 0;"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input type="text" value="M" readonly aria-label="Search drivers" style="flex: 1; min-width: 0; height: 40px; border: 0; outline: none; background: transparent; font-size: 14px; line-height: 20px; color: #111827;">
+</div>
+
+<div role="listbox" aria-label="Drivers" style="padding: 4px;">
+
+<button type="button" role="option" aria-selected="false" style="display: flex; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 6px 8px; box-sizing: border-box; border: 0; border-radius: 4px; background: #f4f4f5; text-align: left; cursor: pointer;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0; flex-shrink: 0;"><path d="M20 6 9 17l-5-5"></path></svg>
+<span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 16px; background: #e5e7eb; color: #374151; font-size: 12px; line-height: 16px; font-weight: 600; flex-shrink: 0;">MF</span>
+<span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #374151;">Mattew Foren</span>
+</button>
+
+<button type="button" role="option" aria-selected="false" style="display: flex; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 6px 8px; box-sizing: border-box; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0; flex-shrink: 0;"><path d="M20 6 9 17l-5-5"></path></svg>
+<span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 16px; background: #e5e7eb; color: #374151; font-size: 12px; line-height: 16px; font-weight: 600; flex-shrink: 0;">MB</span>
+<span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #374151;">Max Butch</span>
+</button>
+
+<button type="button" role="option" aria-selected="false" style="display: flex; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 6px 8px; box-sizing: border-box; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0; flex-shrink: 0;"><path d="M20 6 9 17l-5-5"></path></svg>
+<span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 16px; background: #e5e7eb; color: #374151; font-size: 12px; line-height: 16px; font-weight: 600; flex-shrink: 0;">MJ</span>
+<span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #374151;">Marry Johnson</span>
+</button>
+
+<button type="button" role="option" aria-selected="false" style="display: flex; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 6px 8px; box-sizing: border-box; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0; flex-shrink: 0;"><path d="M20 6 9 17l-5-5"></path></svg>
+<span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 16px; background: #e5e7eb; color: #374151; font-size: 12px; line-height: 16px; font-weight: 600; flex-shrink: 0;">JM</span>
+<span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #374151;">John Mallkow</span>
+</button>
+
+</div>
+</div>
+</div>
+
+<div style="margin-top: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 56px 24px; border: 1px dashed #d1d5db; border-radius: 10px; background: #f9fafb; text-align: center;">
+<div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 22px; background: #ffffff; border: 1px solid #e5e7eb;">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>
+</div>
+<p style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #111827;">Choose a driver</p>
+<p style="margin: 0; max-width: 420px; font-size: 14px; line-height: 20px; color: #4b5563;">Pick a driver above to see all of their work trackers and whether each one has been paid.</p>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

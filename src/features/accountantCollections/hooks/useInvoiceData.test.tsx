@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
 // Spec: docs/specs/accountant-collections-08-invoice-data.md §3 and §4. The hook is rendered on
 // the server with `useTypedQuery` replaced: what is under test is the questions it asks the
@@ -162,6 +163,7 @@ function taskRow(over: Record<string, unknown> & { id: string }) {
     due_date: "2026-11-15",
     note: "Remind the customer about payment",
     completed: 0,
+    finished_at: null,
     ...over,
   };
 }
@@ -306,11 +308,13 @@ describe("useInvoiceData: the queries", () => {
   // compiled twice: the distinct ones are what the screen asks.
   const asked = () => [...new Set(mocks.compiled.map((c) => c.sql))];
 
-  it("keeps the query count small: at most the 15 of the spec", () => {
+  // Spec 08 allowed 15 distinct queries; spec 20 adds two narrow ones (the active signatures and the
+  // log rows that set the event to booked), so the budget is 17 and not one more.
+  it("keeps the query count small: the 15 of spec 08 and the 2 of spec 20", () => {
     setHappyPath();
     drawn();
 
-    expect(asked().length).toBeLessThanOrEqual(15);
+    expect(asked().length).toBeLessThanOrEqual(17);
   });
 
   it("reads only the rows of the event it is asked about", () => {
@@ -326,6 +330,17 @@ describe("useInvoiceData: the queries", () => {
       const query = mocks.compiled.find((c) => which(c.sql) === name)!;
       expect(query.parameters, name).toContain(EVENT_ID);
     }
+  });
+
+  // docs/specs/accountant-collections-19-task-delete.md §3 and §5.
+  it("asks for the tasks that are not deleted (spec 19)", () => {
+    setHappyPath();
+    drawn();
+
+    const { sql, parameters } = mocks.compiled.find((c) => which(c.sql) === "ArEventTasks")!;
+    expect(sql).toMatch(/"deleted_at" is null/i);
+    expect(sql).toMatch(/"event_uuid" = \?/);
+    expect(parameters).toEqual([EVENT_ID]);
   });
 
   it("leaves deleted line items out of the sum", () => {
@@ -346,6 +361,257 @@ describe("useInvoiceData: the queries", () => {
   });
 });
 
+// docs/specs/accountant-collections-19-task-delete.md §3 and §5: the question the hook asks for the
+// tasks is run on a real SQLite table, and the page is drawn from what it answers.
+describe("useInvoiceData: a deleted task (spec 19)", () => {
+  const TASK_SQL_ROWS = [
+    // id, due_date, completed, note, finished_at, deleted_at
+    ["t-kept", "2026-11-01", 1, "Kept", "2026-11-02T14:00:00.000Z", null],
+    [
+      "t-gone",
+      "2026-11-05",
+      1,
+      "Deleted by mistake",
+      "2026-11-06T14:00:00.000Z",
+      "2026-11-07T09:00:00.000Z",
+    ],
+    ["t-open", "2026-11-17", 0, "Still open", null, null],
+  ] as const;
+
+  /** The tasks the hook's own query gives from a table that holds a deleted task. */
+  function tasksFromTheLocalTable() {
+    setHappyPath();
+    drawn();
+    const { sql, parameters } = mocks.compiled.find((c) => which(c.sql) === "ArEventTasks")!;
+
+    const sqlite = new DatabaseSync(":memory:");
+    sqlite.exec(`create table "ArEventTasks" (id text primary key, created_at text, due_date text,
+      completed integer, note text, event_uuid text, finished_at text, deleted_at text)`);
+    const insert = sqlite.prepare(
+      `insert into "ArEventTasks" values (?, '2026-10-01T05:20:00.000Z', ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const [id, due, completed, note, finished, deleted] of TASK_SQL_ROWS) {
+      insert.run(id, due, completed, note, EVENT_ID, finished, deleted);
+    }
+    // Another event's tasks, deleted or not, are never part of the answer.
+    insert.run("t-other", "2026-11-01", 1, "Other event", "other", null, null);
+
+    const rows = sqlite.prepare(sql).all(...(parameters as SQLInputValue[]));
+    mocks.answers.ArEventTasks = done(rows);
+    return drawn().tasks as {
+      open: { id: string } | null;
+      completed: { id: string }[];
+    };
+  }
+
+  it("does not put a deleted task in tasks", () => {
+    const tasks = tasksFromTheLocalTable();
+    expect(tasks.completed.map((t) => t.id)).toEqual(["t-kept"]);
+    expect(JSON.stringify(tasks)).not.toContain("Deleted by mistake");
+  });
+
+  it("keeps the open task and the tasks that were not deleted", () => {
+    const tasks = tasksFromTheLocalTable();
+    expect(tasks.open?.id).toBe("t-open");
+    expect(tasks.completed).toHaveLength(1);
+  });
+});
+
+// docs/specs/accountant-collections-20-signed-booked-line.md §3 and §5: the Signed / Booked line.
+describe("useInvoiceData: the Signed / Booked line (spec 20)", () => {
+  const signatureAnswer = (rows: { signer_name: string | null; signed_at: string | null }[]) =>
+    done(rows);
+  const logAnswer = (rows: { changed_by_user_uuid: string | null; changed_at: string }[]) =>
+    done(rows);
+  const ask = (name: string) => {
+    setHappyPath();
+    drawn();
+    return mocks.compiled.find((c) => which(c.sql) === name)!;
+  };
+
+  it("asks for the active signatures of the event: signer and time only", () => {
+    const { sql, parameters } = ask("ContractSignatures");
+
+    expect(sql).toMatch(/^select "signer_name", "signed_at" from "ContractSignatures" where/i);
+    expect(sql).toMatch(/"event_uuid" = \?/);
+    expect(sql).toMatch(/"status" = \?/);
+    expect(parameters).toEqual([EVENT_ID, "active"]);
+  });
+
+  it("asks for the event's status log rows that moved it to booked: manager and time only", () => {
+    const { sql, parameters } = ask("EventChangeLog");
+
+    expect(sql).toMatch(
+      /^select "changed_by_user_uuid", "changed_at" from "EventChangeLog" where/i,
+    );
+    expect(sql).toMatch(/"event_uuid" = \?/);
+    expect(sql).toMatch(/"field_name" = \?/);
+    expect(sql).toMatch(/"next_value" = \?/);
+    expect(parameters).toEqual([EVENT_ID, "event_status", "booked"]);
+  });
+
+  // The builder is given every matching row and picks the latest, so the queries carry no limit.
+  it("reads every matching row: no limit, the builder picks the latest", () => {
+    expect(ask("ContractSignatures").sql).not.toMatch(/limit/i);
+    expect(ask("EventChangeLog").sql).not.toMatch(/limit/i);
+  });
+
+  describe("on a real SQLite table", () => {
+    function runBoth() {
+      setHappyPath();
+      drawn();
+      const signatures = mocks.compiled.find((c) => which(c.sql) === "ContractSignatures")!;
+      const logs = mocks.compiled.find((c) => which(c.sql) === "EventChangeLog")!;
+
+      const sqlite = new DatabaseSync(":memory:");
+      sqlite.exec(`create table "ContractSignatures" (id text primary key, event_uuid text,
+        signer_name text, signed_at text, status text);
+        create table "EventChangeLog" (id text primary key, event_uuid text, field_name text,
+        prev_value text, next_value text, changed_by_user_uuid text, changed_at text)`);
+      const sign = sqlite.prepare(`insert into "ContractSignatures" values (?, ?, ?, ?, ?)`);
+      sign.run("s-active", EVENT_ID, "Dana Whitfield", "2026-10-22T19:14:00.000Z", "active");
+      sign.run("s-old", EVENT_ID, "Old Signer", "2026-09-01T10:00:00.000Z", "invalidated");
+      sign.run("s-other", "ev-other", "Other Signer", "2026-10-30T10:00:00.000Z", "active");
+      const log = sqlite.prepare(`insert into "EventChangeLog" values (?, ?, ?, ?, ?, ?, ?)`);
+      log.run(
+        "l-booked",
+        EVENT_ID,
+        "event_status",
+        "quoted",
+        "booked",
+        "user-7",
+        "2026-11-03 14:15:00+00",
+      );
+      log.run(
+        "l-lost",
+        EVENT_ID,
+        "event_status",
+        "booked",
+        "lost",
+        "user-7",
+        "2026-11-04 10:00:00+00",
+      );
+      log.run("l-field", EVENT_ID, "event_name", "A", "booked", "user-7", "2026-11-05 10:00:00+00");
+      log.run(
+        "l-other",
+        "ev-other",
+        "event_status",
+        "quoted",
+        "booked",
+        "user-7",
+        "2026-11-06 10:00:00+00",
+      );
+
+      return {
+        signatures: sqlite
+          .prepare(signatures.sql)
+          .all(...(signatures.parameters as SQLInputValue[])),
+        logs: sqlite.prepare(logs.sql).all(...(logs.parameters as SQLInputValue[])),
+      };
+    }
+
+    it("does not return an invalidated signature or another event's", () => {
+      expect(runBoth().signatures).toEqual([
+        { signer_name: "Dana Whitfield", signed_at: "2026-10-22T19:14:00.000Z" },
+      ]);
+    });
+
+    it("returns only the rows that set this event to booked", () => {
+      expect(runBoth().logs).toEqual([
+        { changed_by_user_uuid: "user-7", changed_at: "2026-11-03 14:15:00+00" },
+      ]);
+    });
+  });
+
+  it("is loading while either query has not answered", () => {
+    for (const name of ["ContractSignatures", "EventChangeLog"]) {
+      setHappyPath();
+      mocks.answers[name] = { data: [], isLoading: true, isFetching: true, error: undefined };
+      expect(drawn().isLoading, name).toBe(true);
+    }
+  });
+
+  it("builds Signed from the signature rows", () => {
+    setHappyPath();
+    mocks.answers.ContractSignatures = signatureAnswer([
+      { signer_name: "Dana Whitfield", signed_at: "2026-10-22T19:14:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine).toEqual({
+      label: "Signed",
+      text: "Oct 22, 2026 at 3:14 PM EDT by Dana Whitfield",
+    });
+  });
+
+  it("builds Booked from the log row, with the manager's name from the staff names", () => {
+    setHappyPath();
+    mocks.answers.EventChangeLog = logAnswer([
+      { changed_by_user_uuid: "user-1", changed_at: "2026-11-03T14:15:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine).toEqual({
+      label: "Booked",
+      text: "Nov 3, 2026 at 9:15 AM EST by Sam Lee",
+    });
+  });
+
+  it("builds Signed when both kinds of row exist", () => {
+    setHappyPath();
+    mocks.answers.ContractSignatures = signatureAnswer([
+      { signer_name: "Dana Whitfield", signed_at: "2026-10-22T19:14:00.000Z" },
+    ]);
+    mocks.answers.EventChangeLog = logAnswer([
+      { changed_by_user_uuid: "user-1", changed_at: "2026-11-03T14:15:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine.label).toBe("Signed");
+  });
+
+  it("has no line for an event that is not booked and has no signature", () => {
+    setHappyPath();
+    mocks.answers.event = done([eventRow({ event_status: "quoted" })]);
+    mocks.answers.EventChangeLog = logAnswer([
+      { changed_by_user_uuid: "user-1", changed_at: "2026-11-03T14:15:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine).toBeNull();
+  });
+
+  it("has no line for a booked event with no row and no booked_at", () => {
+    setHappyPath();
+    mocks.answers.event = done([eventRow({ booked_at: null })]);
+
+    expect(drawn().event.signedLine).toBeNull();
+  });
+
+  it("treats a failed read of either query as no rows: the page still draws", () => {
+    setHappyPath();
+    const failed = {
+      data: undefined as unknown as unknown[],
+      isLoading: false,
+      isFetching: false,
+      error: new Error("read failed"),
+    };
+    mocks.answers.ContractSignatures = failed;
+    mocks.answers.EventChangeLog = failed;
+
+    const data = drawn();
+    expect(data.isLoading).toBe(false);
+    expect(data.notFound).toBe(false);
+    expect(data.event.signedLine).toEqual({ label: "Booked", text: "Aug 1, 2026 at 8:00 AM EDT" });
+  });
+
+  it("writes the time in the office's zone, not UTC's", () => {
+    setHappyPath();
+    // 03:30 UTC on the 23rd is 23:30 on the 22nd in Toronto (EDT).
+    mocks.answers.ContractSignatures = signatureAnswer([
+      { signer_name: "Dana Whitfield", signed_at: "2026-10-23T03:30:00.000Z" },
+    ]);
+
+    expect(drawn().event.signedLine.text).toBe("Oct 22, 2026 at 11:30 PM EDT by Dana Whitfield");
+  });
+});
+
 describe("useInvoiceData: the page's data", () => {
   it("builds the header: name, number, status, days overdue and account manager", () => {
     setHappyPath();
@@ -356,6 +622,8 @@ describe("useInvoiceData: the page's data", () => {
       status: "collections",
       daysOverdue: 45,
       accountManager: "Sam Lee",
+      // No signature and no booked log row: the booked_at of the event, with no name (spec 20).
+      signedLine: { label: "Booked", text: "Aug 1, 2026 at 8:00 AM EDT" },
     });
   });
 
@@ -440,6 +708,28 @@ describe("useInvoiceData: the page's data", () => {
     const { tasks } = drawn();
     expect(tasks.open).toMatchObject({ id: "t-open", note: "Call the accountant" });
     expect(tasks.completed.map((t: { id: string }) => t.id)).toEqual(["t-done"]);
+  });
+
+  // docs/specs/accountant-collections-18-task-finished-at.md §3 and §5.
+  it("asks for finished_at with the tasks", () => {
+    setHappyPath();
+    drawn();
+
+    const { sql } = mocks.compiled.find((c) => which(c.sql) === "ArEventTasks")!;
+    expect(sql).toContain('"finished_at"');
+  });
+
+  it("passes the finish time through as a date in the office's time zone", () => {
+    setHappyPath();
+    mocks.answers.ArEventTasks = done([
+      // 03:30 UTC on the 10th is 22:30 of the 9th in Toronto.
+      taskRow({ id: "t-done", completed: 1, finished_at: "2026-11-10T03:30:00.000Z" }),
+      taskRow({ id: "t-open", due_date: "2026-11-17" }),
+    ]);
+
+    const { tasks } = drawn();
+    expect(tasks.completed[0].finishedLabel).toBe("09/11/2026");
+    expect(tasks.open.finishedLabel).toBe("—");
   });
 
   it("takes the newest as the open task if two exist", () => {

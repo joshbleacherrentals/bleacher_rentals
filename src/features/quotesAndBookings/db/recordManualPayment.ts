@@ -1,8 +1,10 @@
 import { db } from "@/components/providers/SystemProvider";
-import { typedExecute } from "@/lib/powersync/typedQuery";
+import { typedExecuteBatch } from "@/lib/powersync/typedQuery";
 import { Currency } from "../types/quoteTypes";
 import { ManualPaymentMethod } from "../types/paymentTypes";
 import { MAX_PAYMENT_CENTS } from "../utils/parseAmountInput";
+import { describePaymentForLog, paymentLogFieldName } from "../utils/paymentEdit";
+import { eventLogInsert } from "./eventLogInsert";
 
 /**
  * Records money that never touched Stripe: a check, an ACH transfer, a card
@@ -13,14 +15,20 @@ import { MAX_PAYMENT_CENTS } from "../utils/parseAmountInput";
  * connector replays it to PostgREST under the user's Clerk JWT, where the RLS
  * INSERT policy — not this function — decides whether it is allowed.
  *
- * **The upload's verdict never comes back.** `typedExecute` resolves once the
- * row is in the local database. If PostgREST later refuses it, the connector
- * treats the code as fatal and discards the transaction with a console error
- * (BackendConnector.ts:110). So a resolved promise here means "written
- * locally", not "accepted" — which is why the guards below run before the
- * write rather than trusting the CHECK constraints to catch a bad row. A
+ * **The upload's verdict never comes back.** `typedExecuteBatch` resolves once
+ * the rows are in the local database. If PostgREST later refuses them, the
+ * connector treats the code as fatal and discards the transaction with a
+ * console error (BackendConnector.ts:110). So a resolved promise here means
+ * "written locally", not "accepted" — which is why the guards below run before
+ * the write rather than trusting the CHECK constraints to catch a bad row. A
  * constraint violation is code 23514, and that is in the fatal set too: it
  * would take the payment down silently.
+ *
+ * **The payment and its `EventChangeLog` row are ONE write transaction**
+ * (docs/specs/event-change-log-01-payment-recorded.md R2), as in
+ * `editManualPayment`. The connector discards a whole transaction it is
+ * refused, so a payment that is refused leaves no row behind. The row says
+ * amount, method and paid date and nothing else — never the notes.
  *
  * Amounts are signed. A negative row is a refund, a bounced check or the
  * correction of a typo, and it is the only way to undo anything in an
@@ -58,13 +66,16 @@ export async function recordManualPayment(input: RecordManualPaymentInput): Prom
     throw new Error("A manual payment must say who recorded it.");
   }
 
-  await typedExecute(
+  // Generated here so a retried upload upserts the same row rather than
+  // recording the payment twice — and so the Log row can name it.
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+
+  await typedExecuteBatch([
     db
       .insertInto("PaymentHistory")
       .values({
-        // Generated here so a retried upload upserts the same row rather than
-        // recording the payment twice.
-        id: crypto.randomUUID(),
+        id,
         event_uuid: input.eventId,
         // The live link the allocation reads, and the historical fact that
         // survives a schedule rebuild. One choice, both columns.
@@ -82,8 +93,26 @@ export async function recordManualPayment(input: RecordManualPaymentInput): Prom
         notes: input.notes,
         recorded_by_user_uuid: input.recordedByUserUuid,
         paid_at: input.paidAt,
-        created_at: new Date().toISOString(),
+        created_at: createdAt,
       })
       .compile(),
-  );
+    eventLogInsert({
+      eventId: input.eventId,
+      changedByUserUuid: input.recordedByUserUuid,
+      // The log has no column for a payment's id, so it travels here (spec 09, D1 C).
+      fieldName: paymentLogFieldName(id),
+      prevValue: null,
+      // "$100.00 · Check · Aug 14, 2026" — from what is being written, so the row says the
+      // same as the payment (D3). The paid date is the day the user typed (R3).
+      nextValue: describePaymentForLog({
+        amountCents: input.amountCents,
+        currency: input.currency,
+        paymentMethodType: input.method,
+        entrySource: "manual",
+        paidAt: input.paidAt,
+        createdAt,
+      }),
+      actionType: "payment_add",
+    }),
+  ]);
 }

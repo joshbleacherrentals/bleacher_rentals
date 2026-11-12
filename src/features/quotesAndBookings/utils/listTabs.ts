@@ -53,6 +53,11 @@ export const QUOTES_BOOKINGS_TABS: ListTabDeclaration = {
  * of booked events. It keeps its own order and Show Not Due Yet in the URL (`csort`, `cdir`,
  * `cnotdue`), so the `startingSort` here, which sorts events, is never used.
  * Spec: docs/specs/accountant-collections-07-collections-list.md §3
+ *
+ * Audit is the last tab: a driver's work trackers with their Paid / Not paid status, read-only. Like
+ * Collections it shows none of the receivables chrome and has an order of its own, so the
+ * `startingSort` here, which sorts events, is never used.
+ * Spec: docs/specs/accountant-audit-01-tab.md §3
  */
 export const ACCOUNTANT_TABS: ListTabDeclaration = {
   tabs: [
@@ -67,6 +72,7 @@ export const ACCOUNTANT_TABS: ListTabDeclaration = {
       startingSort: { key: "start_date", direction: "desc" },
       offersStatus: false,
     },
+    { id: "audit", startingSort: DEFAULT_SORT, offersStatus: false },
   ],
   openingTab: "collections",
   writeTabToUrl: true,

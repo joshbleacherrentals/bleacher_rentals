@@ -6,8 +6,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * line item, and the open task. Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
  * (loaded from .env.local by the `test:e2e` script).
  *
- * The events have no payment schedule and start inside 7 days, so their whole balance is overdue
- * at once (spec 01 §0, decision 3) and the daily job would give them a task anyway.
+ * The events have no payment schedule and start today, so their whole balance is overdue from
+ * the start day (docs/specs/accountant-collections-24-no-schedule-due-on-start-day.md) and the daily
+ * job would give them a task anyway. `startInDays` moves the start: an event that starts later is
+ * not overdue, one that started already is.
  */
 
 function admin(): SupabaseClient {
@@ -28,8 +30,23 @@ const isoDate = (offsetDays: number): string => {
 };
 
 /**
- * A booked, overdue event with one open task. `taskDueInDays` is relative to today: negative for a
- * past task, 0 for today, positive for one that is not due yet.
+ * Toronto's calendar date `offsetDays` from today: the day the database counts an event's start
+ * from (`ar_sync_event_tasks` takes Toronto's date). The UTC date differs from it in the evening.
+ */
+const officeIsoDate = (offsetDays: number): string => {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto" }).format(
+    new Date(),
+  );
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * A booked event with one open task; with no payment schedule it is overdue from the day it starts,
+ * which is today unless `startInDays` says otherwise (negative: started already, positive: not
+ * overdue yet). `taskDueInDays` is relative to today: negative for a past task, 0 for today,
+ * positive for one that is not due yet.
  */
 export async function createOverdueBooking(options: {
   name: string;
@@ -38,16 +55,19 @@ export async function createOverdueBooking(options: {
   taskNote?: string;
   status?: "booked" | "lost" | "quoted";
   withOpenTask?: boolean;
+  /** Days from today until the event starts; 0 (today) when left out. */
+  startInDays?: number;
 }): Promise<SeededBooking> {
   const db = admin();
   const invoiceNumber = 900_000_000 + Math.floor(Math.random() * 90_000_000);
+  const startInDays = options.startInDays ?? 0;
 
   const { data: event, error } = await db
     .from("Events")
     .insert({
       event_name: options.name,
-      event_start: isoDate(3),
-      event_end: isoDate(4),
+      event_start: officeIsoDate(startInDays),
+      event_end: officeIsoDate(startInDays + 1),
       lenient: false,
       must_be_clean: false,
       event_status: options.status ?? "booked",
@@ -97,7 +117,9 @@ const E2E_FRENCH_CONTACT_LAST_NAME = "E2E Collections French";
  * Removes the events; their tasks, line items and payments go with them (cascade). The objects
  * that `addEventFile` stored in `event-files` are removed first, since the rows that name them go
  * with the events. A signature does not cascade (its foreign key has no ON DELETE), so the
- * signatures that `addSignature` wrote go first, with their PDFs and their terms template.
+ * signatures that `addSignature` wrote go first, with their PDFs and their terms template. The
+ * activity log does not cascade either: the rows `addBookedLog` wrote (and any the app wrote) go
+ * before the events.
  */
 export async function cleanupBookings(eventIds: string[]): Promise<void> {
   if (eventIds.length === 0) return;
@@ -130,6 +152,7 @@ export async function cleanupBookings(eventIds: string[]): Promise<void> {
       )
       .like("name", `${E2E_TERMS_PREFIX}%`);
   }
+  await db.from("EventChangeLog").delete().in("event_uuid", eventIds);
   // The terms and contacts that `addContractTerms` and `addFrenchContact` gave the events: the
   // events refer to them, so they go after the events.
   const { data: given } = await db
@@ -161,21 +184,29 @@ export async function cleanupBookings(eventIds: string[]): Promise<void> {
   }
 }
 
-/** The event's tasks, open ones first. */
+/**
+ * The event's tasks, open ones first, with the hidden ones too: `deleted_at` is the moment a closed
+ * task was deleted from Task History, and null for every task that is still shown
+ * (docs/specs/accountant-collections-19-task-delete.md §3).
+ */
 export async function tasksOf(
   eventId: string,
-): Promise<{ note: string; completed: boolean; due_date: string }[]> {
+): Promise<{ note: string; completed: boolean; due_date: string; deleted_at: string | null }[]> {
   const { data, error } = await admin()
     .from("ArEventTasks")
-    .select("note, completed, due_date")
+    .select("note, completed, due_date, deleted_at")
     .eq("event_uuid", eventId)
     .order("completed", { ascending: true });
   if (error) throw new Error(`tasksOf: ${error.message}`);
   return data ?? [];
 }
 
-/** A manual payment for the whole balance, as the Record Payment dialog would write it. */
-export async function payInFull(eventId: string, amountCents = 100_000): Promise<void> {
+/**
+ * A manual payment of `amountCents`, as the Record Payment dialog would write it. It names no
+ * installment, so it pays the schedule from the oldest installment on
+ * (docs/specs/accountant-collections-23-amount-type-switch.md §3).
+ */
+export async function addPayment(eventId: string, amountCents: number): Promise<void> {
   const { error } = await admin().from("PaymentHistory").insert({
     event_uuid: eventId,
     amount_cents: amountCents,
@@ -186,13 +217,58 @@ export async function payInFull(eventId: string, amountCents = 100_000): Promise
     entry_source: "manual",
     paid_at: new Date().toISOString(),
   });
-  if (error) throw new Error(`payInFull: ${error.message}`);
+  if (error) throw new Error(`addPayment: ${error.message}`);
 }
 
-/** A task of the event, completed or open, `dueInDays` from today (negative for the past). */
+/** A manual payment for the whole balance (the fixture's default total is $1,000.00). */
+export async function payInFull(eventId: string, amountCents = 100_000): Promise<void> {
+  await addPayment(eventId, amountCents);
+}
+
+/**
+ * A payment schedule for the event: one `PaymentInstallments` row per entry, due `dueInDays` from
+ * today (Toronto's date, negative for the past) and worth `percentageBps` of the total (10000 is
+ * all of it). The schedule decides when the event is overdue, not its start date
+ * (docs/specs/accountant-collections-24-no-schedule-due-on-start-day.md, S80).
+ */
+export async function addInstallments(
+  eventId: string,
+  installments: { dueInDays: number; percentageBps: number }[],
+): Promise<void> {
+  const { error } = await admin()
+    .from("PaymentInstallments")
+    .insert(
+      installments.map((i) => ({
+        event_uuid: eventId,
+        due_date: officeIsoDate(i.dueInDays),
+        currency: "USD" as const,
+        percentage_bps: i.percentageBps,
+      })),
+    );
+  if (error) throw new Error(`addInstallments: ${error.message}`);
+}
+
+/**
+ * 17:00 UTC, `daysAgo` days before today: noon in Toronto, so the office's calendar day is the same
+ * as the UTC one however the clocks stand (docs/specs/accountant-collections-18-task-finished-at.md).
+ */
+export function finishedMoment(daysAgo: number): Date {
+  const d = new Date();
+  d.setUTCHours(17, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d;
+}
+
+/**
+ * A task of the event, completed or open, `dueInDays` from today (negative for the past).
+ * `finishedDaysAgo` writes an explicit `finished_at` for a completed task, which the trigger keeps.
+ * Without it a completed task is stamped by the trigger with the moment of this insert: the API
+ * cannot write a closed task that has no finish time (only a database session with the trigger off
+ * can), so that case is covered by the SQL and unit tests, not by Playwright.
+ */
 export async function addTask(
   eventId: string,
-  options: { dueInDays: number; note: string; completed: boolean },
+  options: { dueInDays: number; note: string; completed: boolean; finishedDaysAgo?: number },
 ): Promise<void> {
   const { error } = await admin()
     .from("ArEventTasks")
@@ -201,6 +277,9 @@ export async function addTask(
       due_date: isoDate(options.dueInDays),
       completed: options.completed,
       note: options.note,
+      ...(options.finishedDaysAgo === undefined
+        ? {}
+        : { finished_at: finishedMoment(options.finishedDaysAgo).toISOString() }),
     });
   if (error) throw new Error(`addTask: ${error.message}`);
 }
@@ -208,20 +287,24 @@ export async function addTask(
 /**
  * A file of the event, as the app stores one: the object in `event-files` (unless `source` is
  * `signed_contract`, whose object lives in the `contracts` bucket and is not created here) and its
- * EventFiles row. Returns the row's id.
+ * EventFiles row. Returns the row's id. With `storagePath` given (the column is NOT NULL, so an
+ * empty string is the closest to "no path") nothing is stored and the row carries that value.
  */
 export async function addEventFile(
   eventId: string,
   options: {
     name: string;
     source: "upload" | "sent_quote" | "signed_contract" | "email_attachment";
+    storagePath?: string;
   },
 ): Promise<string> {
   const db = admin();
   const id = crypto.randomUUID();
   const extension = options.name.split(".").pop() ?? "bin";
   let storagePath = `contracts/${eventId}/${id}.${extension}`;
-  if (options.source !== "signed_contract") {
+  if (options.storagePath !== undefined) {
+    storagePath = options.storagePath;
+  } else if (options.source !== "signed_contract") {
     storagePath = `${eventId}/${id}.${extension}`;
     const { error: uploadError } = await db.storage
       .from("event-files")
@@ -250,11 +333,16 @@ export async function addEventFile(
  *   `signed_pdf_path`;
  * - `none`: no path (the signature was saved, the upload failed);
  * - `missing`: a path with no object behind it.
+ * `signedAt` (an ISO time) is when it was signed; without it the database stamps the insert.
  * Returns the signature's id and the path it wrote (`null` for `none`).
  */
 export async function addSignature(
   eventId: string,
-  options: { status: "active" | "invalidated"; pdf: "stored" | "none" | "missing" },
+  options: {
+    status: "active" | "invalidated";
+    pdf: "stored" | "none" | "missing";
+    signedAt?: string;
+  },
 ): Promise<{ id: string; path: string | null }> {
   const db = admin();
   const id = crypto.randomUUID();
@@ -282,6 +370,7 @@ export async function addSignature(
     event_uuid: eventId,
     terms_and_conditions_uuid: terms.id as string,
     signer_name: "E2E Signer",
+    ...(options.signedAt ? { signed_at: options.signedAt } : {}),
     status: options.status,
     signed_pdf_path: path,
     invalidated_at: options.status === "invalidated" ? new Date().toISOString() : null,
@@ -370,4 +459,44 @@ export async function activeSignaturesOf(eventId: string): Promise<number> {
     .eq("status", "active");
   if (error) throw new Error(`activeSignaturesOf: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * The log row the status button on the quote card (or the edit page's save) leaves when it moves an
+ * event to booked: `field_name = 'event_status'`, `next_value = 'booked'`, the manager's
+ * `Users.id` and the time `at` (an ISO time)
+ * (docs/specs/accountant-collections-20-signed-booked-line.md §3). `cleanupBookings` removes it with
+ * the event.
+ */
+export async function addBookedLog(
+  eventId: string,
+  options: { userUuid: string; at: string },
+): Promise<void> {
+  const { error } = await admin().from("EventChangeLog").insert({
+    event_uuid: eventId,
+    changed_by_user_uuid: options.userUuid,
+    field_name: "event_status",
+    prev_value: "quoted",
+    next_value: "booked",
+    action_type: "status_change",
+    changed_at: options.at,
+  });
+  if (error) throw new Error(`addBookedLog: ${error.message}`);
+}
+
+/**
+ * A member of staff with a name, to be the manager of `addBookedLog`; `name` is written the way the
+ * page writes it (first and last name, spaced). Any user the seed has will do.
+ */
+export async function aStaffMember(): Promise<{ id: string; name: string }> {
+  const { data, error } = await admin()
+    .from("Users")
+    .select("id, first_name, last_name")
+    .not("first_name", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) throw new Error(`aStaffMember: no user with a name: ${error?.message}`);
+  const name = [data.first_name, data.last_name].filter(Boolean).join(" ");
+  return { id: data.id as string, name };
 }
