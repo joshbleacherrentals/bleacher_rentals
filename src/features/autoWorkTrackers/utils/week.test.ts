@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { weekStartOf, weekEndOf, shiftWeek, formatWeekLabel } from "./week";
+import { weekStartOf, weekEndOf, shiftWeek, formatWeekLabel, weekDays } from "./week";
 
 describe("auto work tracker weeks (Monday to Sunday, both included)", () => {
   it("a Monday is the start of its own week", () => {
@@ -37,6 +37,26 @@ describe("auto work tracker weeks (Monday to Sunday, both included)", () => {
     expect(shiftWeek("2026-10-26", 1)).toBe("2026-11-02");
     expect(shiftWeek("2026-03-02", 1)).toBe("2026-03-09");
     expect(weekEndOf("2026-03-02")).toBe("2026-03-08");
+  });
+
+  it("lists the seven days of a week, Monday first and Sunday last", () => {
+    expect(weekDays("2026-11-09")).toEqual([
+      "2026-11-09",
+      "2026-11-10",
+      "2026-11-11",
+      "2026-11-12",
+      "2026-11-13",
+      "2026-11-14",
+      "2026-11-15",
+    ]);
+  });
+
+  it("lists days across a month and a year boundary", () => {
+    const days = weekDays("2026-12-28");
+    expect(days).toHaveLength(7);
+    expect(days[3]).toBe("2026-12-31");
+    expect(days[4]).toBe("2027-01-01");
+    expect(days[6]).toBe("2027-01-03");
   });
 
   it("labels a week with both its Monday and its Sunday", () => {

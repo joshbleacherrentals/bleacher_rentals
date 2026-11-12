@@ -1,5 +1,10 @@
 # Local-only Python tools, on top of the production pins.
 -r requirements.txt
 click==8.5.1
-h11==0.16.0
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+pytest==9.2.0
+python-dotenv==1.2.4
 uvicorn==0.54.0

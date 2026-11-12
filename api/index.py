@@ -1,7 +1,7 @@
-"""Python API (FastAPI) for features that need Python.
+"""Entry point of the Python API (FastAPI). It only creates the app and mounts routers.
 
-Every route lives under /api/py so it never collides with the Next.js routes in
-src/app/api. The browser calls /api/py/*:
+Every endpoint lives in a router.py under python_api/<feature>/, and every route is under /api/py
+so it never collides with the Next.js routes in src/app/api. The browser calls /api/py/*:
 
 - Locally, next.config.ts proxies it to this app (npm run dev:py, port 8000).
 - On Vercel, next.config.ts rewrites it to this function.
@@ -9,22 +9,12 @@ src/app/api. The browser calls /api/py/*:
 Auth is enforced by the Clerk proxy (src/proxy.ts), not here.
 """
 
-import platform
-import sys
+from fastapi import FastAPI
 
-from fastapi import FastAPI, Request
+from python_api.auto_work_trackers.router import router as auto_work_trackers_router
+from python_api.health.router import router as health_router
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
-
-@app.get("/api/py/health")
-def health(request: Request):
-    return {
-        "ok": True,
-        "runtime": "python",
-        "framework": "fastapi",
-        "python_version": sys.version.split()[0],
-        "platform": platform.platform(),
-        # The path this function actually received, to confirm routing in each environment.
-        "path_seen": request.url.path,
-    }
+app.include_router(health_router)
+app.include_router(auto_work_trackers_router)

@@ -25,6 +25,11 @@ export function shiftWeek(weekStart: string, weeks: number): string {
   return parse(weekStart).plus({ weeks }).toISODate()!;
 }
 
+/** The seven days of the week starting on `weekStart`, Monday first, as "YYYY-MM-DD". */
+export function weekDays(weekStart: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => parse(weekStart).plus({ days: i }).toISODate()!);
+}
+
 /** The Monday of the current week, by the viewer's own calendar day. */
 export function currentWeekStart(): string {
   return weekStartOf(DateTime.now().toISODate()!);

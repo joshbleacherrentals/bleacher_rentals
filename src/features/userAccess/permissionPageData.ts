@@ -453,11 +453,15 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Auto Work Trackers",
     description:
-      "The Auto Work Trackers page in the sidebar, where you pick one zone and one week (Monday to Sunday). It is being built: for now it only holds your selection and creates nothing.",
+      "The Auto Work Trackers page in the sidebar, where you pick one zone and one week (Monday to Sunday). It shows that zone's bleachers across the week, laid out like the Dashboard. The Create work trackers button works out which of the zone's bleachers need a trip that week and creates a draft work tracker for each, with the pick-up and drop-off address filled in and no driver, contact or times. It is being built: the days of the grid are still blank.",
     category: "Day to Day Operations",
     roles: {
-      admin: full("Can open the page and pick a zone and a week."),
-      account_manager: full("Can open the page and pick a zone and a week."),
+      admin: full(
+        "Can open the page, pick a zone and a week, see the zone's bleachers laid out across it, and create the draft work trackers.",
+      ),
+      account_manager: full(
+        "Can open the page, pick any zone and a week, see its bleachers laid out across it, and create the draft work trackers.",
+      ),
       developer: none("Does not have this page."),
       viewer: none("Does not have this page."),
       driver: none("Drivers only have access to the Driver Mobile App."),
