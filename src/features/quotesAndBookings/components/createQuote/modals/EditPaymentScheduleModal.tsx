@@ -58,7 +58,8 @@ export function EditPaymentScheduleModal() {
     10000 -
     draft.reduce((sum, i) => sum + (Number.isFinite(i.percentageBps) ? i.percentageBps : 0), 0);
   const isBalanced = remaining === 0;
-  const validationError = validatePaymentSchedule(draft);
+  // An empty draft is only the instant before the editor seeds its rows; it is not an error.
+  const validationError = draft.length ? validatePaymentSchedule(draft) : null;
   const hasMissingDates = draft.some((i) => !i.dueDate);
   const canSave = draft.length > 0 && !validationError;
   const resolved = resolvePaymentSchedule(
@@ -114,14 +115,6 @@ export function EditPaymentScheduleModal() {
   const handleSave = () => {
     if (!canSave) return;
     setPaymentInstallments(draft.map(({ pctDisplay, ...rest }) => rest));
-    close();
-  };
-
-  // The schedule is optional — clearing it returns the quote to "no schedule".
-  // Only offered when a saved schedule exists.
-  const hasSavedSchedule = storeInstallments.length > 0;
-  const handleRemoveSchedule = () => {
-    setPaymentInstallments([]);
     close();
   };
 
@@ -239,15 +232,6 @@ export function EditPaymentScheduleModal() {
           </p>
         )}
         <DialogFooter>
-          {hasSavedSchedule && (
-            <Button
-              variant="outline"
-              onClick={handleRemoveSchedule}
-              className="mr-auto text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              Remove Schedule
-            </Button>
-          )}
           <Button variant="outline" onClick={close}>
             Cancel
           </Button>

@@ -30,6 +30,8 @@ test("new quotes have a percentage schedule that follows the price and survives 
 
   await section.getByRole("button", { name: "Edit schedule" }).click();
   await expect(dialog.getByRole("spinbutton")).toHaveCount(2);
+  // A quote always has a schedule: the editor offers no way to remove it.
+  await expect(dialog.getByRole("button", { name: "Remove Schedule" })).toHaveCount(0);
   await dialog.getByLabel("Installment 1 percentage").fill("40");
   await expect(dialog.getByRole("button", { name: "Percentages must total 100%" })).toBeDisabled();
   await dialog.getByLabel("Installment 2 percentage").fill("60");
