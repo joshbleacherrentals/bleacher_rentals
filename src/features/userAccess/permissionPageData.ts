@@ -80,10 +80,10 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "should be able to create, update, delete, and edit any events on the Quotes & Bookings page, regardless of who event is assigned to. This includes the ability to reassign events between account managers. On the Dashboard an event opens read-only: an admin can still change its colour, add or remove its bleachers, and move events between bleachers, but cannot create, edit or delete an event there.",
+        "should be able to create, update, delete, and edit any events on the Quotes & Bookings page, regardless of who event is assigned to. This includes the ability to reassign events between account managers. On the Dashboard an event opens read-only: an admin can still change its colour, add or remove its bleachers, and move events between bleachers, but cannot create, edit or delete an event there. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved.",
       ),
       account_manager: custom(
-        "Account managers can freely create events on the Quotes & Bookings page, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner. On the Dashboard they cannot create or edit events: an event opens read-only. They can change the colour and the bleachers of an event only where they could also edit it, and can move events between bleachers.",
+        "Account managers can freely create events on the Quotes & Bookings page, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner. On the Dashboard they cannot create or edit events: an event opens read-only. They can change the colour and the bleachers of an event only where they could also edit it, and can move events between bleachers. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved.",
       ),
       developer: none(
         "Unable to even access the pages where they can see events, and developer is only meant to work on the developer roadmap.",

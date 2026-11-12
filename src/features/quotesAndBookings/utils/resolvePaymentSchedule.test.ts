@@ -32,8 +32,11 @@ describe("percentage schedules", () => {
     expect(validatePaymentSchedule([row("a", NaN)])).toBeTruthy();
     expect(validatePaymentSchedule([{ ...row("a", 10000), dueDate: "2026-02-30" }])).toBeTruthy();
     expect(validatePaymentSchedule([row("a", 3333), row("b", 3333), row("c", 3334)])).toBeNull();
-    expect(validatePaymentSchedule([])).toBeNull();
     expect(() => resolvePaymentSchedule([row("a", 10000)], -1)).toThrow();
+  });
+  it("refuses an empty schedule: a quote cannot be saved without one", () => {
+    expect(validatePaymentSchedule([])).toBe("Add a payment schedule before saving.");
+    expect(validatePaymentSchedule([row("a", 10000)])).toBeNull();
   });
   it("converts balanced legacy amounts with exact percentage rounding", () => {
     const legacy = [1, 1, 1].map((amountCents, i) => ({

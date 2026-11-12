@@ -42,8 +42,9 @@ vi.mock("./paymentInstallments", () => ({ syncPaymentInstallments: vi.fn() }));
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToast: vi.fn() }));
 
 import { createQuoteEvent } from "./createQuoteEvent";
+import { syncPaymentInstallments } from "./paymentInstallments";
 
-const state = {
+const baseState = {
   eventName: "Homecoming",
   eventStart: "2026-09-12",
   eventEnd: "2026-09-13",
@@ -52,19 +53,46 @@ const state = {
   taxPercent: 0,
   taxOverrideCents: null,
   scheduleError: null,
-  paymentInstallments: [],
+  paymentInstallments: [{ id: "inst-1", dueDate: "2026-09-01", percentageBps: 10000 }],
   currency: "USD",
   venueId: null,
   eventAddressData: null,
-} as never;
+};
+const state = baseState as never;
 
 const rpc = vi.fn();
 const supabase = { rpc } as never;
 
 beforeEach(() => {
   executed.length = 0;
+  vi.mocked(syncPaymentInstallments).mockClear();
   rpc.mockReset();
   rpc.mockResolvedValue({ data: 123456789, error: null });
+});
+
+describe("createQuoteEvent — the payment schedule", () => {
+  it("refuses to save a quote with no schedule, whatever its status, and writes nothing", async () => {
+    for (const status of ["draft", "quoted"]) {
+      const noSchedule = { ...baseState, status, paymentInstallments: [] } as never;
+
+      await expect(createQuoteEvent(noSchedule, supabase, "user-1")).rejects.toThrow(
+        "Add a payment schedule before saving.",
+      );
+    }
+
+    expect(executed).toHaveLength(0);
+    expect(syncPaymentInstallments).not.toHaveBeenCalled();
+  });
+
+  it("saves a quote whose schedule is a single full payment", async () => {
+    await createQuoteEvent(state, supabase, "user-1");
+
+    expect(syncPaymentInstallments).toHaveBeenCalledWith(
+      expect.any(String),
+      [{ id: "inst-1", dueDate: "2026-09-01", percentageBps: 10000 }],
+      "USD",
+    );
+  });
 });
 
 describe("createQuoteEvent — the invoice number", () => {
