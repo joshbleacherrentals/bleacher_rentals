@@ -331,6 +331,39 @@ describe("InvoicePage: Previous Task and Next Task", () => {
   });
 });
 
+// docs/specs/accountant-collections-22-side-task-buttons.md §3 and §5. Static markup measures no
+// width, so no side buttons are drawn here: the page sits in the frame, and the bottom buttons stay
+// the only Previous Task / Next Task links. The rails themselves are tested in
+// InvoicePageFrame.test.tsx.
+describe("InvoicePage: side Previous Task and Next Task buttons", () => {
+  const count = (html: string, label: string) => html.split(label).length - 1;
+
+  it("draws the page in the frame, with the column of 1040 px", () => {
+    const html = renderAt("id=evt-1&tab=info");
+    expect(html).toMatch(/<div class="[^"]*\bflex-\[0_1_1040px\][^"]*">/);
+    expect(html).toMatch(/^<div class="[^"]*\bw-full\b/);
+  });
+
+  it("draws no side buttons before the width is measured: the bottom ones are the only ones", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
+    for (const query of ["id=evt-1&tab=info", "id=evt-1&tab=messages"]) {
+      const html = renderAt(query);
+      expect(html).not.toMatch(/<div[^>]*aria-hidden="true"[^>]*>(?:(?!<\/div>)[^])*Previous Task/);
+      expect(html).not.toMatch(/<div[^>]*aria-hidden="true"[^>]*>(?:(?!<\/div>)[^])*Next Task/);
+      expect(html).not.toContain('tabindex="-1"');
+      expect(count(html, "Previous Task")).toBe(1);
+      expect(count(html, "Next Task")).toBe(1);
+    }
+  });
+
+  it("leaves the loading and not-found pages without the frame", () => {
+    mockInvoice.mockReturnValue(invoiceDataFixture({ isLoading: true }));
+    expect(renderAt("id=evt-1")).not.toContain("flex-[0_1_1040px]");
+    mockInvoice.mockReturnValue(invoiceDataFixture({ notFound: true }));
+    expect(renderAt("id=evt-1")).not.toContain("flex-[0_1_1040px]");
+  });
+});
+
 // docs/specs/accountant-collections-13-task-history-and-files.md §3 and §5.
 describe("InvoicePage: Task History and Files", () => {
   it("puts Task History first in Information and Files last", () => {

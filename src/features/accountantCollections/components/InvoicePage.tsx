@@ -22,6 +22,7 @@ import {
 import { CustomerPageFrame } from "./CustomerPageFrame";
 import { InvoiceHeader } from "./InvoiceHeader";
 import { InvoiceInformation } from "./InvoiceInformation";
+import { InvoicePageFrame } from "./InvoicePageFrame";
 import { NewTaskWindow } from "./NewTaskWindow";
 
 /**
@@ -30,12 +31,14 @@ import { NewTaskWindow } from "./NewTaskWindow";
  * fixed when the page opened). The event, the tab and the list's order come from the URL. The New
  * Task button opens a floating window that belongs to the page, not to a tab, and to the event it
  * was opened on. The Customer view button in the header swaps the tab bar for the customer's
- * three tabs and the body for the customer's page, and hides the footer.
+ * three tabs and the body for the customer's page, and hides the footer. The page sits in
+ * `InvoicePageFrame`, which adds Previous Task / Next Task beside the column when there is room.
  * docs/specs/accountant-collections-09-design.md §3, accountant-collections-10-prev-next.md §3,
  * accountant-collections-12-tabs-and-messages.md §3,
  * accountant-collections-13-task-history-and-files.md §3,
  * accountant-collections-14-new-task-window.md §3, accountant-collections-15-open-pdf.md §3 and
- * accountant-collections-16-customer-page-view.md §3.
+ * accountant-collections-16-customer-page-view.md §3 and
+ * accountant-collections-22-side-task-buttons.md §3.
  */
 
 // Same reasoning as on the Billing tab: a form most visits never open.
@@ -192,7 +195,11 @@ export function InvoicePage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1040px] px-8 pb-14 pt-2">
+    <InvoicePageFrame
+      sideLinks={!customerView}
+      previousHref={neighbourHref(neighbours.previousId)}
+      nextHref={neighbourHref(neighbours.nextId)}
+    >
       <Link
         href={backHref}
         className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-darkBlue hover:underline"
@@ -308,6 +315,6 @@ export function InvoicePage() {
           recordedByUserUuid={userId}
         />
       )}
-    </div>
+    </InvoicePageFrame>
   );
 }
