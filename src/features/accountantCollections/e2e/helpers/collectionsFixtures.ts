@@ -235,20 +235,24 @@ export async function addTask(
 /**
  * A file of the event, as the app stores one: the object in `event-files` (unless `source` is
  * `signed_contract`, whose object lives in the `contracts` bucket and is not created here) and its
- * EventFiles row. Returns the row's id.
+ * EventFiles row. Returns the row's id. With `storagePath` given (the column is NOT NULL, so an
+ * empty string is the closest to "no path") nothing is stored and the row carries that value.
  */
 export async function addEventFile(
   eventId: string,
   options: {
     name: string;
     source: "upload" | "sent_quote" | "signed_contract" | "email_attachment";
+    storagePath?: string;
   },
 ): Promise<string> {
   const db = admin();
   const id = crypto.randomUUID();
   const extension = options.name.split(".").pop() ?? "bin";
   let storagePath = `contracts/${eventId}/${id}.${extension}`;
-  if (options.source !== "signed_contract") {
+  if (options.storagePath !== undefined) {
+    storagePath = options.storagePath;
+  } else if (options.source !== "signed_contract") {
     storagePath = `${eventId}/${id}.${extension}`;
     const { error: uploadError } = await db.storage
       .from("event-files")

@@ -106,6 +106,49 @@ describe("createEventFileUrl", () => {
     const { client } = fakeClient({ signed: { data: null, error: boom } });
     await expect(createEventFileUrl(client, "evt-1/abc.pdf")).rejects.toBe(boom);
   });
+
+  // Spec: docs/specs/accountant-collections-21-files-row-click.md §3 and §5. The optional third
+  // parameter is what the invoice page's Download icon uses; the quote card's Files tab never
+  // passes it, so a call without it must reach the storage client exactly as before.
+  describe("the download option", () => {
+    it("hands { download: name } to createSignedUrl for a contracts/ path", async () => {
+      const { client, calls, createSignedUrl } = fakeClient();
+      await createEventFileUrl(client, "contracts/x/y.pdf", { download: "a.pdf" });
+      expect(calls).toEqual(["bucket:contracts", "signed"]);
+      expect(createSignedUrl).toHaveBeenCalledWith("x/y.pdf", 3600, { download: "a.pdf" });
+    });
+
+    it("hands { download: name } to createSignedUrl for any other path", async () => {
+      const { client, calls, createSignedUrl } = fakeClient();
+      await createEventFileUrl(client, "evt-1/abc.pdf", { download: "a.pdf" });
+      expect(calls).toEqual(["bucket:event-files", "signed"]);
+      expect(createSignedUrl).toHaveBeenCalledWith("evt-1/abc.pdf", 3600, { download: "a.pdf" });
+    });
+
+    it("hands { download: true } through as it is", async () => {
+      const { client, createSignedUrl } = fakeClient();
+      await createEventFileUrl(client, "evt-1/abc.pdf", { download: true });
+      expect(createSignedUrl).toHaveBeenCalledWith("evt-1/abc.pdf", 3600, { download: true });
+    });
+
+    it("still returns the signed address and still throws the storage error", async () => {
+      const { client } = fakeClient();
+      expect(await createEventFileUrl(client, "evt-1/abc.pdf", { download: "a.pdf" })).toBe(
+        "https://signed.example/file",
+      );
+      const boom = new Error("Object not found");
+      const failing = fakeClient({ signed: { data: null, error: boom } });
+      await expect(
+        createEventFileUrl(failing.client, "evt-1/abc.pdf", { download: "a.pdf" }),
+      ).rejects.toBe(boom);
+    });
+
+    it("passes no third argument at all when no options are given", async () => {
+      const { client, createSignedUrl } = fakeClient();
+      await createEventFileUrl(client, "evt-1/abc.pdf");
+      expect(createSignedUrl.mock.calls[0]).toHaveLength(2);
+    });
+  });
 });
 
 describe("removeEventFile", () => {

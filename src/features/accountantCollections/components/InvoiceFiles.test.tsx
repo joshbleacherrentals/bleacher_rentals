@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // Spec: docs/specs/accountant-collections-13-task-history-and-files.md §1, §3, §5 and §7. Static
 // markup: the query it asks, the section, the table, the staged list. What storage does is tested
 // with `eventFileStorage.test.ts` and `eventFileUpload.test.ts`.
+// Spec: docs/specs/accountant-collections-21-files-row-click.md §1, §3 and §5 (the row is a
+// click target, Download really downloads): the markup of the row, and the two handlers.
 
 type Compiled = { sql: string; parameters: unknown[] };
 
@@ -17,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   userUuid: "user-uuid-5" as string | null,
   uploadEventFile: vi.fn(),
   removeEventFile: vi.fn(),
+  createEventFileUrl: vi.fn(),
+  /** The lines of every `createErrorToastNoThrow` call. */
+  toast: vi.fn(),
   /** While set, the component's hooks are these stubs (see `callComponent`); otherwise the real ones. */
   hooks: null as HookStubs | null,
 }));
@@ -74,10 +79,12 @@ vi.mock("@/features/quotesAndBookings/utils/eventFileUpload", async (importOrigi
   uploadEventFile: (p: unknown) => mocks.uploadEventFile(p),
 }));
 vi.mock("@/features/quotesAndBookings/utils/eventFileStorage", () => ({
-  createEventFileUrl: vi.fn(),
+  createEventFileUrl: (...args: unknown[]) => mocks.createEventFileUrl(...args),
   removeEventFile: (...args: unknown[]) => mocks.removeEventFile(...args),
 }));
-vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToastNoThrow: vi.fn() }));
+vi.mock("@/components/toasts/ErrorToast", () => ({
+  createErrorToastNoThrow: (lines: string[]) => mocks.toast(lines),
+}));
 
 import {
   FilesTable,
@@ -116,6 +123,13 @@ beforeEach(() => {
   mocks.uploadEventFile.mockResolvedValue("new-file-id");
   mocks.removeEventFile.mockReset();
   mocks.removeEventFile.mockResolvedValue(undefined);
+  mocks.createEventFileUrl.mockReset();
+  mocks.createEventFileUrl.mockResolvedValue("https://storage.example/signed?token=abc");
+  mocks.toast.mockReset();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 const render = () => renderToStaticMarkup(<InvoiceFiles eventId="evt-1" timezone={TZ} />);
@@ -194,6 +208,7 @@ describe("FilesTable", () => {
       <FilesTable
         rows={rows}
         isLoading={false}
+        onOpen={vi.fn()}
         onDownload={vi.fn()}
         onDelete={vi.fn()}
         {...props}
@@ -244,14 +259,142 @@ describe("FilesTable", () => {
     expect(download).not.toMatch(/\sdisabled=""/);
   });
 
-  it("writes the file name as plain text: no link, and no name inside a button", () => {
+  // ── The whole row opens the file (spec 21, §1, §3 and §5) ──
+
+  const OPEN_TITLE = "Opens the file in a new tab";
+  const trOf = (html: string, name: string) => /^<tr[^>]*>/.exec(rowOf(html, name))?.[0] ?? "";
+  const classOf = (tag: string) => /class="([^"]*)"/.exec(tag)?.[1] ?? "";
+  /** The `<button …>name</button>` that holds the file name, or "" when the name is not in one. */
+  const nameButtonOf = (html: string, name: string) =>
+    new RegExp(
+      `<button(?![^>]*aria-label)[^>]*>(?:(?!</button>)[^])*${name}(?:(?!</button>)[^])*</button>`,
+    ).exec(html)?.[0] ?? "";
+
+  it("makes the file name a real button inside its row, not a link", () => {
     const html = table();
     expect(html).not.toMatch(/<a[\s>]/);
-    expect(html).toMatch(/<span[^>]*>Signed_Contract\.pdf<\/span>/);
-    for (const [, inner] of html.matchAll(/<button[^>]*>([^]*?)<\/button>/g)) {
-      expect(inner).not.toContain("Signed_Contract.pdf");
-      expect(inner).not.toContain("Check_Scan.pdf");
+    for (const name of ["Signed_Contract.pdf", "Check_Scan.pdf"]) {
+      const button = nameButtonOf(html, name);
+      expect(button).toMatch(/^<button[^>]*type="button"/);
+      expect(rowOf(html, name)).toContain(button);
     }
+  });
+
+  it("stretches the name button over the whole row with an overlay, and makes the row its box", () => {
+    const html = table();
+    const button = nameButtonOf(html, "Check_Scan.pdf");
+    expect(classOf(button)).toContain("after:absolute");
+    expect(classOf(button)).toContain("after:inset-0");
+    // The button itself must not become the box of the overlay, or it covers only its own text.
+    expect(classOf(button).split(/\s+/)).not.toContain("relative");
+    expect(classOf(trOf(html, "Check_Scan.pdf")).split(/\s+/)).toContain("relative");
+    expect(classOf(trOf(html, "Signed_Contract.pdf")).split(/\s+/)).toContain("relative");
+  });
+
+  it("puts the Action cell above the overlay, so Download and Delete do not also open the file", () => {
+    const html = table();
+    const row = rowOf(html, "Check_Scan.pdf");
+    const cells = [...row.matchAll(/<td[^>]*>/g)].map((m) => m[0]);
+    expect(cells).toHaveLength(5);
+    const action = classOf(cells[4]).split(/\s+/);
+    expect(action).toContain("relative");
+    expect(action).toContain("z-10");
+    // The Download and Delete buttons are inside that cell.
+    const actionCell = row.slice(row.lastIndexOf(cells[4]));
+    expect(actionCell).toContain('aria-label="Download Check_Scan.pdf"');
+    expect(actionCell).toContain('aria-label="Delete Check_Scan.pdf"');
+    // No other cell is above the overlay.
+    for (const cell of cells.slice(0, 4)) expect(classOf(cell).split(/\s+/)).not.toContain("z-10");
+  });
+
+  it("titles the name button 'Opens the file in a new tab'", () => {
+    const button = nameButtonOf(table(), "Check_Scan.pdf");
+    expect(/<button[^>]*\stitle="([^"]*)"/.exec(button)?.[1]).toBe(OPEN_TITLE);
+  });
+
+  it("gives the clickable row a hand, a light grey hover, an underlined name and a blue focus ring", () => {
+    const html = table();
+    const row = classOf(trOf(html, "Check_Scan.pdf"));
+    const button = classOf(nameButtonOf(html, "Check_Scan.pdf"));
+    expect(row).toContain("hover:bg-gray-50");
+    expect(button).toContain("cursor-pointer");
+    expect(html).toContain("group-hover:underline");
+    // Keyboard focus on the name: a 2 px outline in the page's blue, drawn around the whole row.
+    expect(button).toContain("focus-visible:after:outline-2");
+    expect(button).toContain("focus-visible:after:outline-lightBlue");
+    expect(button).toContain("focus-visible:outline-none");
+  });
+
+  it("keeps the whole name in a title of its own and cuts a long one with an ellipsis, inside the button", () => {
+    const long = "A_very_long_scanned_check_from_the_customers_bank_for_the_second_installment.pdf";
+    const html = table({ rows: buildFileRows([{ ...FILES[1], file_name: long }], TZ) });
+    const button = nameButtonOf(html, long);
+    const span = new RegExp(`<span[^>]*>${long}</span>`).exec(button)?.[0] ?? "";
+    expect(span).toContain(`title="${long}"`);
+    expect(span).toContain("truncate");
+  });
+
+  it("calls onOpen with the row when the name button is clicked, and no other handler", () => {
+    const onOpen = vi.fn();
+    const onDownload = vi.fn();
+    const onDelete = vi.fn();
+    const tree = FilesTable({ rows, isLoading: false, onOpen, onDownload, onDelete });
+    const opens = findAll(tree, (el) => el.type === "button" && el.props?.title === OPEN_TITLE);
+    expect(opens).toHaveLength(2);
+    opens[1].props.onClick();
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledWith(rows[1]);
+    expect(onDownload).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it("keeps Download and Delete wired to their own handlers, not to onOpen", () => {
+    const onOpen = vi.fn();
+    const onDownload = vi.fn();
+    const onDelete = vi.fn();
+    const tree = FilesTable({ rows, isLoading: false, onOpen, onDownload, onDelete });
+    const named = (label: string) =>
+      findAll(tree, (el) => el.type === "button" && el.props?.["aria-label"] === label)[0];
+    named("Download Check_Scan.pdf").props.onClick();
+    named("Delete Check_Scan.pdf").props.onClick();
+    expect(onDownload).toHaveBeenCalledWith(rows[1]);
+    expect(onDelete).toHaveBeenCalledWith(rows[1]);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  describe("a row with no storage path", () => {
+    const broken = buildFileRows([{ ...FILES[1], storage_path: null }], TZ);
+
+    it("writes the name as plain text: no button around it, no title about opening", () => {
+      const html = table({ rows: broken });
+      expect(html).toMatch(/<span[^>]*>Check_Scan\.pdf<\/span>/);
+      expect(nameButtonOf(html, "Check_Scan.pdf")).toBe("");
+      expect(html).not.toContain(OPEN_TITLE);
+      for (const [, inner] of html.matchAll(/<button[^>]*>([^]*?)<\/button>/g)) {
+        expect(inner).not.toContain("Check_Scan.pdf");
+      }
+    });
+
+    it("is not clickable and has no hover: no overlay, no hand, no grey, no underline", () => {
+      const html = table({ rows: broken });
+      expect(html).not.toContain("after:absolute");
+      expect(html).not.toContain("hover:bg-gray-50");
+      expect(html).not.toContain("group-hover:underline");
+      // (The Download and Delete icons keep their own pointer; the row and the name have none.)
+      expect(classOf(trOf(html, "Check_Scan.pdf"))).not.toContain("cursor-pointer");
+      const nameSpan = /<span[^>]*>Check_Scan\.pdf<\/span>/.exec(html)?.[0] ?? "";
+      expect(classOf(nameSpan)).not.toContain("cursor-pointer");
+    });
+
+    it("still has Download and Delete, disabled", () => {
+      const html = table({ rows: broken });
+      expect(/<button[^>]*aria-label="Download Check_Scan.pdf"[^>]*>/.exec(html)?.[0]).toMatch(
+        /\sdisabled=""/,
+      );
+      expect(/<button[^>]*aria-label="Delete Check_Scan.pdf"[^>]*>/.exec(html)?.[0]).toMatch(
+        /\sdisabled=""/,
+      );
+    });
   });
 
   it("cuts a long name and keeps the whole of it in a title", () => {
@@ -490,5 +633,166 @@ describe("InvoiceFiles: Delete writes the Log row through removeEventFile", () =
   it("deletes nothing for a file with no storage path", async () => {
     await confirmDelete({ 2: { ...target, storagePath: null } });
     expect(mocks.removeEventFile).not.toHaveBeenCalled();
+  });
+});
+
+// ── Open in a new tab, and Download that really downloads (spec 21, §1, §3 and §5) ──
+
+/** The two handlers of the table, as `InvoiceFiles` hands them to `FilesTable`, and its rows. */
+function tableHandlers() {
+  const [element] = findAll(callComponent({}), (el) => el.type === FilesTable);
+  return {
+    rows: element.props.rows as ReturnType<typeof buildFileRows>,
+    onOpen: element.props.onOpen as (row: unknown) => Promise<void>,
+    onDownload: element.props.onDownload as (row: unknown) => Promise<void>,
+  };
+}
+
+const SIGNED = "https://storage.example/signed?token=abc";
+
+describe("InvoiceFiles: a click on the row opens the file in a new tab", () => {
+  const fakeTab = () => ({
+    opener: { stillThere: true } as unknown,
+    location: { href: "about:blank" },
+    close: vi.fn(),
+  });
+
+  it("opens a blank tab in the click itself and asks for the plain link in the same turn", async () => {
+    const { rows, onOpen } = tableHandlers();
+    const tab = fakeTab();
+    const open = vi.fn(() => tab);
+    vi.stubGlobal("window", { open });
+
+    const pending = onOpen(rows[1]);
+    // Before any await: a tab opened after one can be blocked by the browser.
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith("", "_blank");
+    // The same link as before, with no download flag: the browser shows what it can.
+    expect(mocks.createEventFileUrl).toHaveBeenCalledTimes(1);
+    expect(mocks.createEventFileUrl).toHaveBeenCalledWith(mocks.supabase, "evt-1/s.pdf");
+    await pending;
+
+    expect(tab.opener).toBeNull();
+    expect(tab.location.href).toBe(SIGNED);
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it("opens a contracts/ file the same way, with its full storage path", async () => {
+    const { rows, onOpen } = tableHandlers();
+    vi.stubGlobal("window", { open: () => fakeTab() });
+    await onOpen(rows[0]);
+    expect(mocks.createEventFileUrl).toHaveBeenCalledWith(mocks.supabase, "contracts/evt-1/c.pdf");
+  });
+
+  it("closes the blank tab and shows the reason when the link cannot be made", async () => {
+    const { rows, onOpen } = tableHandlers();
+    const tab = fakeTab();
+    vi.stubGlobal("window", { open: () => tab });
+    mocks.createEventFileUrl.mockRejectedValueOnce({ message: "Object not found" });
+
+    await onOpen(rows[1]);
+
+    expect(tab.close).toHaveBeenCalledTimes(1);
+    expect(tab.location.href).toBe("about:blank");
+    expect(mocks.toast).toHaveBeenCalledWith(["Could not open the file", "Object not found"]);
+  });
+
+  it("tells the user to allow pop-ups when the browser blocks the tab, and asks for no link", async () => {
+    const { rows, onOpen } = tableHandlers();
+    vi.stubGlobal("window", { open: () => null });
+
+    await onOpen(rows[1]);
+
+    expect(mocks.createEventFileUrl).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+    expect(mocks.toast.mock.calls[0][0].join(" ")).toMatch(/pop-?ups/i);
+  });
+
+  it("does nothing for a row with no storage path: no tab, no link, no toast", async () => {
+    const { rows, onOpen } = tableHandlers();
+    const open = vi.fn(() => fakeTab());
+    vi.stubGlobal("window", { open });
+
+    await onOpen({ ...rows[1], storagePath: null });
+
+    expect(open).not.toHaveBeenCalled();
+    expect(mocks.createEventFileUrl).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+});
+
+describe("InvoiceFiles: Download really downloads", () => {
+  /** An anchor like the browser's, minus the `download` attribute, which must never be set. */
+  const stubAnchor = () => {
+    const anchor = { href: "", click: vi.fn() };
+    vi.stubGlobal("document", { createElement: vi.fn(() => anchor) });
+    return anchor;
+  };
+
+  it("asks for the link with the storage download flag and the file's name", async () => {
+    const { rows, onDownload } = tableHandlers();
+    stubAnchor();
+
+    await onDownload(rows[1]);
+
+    expect(mocks.createEventFileUrl).toHaveBeenCalledTimes(1);
+    expect(mocks.createEventFileUrl).toHaveBeenCalledWith(mocks.supabase, "evt-1/s.pdf", {
+      download: "Check_Scan.pdf",
+    });
+  });
+
+  it("asks for the bare flag when the file has no name", async () => {
+    const { rows, onDownload } = tableHandlers();
+    stubAnchor();
+
+    await onDownload({ ...rows[1], name: "" });
+
+    expect(mocks.createEventFileUrl).toHaveBeenCalledWith(mocks.supabase, "evt-1/s.pdf", {
+      download: true,
+    });
+  });
+
+  it("clicks a temporary anchor on the signed link, with no download attribute (the header does the work)", async () => {
+    const { rows, onDownload } = tableHandlers();
+    const anchor = stubAnchor();
+
+    await onDownload(rows[1]);
+
+    expect(anchor.href).toBe(SIGNED);
+    expect(anchor.click).toHaveBeenCalledTimes(1);
+    expect(anchor).not.toHaveProperty("download");
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it("opens no tab", async () => {
+    const { rows, onDownload } = tableHandlers();
+    stubAnchor();
+    const open = vi.fn();
+    vi.stubGlobal("window", { open });
+
+    await onDownload(rows[1]);
+
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("shows the Download failed toast, and clicks nothing, when the link cannot be made", async () => {
+    const { rows, onDownload } = tableHandlers();
+    const anchor = stubAnchor();
+    mocks.createEventFileUrl.mockRejectedValueOnce(new Error("Object not found"));
+
+    await onDownload(rows[1]);
+
+    expect(anchor.click).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(["Download failed", "Object not found"]);
+  });
+
+  it("asks for nothing for a row with no storage path", async () => {
+    const { rows, onDownload } = tableHandlers();
+    const anchor = stubAnchor();
+
+    await onDownload({ ...rows[1], storagePath: null });
+
+    expect(mocks.createEventFileUrl).not.toHaveBeenCalled();
+    expect(anchor.click).not.toHaveBeenCalled();
   });
 });

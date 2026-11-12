@@ -21,15 +21,22 @@ export function eventFileLocation(storagePath: string): { bucket: string; path: 
   return { bucket: EVENT_FILES_BUCKET, path: storagePath };
 }
 
-/** A link to the file that lives one hour. Throws the storage error. */
+/**
+ * A link to the file that lives one hour. Throws the storage error. With `options.download` (a file
+ * name, or `true`) the storage answers the link with `Content-Disposition: attachment`, so the
+ * browser saves the file instead of showing it; without options the call is exactly as it always
+ * was (docs/specs/accountant-collections-21-files-row-click.md §3).
+ */
 export async function createEventFileUrl(
   supabase: SupabaseClient<any>,
   storagePath: string,
+  options?: { download?: string | boolean },
 ): Promise<string> {
   const { bucket, path } = eventFileLocation(storagePath);
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, SIGNED_URL_SECONDS);
+  const bucketApi = supabase.storage.from(bucket);
+  const { data, error } = options
+    ? await bucketApi.createSignedUrl(path, SIGNED_URL_SECONDS, options)
+    : await bucketApi.createSignedUrl(path, SIGNED_URL_SECONDS);
   if (error) throw error;
   return data.signedUrl;
 }
