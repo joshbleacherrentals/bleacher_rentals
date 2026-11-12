@@ -43,6 +43,12 @@ export type CollectionsRow = {
   dueDate: string;
   note: string;
   amountDueCents: number;
+  /**
+   * What is still to be paid on the quote: the total minus the payments received, never below 0.
+   * The Collections / Deposits split compares `amountDueCents` with it
+   * (docs/specs/accountant-collections-23-amount-type-switch.md §1).
+   */
+  remainingCents: number;
   currency: Currency;
   /** Null when nothing is overdue (an Amount Due of 0). */
   daysOverdue: number | null;
@@ -108,6 +114,7 @@ export function buildCollectionsRows(
       dueDate: (task.due_date ?? "").slice(0, 10),
       note: task.note ?? "",
       amountDueCents: balances.amountDueCents,
+      remainingCents: balances.remainingCents,
       currency,
       daysOverdue: balances.daysOverdue,
     };

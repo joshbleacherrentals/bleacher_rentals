@@ -287,6 +287,14 @@ describe("permission matrix", () => {
         expect(row?.description).toMatch(/closes by itself when the payment arrives/);
       });
 
+      // docs/specs/accountant-collections-23-amount-type-switch.md §3.
+      it("says the list has a Collections / Deposits / All switch, Show Not Due Yet and sorting", () => {
+        expect(row?.description).toContain(
+          "lists the bookings with an overdue payment, one open task each, with a Collections / Deposits / All switch, Show Not Due Yet and sorting.",
+        );
+        expect(row?.description).not.toContain("with Show Not Due Yet and sorting");
+      });
+
       // docs/specs/accountant-collections-12-tabs-and-messages.md §3.
       it("says the invoice page has a Messages tab with the booking's internal chat", () => {
         expect(row?.description).toContain(

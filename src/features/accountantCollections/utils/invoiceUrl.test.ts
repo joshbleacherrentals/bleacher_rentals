@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CollectionsListState } from "./collectionsListState";
+import { DEFAULT_LIST_STATE, type CollectionsListState } from "./collectionsListState";
 import {
   collectionsHref,
   invoiceHref,
@@ -8,8 +8,15 @@ import {
   withCollectionsListState,
 } from "./invoiceUrl";
 
-const DEFAULT: CollectionsListState = { sort: "followUp", dir: "asc", showNotDue: false };
-const CHANGED: CollectionsListState = { sort: "amount", dir: "desc", showNotDue: true };
+const DEFAULT: CollectionsListState = DEFAULT_LIST_STATE;
+const CHANGED: CollectionsListState = {
+  sort: "amount",
+  dir: "desc",
+  showNotDue: true,
+  type: "collections",
+};
+const DEPOSITS: CollectionsListState = { ...DEFAULT_LIST_STATE, type: "deposits" };
+const ALL: CollectionsListState = { ...CHANGED, type: "all" };
 
 describe("invoiceHref", () => {
   it("opens the invoice on the tab asked for, with no list parameters for the default list", () => {
@@ -33,6 +40,19 @@ describe("invoiceHref", () => {
     );
   });
 
+  // docs/specs/accountant-collections-23-amount-type-switch.md §1 (D4) and §5.
+  it("carries type when it is not Collections, and nothing for Collections", () => {
+    expect(invoiceHref({ eventId: "evt-1", tab: "info", listState: DEPOSITS })).toBe(
+      "/accountant/invoice?id=evt-1&tab=info&type=deposits",
+    );
+    expect(invoiceHref({ eventId: "evt-1", tab: "messages", listState: ALL })).toBe(
+      "/accountant/invoice?id=evt-1&tab=messages&csort=amount&cdir=desc&cnotdue=1&type=all",
+    );
+    expect(invoiceHref({ eventId: "evt-1", tab: "info", listState: CHANGED })).not.toContain(
+      "type=",
+    );
+  });
+
   it("encodes an id that needs it", () => {
     expect(invoiceHref({ eventId: "a b&c", tab: "info", listState: DEFAULT })).toBe(
       "/accountant/invoice?id=a+b%26c&tab=info",
@@ -48,6 +68,13 @@ describe("collectionsHref", () => {
   it("brings the list's parameters back", () => {
     expect(collectionsHref(CHANGED)).toBe(
       "/accountant?tab=collections&csort=amount&cdir=desc&cnotdue=1",
+    );
+  });
+
+  it("brings the type back when it is not Collections", () => {
+    expect(collectionsHref(DEPOSITS)).toBe("/accountant?tab=collections&type=deposits");
+    expect(collectionsHref(ALL)).toBe(
+      "/accountant?tab=collections&csort=amount&cdir=desc&cnotdue=1&type=all",
     );
   });
 });
@@ -79,6 +106,41 @@ describe("withCollectionsListState", () => {
   it("drops the parameters that are back to their default", () => {
     const current = new URLSearchParams("tab=collections&csort=amount&cdir=desc&cnotdue=1");
     expect(withCollectionsListState(current, DEFAULT)).toBe("tab=collections");
+  });
+
+  it("writes type for Deposits and All", () => {
+    const current = new URLSearchParams("tab=collections");
+    expect(withCollectionsListState(current, DEPOSITS)).toBe("tab=collections&type=deposits");
+    expect(new URLSearchParams(withCollectionsListState(current, ALL)).get("type")).toBe("all");
+  });
+
+  it("replaces an old type", () => {
+    const current = new URLSearchParams("tab=collections&type=deposits");
+    const next = new URLSearchParams(withCollectionsListState(current, ALL));
+    expect(next.getAll("type")).toEqual(["all"]);
+  });
+
+  it("removes the type when the new state is Collections, and keeps every other parameter", () => {
+    const current = new URLSearchParams("tab=collections&q=abc&type=all&csort=amount&page=2");
+    const next = new URLSearchParams(
+      withCollectionsListState(current, { ...DEFAULT_LIST_STATE, sort: "amount" }),
+    );
+    expect(next.has("type")).toBe(false);
+    expect(next.get("tab")).toBe("collections");
+    expect(next.get("q")).toBe("abc");
+    expect(next.get("page")).toBe("2");
+    expect(next.get("csort")).toBe("amount");
+  });
+
+  it("changing the type keeps the sort and Show Not Due Yet", () => {
+    const current = new URLSearchParams("tab=collections&csort=amount&cdir=desc&cnotdue=1");
+    const next = new URLSearchParams(
+      withCollectionsListState(current, { ...CHANGED, type: "deposits" }),
+    );
+    expect(next.get("csort")).toBe("amount");
+    expect(next.get("cdir")).toBe("desc");
+    expect(next.get("cnotdue")).toBe("1");
+    expect(next.get("type")).toBe("deposits");
   });
 });
 

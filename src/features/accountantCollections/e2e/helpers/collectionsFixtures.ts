@@ -201,8 +201,12 @@ export async function tasksOf(
   return data ?? [];
 }
 
-/** A manual payment for the whole balance, as the Record Payment dialog would write it. */
-export async function payInFull(eventId: string, amountCents = 100_000): Promise<void> {
+/**
+ * A manual payment of `amountCents`, as the Record Payment dialog would write it. It names no
+ * installment, so it pays the schedule from the oldest installment on
+ * (docs/specs/accountant-collections-23-amount-type-switch.md §3).
+ */
+export async function addPayment(eventId: string, amountCents: number): Promise<void> {
   const { error } = await admin().from("PaymentHistory").insert({
     event_uuid: eventId,
     amount_cents: amountCents,
@@ -213,7 +217,12 @@ export async function payInFull(eventId: string, amountCents = 100_000): Promise
     entry_source: "manual",
     paid_at: new Date().toISOString(),
   });
-  if (error) throw new Error(`payInFull: ${error.message}`);
+  if (error) throw new Error(`addPayment: ${error.message}`);
+}
+
+/** A manual payment for the whole balance (the fixture's default total is $1,000.00). */
+export async function payInFull(eventId: string, amountCents = 100_000): Promise<void> {
+  await addPayment(eventId, amountCents);
 }
 
 /**
