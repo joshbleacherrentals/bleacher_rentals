@@ -70,7 +70,7 @@ vi.mock("@/components/toasts/SuccessToast", () => ({ createSuccessToast: vi.fn()
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToast: vi.fn() }));
 vi.mock("../sendQuote/SendQuoteDialog", () => ({ SendQuoteDialog: () => null }));
 vi.mock("./QuoteActionBar", () => ({ QuoteActionBar: () => null }));
-// Open AP takes its look from the invoice page's header button; that module pulls in the PDF hooks.
+// Open AR takes its look from the invoice page's header button; that module pulls in the PDF hooks.
 vi.mock("@/features/accountantCollections/components/OpenPdfButton", () => ({
   HEADER_BUTTON: "stand-in-header-button",
 }));
@@ -220,9 +220,9 @@ describe("QuoteDetailView", () => {
     });
   });
 
-  // The Open AP button in the header: a link to the invoice page in a new tab, drawn by the
+  // The Open AR button in the header: a link to the invoice page in a new tab, drawn by the
   // `openAp` capability (admin and accountant) and by nothing else.
-  describe("the Open AP button", () => {
+  describe("the Open AR button", () => {
     const LINK = 'href="/accountant/invoice?id=ev-1&amp;tab=info"';
 
     it("is drawn in the header, above the tab bar, for a user who may open the invoice page", () => {
@@ -231,7 +231,7 @@ describe("QuoteDetailView", () => {
       const html = render();
 
       expect(html).toContain(LINK);
-      expect(html).toContain("Open AP");
+      expect(html).toContain("Open AR");
       expect(html.indexOf(LINK)).toBeGreaterThan(html.indexOf("<h1"));
       expect(html.indexOf(LINK)).toBeLessThan(html.indexOf('role="tablist"'));
     });
@@ -248,7 +248,7 @@ describe("QuoteDetailView", () => {
       mocks.state = { quote: quote(), isLoading: false, error: null };
       const html = render();
 
-      expect(html).not.toContain("Open AP");
+      expect(html).not.toContain("Open AR");
       expect(html).not.toContain("/accountant/invoice");
     });
 
@@ -256,16 +256,16 @@ describe("QuoteDetailView", () => {
       mocks.can = {};
       mocks.state = { quote: quote(), isLoading: false, error: null };
 
-      expect(render()).not.toContain("Open AP");
+      expect(render()).not.toContain("Open AR");
     });
 
     it("is not drawn while the quote is loading or when there is none", () => {
       mocks.can = { openAp: true };
       mocks.state = { quote: null, isLoading: true, error: null };
-      expect(render()).not.toContain("Open AP");
+      expect(render()).not.toContain("Open AR");
 
       mocks.state = { quote: null, isLoading: false, error: null };
-      expect(render()).not.toContain("Open AP");
+      expect(render()).not.toContain("Open AR");
     });
   });
 

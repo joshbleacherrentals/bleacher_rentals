@@ -228,7 +228,7 @@ describe("accountant", () => {
     expect(capsFor(["accountant"]).seeInvoiceAlerts).toBe(true);
   });
 
-  it("can do nothing else: the flag, the payments, the invoice, its alerts, the chat and Open AP are the only 'yes' in their column", () => {
+  it("can do nothing else: the flag, the payments, the invoice, its alerts, the chat and Open AR are the only 'yes' in their column", () => {
     expect(capsFor(["accountant"])).toEqual({
       ...NOTHING,
       setQuickBooksFlag: true,
@@ -240,7 +240,7 @@ describe("accountant", () => {
     });
   });
 
-  it("stays at the flag, the payments, the invoice, its alerts, the chat and Open AP even with the zones and the ownership that would help a manager", () => {
+  it("stays at the flag, the payments, the invoice, its alerts, the chat and Open AR even with the zones and the ownership that would help a manager", () => {
     expect(
       capsFor(["accountant"], {
         leadZoneIds: ["zone-a"],
@@ -547,7 +547,7 @@ describe("no quote (the list)", () => {
   });
 });
 
-// Open AP, the header button of the quote card that opens the booking's invoice page
+// Open AR, the header button of the quote card that opens the booking's invoice page
 // (/accountant/invoice) in a new tab. It follows the page's own access rule (accessConfig), so an
 // admin and an accountant are shown it and no other role is. Not tied to the quote.
 describe("openAp: admin and accountant only", () => {

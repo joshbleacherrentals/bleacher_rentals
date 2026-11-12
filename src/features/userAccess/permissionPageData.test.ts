@@ -327,7 +327,7 @@ describe("permission matrix", () => {
         "Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.";
 
       const OPEN_AP_SENTENCE =
-        "Sees the Open AP button on a quote, which opens that booking's invoice page in a new tab.";
+        "Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab.";
 
       it("tells the accountant what they can do there", () => {
         expect(accountant("Collections")?.note).toBe(
@@ -341,16 +341,16 @@ describe("permission matrix", () => {
         );
       });
 
-      // The Open AP button in the header of a quote (getQuotesBookingsCapabilities.openAp).
-      it("says a quote has an Open AP button that opens the invoice page in a new tab", () => {
+      // The Open AR button in the header of a quote (getQuotesBookingsCapabilities.openAp).
+      it("says a quote has an Open AR button that opens the invoice page in a new tab", () => {
         expect(row?.description).toContain(
-          "On a quote's page, an Open AP button in the header opens that booking's invoice page in a new tab.",
+          "On a quote's page, an Open AR button in the header opens that booking's invoice page in a new tab.",
         );
       });
 
-      it("tells an account manager and a viewer they do not get the Open AP button", () => {
-        expect(row?.roles.account_manager.note).toContain("but not the Open AP button");
-        expect(row?.roles.viewer.note).toContain("but not the Open AP button");
+      it("tells an account manager and a viewer they do not get the Open AR button", () => {
+        expect(row?.roles.account_manager.note).toContain("but not the Open AR button");
+        expect(row?.roles.viewer.note).toContain("but not the Open AR button");
       });
 
       it("does not give the other five roles the customer's page through this row", () => {

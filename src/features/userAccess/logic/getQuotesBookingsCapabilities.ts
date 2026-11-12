@@ -68,7 +68,7 @@ export type QuotesBookingsCapabilities = {
   /** Open in Dashboard. */
   openInDashboard: boolean;
   /**
-   * Open AP, the header button that opens the booking's invoice page (/accountant/invoice) in a new
+   * Open AR, the header button that opens the booking's invoice page (/accountant/invoice) in a new
    * tab: drawn when true, not drawn when false. An admin or an accountant, on any quote — whoever
    * the invoice page itself lets in, so the button never leads to a page that turns the user away.
    */

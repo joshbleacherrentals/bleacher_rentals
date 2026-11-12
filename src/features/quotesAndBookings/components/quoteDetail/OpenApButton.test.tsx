@@ -22,9 +22,9 @@ describe("OpenApButton", () => {
     expect(html).toContain('rel="noopener noreferrer"');
   });
 
-  it("says Open AP, with the look of the header buttons of the invoice page", () => {
+  it("says Open AR, with the look of the header buttons of the invoice page", () => {
     const html = render();
-    expect(html).toContain("Open AP");
+    expect(html).toContain("Open AR");
     expect(html).toMatch(/class="stand-in-header-button[ "]/);
   });
 

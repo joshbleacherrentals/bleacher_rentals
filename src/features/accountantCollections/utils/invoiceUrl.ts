@@ -40,7 +40,7 @@ export function invoiceHref({
 }
 
 /**
- * The invoice page of an event on its Information tab, for the Open AP button on the quote card.
+ * The invoice page of an event on its Information tab, for the Open AR button on the quote card.
  * It carries no list state: the page was not reached from the Collections list.
  */
 export function openApHref(eventId: string): string {
