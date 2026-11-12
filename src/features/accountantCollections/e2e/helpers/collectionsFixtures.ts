@@ -6,8 +6,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * line item, and the open task. Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
  * (loaded from .env.local by the `test:e2e` script).
  *
- * The events have no payment schedule and start inside 7 days, so their whole balance is overdue
- * at once (spec 01 §0, decision 3) and the daily job would give them a task anyway.
+ * The events have no payment schedule and start today, so their whole balance is overdue from
+ * the start day (docs/specs/accountant-collections-24-no-schedule-due-on-start-day.md) and the daily
+ * job would give them a task anyway. `startInDays` moves the start: an event that starts later is
+ * not overdue, one that started already is.
  */
 
 function admin(): SupabaseClient {
@@ -28,8 +30,23 @@ const isoDate = (offsetDays: number): string => {
 };
 
 /**
- * A booked, overdue event with one open task. `taskDueInDays` is relative to today: negative for a
- * past task, 0 for today, positive for one that is not due yet.
+ * Toronto's calendar date `offsetDays` from today: the day the database counts an event's start
+ * from (`ar_sync_event_tasks` takes Toronto's date). The UTC date differs from it in the evening.
+ */
+const officeIsoDate = (offsetDays: number): string => {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto" }).format(
+    new Date(),
+  );
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * A booked event with one open task; with no payment schedule it is overdue from the day it starts,
+ * which is today unless `startInDays` says otherwise (negative: started already, positive: not
+ * overdue yet). `taskDueInDays` is relative to today: negative for a past task, 0 for today,
+ * positive for one that is not due yet.
  */
 export async function createOverdueBooking(options: {
   name: string;
@@ -38,16 +55,19 @@ export async function createOverdueBooking(options: {
   taskNote?: string;
   status?: "booked" | "lost" | "quoted";
   withOpenTask?: boolean;
+  /** Days from today until the event starts; 0 (today) when left out. */
+  startInDays?: number;
 }): Promise<SeededBooking> {
   const db = admin();
   const invoiceNumber = 900_000_000 + Math.floor(Math.random() * 90_000_000);
+  const startInDays = options.startInDays ?? 0;
 
   const { data: event, error } = await db
     .from("Events")
     .insert({
       event_name: options.name,
-      event_start: isoDate(3),
-      event_end: isoDate(4),
+      event_start: officeIsoDate(startInDays),
+      event_end: officeIsoDate(startInDays + 1),
       lenient: false,
       must_be_clean: false,
       event_status: options.status ?? "booked",
@@ -194,6 +214,29 @@ export async function payInFull(eventId: string, amountCents = 100_000): Promise
     paid_at: new Date().toISOString(),
   });
   if (error) throw new Error(`payInFull: ${error.message}`);
+}
+
+/**
+ * A payment schedule for the event: one `PaymentInstallments` row per entry, due `dueInDays` from
+ * today (Toronto's date, negative for the past) and worth `percentageBps` of the total (10000 is
+ * all of it). The schedule decides when the event is overdue, not its start date
+ * (docs/specs/accountant-collections-24-no-schedule-due-on-start-day.md, S80).
+ */
+export async function addInstallments(
+  eventId: string,
+  installments: { dueInDays: number; percentageBps: number }[],
+): Promise<void> {
+  const { error } = await admin()
+    .from("PaymentInstallments")
+    .insert(
+      installments.map((i) => ({
+        event_uuid: eventId,
+        due_date: officeIsoDate(i.dueInDays),
+        currency: "USD" as const,
+        percentage_bps: i.percentageBps,
+      })),
+    );
+  if (error) throw new Error(`addInstallments: ${error.message}`);
 }
 
 /**

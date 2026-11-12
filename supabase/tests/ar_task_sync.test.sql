@@ -51,7 +51,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(171);
+SELECT plan(180);
 
 -- ── Helpers (dropped by the ROLLBACK) ───────────────────────────────────────
 
@@ -69,7 +69,8 @@ END;
 $$;
 
 -- A probe event with one 1000-cent line, no tax and no payment schedule. Starting today (the
--- default) it is inside the 7 days before its start, so its whole balance is already due.
+-- default) its whole balance is already due: an event with no schedule falls due on the day it
+-- starts (docs/specs/accountant-collections-24-no-schedule-due-on-start-day.md).
 CREATE FUNCTION public.st_event(
   p_status event_status DEFAULT 'booked', p_start date DEFAULT NULL, p_deleted boolean DEFAULT false
 ) RETURNS uuid LANGUAGE plpgsql AS $$
@@ -209,11 +210,12 @@ SELECT count(*) AS settled FROM public.ar_sync_all_event_tasks() \gset
 SELECT public.st_event() AS n_over \gset
 SELECT public.st_event(p_start => public.st_today() + 90) AS n_sched_today \gset
 SELECT public.st_inst(:'n_sched_today', public.st_today());
-SELECT public.st_event(p_start => public.st_today() + 7) AS n_7 \gset
 SELECT public.st_event() AS n_done \gset
 SELECT public.st_task(:'n_done', 'Call the customer', public.st_today() - 1, true);
 
 -- Left alone.
+SELECT public.st_event(p_start => public.st_today() + 1) AS n_1 \gset
+SELECT public.st_event(p_start => public.st_today() + 7) AS n_7 \gset
 SELECT public.st_event(p_start => public.st_today() + 8) AS n_8 \gset
 SELECT public.st_event() AS n_notdue \gset
 SELECT public.st_inst(:'n_notdue', public.st_today() + 1);
@@ -242,9 +244,9 @@ SELECT public.st_total() AS n0 \gset
 
 SELECT created AS c1, completed AS d1 FROM public.ar_sync_all_event_tasks() \gset
 
-SELECT is(:c1, 4, 'nightly: the first run reports the four tasks it made');
+SELECT is(:c1, 3, 'nightly: the first run reports the three tasks it made');
 SELECT is(:d1, 3, 'nightly: ...and the three it completed');
-SELECT is(public.st_total() - :n0, 4::bigint, 'nightly: no other task is made');
+SELECT is(public.st_total() - :n0, 3::bigint, 'nightly: no other task is made');
 
 SELECT is(public.st_state(:'n_over'), '1|0', 'nightly creates: a booked event that owes');
 SELECT is(
@@ -258,10 +260,11 @@ SELECT ok(
    FROM public."ArEventTasks" WHERE event_uuid = :'n_over'),
   'nightly creates: created_at is now');
 SELECT is(public.st_state(:'n_sched_today'), '1|0', 'nightly creates: an installment due today is overdue');
-SELECT is(public.st_state(:'n_7'), '1|0', 'nightly creates: no schedule, starting in 7 days');
 SELECT is(public.st_state(:'n_done'), '1|1',
   'nightly creates: an event whose only task is completed gets a new open one, the old one untouched');
 
+SELECT is(public.st_state(:'n_1'), '0|0', 'nightly skips: no schedule, starting tomorrow');
+SELECT is(public.st_state(:'n_7'), '0|0', 'nightly skips: no schedule, starting in 7 days');
 SELECT is(public.st_state(:'n_8'), '0|0', 'nightly skips: no schedule, starting in 8 days');
 SELECT is(public.st_state(:'n_notdue'), '0|0', 'nightly skips: nothing due yet (installment tomorrow)');
 SELECT is(public.st_state(:'n_paid_nt'), '0|0', 'nightly skips: fully paid and no task');
@@ -284,7 +287,7 @@ SELECT is(public.st_state(:'n_lost'), '0|1', 'nightly completes: a Lost event');
 SELECT created AS c2, completed AS d2 FROM public.ar_sync_all_event_tasks() \gset
 SELECT is(:c2, 0, 'nightly idempotent: a second run makes none');
 SELECT is(:d2, 0, 'nightly idempotent: ...and completes none');
-SELECT is(public.st_total() - :n0, 4::bigint, 'nightly idempotent: ...and adds no row');
+SELECT is(public.st_total() - :n0, 3::bigint, 'nightly idempotent: ...and adds no row');
 
 SELECT is(
   (SELECT pg_get_function_result(p.oid) FROM pg_proc p
@@ -650,13 +653,19 @@ UPDATE public."Events" SET deleted = false WHERE id = :'v_restored';
 SELECT public.st_fire();
 SELECT is(public.st_state(:'v_restored'), '1|0', 'event deleted: restored with a debt it gets the task');
 
--- event_start moved inside 7 days (no schedule).
+-- event_start moved (no schedule): it falls due on the day the event starts, not before.
 SELECT public.st_event(p_start => public.st_today() + 30) AS v_start \gset
 SELECT public.st_fire();
 SELECT is(public.st_state(:'v_start'), '0|0', 'event start: 30 days away, nothing due');
 UPDATE public."Events" SET event_start = public.st_today() + 3, event_end = public.st_today() + 4 WHERE id = :'v_start';
 SELECT public.st_fire();
-SELECT is(public.st_state(:'v_start'), '1|0', 'event start: moved inside 7 days it falls due and creates the task');
+SELECT is(public.st_state(:'v_start'), '0|0', 'event start: moved 3 days ahead there is still nothing due');
+UPDATE public."Events" SET event_start = public.st_today(), event_end = public.st_today() + 1 WHERE id = :'v_start';
+SELECT public.st_fire();
+SELECT is(public.st_state(:'v_start'), '1|0', 'event start: moved to today it falls due and creates the task');
+UPDATE public."Events" SET event_start = public.st_today() + 5, event_end = public.st_today() + 6 WHERE id = :'v_start';
+SELECT public.st_fire();
+SELECT is(public.st_state(:'v_start'), '0|1', 'event start: moved later again it owes nothing and the task is completed');
 
 -- A tax change that creates a debt, then removes it.
 SELECT public.st_event() AS v_tax \gset
@@ -750,6 +759,51 @@ SELECT is(public.st_state(:'h_gone'), '0|1', 'half-saved: the last request of th
 SELECT is(public.st_state(:'h_stays'), '1|0', 'half-saved: a final schedule that still owes keeps its task');
 SELECT is((SELECT id FROM public."ArEventTasks" WHERE event_uuid = :'h_stays' AND completed = false), :'h_stays_task'::uuid,
   'half-saved: ...the same task, not a new one');
+
+-- ═══ The new rule at the deploy (spec 24) ══════════════════════════════════
+-- Under the old rule an event with no schedule that starts in 1 to 7 days owed its whole balance and
+-- had an open task. Under the new rule its Amount Due is 0: ar_sync_event_tasks completes that task
+-- (and the trigger of spec 18 stamps finished_at), and so does the one pass that migration
+-- 20261111140000_ar_no_schedule_due_on_start_day.sql runs at the deploy. No trigger is fired
+-- between the inserts and the calls, so only the calls under test change a task.
+
+SELECT public.st_event(p_start => public.st_today() + 3) AS z_stale \gset
+SELECT public.st_event(p_start => public.st_today() + 3) AS z_stale2 \gset
+SELECT public.st_event() AS z_live \gset
+SELECT public.st_fire();
+-- The firing gave z_live (it starts today, so it owes) its open task and the other two none. The tasks
+-- the old rule made for the stale ones are written by hand.
+SELECT public.st_task(:'z_stale', 'Remind the customer about payment');
+SELECT public.st_task(:'z_stale2', 'Remind the customer about payment');
+
+SELECT is(public.st_run(:'z_stale'), 'completed|0|1',
+  'stale task: an event with no schedule that starts in 3 days has its open task completed');
+SELECT ok(
+  (SELECT finished_at IS NOT NULL FROM public."ArEventTasks" WHERE event_uuid = :'z_stale'),
+  'stale task: ...and its finished_at is set');
+
+SELECT public.st_total() AS z0 \gset
+
+-- The closing pass of the migration, copied word for word (migration 20261111140000).
+DO $$
+DECLARE
+  v_today date := (now() AT TIME ZONE 'America/Toronto')::date;
+  v_event uuid;
+BEGIN
+  FOR v_event IN
+    SELECT DISTINCT t.event_uuid FROM public."ArEventTasks" t WHERE t.completed = false
+  LOOP
+    PERFORM public.ar_sync_event_tasks(v_event, v_today);
+  END LOOP;
+END;
+$$;
+
+SELECT is(public.st_state(:'z_stale2'), '0|1', 'closing pass: the open task of an event that is not overdue is closed');
+SELECT ok(
+  (SELECT finished_at IS NOT NULL FROM public."ArEventTasks" WHERE event_uuid = :'z_stale2'),
+  'closing pass: ...with finished_at set');
+SELECT is(public.st_state(:'z_live'), '1|0', 'closing pass: an open task of an event that is overdue stays open');
+SELECT is(public.st_total() - :z0, 0::bigint, 'closing pass: it creates no task');
 
 -- ═══ Nothing blocks a write ════════════════════════════════════════════════
 -- A calculation that raises. The calculation is replaced for the rest of the test.

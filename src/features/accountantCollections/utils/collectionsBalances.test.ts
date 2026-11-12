@@ -188,38 +188,36 @@ describe("computeCollectionsBalances: no payment schedule", () => {
   const withStart = (event_start: string | null, booked_at: string | null = null) =>
     input({ event: { event_start, booked_at, tax_percent: null, tax_amount_cents: null } });
 
-  it("owes the whole remaining balance when the start is 7 days away", () => {
-    expect(computeCollectionsBalances(withStart("2026-11-22")).amountDueCents).toBe(3000);
+  it("owes the whole remaining balance when the event starts today", () => {
+    expect(computeCollectionsBalances(withStart("2026-11-15")).amountDueCents).toBe(3000);
   });
 
-  it("owes nothing when the start is 8 days away", () => {
+  it("owes nothing when the start is tomorrow, in 7 days or in 8 days", () => {
+    expect(computeCollectionsBalances(withStart("2026-11-16")).amountDueCents).toBe(0);
+    expect(computeCollectionsBalances(withStart("2026-11-22")).amountDueCents).toBe(0);
     expect(computeCollectionsBalances(withStart("2026-11-23")).amountDueCents).toBe(0);
-  });
-
-  it("owes the whole remaining balance for an event booked inside the 7 days", () => {
-    expect(computeCollectionsBalances(withStart("2026-11-18")).amountDueCents).toBe(3000);
   });
 
   it("owes the whole remaining balance for an event that already started", () => {
     expect(computeCollectionsBalances(withStart("2026-10-16")).amountDueCents).toBe(3000);
   });
 
-  it("owes only what is left after a part payment, and 0 while not yet due", () => {
+  it("owes only what is left from the start day after a part payment, and 0 before it", () => {
     const due = computeCollectionsBalances({
-      ...withStart("2026-11-18"),
+      ...withStart("2026-11-15"),
       payments: [payment(600)],
     });
     expect(due.amountDueCents).toBe(2400);
     const early = computeCollectionsBalances({
-      ...withStart("2026-11-23"),
+      ...withStart("2026-11-16"),
       payments: [payment(600)],
     });
     expect(early).toMatchObject({ remainingCents: 2400, amountDueCents: 0 });
   });
 
-  it("takes the 7 days from the date part of a timestamp-shaped start", () => {
-    expect(computeCollectionsBalances(withStart("2026-11-22T00:00:00")).amountDueCents).toBe(3000);
-    expect(computeCollectionsBalances(withStart("2026-11-23T00:00:00")).amountDueCents).toBe(0);
+  it("takes the date part of a timestamp-shaped start", () => {
+    expect(computeCollectionsBalances(withStart("2026-11-15T00:00:00")).amountDueCents).toBe(3000);
+    expect(computeCollectionsBalances(withStart("2026-11-16T00:00:00")).amountDueCents).toBe(0);
   });
 
   it("owes nothing when there is no start date, like the SQL (a null date never compares true)", () => {
@@ -228,109 +226,53 @@ describe("computeCollectionsBalances: no payment schedule", () => {
 });
 
 describe("computeCollectionsBalances: overdueSince and daysOverdue", () => {
-  it("counts an event booked earlier from 7 days before its start", () => {
-    const result = computeCollectionsBalances(
-      input({
-        event: {
-          event_start: "2026-11-18",
-          booked_at: "2026-10-01T09:00:00+00:00",
-          tax_percent: null,
-          tax_amount_cents: null,
-        },
-      }),
-    );
-    expect(result.overdueSince).toBe("2026-11-11");
-    expect(result.daysOverdue).toBe(4);
+  const noSchedule = (event_start: string | null, booked_at: string | null = null) =>
+    input({ event: { event_start, booked_at, tax_percent: null, tax_amount_cents: null } });
+
+  it("counts an event with no schedule from its start day (3 days ago: 3 days)", () => {
+    const result = computeCollectionsBalances(noSchedule("2026-11-12"));
+    expect(result.overdueSince).toBe("2026-11-12");
+    expect(result.daysOverdue).toBe(3);
   });
 
-  it("counts an event booked inside the 7 days from booked_at", () => {
-    const result = computeCollectionsBalances(
-      input({
-        event: {
-          event_start: "2026-11-18",
-          booked_at: "2026-11-13T15:30:00+00:00",
-          tax_percent: null,
-          tax_amount_cents: null,
-        },
-      }),
-    );
-    expect(result.overdueSince).toBe("2026-11-13");
-    expect(result.daysOverdue).toBe(2);
-  });
-
-  it("reads a booked_at shaped like the PowerSync local DB returns it", () => {
-    const result = computeCollectionsBalances(
-      input({
-        event: {
-          event_start: "2026-11-18",
-          booked_at: "2026-11-13 15:30:00+00",
-          tax_percent: null,
-          tax_amount_cents: null,
-        },
-      }),
-    );
-    expect(result.overdueSince).toBe("2026-11-13");
-  });
-
-  it("treats a null booked_at as 7 days before the start", () => {
-    const result = computeCollectionsBalances(
-      input({
-        event: {
-          event_start: "2026-11-18",
-          booked_at: null,
-          tax_percent: null,
-          tax_amount_cents: null,
-        },
-      }),
-    );
-    expect(result.overdueSince).toBe("2026-11-11");
-    expect(result.daysOverdue).toBe(4);
-  });
-
-  it("gives an empty figure when the count starts in the future", () => {
-    const result = computeCollectionsBalances(
-      input({
-        event: {
-          event_start: "2026-11-18",
-          booked_at: "2026-11-16T10:00:00+00:00",
-          tax_percent: null,
-          tax_amount_cents: null,
-        },
-      }),
-    );
+  it("gives the start date and 0 days when the event starts today", () => {
+    const result = computeCollectionsBalances(noSchedule("2026-11-15"));
     expect(result.amountDueCents).toBe(3000);
+    expect(result.overdueSince).toBe("2026-11-15");
+    expect(result.daysOverdue).toBe(0);
+  });
+
+  it("gives an empty figure when the start is in the future", () => {
+    const result = computeCollectionsBalances(noSchedule("2026-11-18"));
+    expect(result.amountDueCents).toBe(0);
     expect(result.overdueSince).toBeNull();
     expect(result.daysOverdue).toBeNull();
   });
 
+  it.each([
+    ["inside the last days before the start", "2026-11-10T15:30:00+00:00"],
+    ["after the start", "2026-11-14T12:00:00+00:00"],
+    ["null", null],
+    ["shaped like the PowerSync local DB returns it", "2026-11-13 15:30:00+00"],
+  ])("ignores booked_at, %s", (_label, bookedAt) => {
+    const result = computeCollectionsBalances(noSchedule("2026-11-12", bookedAt));
+    expect(result.amountDueCents).toBe(3000);
+    expect(result.overdueSince).toBe("2026-11-12");
+    expect(result.daysOverdue).toBe(3);
+  });
+
   it("gives an empty figure when the Amount Due is 0 (no schedule)", () => {
-    const result = computeCollectionsBalances(
-      input({
-        event: {
-          event_start: "2026-11-18",
-          booked_at: null,
-          tax_percent: null,
-          tax_amount_cents: null,
-        },
-        payments: [payment(3000)],
-      }),
-    );
+    const result = computeCollectionsBalances({
+      ...noSchedule("2026-11-10"),
+      payments: [payment(3000)],
+    });
     expect(result.amountDueCents).toBe(0);
     expect(result.overdueSince).toBeNull();
     expect(result.daysOverdue).toBeNull();
   });
 
   it("gives an empty figure when nothing is due yet (no schedule)", () => {
-    const result = computeCollectionsBalances(
-      input({
-        event: {
-          event_start: "2026-12-30",
-          booked_at: null,
-          tax_percent: null,
-          tax_amount_cents: null,
-        },
-      }),
-    );
+    const result = computeCollectionsBalances(noSchedule("2026-12-30"));
     expect(result.daysOverdue).toBeNull();
   });
 

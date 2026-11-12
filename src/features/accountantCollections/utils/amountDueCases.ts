@@ -435,26 +435,33 @@ export const HAND_CASES: AmountDueCase[] = [
     expect: [1000, 0, 1000, 0],
   }),
 
-  // ── No payment schedule: the whole balance falls due 7 days before event_start ──
-  hand("no schedule: event_start = today + 7 is due today", {
+  // ── No payment schedule: the whole balance falls due on the day the event starts ──
+  hand("no schedule: event_start = today is due today", {
     lines: [line(2000)],
-    start: "2026-11-22",
+    start: "2026-11-15",
     expect: [2000, 0, 2000, 2000],
   }),
-  hand("no schedule: event_start = today + 8 is not due yet", {
+  hand("no schedule: event_start = today + 1 is not due yet", {
     lines: [line(2000)],
-    start: "2026-11-23",
+    start: "2026-11-16",
     expect: [2000, 0, 2000, 0],
   }),
-  hand("no schedule: an event booked inside the 7 days is overdue at once", {
+  // The boundary of the old rule (7 days before the start): no longer due.
+  hand("no schedule: event_start = today + 7 is not due yet", {
     lines: [line(2000)],
-    start: "2026-11-18",
-    bookedAt: "2026-11-13T12:00:00+00:00",
-    expect: [2000, 0, 2000, 2000],
+    start: "2026-11-22",
+    expect: [2000, 0, 2000, 0],
   }),
-  hand("no schedule: a part-paid event owes only what is left", {
+  // booked_at is not read: a booking two days before the start makes nothing due.
+  hand("no schedule: a booking 2 days before the start does not make it due", {
     lines: [line(2000)],
-    start: "2026-11-18",
+    start: "2026-11-17",
+    bookedAt: "2026-11-15T12:00:00+00:00",
+    expect: [2000, 0, 2000, 0],
+  }),
+  hand("no schedule: a part-paid event whose start is today owes what is left", {
+    lines: [line(2000)],
+    start: "2026-11-15",
     payments: [pay(600)],
     expect: [2000, 600, 1400, 1400],
   }),
@@ -469,9 +476,9 @@ export const HAND_CASES: AmountDueCase[] = [
     payments: [pay(600)],
     expect: [2000, 600, 1400, 0],
   }),
-  hand("no schedule: the date comes from the caller (today + 7 a day later)", {
+  hand("no schedule: the date comes from the caller (the start is tomorrow, today is tomorrow)", {
     lines: [line(2000)],
-    start: "2026-11-23",
+    start: "2026-11-16",
     today: "2026-11-16",
     expect: [2000, 0, 2000, 2000],
   }),
