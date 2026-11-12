@@ -1,4 +1,4 @@
-import type { CollectionsListState } from "./collectionsListState";
+import type { CollectionsAmountType, CollectionsListState } from "./collectionsListState";
 import type { CollectionsRow } from "./collectionsRows";
 
 /**
@@ -7,13 +7,33 @@ import type { CollectionsRow } from "./collectionsRows";
  * docs/specs/accountant-collections-07-collections-list.md §1 and §3.
  */
 
-/** Show Not Due Yet off drops the tasks dated after today; a task due today is always shown. */
+/**
+ * The list a row belongs to, from its own figures (docs/specs/accountant-collections-23-amount-type-switch.md §1):
+ * - `collections`: Amount Due is above 0 and equals what is still to be paid (Remaining). The
+ *   calculation caps Amount Due at Remaining, so "equals" and "at least" are the same test.
+ * - `deposits`: Amount Due is above 0 and below Remaining.
+ * - `null`: Amount Due is 0, an open task that the nightly sync has not closed yet. It is in no
+ *   type; only All shows it.
+ * The two types never overlap.
+ */
+export function amountTypeOf(
+  row: Pick<CollectionsRow, "amountDueCents" | "remainingCents">,
+): Exclude<CollectionsAmountType, "all"> | null {
+  if (row.amountDueCents <= 0) return null;
+  return row.amountDueCents >= row.remainingCents ? "collections" : "deposits";
+}
+
+/**
+ * Show Not Due Yet off drops the tasks dated after today (a task due today is always shown); then
+ * the amount type keeps the rows of that type, and `all` keeps every row.
+ */
 export function filterCollectionsRows(
   rows: readonly CollectionsRow[],
   state: CollectionsListState,
   today: string,
 ): CollectionsRow[] {
-  return state.showNotDue ? [...rows] : rows.filter((row) => row.dueDate <= today);
+  const due = state.showNotDue ? [...rows] : rows.filter((row) => row.dueDate <= today);
+  return state.type === "all" ? due : due.filter((row) => amountTypeOf(row) === state.type);
 }
 
 type Compare = (a: CollectionsRow, b: CollectionsRow) => number;

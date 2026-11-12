@@ -9,9 +9,11 @@ import { TaskHistoryTable } from "./TaskHistoryTable";
 
 /**
  * The Information tab: the task history, invoice and account manager, the contacts, the venue and
- * event cards, the money, the schedule, the payments and the files.
- * docs/specs/accountant-collections-09-design.md §3 and
- * accountant-collections-13-task-history-and-files.md §3.
+ * event cards, the money, the schedule, the payments and the files. Under the invoice number sits
+ * the Signed / Booked line, when the event has one.
+ * docs/specs/accountant-collections-09-design.md §3,
+ * accountant-collections-13-task-history-and-files.md §3 and
+ * accountant-collections-20-signed-booked-line.md §3.
  */
 
 const SECTION_TITLE = "mb-3 text-xs font-bold uppercase tracking-wider text-gray-500";
@@ -46,9 +48,17 @@ export function InvoiceInformation({
       <TaskHistoryTable tasks={data.tasks} />
 
       <div className="flex flex-wrap justify-between gap-x-6 gap-y-2 rounded-[10px] border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-        <div>
-          <span className="text-gray-500">Invoice</span>
-          <span className="ml-2 font-semibold">{event.invoiceNumber ?? "—"}</span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <div>
+            <span className="text-gray-500">Invoice</span>
+            <span className="ml-2 font-semibold">{event.invoiceNumber ?? "—"}</span>
+          </div>
+          {event.signedLine && (
+            <div>
+              <span className="text-gray-500">{event.signedLine.label}</span>
+              <span className="ml-2">{event.signedLine.text}</span>
+            </div>
+          )}
         </div>
         <div>
           <span className="text-gray-500">Account Manager</span>

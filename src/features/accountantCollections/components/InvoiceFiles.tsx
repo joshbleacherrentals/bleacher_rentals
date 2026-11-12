@@ -5,6 +5,7 @@ import { Download, FileText, Loader2, Paperclip, Trash2, Upload, X } from "lucid
 import { useAuth } from "@clerk/nextjs";
 import { db } from "@/components/providers/SystemProvider";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
+import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,18 +29,27 @@ import {
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { buildFileRows, type FileRow, type InvoiceFileRow } from "../utils/invoiceFiles";
+import { openFileInNewTab } from "../utils/openFileInNewTab";
 
 /**
  * The Files section of Information: the files attached to the quote / invoice, the same rows as
  * the quote card's Files tab, with Download on every file, Delete on the ones attached by hand and
  * an Attach File button that stages the chosen files until Save. The list reads the local table;
- * upload, download and delete go to Supabase Storage, so they work online only.
- * docs/specs/accountant-collections-13-task-history-and-files.md §3.
+ * upload, download and delete go to Supabase Storage, so they work online only. A click anywhere
+ * on a row opens the file in a new tab; the Download icon really downloads it.
+ * docs/specs/accountant-collections-13-task-history-and-files.md §3,
+ * docs/specs/accountant-collections-21-files-row-click.md §1 and §3.
  */
 
 const TH = "border-b border-gray-200 p-2 font-medium";
 const ICON_BUTTON =
   "inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40";
+const OPEN_TITLE = "Opens the file in a new tab";
+// The name button is the row's one Tab stop; its ::after stretches over the row (the row is the
+// positioned box), the same way CollectionsTable makes a row a link. While the button has keyboard
+// focus, the overlay draws the 2 px blue ring around the whole row.
+const NAME_BUTTON =
+  "block max-w-[320px] cursor-pointer text-left after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-lightBlue";
 
 export type StagedFile = { id: string; file: File; preview?: string };
 
@@ -137,11 +147,13 @@ export function StagedFilesList({
 export function FilesTable({
   rows,
   isLoading,
+  onOpen,
   onDownload,
   onDelete,
 }: {
   rows: readonly FileRow[];
   isLoading: boolean;
+  onOpen: (row: FileRow) => void;
   onDownload: (row: FileRow) => void;
   onDelete: (row: FileRow) => void;
 }) {
@@ -180,16 +192,38 @@ export function FilesTable({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-100 last:border-b-0">
+              <tr
+                key={row.id}
+                className={`border-b border-gray-100 last:border-b-0 ${
+                  row.storagePath ? "group relative hover:bg-gray-50" : ""
+                }`}
+              >
                 <td className="py-2 pr-2 text-gray-500">{row.number}</td>
                 <td className="p-2">
-                  <span className="block max-w-[320px] truncate" title={row.name}>
-                    {row.name || "—"}
-                  </span>
+                  {row.storagePath ? (
+                    <button
+                      type="button"
+                      title={OPEN_TITLE}
+                      onClick={() => onOpen(row)}
+                      className={NAME_BUTTON}
+                    >
+                      <span
+                        className="block max-w-[320px] truncate group-hover:underline"
+                        title={row.name}
+                      >
+                        {row.name || "—"}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="block max-w-[320px] truncate" title={row.name}>
+                      {row.name || "—"}
+                    </span>
+                  )}
                 </td>
                 <td className="p-2">{row.typeLabel}</td>
                 <td className="p-2">{row.dateLabel}</td>
-                <td className="py-2 pl-2 text-right">
+                {/* Above the row's overlay, so Download and Delete never also open the file. */}
+                <td className="relative z-10 py-2 pl-2 text-right">
                   <span className="inline-flex gap-1">
                     <button
                       type="button"
@@ -227,6 +261,8 @@ export function FilesTable({
 export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone: string }) {
   const supabase = useClerkSupabaseClient();
   const { userId } = useAuth();
+  // `Users.id`, for the Log rows of an upload and of a delete. `userId` above is the Clerk id.
+  const userUuid = usePermissionsStore((s) => s.userId);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [staged, setStaged] = useState<StagedFile[]>([]);
@@ -294,6 +330,7 @@ export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone:
           file: item.file,
           source: "upload",
           uploadedBy: userId,
+          changedByUserUuid: userUuid,
         });
         // A file that went up leaves the list, so a retry after a later failure does not send it twice.
         removeStaged(item.id);
@@ -305,13 +342,28 @@ export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone:
     }
   };
 
+  // The tab is opened inside the click itself (`openFileInNewTab` opens it before it awaits).
+  const handleOpen = (row: FileRow): Promise<void> => {
+    const storagePath = row.storagePath;
+    if (!storagePath) return Promise.resolve();
+    return openFileInNewTab({
+      openTab: () => window.open("", "_blank"),
+      createUrl: () => createEventFileUrl(supabase, storagePath),
+      showError: createErrorToastNoThrow,
+    });
+  };
+
   const handleDownload = async (row: FileRow) => {
     if (!row.storagePath) return;
     try {
-      const url = await createEventFileUrl(supabase, row.storagePath);
+      // The storage answers this link with `Content-Disposition: attachment` and the file's name,
+      // so the browser saves the file without leaving the page. (An anchor's own `download`
+      // attribute is ignored on a link to another origin, which is why the page used to navigate.)
+      const url = await createEventFileUrl(supabase, row.storagePath, {
+        download: row.name || true,
+      });
       const link = document.createElement("a");
       link.href = url;
-      link.download = row.name || "file";
       link.click();
     } catch (err) {
       createErrorToastNoThrow(["Download failed", errorMessage(err)]);
@@ -322,10 +374,15 @@ export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone:
     if (!deleteTarget?.storagePath) return;
     setDeleting(true);
     try {
-      await removeEventFile(supabase, {
-        id: deleteTarget.id,
-        storage_path: deleteTarget.storagePath,
-      });
+      await removeEventFile(
+        supabase,
+        {
+          id: deleteTarget.id,
+          storage_path: deleteTarget.storagePath,
+          file_name: deleteTarget.name,
+        },
+        { eventId, changedByUserUuid: userUuid },
+      );
     } catch (err) {
       createErrorToastNoThrow(["Delete failed", errorMessage(err)]);
     } finally {
@@ -370,6 +427,7 @@ export function InvoiceFiles({ eventId, timezone }: { eventId: string; timezone:
       <FilesTable
         rows={rows}
         isLoading={isLoading}
+        onOpen={handleOpen}
         onDownload={handleDownload}
         onDelete={setDeleteTarget}
       />
