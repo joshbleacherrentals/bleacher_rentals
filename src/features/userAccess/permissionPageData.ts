@@ -80,10 +80,10 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "should be able to create, update, delete, and edit any events on the Quotes & Bookings page, regardless of who event is assigned to. This includes the ability to reassign events between account managers. On the Dashboard an event opens read-only: an admin can still change its colour, add or remove its bleachers, and move events between bleachers, but cannot create, edit or delete an event there.",
+        "should be able to create, update, delete, and edit any events on the Quotes & Bookings page, regardless of who event is assigned to. This includes the ability to reassign events between account managers. On the Dashboard an event opens read-only: an admin can still change its colour, add or remove its bleachers, and move events between bleachers, but cannot create, edit or delete an event there. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved.",
       ),
       account_manager: custom(
-        "Account managers can freely create events on the Quotes & Bookings page, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner. On the Dashboard they cannot create or edit events: an event opens read-only. They can change the colour and the bleachers of an event only where they could also edit it, and can move events between bleachers.",
+        "Account managers can freely create events on the Quotes & Bookings page, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner. On the Dashboard they cannot create or edit events: an event opens read-only. They can change the colour and the bleachers of an event only where they could also edit it, and can move events between bleachers. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved.",
       ),
       developer: none(
         "Unable to even access the pages where they can see events, and developer is only meant to work on the developer roadmap.",
@@ -99,6 +99,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       accountant: read(
         "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments, and the QuickBooks invoice (see those rows).",
+      ),
+    },
+  },
+  // The Booked button on a booked quote's Contract tab (BookedAtButton). Edit and Delete's rule.
+  {
+    label: "Booked Date",
+    description:
+      "The Booked button on the Contract tab of a booked quote, which shows the day the quote was booked and lets you change it. Use it to put the date back when an event moved between statuses and lost it. Picking a day saves it at once, at 12:00 in the timezone chosen in the app, and adds an 'Updated: Booked At' line to the quote's Log. The date drives the Booked column and filter on the Quotes & Bookings list, the weekly booked leaderboard and the Sales Scorecard.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full("Can change the booked date of any booked quote."),
+      account_manager: custom(
+        "Can change the booked date only on booked quotes they created, the same rule as Edit and Delete. On other account managers' quotes the button is not shown.",
+      ),
+      developer: none(
+        "Unable to even access the pages where they can see quotes, and developer is only meant to work on the developer roadmap.",
+      ),
+      viewer: none("Can read a quote but cannot change its booked date."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(
+        "Can read a quote but cannot change its booked date. Apart from payments and the QuickBooks Invoice Flag and invoice, an accountant changes nothing on a quote.",
       ),
     },
   },

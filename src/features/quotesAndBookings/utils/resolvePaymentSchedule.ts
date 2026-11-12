@@ -40,10 +40,14 @@ export function resolvePaymentSchedule(
   return installments.map((i, index) => ({ ...i, amountCents: cents[index] }));
 }
 
+/**
+ * Null when the schedule can be saved. A quote always has one: a full payment is a single
+ * installment of 100%, so an empty schedule is refused rather than meaning "no schedule".
+ */
 export function validatePaymentSchedule(
   installments: readonly PaymentInstallment[],
 ): string | null {
-  if (!installments.length) return null;
+  if (!installments.length) return "Add a payment schedule before saving.";
   if (
     installments.some(
       (i) =>

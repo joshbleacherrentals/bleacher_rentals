@@ -102,6 +102,18 @@ describe("getTitle", () => {
     );
   });
 
+  it("returns 'Updated: Booked At' for a booked date change, with the two days as written", () => {
+    const row = makeLog({
+      action_type: "update",
+      field_name: "booked_at",
+      prev_value: "Nov 5, 2026",
+      next_value: "Nov 12, 2026",
+    });
+    expect(logTitle(row)).toBe("Updated: Booked At");
+    expect(formatValue(row.prev_value)).toBe("Nov 5, 2026");
+    expect(formatValue(row.next_value)).toBe("Nov 12, 2026");
+  });
+
   it("returns 'Status Changed: Status' for status_change", () => {
     expect(getTitle(makeLog({ action_type: "status_change", field_name: "event_status" }))).toBe(
       "Status Changed: Status",
