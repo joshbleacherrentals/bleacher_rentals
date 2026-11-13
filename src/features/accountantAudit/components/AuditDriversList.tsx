@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRegisterCsvExport } from "@/components/csvExport/CsvExport";
 import { useAuditDriverTotals } from "../hooks/useAuditDriverTotals";
+import { auditDriversCsvPrefix, buildAuditDriversCsv } from "../utils/auditCsv";
 import { filterAuditDriverRows, type AuditDriverRow } from "../utils/auditDriverRows";
 import type { AuditRange } from "../utils/auditRange";
 import { nextAuditSort, sortAuditDriverRows, type AuditSortKey } from "../utils/auditSort";
@@ -99,6 +101,14 @@ export function AuditDriversList({ range, onRangeChange, isInverted }: Props) {
     () => sortAuditDriverRows(filterAuditDriverRows(rows, text), sort),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, text, sort.key, sort.direction],
+  );
+
+  // What Export to CSV in the page header downloads while this list is open: the drivers as shown.
+  const getCsv = useCallback(() => buildAuditDriversCsv(visible), [visible]);
+  useRegisterCsvExport(
+    auditDriversCsvPrefix(range),
+    getCsv,
+    isInverted || isLoading || !!error || visible.length === 0,
   );
 
   let body;

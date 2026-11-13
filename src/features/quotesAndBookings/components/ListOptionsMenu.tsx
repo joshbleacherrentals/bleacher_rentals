@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreVertical, SlidersHorizontal } from "lucide-react";
+import { Download, MoreVertical, SlidersHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -12,9 +12,9 @@ import {
 
 /**
  * The three-dot options menu on the quotes lists. It holds what is rarely needed, so it takes no
- * room on the page: the Filters sidebar toggle and Show Deleted. A dot on the button says something
- * is narrowing the list that may be out of sight (Show Deleted, or filters applied while the sidebar
- * is closed).
+ * room on the page: the Filters sidebar toggle, Show Deleted and Export to CSV. A dot on the button
+ * says something is narrowing the list that may be out of sight (Show Deleted, or filters applied
+ * while the sidebar is closed).
  */
 export function ListOptionsMenu({
   showDeleted,
@@ -22,6 +22,8 @@ export function ListOptionsMenu({
   filtersOpen,
   activeFilterCount,
   onToggleFilters,
+  onExportCsv,
+  exportDisabled,
 }: {
   showDeleted: boolean;
   onShowDeletedChange: (value: boolean) => void;
@@ -29,6 +31,10 @@ export function ListOptionsMenu({
   /** How many filters are narrowing the list, shown next to Filters. */
   activeFilterCount: number;
   onToggleFilters: () => void;
+  /** Downloads the list as it is now (filters, search and sort applied) as a CSV file. */
+  onExportCsv: () => void;
+  /** True while the list is loading or has no rows, when there is nothing to export. */
+  exportDisabled: boolean;
 }) {
   const hidden = showDeleted || (!filtersOpen && activeFilterCount > 0);
   return (
@@ -68,6 +74,15 @@ export function ListOptionsMenu({
         >
           Show Deleted
         </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={onExportCsv}
+          disabled={exportDisabled}
+          className="cursor-pointer"
+        >
+          <Download />
+          Export to CSV
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -13,17 +13,14 @@ import type { AuditRange } from "../utils/auditRange";
 const NO_DRIVER = "__none__";
 
 /**
- * One page of a driver's trackers, newest date first (D5), every status (D1). The group is joined on
- * `wt.worktracker_group_uuid` (A1, R1): no date comparison, no week arithmetic, at most one group
- * per tracker. Left joins throughout, so a missing type, bleacher or address row leaves the tracker
- * listed with nulls (R6). The last tie-break on `wt.id` keeps a row from moving between pages (R3).
+ * A driver's trackers, newest date first (D5), every status (D1), before any paging. The group is
+ * joined on `wt.worktracker_group_uuid` (A1, R1): no date comparison, no week arithmetic, at most
+ * one group per tracker. Left joins throughout, so a missing type, bleacher or address row leaves
+ * the tracker listed with nulls (R6). The last tie-break on `wt.id` keeps a row from moving between
+ * pages (R3). One query behind both the pages and the Export to CSV button, so the file lists what
+ * the pages list, in the same order.
  */
-export function buildAuditTrackersQuery(
-  driverUuid: string | null,
-  range: AuditRange,
-  page: number,
-  pageSize: number,
-) {
+function auditTrackersQuery(driverUuid: string | null, range: AuditRange) {
   return (
     db
       .selectFrom("WorkTrackers as wt")
@@ -64,10 +61,25 @@ export function buildAuditTrackersQuery(
       .orderBy(sql<string>`wt.pickup_time_start is null`, "asc")
       .orderBy("wt.pickup_time_start", "asc")
       .orderBy("wt.id", "asc")
-      .limit(pageSize)
-      .offset((page - 1) * pageSize)
-      .compile()
   );
+}
+
+/** One page of a driver's trackers (see `auditTrackersQuery`). */
+export function buildAuditTrackersQuery(
+  driverUuid: string | null,
+  range: AuditRange,
+  page: number,
+  pageSize: number,
+) {
+  return auditTrackersQuery(driverUuid, range)
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
+    .compile();
+}
+
+/** Every one of a driver's trackers in the range, for the Export to CSV button: no paging. */
+export function buildAuditTrackersExportQuery(driverUuid: string | null, range: AuditRange) {
+  return auditTrackersQuery(driverUuid, range).compile();
 }
 
 /** How many trackers the driver has in the range: the total behind the pager. */

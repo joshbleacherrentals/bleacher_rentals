@@ -80,16 +80,16 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "should be able to create, update, delete, and edit any events on the Quotes & Bookings page, regardless of who event is assigned to. This includes the ability to reassign events between account managers. On the Dashboard an event opens read-only: an admin can still change its colour, add or remove its bleachers, and move events between bleachers, but cannot create, edit or delete an event there. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved.",
+        "should be able to create, update, delete, and edit any events on the Quotes & Bookings page, regardless of who event is assigned to. This includes the ability to reassign events between account managers. On the Dashboard an event opens read-only: an admin can still change its colour, add or remove its bleachers, and move events between bleachers, but cannot create, edit or delete an event there. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved. On the Quotes & Bookings list, the three-dot menu has Export to CSV, which downloads the list as it is on screen — the filters, search and sort applied, every page of it — with the same columns.",
       ),
       account_manager: custom(
-        "Account managers can freely create events on the Quotes & Bookings page, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner. On the Dashboard they cannot create or edit events: an event opens read-only. They can change the colour and the bleachers of an event only where they could also edit it, and can move events between bleachers. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved.",
+        "Account managers can freely create events on the Quotes & Bookings page, but can only edit or delete events that were created by themselves. They are able to view All events regardless of the event owner. On the Dashboard they cannot create or edit events: an event opens read-only. They can change the colour and the bleachers of an event only where they could also edit it, and can move events between bleachers. A quote or booking cannot be saved without a payment schedule, and a schedule cannot be removed; a full payment is a single installment of 100%. An older event that has no schedule needs one set up before it can be saved. On the Quotes & Bookings list, the three-dot menu has Export to CSV, which downloads the list as it is on screen — the filters, search and sort applied, every page of it — with the same columns.",
       ),
       developer: none(
         "Unable to even access the pages where they can see events, and developer is only meant to work on the developer roadmap.",
       ),
       viewer: read(
-        "This user will be able to see all the event and every detail but not able to create, edit, or delete any events. On the Dashboard they can open an event to read it, and its Quote button takes them to the event's page.",
+        "This user will be able to see all the event and every detail but not able to create, edit, or delete any events. On the Dashboard they can open an event to read it, and its Quote button takes them to the event's page. On the Quotes & Bookings list, the three-dot menu has Export to CSV, which downloads the list as it is on screen — the filters, search and sort applied, every page of it — with the same columns.",
       ),
       driver: custom(
         "Can file a ticket to the developers from the mobile app, and edit their own for a short window afterwards. Has no access to the rest of the roadmap — they cannot see, edit or comment on anyone else's work.",
@@ -98,7 +98,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "The Dashboard shows events, and a maintainer can open one to read it, but cannot create, edit or delete any. They still have no Quotes & Bookings page.",
       ),
       accountant: read(
-        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments, and the QuickBooks invoice (see those rows).",
+        "Opens the Quotes & Bookings list and any quote or booking and reads it — the Contract, Billing and Log tabs, and for a quote made from the website form, its Submission tab. Cannot create, edit, delete or send one. What they can change is the QuickBooks Invoice Flag and the payments, and the QuickBooks invoice (see those rows). On the Quotes & Bookings list, the three-dot menu has Export to CSV, which downloads the list as it is on screen — the filters, search and sort applied, every page of it — with the same columns.",
       ),
     },
   },
@@ -221,7 +221,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       "The Accountant page: the AR Deposits tab lists booked events with an amount due that is scheduled to be paid after today, with the Amount Due and the Remaining Balance. Filters, search and sorting apply to it. A second tab, Need attention, lists the quotes whose QuickBooks invoice no longer matches the quote; it opens on the newest event. The Accountant page opens on the Collections tab.",
     category: "Day to Day Operations",
     roles: {
-      admin: read("Can open the Accountant page and see the balances of every booking."),
+      admin: read(
+        "Can open the Accountant page and see the balances of every booking. Export to CSV in the page header downloads the AR Deposits or the Need attention tab as it is on screen — search and sort applied, every page of it.",
+      ),
       account_manager: none(
         "The Accountant page is for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote.",
       ),
@@ -233,7 +235,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: read("Can open the Accountant page and see the balances of every booking."),
+      accountant: read(
+        "Can open the Accountant page and see the balances of every booking. Export to CSV in the page header downloads the AR Deposits or the Need attention tab as it is on screen — search and sort applied, every page of it.",
+      ),
     },
   },
   {
@@ -243,7 +247,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab.",
+        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab. Export to CSV in the page header downloads the list as it is on screen — the Collections / Deposits / All switch and Show Not Due Yet applied, sorted as shown.",
       ),
       account_manager: none(
         "The Collections tab and the invoice page are for accountants and administrators. An account manager still sees a booking's balance on the Billing tab of the quote, but not the Open AR button.",
@@ -257,7 +261,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
-        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab.",
+        "Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment. Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab. Export to CSV in the page header downloads the list as it is on screen — the Collections / Deposits / All switch and Show Not Due Yet applied, sorted as shown.",
       ),
     },
   },
@@ -269,7 +273,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: read(
-        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active.",
+        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Export to CSV in the page header downloads the drivers table for the range and search chosen, or, on a driver's page, all of that driver's work trackers in the range, not just the page on screen.",
       ),
       account_manager: none(
         "The Accountant page is for accountants and administrators. An account manager still reads their drivers' work trackers on the Work Trackers pages.",
@@ -283,7 +287,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: read(
-        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
+        "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages. Export to CSV in the page header downloads the drivers table for the range and search chosen, or, on a driver's page, all of that driver's work trackers in the range, not just the page on screen.",
       ),
     },
   },
