@@ -45,7 +45,8 @@ vi.mock("@/components/providers/SystemProvider", () => ({
   },
 }));
 
-const { buildAuditTrackersQuery, buildAuditTrackerCountQuery } = await import("./auditTrackers");
+const { buildAuditTrackersQuery, buildAuditTrackerCountQuery, buildAuditTrackersExportQuery } =
+  await import("./auditTrackers");
 const { toAuditRow } = await import("../utils/auditRows");
 
 beforeEach(() => {
@@ -462,5 +463,57 @@ describe("the date range (spec 05, D8, D15)", () => {
   it("the page's rows and the count agree for the same range (the Trips figure of the table)", () => {
     const total = (countOf("d1", NOVEMBER)[0] as { total: number }).total;
     expect(idsOf("d1", 1, 100, NOVEMBER)).toHaveLength(total);
+  });
+});
+
+// The Export to CSV button of the Audit tab: every tracker of the driver in the range, not a page.
+describe("the export query (every tracker in the range)", () => {
+  const exportIds = (driver: string | null, range: Range = ALL_TIME) =>
+    run(buildAuditTrackersExportQuery(driver, range)).map((r) => toAuditRow(r).id);
+
+  it("lists what all the pages list together, in the same order", () => {
+    addTracker({ id: "a", date: "2026-09-01" });
+    addTracker({ id: "b", date: "2026-09-03" });
+    addTracker({ id: "c", date: "2026-09-03", pickupTime: "08:00:00" });
+    addTracker({ id: "d", date: "2026-09-05" });
+    addTracker({ id: "e", date: "2026-09-07" });
+
+    const pages = [1, 2, 3].flatMap((n) => idsOf("d1", n, 2));
+    expect(exportIds("d1")).toEqual(pages);
+    expect(exportIds("d1")).toHaveLength(5);
+  });
+
+  it("is narrowed by the range, ends included, and is the driver's own", () => {
+    addTracker({ id: "a", date: "2026-09-01" });
+    addTracker({ id: "b", date: "2026-09-15" });
+    addTracker({ id: "c", date: "2026-09-30" });
+    addTracker({ id: "other", driver: "d2", date: "2026-09-15" });
+
+    expect(exportIds("d1", { from: "2026-09-15", to: "2026-09-30" })).toEqual(["c", "b"]);
+  });
+
+  it("never lists a tracker with no date, and lists nothing for no driver", () => {
+    addTracker({ id: "nodate", date: null });
+    addTracker({ id: "dated", date: "2026-09-01" });
+
+    expect(exportIds("d1")).toEqual(["dated"]);
+    expect(exportIds(null)).toEqual([]);
+  });
+
+  it("carries the same columns as a page, so one row builder serves both", () => {
+    addGroup("g1", "d1", "2026-09-21", 1);
+    addBleacher("bl1", 12);
+    addType("t1", "pickup", "Pickup");
+    addTracker({ id: "a", bleacher: "bl1", type: "t1", group: "g1", minutes: 90, meters: 16093 });
+
+    const [row] = run(buildAuditTrackersExportQuery("d1", ALL_TIME)).map(toAuditRow);
+    expect(row).toMatchObject({
+      id: "a",
+      bleacherNumber: 12,
+      typeName: "Pickup",
+      driveMinutes: 90,
+      distanceMeters: 16093,
+      payment: "paid",
+    });
   });
 });

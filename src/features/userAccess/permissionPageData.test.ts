@@ -351,15 +351,19 @@ describe("permission matrix", () => {
       const OPEN_AP_SENTENCE =
         "Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab.";
 
+      // The Export to CSV button in the header of the Accountant page.
+      const EXPORT_SENTENCE =
+        "Export to CSV in the page header downloads the list as it is on screen — the Collections / Deposits / All switch and Show Not Due Yet applied, sorted as shown.";
+
       it("tells the accountant what they can do there", () => {
         expect(accountant("Collections")?.note).toBe(
-          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE} ${OPEN_AP_SENTENCE}`,
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE} ${OPEN_AP_SENTENCE} ${EXPORT_SENTENCE}`,
         );
       });
 
       it("tells an admin the same", () => {
         expect(row?.roles.admin.note).toBe(
-          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE} ${OPEN_AP_SENTENCE}`,
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE} ${OPEN_AP_SENTENCE} ${EXPORT_SENTENCE}`,
         );
       });
 
@@ -435,13 +439,29 @@ describe("permission matrix", () => {
         );
       });
 
+      // The Export to CSV button in the header of the Accountant page.
+      const EXPORT_SENTENCE =
+        "Export to CSV in the page header downloads the drivers table for the range and search chosen, or, on a driver's page, all of that driver's work trackers in the range, not just the page on screen.";
+
       it("tells an admin and an accountant what they can read, deactivated drivers included", () => {
         expect(row?.roles.admin.note).toBe(
-          "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active.",
+          `Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. ${EXPORT_SENTENCE}`,
         );
         expect(row?.roles.accountant.note).toBe(
-          "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
+          `Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages. ${EXPORT_SENTENCE}`,
         );
+      });
+
+      it("says Export to CSV is for the same two roles, and for no one else", () => {
+        for (const role of [
+          "account_manager",
+          "viewer",
+          "developer",
+          "driver",
+          "maintainer",
+        ] as const) {
+          expect(row?.roles[role].note ?? "", role).not.toContain("Export to CSV");
+        }
       });
 
       it("tells an account manager and a viewer where they still read work trackers", () => {
