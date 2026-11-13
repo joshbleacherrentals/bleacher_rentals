@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { DataTable, Column, CellText, CellSecondary } from "@/components/DataTable";
 import { Pagination } from "@/components/Pagination";
+import { useRegisterCsvExport } from "@/components/csvExport/CsvExport";
 import { TabsContent } from "@/components/ui/tabs";
 import type { AccountsReceivableEvent, QuotesBookingsEvent } from "../types";
 import type { Currency } from "../types/quoteTypes";
@@ -13,6 +14,7 @@ import { searchReceivables } from "../utils/searchEvents";
 import { sortEvents, type EventSort, type SortKey } from "../utils/sortEvents";
 import { clampPage, getTotalPages, slicePage, type PageSize } from "../utils/pagination";
 import { formatTotalsLabel, sumByCurrency } from "../utils/eventCurrency";
+import { buildReceivablesCsv } from "../utils/eventsCsv";
 import { formatMoney } from "../utils/formatMoney";
 import { RECEIVABLES_HELP } from "../utils/receivablesHelp";
 import type { ReceivablesTab } from "../utils/listTabs";
@@ -102,6 +104,17 @@ function ReceivablesTable({
   const pageData = useMemo(
     () => (shown ? slicePage(shown, currentPage, pageSize) : shown),
     [shown, currentPage, pageSize],
+  );
+
+  // The tab that is open is the one Export to CSV in the page header downloads.
+  const getCsv = useCallback(
+    () => buildReceivablesCsv(shown ?? [], currencyOf),
+    [shown, currencyOf],
+  );
+  useRegisterCsvExport(
+    tab === "ar" ? "accountant-ar" : "accountant-ar-deposits",
+    getCsv,
+    isLoading || totalItems === 0,
   );
 
   const columns: Column<AccountsReceivableEvent>[] = [

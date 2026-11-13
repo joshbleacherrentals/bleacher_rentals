@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { CsvExportProvider, ExportCsvButton } from "@/components/csvExport/CsvExport";
 import { CountBadge } from "@/components/CountBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination } from "@/components/Pagination";
@@ -44,8 +45,21 @@ import { nextSort, type SortKey } from "@/features/quotesAndBookings/utils/sortE
  * docs/specs/accountant-quotes-02-accountant-page.md
  * docs/specs/accountant-collections-09-design.md
  * docs/specs/accountant-audit-01-tab.md
+ *
+ * Export to CSV in the header is on every tab: the table that is open registers its own rows with
+ * it (`useRegisterCsvExport`), so the file is whatever that tab shows with its filters, search and
+ * sort applied.
  */
 export default function AccountantPage() {
+  return (
+    <CsvExportProvider>
+      <AccountantPageBody />
+    </CsvExportProvider>
+  );
+}
+
+/** The page itself, split from the wrapper above so it sits inside the CsvExportProvider. */
+function AccountantPageBody() {
   const router = useRouter();
   const { scrollRef } = useLayoutContext();
 
@@ -183,37 +197,40 @@ export default function AccountantPage() {
         <PageHeader
           title="Accountant"
           action={
-            hideReceivablesChrome ? undefined : (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={showDeleted}
-                  onClick={() => setShowDeleted((v) => !v)}
-                  className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none"
-                >
-                  <span>Show Deleted</span>
-                  <span
-                    className={`relative inline-flex h-[22px] w-[40px] shrink-0 rounded-full transition-colors duration-200 ${
-                      showDeleted ? "bg-darkBlue" : "bg-gray-300"
-                    }`}
+            <div className="flex items-center gap-2">
+              {!hideReceivablesChrome && (
+                <>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showDeleted}
+                    onClick={() => setShowDeleted((v) => !v)}
+                    className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none"
                   >
+                    <span>Show Deleted</span>
                     <span
-                      className={`pointer-events-none inline-block h-[18px] w-[18px] rounded-full bg-white shadow-sm transform transition-transform duration-200 mt-[2px] ${
-                        showDeleted ? "translate-x-[20px]" : "translate-x-[2px]"
+                      className={`relative inline-flex h-[22px] w-[40px] shrink-0 rounded-full transition-colors duration-200 ${
+                        showDeleted ? "bg-darkBlue" : "bg-gray-300"
                       }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-[18px] w-[18px] rounded-full bg-white shadow-sm transform transition-transform duration-200 mt-[2px] ${
+                          showDeleted ? "translate-x-[20px]" : "translate-x-[2px]"
+                        }`}
+                      />
+                    </span>
+                  </button>
+                  {!filters.isOpen && (
+                    <FilterButton
+                      isOpen={false}
+                      onClick={toggleOpen}
+                      activeCount={countActiveFilters(filters)}
                     />
-                  </span>
-                </button>
-                {!filters.isOpen && (
-                  <FilterButton
-                    isOpen={false}
-                    onClick={toggleOpen}
-                    activeCount={countActiveFilters(filters)}
-                  />
-                )}
-              </div>
-            )
+                  )}
+                </>
+              )}
+              <ExportCsvButton />
+            </div>
           }
         />
 
