@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRegisterCsvExport } from "@/components/csvExport/CsvExport";
 import { useCollectionsData } from "../hooks/useCollectionsData";
 import {
   nextSortState,
@@ -9,6 +10,7 @@ import {
   type CollectionsListState,
   type CollectionsSortKey,
 } from "../utils/collectionsListState";
+import { buildCollectionsCsv, isCollectionsExportDisabled } from "../utils/collectionsCsv";
 import { filterCollectionsRows, sortCollectionsRows } from "../utils/collectionsSort";
 import { withCollectionsListState } from "../utils/invoiceUrl";
 import { AmountTypeButton } from "./AmountTypeButton";
@@ -30,6 +32,14 @@ export function CollectionsTab() {
   const listed = useMemo(
     () => sortCollectionsRows(filterCollectionsRows(rows, state, today), state),
     [rows, state, today],
+  );
+
+  // What Export to CSV in the page header downloads while this tab is open: the list as shown.
+  const getCsv = useCallback(() => buildCollectionsCsv(listed, today), [listed, today]);
+  useRegisterCsvExport(
+    "accountant-collections",
+    getCsv,
+    isCollectionsExportDisabled(isLoading, error, listed.length),
   );
 
   const update = (next: CollectionsListState) => {

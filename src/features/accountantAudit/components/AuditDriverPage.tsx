@@ -1,13 +1,17 @@
 "use client";
 
+import { useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { useRegisterCsvExport } from "@/components/csvExport/CsvExport";
 import { useLayoutContext } from "@/contexts/LayoutContexts";
 import type { PageSize } from "@/features/quotesAndBookings/utils/pagination";
 import type { AuditDriverInfo as AuditDriverInfoData } from "../db/auditDriverInfo";
+import { loadAuditTrackersForExport } from "../db/loadAuditTrackersForExport";
 import { useAuditTrackers } from "../hooks/useAuditTrackers";
+import { auditTrackersCsvPrefix, buildAuditTrackersCsv } from "../utils/auditCsv";
 import type { AuditRange } from "../utils/auditRange";
 import { parseAuditPaging, withAuditDriver, withAuditPaging } from "../utils/auditUrlState";
 import { AuditAvatar } from "./AuditAvatar";
@@ -60,6 +64,19 @@ export function AuditDriverPage({ driver, info, range, onRangeChange, isInverted
   const name = info
     ? [info.firstName, info.lastName].filter(Boolean).join(" ") || "Unknown Driver"
     : "";
+
+  // What Export to CSV in the page header downloads while this page is open: every tracker of the
+  // driver in the range, not just the page on screen, so it is read when the button is clicked.
+  const { from, to } = range;
+  const getCsv = useCallback(
+    async () => buildAuditTrackersCsv(await loadAuditTrackersForExport(driver, { from, to })),
+    [driver, from, to],
+  );
+  useRegisterCsvExport(
+    auditTrackersCsvPrefix(name, range),
+    getCsv,
+    isInverted || isLoading || !!error || total === 0,
+  );
 
   return (
     <div data-testid="audit-driver-page">
