@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { DataTable, Column, CellText, CellSecondary } from "@/components/DataTable";
 import { Pagination } from "@/components/Pagination";
+import { useRegisterCsvExport } from "@/components/csvExport/CsvExport";
 import { TabsContent } from "@/components/ui/tabs";
 import type { QuotesBookingsEvent } from "../types";
 import { useNeedAttentionData } from "../hooks/useNeedAttentionData";
+import { buildNeedAttentionCsv } from "../utils/eventsCsv";
 import { INVOICE_REASON_TEXT } from "../utils/invoiceAttention";
 import { formatInvoiceNumber } from "../utils/invoiceNumber";
 import { needAttentionRows, type NeedAttentionEvent } from "../utils/needAttentionRows";
@@ -85,6 +87,10 @@ function NeedAttentionTable({
     () => (shown ? slicePage(shown, currentPage, pageSize) : shown),
     [shown, currentPage, pageSize],
   );
+
+  // What Export to CSV in the page header downloads while this tab is open.
+  const getCsv = useCallback(() => buildNeedAttentionCsv(shown ?? []), [shown]);
+  useRegisterCsvExport("accountant-need-attention", getCsv, isLoading || totalItems === 0);
 
   const columns: Column<NeedAttentionEvent>[] = [
     {

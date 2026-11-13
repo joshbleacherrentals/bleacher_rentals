@@ -46,6 +46,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Pagination } from "@/components/Pagination";
 import { useLayoutContext } from "@/contexts/LayoutContexts";
 import { clampPage, getTotalPages, slicePage } from "@/features/quotesAndBookings/utils/pagination";
+import { buildEventsCsv, eventStatusLabel } from "@/features/quotesAndBookings/utils/eventsCsv";
+import { csvFilename, downloadCsv } from "@/lib/csv";
 
 function getStatusVariant(status: string | null): "success" | "warning" | "error" | "default" {
   switch (status?.toLowerCase()) {
@@ -58,11 +60,6 @@ function getStatusVariant(status: string | null): "success" | "warning" | "error
     default:
       return "default";
   }
-}
-
-function capitalizeStatus(status: string | null): string {
-  if (!status) return "Unknown";
-  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }
 
 export default function QuotesBookingsPage() {
@@ -196,6 +193,13 @@ export default function QuotesBookingsPage() {
     [currencyByOfficeId],
   );
 
+  // The export is the whole list as filtered, searched and sorted — every page of it, not just the
+  // one on screen.
+  const exportCsv = useCallback(() => {
+    if (!searchedData || searchedData.length === 0) return;
+    downloadCsv(csvFilename("quotes-bookings"), buildEventsCsv(searchedData, currencyOf));
+  }, [searchedData, currencyOf]);
+
   const periodLabel =
     timeRangeParam === "quarterly"
       ? "this quarter"
@@ -214,14 +218,11 @@ export default function QuotesBookingsPage() {
       key: "status",
       header: "Status",
       sortKey: "status",
-      render: (event) =>
-        event.deleted === 1 ? (
-          <CellBadge variant="error">Deleted</CellBadge>
-        ) : (
-          <CellBadge variant={getStatusVariant(event.event_status)}>
-            {capitalizeStatus(event.event_status)}
-          </CellBadge>
-        ),
+      render: (event) => (
+        <CellBadge variant={event.deleted === 1 ? "error" : getStatusVariant(event.event_status)}>
+          {eventStatusLabel(event)}
+        </CellBadge>
+      ),
     },
     {
       key: "account_manager",
@@ -329,6 +330,8 @@ export default function QuotesBookingsPage() {
                 filtersOpen={filters.isOpen}
                 activeFilterCount={countActiveFilters(filters)}
                 onToggleFilters={toggleOpen}
+                onExportCsv={exportCsv}
+                exportDisabled={isLoading || totalItems === 0}
               />
             </div>
           }
