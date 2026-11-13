@@ -8,14 +8,17 @@ import { neighboursOf, orderedEventIds } from "./taskNeighbours";
 
 const TODAY = "2026-11-15";
 
+// By default a row owes all it still has to pay (Amount Due equals Remaining): a Collections row.
 function row(id: string, overrides: Partial<CollectionsRow> = {}): CollectionsRow {
+  const amountDueCents = overrides.amountDueCents ?? 10000;
   return {
     eventId: id,
     eventName: `Event ${id}`,
     taskId: `task-${id}`,
     dueDate: "2026-11-10",
     note: "Remind the customer about payment",
-    amountDueCents: 10000,
+    amountDueCents,
+    remainingCents: amountDueCents,
     currency: "USD",
     daysOverdue: 10,
     ...overrides,
@@ -26,7 +29,8 @@ const state = (
   sort: CollectionsListState["sort"],
   dir: CollectionsListState["dir"],
   showNotDue = false,
-): CollectionsListState => ({ sort, dir, showNotDue });
+  type: CollectionsListState["type"] = "collections",
+): CollectionsListState => ({ sort, dir, showNotDue, type });
 
 // Four rows with distinct values in every column, so each order is unambiguous.
 const ROWS = [
@@ -87,6 +91,61 @@ describe("orderedEventIds", () => {
       );
     }
     expect(orderedEventIds(tied, state("followUp", "asc"), TODAY)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  // docs/specs/accountant-collections-23-amount-type-switch.md §1 (D4) and §5.
+  describe("the amount type", () => {
+    // Two Collections rows, two Deposits rows, one with nothing overdue.
+    const mixed = [
+      row("c1", { amountDueCents: 40000 }),
+      row("c2", { amountDueCents: 20000 }),
+      row("d1", { amountDueCents: 30000, remainingCents: 90000 }),
+      row("d2", { amountDueCents: 10000, remainingCents: 50000 }),
+      row("z", { amountDueCents: 0, remainingCents: 90000 }),
+    ];
+    const by = (type: CollectionsListState["type"]) =>
+      orderedEventIds(mixed, state("amount", "desc", false, type), TODAY);
+
+    it("Collections walks only the Collections events", () => {
+      expect(by("collections")).toEqual(["c1", "c2"]);
+    });
+
+    it("Deposits walks only the Deposits events", () => {
+      expect(by("deposits")).toEqual(["d1", "d2"]);
+    });
+
+    it("All walks every event, the one with nothing overdue included", () => {
+      expect(by("all")).toEqual(["c1", "d1", "c2", "d2", "z"]);
+    });
+
+    it("keeps the sort inside a type, and Show Not Due Yet with it", () => {
+      const rows = [
+        ...mixed,
+        row("d3", { amountDueCents: 20000, remainingCents: 30000, dueDate: "2026-11-30" }),
+      ];
+      expect(orderedEventIds(rows, state("amount", "asc", false, "deposits"), TODAY)).toEqual([
+        "d2",
+        "d1",
+      ]);
+      expect(orderedEventIds(rows, state("amount", "asc", true, "deposits"), TODAY)).toEqual([
+        "d2",
+        "d3",
+        "d1",
+      ]);
+    });
+
+    it("an event outside the chosen type has no neighbours", () => {
+      expect(neighboursOf(by("deposits"), "c1")).toEqual({
+        found: false,
+        previousId: null,
+        nextId: null,
+      });
+      expect(neighboursOf(by("deposits"), "d1")).toEqual({
+        found: true,
+        previousId: null,
+        nextId: "d2",
+      });
+    });
   });
 
   it("is empty for no rows", () => {

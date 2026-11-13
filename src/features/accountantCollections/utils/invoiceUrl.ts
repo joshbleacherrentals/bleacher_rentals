@@ -1,8 +1,12 @@
-import { collectionsListStateToParams, type CollectionsListState } from "./collectionsListState";
+import {
+  collectionsListStateToParams,
+  DEFAULT_LIST_STATE,
+  type CollectionsListState,
+} from "./collectionsListState";
 
 /**
  * The links between the Collections list and the invoice page. The list's state (`csort`, `cdir`,
- * `cnotdue`) travels in the URL both ways, so "Back to tasks" returns to the same order and spec 10
+ * `cnotdue` and `type`) travels in the URL both ways, so "Back to tasks" returns to the same order and spec 10
  * can recreate it. docs/specs/accountant-collections-09-design.md §3.
  */
 
@@ -15,7 +19,7 @@ export function parseInvoiceTab(raw: string | null): InvoiceTab {
 
 /** Every parameter the list owns: the ones a state change must clear before it writes its own. */
 const LIST_PARAMS = Object.keys(
-  collectionsListStateToParams({ sort: "overdue", dir: "desc", showNotDue: true }),
+  collectionsListStateToParams({ sort: "overdue", dir: "desc", showNotDue: true, type: "all" }),
 );
 
 export function invoiceHref({
@@ -33,6 +37,22 @@ export function invoiceHref({
     ...collectionsListStateToParams(listState),
   });
   return `/accountant/invoice?${params}`;
+}
+
+/**
+ * The invoice page of an event on its Information tab, for the Open AR button on the quote card.
+ * It carries no list state: the page was not reached from the Collections list.
+ */
+export function openApHref(eventId: string): string {
+  return invoiceHref({ eventId, tab: "info", listState: DEFAULT_LIST_STATE });
+}
+
+/**
+ * The quote card of an event (`/quotes-bookings/{id}`), for the Open Q/I button. It opens the card
+ * as it opens by itself, so no tab is added. docs/specs/accountant-collections-17-open-qi-button.md §3.
+ */
+export function quoteCardHref(eventId: string): string {
+  return `/quotes-bookings/${encodeURIComponent(eventId)}`;
 }
 
 export function collectionsHref(listState: CollectionsListState): string {

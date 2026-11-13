@@ -5,6 +5,7 @@ import {
   logLineItemChanges,
   formatCentsForLog,
   FIELD_LABELS,
+  TRACKED_FIELDS,
 } from "./logEventChanges";
 
 const mockInsert = vi.fn();
@@ -32,6 +33,14 @@ describe("FIELD_LABELS", () => {
 
   it("keeps the label of the manual checkbox", () => {
     expect(FIELD_LABELS.is_qbo).toBe("QuickBooks Invoice");
+  });
+
+  it("names the booked date, so the Log tab shows 'Updated: Booked At' when the date button changes it", () => {
+    expect(FIELD_LABELS.booked_at).toBe("Booked At");
+  });
+
+  it("does not make the edit page log the booked date: it changes with the status, which has its own row", () => {
+    expect(TRACKED_FIELDS as readonly string[]).not.toContain("booked_at");
   });
 });
 

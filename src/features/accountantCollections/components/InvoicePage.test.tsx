@@ -60,6 +60,7 @@ vi.mock("./InvoiceFiles", () => ({
 }));
 // Open PDF reads the local signatures and asks Supabase Storage; its own test covers it.
 vi.mock("./OpenPdfButton", () => ({
+  HEADER_BUTTON: "stand-in-header-button",
   OpenPdfButton: (props: unknown) => {
     mockOpenPdf(props);
     return <button type="button">Open PDF</button>;
@@ -255,6 +256,15 @@ describe("InvoicePage: navigation", () => {
     const html = unescape(renderAt("id=evt-1&csort=amount&cdir=desc&cnotdue=1"));
     expect(html).toContain('href="/accountant?tab=collections&csort=amount&cdir=desc&cnotdue=1"');
   });
+
+  // docs/specs/accountant-collections-23-amount-type-switch.md §1 (D4) and §4 (S77).
+  it("brings the type back with it: Back to tasks returns to the same type", () => {
+    const html = unescape(renderAt("id=evt-1&type=deposits"));
+    expect(html).toContain('href="/accountant?tab=collections&type=deposits"');
+    expect(unescape(renderAt("id=evt-1&csort=amount&type=all"))).toContain(
+      'href="/accountant?tab=collections&csort=amount&type=all"',
+    );
+  });
 });
 
 describe("InvoicePage: Previous Task and Next Task", () => {
@@ -269,19 +279,51 @@ describe("InvoicePage: Previous Task and Next Task", () => {
     renderAt("id=evt-1&tab=messages&csort=amount&cdir=desc&cnotdue=1");
     expect(mockNeighbours).toHaveBeenCalledWith({
       eventId: "evt-1",
-      listState: { sort: "amount", dir: "desc", showNotDue: true },
+      listState: { sort: "amount", dir: "desc", showNotDue: true, type: "collections" },
     });
   });
 
-  it("links to the neighbours, keeping the tab and the three list parameters", () => {
+  // docs/specs/accountant-collections-23-amount-type-switch.md §1 (D4).
+  it("asks the neighbours for the type in the address", () => {
+    renderAt("id=evt-1&type=deposits");
+    expect(mockNeighbours).toHaveBeenCalledWith({
+      eventId: "evt-1",
+      listState: { sort: "followUp", dir: "asc", showNotDue: false, type: "deposits" },
+    });
+    renderAt("id=evt-1&type=all");
+    expect(mockNeighbours).toHaveBeenLastCalledWith({
+      eventId: "evt-1",
+      listState: { sort: "followUp", dir: "asc", showNotDue: false, type: "all" },
+    });
+  });
+
+  it("asks for Collections when the address has no type or an unknown one", () => {
+    for (const query of ["id=evt-1", "id=evt-1&type=bogus"]) {
+      renderAt(query);
+      expect(mockNeighbours).toHaveBeenLastCalledWith({
+        eventId: "evt-1",
+        listState: { sort: "followUp", dir: "asc", showNotDue: false, type: "collections" },
+      });
+    }
+  });
+
+  it("links to the neighbours, keeping the tab and the four list parameters", () => {
     mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
-    const html = unescape(renderAt("id=evt-1&tab=messages&csort=amount&cdir=desc&cnotdue=1"));
+    const html = unescape(
+      renderAt("id=evt-1&tab=messages&csort=amount&cdir=desc&cnotdue=1&type=deposits"),
+    );
     expect(link(html, "Previous Task")).toBe(
-      "/accountant/invoice?id=evt-0&tab=messages&csort=amount&cdir=desc&cnotdue=1",
+      "/accountant/invoice?id=evt-0&tab=messages&csort=amount&cdir=desc&cnotdue=1&type=deposits",
     );
     expect(link(html, "Next Task")).toBe(
-      "/accountant/invoice?id=evt-2&tab=messages&csort=amount&cdir=desc&cnotdue=1",
+      "/accountant/invoice?id=evt-2&tab=messages&csort=amount&cdir=desc&cnotdue=1&type=deposits",
     );
+  });
+
+  it("writes no type into the neighbour links for Collections", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
+    const html = unescape(renderAt("id=evt-1&tab=info&type=collections"));
+    expect(link(html, "Next Task")).toBe("/accountant/invoice?id=evt-2&tab=info");
   });
 
   it("opens the neighbour on Information when the page is on Information", () => {
@@ -290,10 +332,12 @@ describe("InvoicePage: Previous Task and Next Task", () => {
     expect(link(html, "Next Task")).toBe("/accountant/invoice?id=evt-2&tab=info");
   });
 
-  it("carries only the three list parameters", () => {
+  it("carries only the four list parameters", () => {
     mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
-    const html = unescape(renderAt("id=evt-1&tab=info&csort=overdue&page=3&q=zed"));
-    expect(link(html, "Next Task")).toBe("/accountant/invoice?id=evt-2&tab=info&csort=overdue");
+    const html = unescape(renderAt("id=evt-1&tab=info&csort=overdue&type=all&page=3&q=zed"));
+    expect(link(html, "Next Task")).toBe(
+      "/accountant/invoice?id=evt-2&tab=info&csort=overdue&type=all",
+    );
   });
 
   it("disables Previous Task at the first row and Next Task at the last", () => {
@@ -327,6 +371,39 @@ describe("InvoicePage: Previous Task and Next Task", () => {
       /<span[^>]*tabindex[^>]*aria-disabled|<span[^>]*aria-disabled[^>]*tabindex/,
     );
     expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[^])*(?:Previous|Next) Task/);
+  });
+});
+
+// docs/specs/accountant-collections-22-side-task-buttons.md §3 and §5. Static markup measures no
+// width, so no side buttons are drawn here: the page sits in the frame, and the bottom buttons stay
+// the only Previous Task / Next Task links. The rails themselves are tested in
+// InvoicePageFrame.test.tsx.
+describe("InvoicePage: side Previous Task and Next Task buttons", () => {
+  const count = (html: string, label: string) => html.split(label).length - 1;
+
+  it("draws the page in the frame, with the column of 1040 px", () => {
+    const html = renderAt("id=evt-1&tab=info");
+    expect(html).toMatch(/<div class="[^"]*\bflex-\[0_1_1040px\][^"]*">/);
+    expect(html).toMatch(/^<div class="[^"]*\bw-full\b/);
+  });
+
+  it("draws no side buttons before the width is measured: the bottom ones are the only ones", () => {
+    mockNeighbours.mockReturnValue({ isReady: true, previousId: "evt-0", nextId: "evt-2" });
+    for (const query of ["id=evt-1&tab=info", "id=evt-1&tab=messages"]) {
+      const html = renderAt(query);
+      expect(html).not.toMatch(/<div[^>]*aria-hidden="true"[^>]*>(?:(?!<\/div>)[^])*Previous Task/);
+      expect(html).not.toMatch(/<div[^>]*aria-hidden="true"[^>]*>(?:(?!<\/div>)[^])*Next Task/);
+      expect(html).not.toContain('tabindex="-1"');
+      expect(count(html, "Previous Task")).toBe(1);
+      expect(count(html, "Next Task")).toBe(1);
+    }
+  });
+
+  it("leaves the loading and not-found pages without the frame", () => {
+    mockInvoice.mockReturnValue(invoiceDataFixture({ isLoading: true }));
+    expect(renderAt("id=evt-1")).not.toContain("flex-[0_1_1040px]");
+    mockInvoice.mockReturnValue(invoiceDataFixture({ notFound: true }));
+    expect(renderAt("id=evt-1")).not.toContain("flex-[0_1_1040px]");
   });
 });
 

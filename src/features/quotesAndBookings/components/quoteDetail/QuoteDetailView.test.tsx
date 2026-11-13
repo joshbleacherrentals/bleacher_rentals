@@ -70,6 +70,16 @@ vi.mock("@/components/toasts/SuccessToast", () => ({ createSuccessToast: vi.fn()
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToast: vi.fn() }));
 vi.mock("../sendQuote/SendQuoteDialog", () => ({ SendQuoteDialog: () => null }));
 vi.mock("./QuoteActionBar", () => ({ QuoteActionBar: () => null }));
+// The booked date button has its own test (BookedAtButton.test.tsx); here only whether the view draws it.
+vi.mock("./BookedAtButton", () => ({
+  BookedAtButton: ({ eventId, bookedAt }: { eventId: string; bookedAt: string | null }) => (
+    <div data-booked-at-button="" data-event={eventId} data-booked-at={bookedAt ?? ""} />
+  ),
+}));
+// Open AR takes its look from the invoice page's header button; that module pulls in the PDF hooks.
+vi.mock("@/features/accountantCollections/components/OpenPdfButton", () => ({
+  HEADER_BUTTON: "stand-in-header-button",
+}));
 // The banner has its own test (InvoiceAttentionBanner.test.tsx); here only whether the view draws it.
 vi.mock("./invoice/InvoiceAttentionBanner", () => ({
   InvoiceAttentionBanner: ({ eventId }: { eventId: string }) => (
@@ -213,6 +223,126 @@ describe("QuoteDetailView", () => {
 
       mocks.state = { quote: null, isLoading: false, error: null };
       expect(render()).not.toContain(BANNER);
+    });
+  });
+
+  // The Open AR button in the header: a link to the invoice page in a new tab, drawn by the
+  // `openAp` capability (admin and accountant) and by nothing else.
+  describe("the Open AR button", () => {
+    const LINK = 'href="/accountant/invoice?id=ev-1&amp;tab=info"';
+
+    it("is drawn in the header, above the tab bar, for a user who may open the invoice page", () => {
+      mocks.can = { openAp: true };
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+      const html = render();
+
+      expect(html).toContain(LINK);
+      expect(html).toContain("Open AR");
+      expect(html.indexOf(LINK)).toBeGreaterThan(html.indexOf("<h1"));
+      expect(html.indexOf(LINK)).toBeLessThan(html.indexOf('role="tablist"'));
+    });
+
+    it("opens in a new tab", () => {
+      mocks.can = { openAp: true };
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+
+      expect(render()).toMatch(/<a [^>]*target="_blank"[^>]*>/);
+    });
+
+    it("is not drawn for a user who may not", () => {
+      mocks.can = { openAp: false };
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+      const html = render();
+
+      expect(html).not.toContain("Open AR");
+      expect(html).not.toContain("/accountant/invoice");
+    });
+
+    it("is not drawn when the capability is absent", () => {
+      mocks.can = {};
+      mocks.state = { quote: quote(), isLoading: false, error: null };
+
+      expect(render()).not.toContain("Open AR");
+    });
+
+    it("is not drawn while the quote is loading or when there is none", () => {
+      mocks.can = { openAp: true };
+      mocks.state = { quote: null, isLoading: true, error: null };
+      expect(render()).not.toContain("Open AR");
+
+      mocks.state = { quote: null, isLoading: false, error: null };
+      expect(render()).not.toContain("Open AR");
+    });
+  });
+
+  // The booked date button, in the Contract tab's action row beside the status button: drawn for a
+  // booked quote, by `manageQuote` (Edit and Delete's rule), and not on a deleted quote.
+  describe("the booked date button", () => {
+    const BUTTON = "data-booked-at-button";
+
+    it("is drawn for a booked quote, for the quote on the card and the date it has", () => {
+      mocks.can = { manageQuote: true };
+      mocks.state = {
+        quote: quote({ eventStatus: "booked", bookedAt: "2026-11-12T17:00:00.000Z" }),
+        isLoading: false,
+        error: null,
+      };
+      const html = render();
+
+      expect(html).toContain(BUTTON);
+      expect(html).toContain('data-event="ev-1"');
+      expect(html).toContain('data-booked-at="2026-11-12T17:00:00.000Z"');
+    });
+
+    it("is drawn in the Contract tab's action row: under the tab bar, before the contract total, above the tab's content", () => {
+      mocks.can = { manageQuote: true };
+      mocks.state = { quote: quote({ eventStatus: "booked" }), isLoading: false, error: null };
+      const html = render();
+
+      expect(html.indexOf(BUTTON)).toBeGreaterThan(html.indexOf('role="tablist"'));
+      expect(html.indexOf(BUTTON)).toBeLessThan(html.indexOf("Contract Total"));
+      expect(html.indexOf(BUTTON)).toBeLessThan(html.indexOf('data-tab="contract"'));
+    });
+
+    it("is drawn for a booked quote that has no booked_at, to set one", () => {
+      mocks.can = { manageQuote: true };
+      mocks.state = {
+        quote: quote({ eventStatus: "booked", bookedAt: null }),
+        isLoading: false,
+        error: null,
+      };
+
+      expect(render()).toContain(BUTTON);
+    });
+
+    it.each(["draft", "quoted", "unsigned_changes", "lost", null])(
+      "is not drawn for a quote whose status is %s",
+      (eventStatus) => {
+        mocks.can = { manageQuote: true };
+        mocks.state = { quote: quote({ eventStatus }), isLoading: false, error: null };
+
+        expect(render()).not.toContain(BUTTON);
+      },
+    );
+
+    it("is not drawn for a user who may not manage the quote", () => {
+      mocks.can = { manageQuote: false };
+      mocks.state = { quote: quote({ eventStatus: "booked" }), isLoading: false, error: null };
+      expect(render()).not.toContain(BUTTON);
+
+      mocks.can = {};
+      expect(render()).not.toContain(BUTTON);
+    });
+
+    it("is not drawn on a deleted quote, which has no actions", () => {
+      mocks.can = { manageQuote: true };
+      mocks.state = {
+        quote: quote({ eventStatus: "booked", deleted: true }),
+        isLoading: false,
+        error: null,
+      };
+
+      expect(render()).not.toContain(BUTTON);
     });
   });
 

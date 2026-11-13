@@ -25,7 +25,8 @@
 --     pending or foreign-currency payment (or one aimed at another event's installment) changes
 --     nothing it should not;
 --   * the boundary: an installment due today is overdue, due tomorrow is not;
---   * no schedule: the whole balance falls due 7 days before event_start;
+--   * no schedule: the whole balance falls due on the day the event starts (event_start <= today),
+--     and booked_at is not read;
 --   * the currency rule and the province rule;
 --   * access: nobody but the owner and the service role can execute any of the functions.
 -- ============================================================================
@@ -35,7 +36,7 @@
 
 BEGIN;
 SET search_path TO extensions, public, "$user";
-SELECT plan(66);
+SELECT plan(67);
 
 -- ── Helpers (dropped by the ROLLBACK) ───────────────────────────────────────
 
@@ -284,23 +285,34 @@ SELECT public.t_line(:'e_b2', 1000);
 SELECT public.t_inst(:'e_b2', '2026-11-16', 10000);
 SELECT is(public.t_bal(:'e_b2', '2026-11-15'), '(1000,0,1000,0)', 'boundary: an installment due tomorrow is not');
 
--- ── No payment schedule: the whole balance falls due 7 days before event_start ──
+-- ── No payment schedule: the whole balance falls due on the day the event starts ──
+-- (docs/specs/accountant-collections-24-no-schedule-due-on-start-day.md; migration 20261111140000)
 
-SELECT public.t_event(date '2026-11-22') AS e_n1 \gset
+SELECT public.t_event(date '2026-11-15') AS e_n1 \gset
 SELECT public.t_line(:'e_n1', 2000);
-SELECT is(public.t_bal(:'e_n1', '2026-11-15'), '(2000,0,2000,2000)', 'no schedule: event_start = today + 7 is due today');
+SELECT is(public.t_bal(:'e_n1', '2026-11-15'), '(2000,0,2000,2000)', 'no schedule: event_start = today is due today');
 
-SELECT public.t_event(date '2026-11-23') AS e_n2 \gset
+SELECT public.t_event(date '2026-11-16') AS e_n2 \gset
 SELECT public.t_line(:'e_n2', 2000);
-SELECT is(public.t_bal(:'e_n2', '2026-11-15'), '(2000,0,2000,0)', 'no schedule: event_start = today + 8 is not due yet');
+SELECT is(public.t_bal(:'e_n2', '2026-11-15'), '(2000,0,2000,0)', 'no schedule: event_start = today + 1 is not due yet');
 
-SELECT public.t_event(date '2026-11-18') AS e_n3 \gset
+-- The boundary of the old rule (7 days before the start) is no longer due.
+SELECT public.t_event(date '2026-11-22') AS e_n6 \gset
+SELECT public.t_line(:'e_n6', 2000);
+SELECT is(public.t_bal(:'e_n6', '2026-11-15'), '(2000,0,2000,0)', 'no schedule: event_start = today + 7 is not due yet');
+
+-- booked_at is not read: an event booked two days before its start (start = today + 2) owes nothing.
+SELECT public.t_event(date '2026-11-17') AS e_n3 \gset
 SELECT public.t_line(:'e_n3', 2000);
-SELECT is(public.t_bal(:'e_n3', '2026-11-15'), '(2000,0,2000,2000)',
-  'no schedule: an event booked inside the 7 days (start = today + 3) is overdue at once');
+UPDATE public."Events" SET booked_at = '2026-11-15 12:00:00+00' WHERE id = :'e_n3';
+SELECT is(public.t_bal(:'e_n3', '2026-11-15'), '(2000,0,2000,0)',
+  'no schedule: a booking 2 days before the start does not make it due');
 
-SELECT public.t_pay(:'e_n3', 600);
-SELECT is(public.t_bal(:'e_n3', '2026-11-15'), '(2000,600,1400,1400)', 'no schedule: a part-paid event owes only what is left');
+SELECT public.t_event(date '2026-11-15') AS e_n7 \gset
+SELECT public.t_line(:'e_n7', 2000);
+SELECT public.t_pay(:'e_n7', 600);
+SELECT is(public.t_bal(:'e_n7', '2026-11-15'), '(2000,600,1400,1400)',
+  'no schedule: a part-paid event whose start is today owes what is left');
 
 SELECT public.t_event(date '2026-10-16') AS e_n4 \gset
 SELECT public.t_line(:'e_n4', 2000);
@@ -311,8 +323,8 @@ SELECT public.t_line(:'e_n5', 2000);
 SELECT public.t_pay(:'e_n5', 600);
 SELECT is(public.t_bal(:'e_n5', '2026-11-15'), '(2000,600,1400,0)', 'no schedule: not due yet stays 0 even with a balance left');
 
--- The function never reads the clock: the same event on the first day it falls due.
-SELECT is(public.t_bal(:'e_n2', '2026-11-16'), '(2000,0,2000,2000)', 'no schedule: the date comes from the caller (today + 7 a day later)');
+-- The function never reads the clock: the same event on the day it starts.
+SELECT is(public.t_bal(:'e_n2', '2026-11-16'), '(2000,0,2000,2000)', 'no schedule: the date comes from the caller (the start is tomorrow, today is tomorrow)');
 
 -- ── The province rule ───────────────────────────────────────────────────────
 

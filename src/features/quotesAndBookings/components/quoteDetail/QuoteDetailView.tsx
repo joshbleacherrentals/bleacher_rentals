@@ -17,6 +17,8 @@ import { LogTab } from "./tabs/LogTab";
 import { MessagesTab } from "./tabs/MessagesTab";
 import { SubmissionTab } from "./tabs/SubmissionTab";
 import { useLeadSubmission } from "../../hooks/useLeadSubmission";
+import { BookedAtButton } from "./BookedAtButton";
+import { OpenApButton } from "./OpenApButton";
 import { QuoteActionBar } from "./QuoteActionBar";
 import { QuoteStatusButton } from "./QuoteStatusButton";
 import { QuoteTabBar } from "./QuoteTabBar";
@@ -241,13 +243,17 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
       {can.seeInvoiceAlerts && !isDeleted && <InvoiceAttentionBanner eventId={eventId} />}
 
       {/* Header */}
-      <div className="bg-linear-to-r from-gray-800 to-gray-600 text-white px-6 py-4">
-        <h1 className="text-xl font-bold">
-          {quote.invoiceNumber != null
-            ? `${quote.eventName} (#${formatInvoiceNumber(quote.invoiceNumber)})`
-            : quote.eventName}
-        </h1>
-        {subtitle && <p className="text-sm text-white/70 mt-0 mb-4">{subtitle}</p>}
+      <div className="bg-linear-to-r from-gray-800 to-gray-600 text-white px-6 py-4 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold">
+            {quote.invoiceNumber != null
+              ? `${quote.eventName} (#${formatInvoiceNumber(quote.invoiceNumber)})`
+              : quote.eventName}
+          </h1>
+          {subtitle && <p className="text-sm text-white/70 mt-0 mb-4">{subtitle}</p>}
+        </div>
+        {/* Admin and accountant: a link to the invoice page of this quote, in a new tab. */}
+        {can.openAp && <OpenApButton eventId={eventId} />}
       </div>
 
       {/* Tab bar */}
@@ -257,6 +263,16 @@ export function QuoteDetailView({ eventId }: { eventId: string }) {
         <div className="bg-white px-6 py-6 rounded-b-lg">
           <TabsContent value="contract">
             <div className="flex items-center justify-end gap-3 mb-6">
+              {/* Booked quotes only, for whoever may edit the quote: puts back a booked date that
+                  was lost when the event moved between statuses. */}
+              {quote.eventStatus === "booked" && can.manageQuote && !isDeleted && (
+                <BookedAtButton
+                  eventId={eventId}
+                  bookedAt={quote.bookedAt}
+                  supabase={supabase}
+                  userId={perms.userId}
+                />
+              )}
               <QuoteStatusButton
                 eventId={eventId}
                 status={quote.eventStatus}

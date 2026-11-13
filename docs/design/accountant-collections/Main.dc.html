@@ -22,12 +22,15 @@ body{margin:0;background:#ffffff}
 
   <div role="tablist" aria-label="Accountant sections" style="display:inline-flex;align-self:flex-start;align-items:center;gap:2px;height:36px;padding:3px;border-radius:10px;background:#f5f5f5">
     <button type="button" role="tab" aria-selected="true" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.1);font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">Collections</button>
-    <button type="button" role="tab" aria-selected="false" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:none;font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">AR</button>
     <button type="button" role="tab" aria-selected="false" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:none;font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">AR Deposits</button>
     <button type="button" role="tab" aria-selected="false" class="col-btn" style="display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:none;font-family:inherit;font-size:14px;font-weight:500;color:#111827;white-space:nowrap;cursor:pointer">Need attention</button>
   </div>
 
   <div style="display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px 24px">
+    <button type="button" onClick="{{ cycleMode }}" title="{{ mode.title }}" aria-label="{{ mode.aria }}" class="col-btn" style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 16px;border:0;border-radius:8px;background:{{ mode.bg }};box-shadow:0 2px 6px rgba(15,42,68,.22);font-family:inherit;font-size:14px;font-weight:600;color:#ffffff;white-space:nowrap;cursor:pointer">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M7 12h10"></path><path d="M10 18h4"></path></svg>
+      <span>{{ mode.label }}</span>
+    </button>
     <button type="button" role="switch" aria-checked="{{ showNotDue }}" onClick="{{ toggleNotDue }}" class="col-btn" style="display:flex;align-items:center;gap:8px;border:0;background:none;padding:0;font-family:inherit;font-size:14px;color:#4b5563;cursor:pointer">
       <span>Show Not Due Yet</span>
       <sc-if value="{{ showNotDue }}" hint-placeholder-val="{{ false }}">
@@ -107,16 +110,29 @@ body{margin:0;background:#ffffff}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"showNotDue":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"showNotDue":{"editor":"boolean","default":false},"amountMode":{"editor":"enum","default":"full","options":["full","deposits","all"]},"$preview":{"width":1280,"height":800}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { notDue: null, sortKey: 'followUp', sortDir: 'desc' };
+    this.state = { notDue: null, mode: null, sortKey: 'followUp', sortDir: 'desc' };
   }
 
   renderVals() {
     const s = this.state;
     const showNotDue = s.notDue === null ? !!(this.props && this.props.showNotDue) : s.notDue;
+
+    // The amount button steps Full amount -> Deposits -> All -> Full amount on every click, like the
+    // status button on /quotes-bookings. It changes only its own label and colour here: the rows below
+    // stay as they are, because what each mode lists is not defined yet.
+    const MODES = ['full', 'deposits', 'all'];
+    const MODE_LABEL = { full: 'Full amount', deposits: 'Deposits', all: 'All' };
+    const MODE_BG = {
+      full: 'linear-gradient(to right,#2f6fb8,#1d62a3)',
+      deposits: 'linear-gradient(to right,#0e7f61,#0b6e55)',
+      all: 'linear-gradient(to right,#6b7280,#4b5563)',
+    };
+    const modeId = MODES.includes(s.mode) ? s.mode : MODES.includes(this.props && this.props.amountMode) ? this.props.amountMode : 'full';
+    const nextMode = MODES[(MODES.indexOf(modeId) + 1) % MODES.length];
 
     const money = (n, cur) =>
       (cur === 'CAD' ? 'C$' : '$') + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -178,6 +194,13 @@ class Component extends DCLogic {
       showNotDue,
       hideNotDue: !showNotDue,
       toggleNotDue: () => this.setState({ notDue: !showNotDue }),
+      mode: {
+        label: MODE_LABEL[modeId],
+        bg: MODE_BG[modeId],
+        title: 'Click to show ' + MODE_LABEL[nextMode],
+        aria: 'Showing: ' + MODE_LABEL[modeId] + '. Click to switch to ' + MODE_LABEL[nextMode] + '.',
+      },
+      cycleMode: () => this.setState({ mode: nextMode }),
       followUp: head('followUp'),
       overdue: head('overdue'),
       amount: head('amount'),

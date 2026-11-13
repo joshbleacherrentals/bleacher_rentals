@@ -45,12 +45,16 @@ export function TaskMonthGrid({
   month,
   today,
   selected,
+  allowPast = false,
   onPick,
   onMonthChange,
 }: {
   month: string;
   today: string;
   selected: string;
+  /** Do not switch the days before today off, nor the arrow back from today's month. The New Task
+   * window plans ahead and leaves it off; the quote page's booked date button picks past days. */
+  allowPast?: boolean;
   onPick: (date: string) => void;
   onMonthChange: (month: string) => void;
 }) {
@@ -62,7 +66,7 @@ export function TaskMonthGrid({
         <button
           type="button"
           onClick={() => onMonthChange(shiftMonth(month, -1))}
-          disabled={month <= today.slice(0, 7)}
+          disabled={!allowPast && month <= today.slice(0, 7)}
           aria-label="Previous month"
           className={arrow}
         >
@@ -89,7 +93,7 @@ export function TaskMonthGrid({
       <div className="grid grid-cols-[repeat(7,36px)] gap-0.5">
         {monthCells(month).map((date, i) => {
           if (date === null) return <span key={`blank-${i}`} aria-hidden="true" />;
-          const past = date < today;
+          const past = !allowPast && date < today;
           const isSelected = date === selected;
           const isToday = date === today;
           const look = isSelected

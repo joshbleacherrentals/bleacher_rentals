@@ -38,6 +38,7 @@ describe("permission matrix", () => {
         "Blocked Customer Emails",
         "Collections",
         "Companies & Contacts",
+        "Driver Audit",
         "Driver Payments & QuickBooks Bills",
         "Driver Week Paid / Unpaid",
         "Edit Team Members",
@@ -130,6 +131,28 @@ describe("permission matrix", () => {
         /To, Cc and Bcc addresses, the subject and the attachments/i,
       );
       expect(row?.roles.account_manager.note).toMatch(/quote PDF always stays attached/i);
+    });
+
+    // The Booked button on a booked quote's Contract tab (BookedAtButton): it follows Edit and
+    // Delete's rule, so an account manager changes the date only on a quote they created.
+    it("has a Booked Date row: full for an admin, custom for an account manager, none for everyone else", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Booked Date");
+      expect(row?.category).toBe("Day to Day Operations");
+      expect(Object.keys(row?.roles ?? {}).sort()).toEqual([...roles].sort());
+      const levels = Object.fromEntries(
+        Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+      );
+      expect(levels).toEqual({
+        admin: "full",
+        account_manager: "custom",
+        accountant: "none",
+        viewer: "none",
+        developer: "none",
+        driver: "none",
+        maintainer: "none",
+      });
+      expect(row?.roles.account_manager.note).toMatch(/only .* they created/i);
+      expect(row?.description).toMatch(/12:00/);
     });
 
     // docs/specs/qbo-invoice-09-banner.md §5: the red notice on a quote whose QuickBooks invoice needs
@@ -286,6 +309,14 @@ describe("permission matrix", () => {
         expect(row?.description).toMatch(/closes by itself when the payment arrives/);
       });
 
+      // docs/specs/accountant-collections-23-amount-type-switch.md §3.
+      it("says the list has a Collections / Deposits / All switch, Show Not Due Yet and sorting", () => {
+        expect(row?.description).toContain(
+          "lists the bookings with an overdue payment, one open task each, with a Collections / Deposits / All switch, Show Not Due Yet and sorting.",
+        );
+        expect(row?.description).not.toContain("with Show Not Due Yet and sorting");
+      });
+
       // docs/specs/accountant-collections-12-tabs-and-messages.md §3.
       it("says the invoice page has a Messages tab with the booking's internal chat", () => {
         expect(row?.description).toContain(
@@ -300,6 +331,13 @@ describe("permission matrix", () => {
         );
       });
 
+      // docs/specs/accountant-collections-19-task-delete.md §3.
+      it("says a closed task can be deleted from the task history and the open task cannot, right after the Information sentence", () => {
+        expect(row?.description).toContain(
+          "Its Information tab shows the booking's task history and its files; the accountant can attach files and delete the ones attached by hand. A closed task can be deleted from the task history; the open task cannot.",
+        );
+      });
+
       // docs/specs/accountant-collections-16-customer-page-view.md §3.
       it("says the invoice page can show the page the customer sees, and what signing and paying do there", () => {
         expect(row?.description).toContain(
@@ -310,16 +348,31 @@ describe("permission matrix", () => {
       const CUSTOMER_PAGE_SENTENCE =
         "Can open the customer's page on an invoice, with Show Customer View on a quote, or by its address, sign for the customer there, and start an online payment.";
 
+      const OPEN_AP_SENTENCE =
+        "Sees the Open AR button on a quote, which opens that booking's invoice page in a new tab.";
+
       it("tells the accountant what they can do there", () => {
         expect(accountant("Collections")?.note).toBe(
-          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE}`,
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE} ${OPEN_AP_SENTENCE}`,
         );
       });
 
       it("tells an admin the same", () => {
         expect(row?.roles.admin.note).toBe(
-          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE}`,
+          `Can open Collections and every invoice page, write the next task, and record, edit and delete manual payments there. ${CUSTOMER_PAGE_SENTENCE} ${OPEN_AP_SENTENCE}`,
         );
+      });
+
+      // The Open AR button in the header of a quote (getQuotesBookingsCapabilities.openAp).
+      it("says a quote has an Open AR button that opens the invoice page in a new tab", () => {
+        expect(row?.description).toContain(
+          "On a quote's page, an Open AR button in the header opens that booking's invoice page in a new tab.",
+        );
+      });
+
+      it("tells an account manager and a viewer they do not get the Open AR button", () => {
+        expect(row?.roles.account_manager.note).toContain("but not the Open AR button");
+        expect(row?.roles.viewer.note).toContain("but not the Open AR button");
       });
 
       it("does not give the other five roles the customer's page through this row", () => {
@@ -340,6 +393,89 @@ describe("permission matrix", () => {
         );
         expect(PERMISSIONS.find((p) => p.label === "Accounts Receivable")?.description).toMatch(
           /The Accountant page opens on the Collections tab\./,
+        );
+      });
+    });
+
+    // docs/specs/accountant-audit-01-tab.md §3 and §5 (R4, R5): the Audit tab of the Accountant page.
+    describe("Driver Audit", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Driver Audit");
+
+      it("sits in Day to Day Operations, right after Collections", () => {
+        const index = PERMISSIONS.findIndex((p) => p.label === "Driver Audit");
+        expect(PERMISSIONS[index - 1]?.label).toBe("Collections");
+        expect(row?.category).toBe("Day to Day Operations");
+      });
+
+      it("is read for an admin and an accountant, and none for the other five roles", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "read",
+          accountant: "read",
+          account_manager: "none",
+          viewer: "none",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("answers for all seven roles, with a note for each", () => {
+        expect(Object.keys(row?.roles ?? {}).sort()).toEqual(Object.keys(ROLE_LABELS).sort());
+        for (const [role, access] of Object.entries(row?.roles ?? {})) {
+          expect(access.note, role).toBeTruthy();
+        }
+      });
+
+      it("describes the tab: the drivers table, the range, the trackers, the paid status, and that it is read-only", () => {
+        expect(row?.description).toBe(
+          "The Audit tab of the Accountant page. It lists every driver with their distance (in kilometres and miles), drive time, trips and pay (in the driver's own currency, USD or CAD) for a date range the user chooses (a preset such as This month, or any From and To dates). Any column can be sorted, and a search bar finds a driver by name. Clicking a driver opens that driver's work trackers inside the same range: status, date, bleacher, type, pickup and dropoff, drive time, distance, and whether the tracker's week has been paid. Read-only: nothing on the tab changes a work tracker or a payment.",
+        );
+      });
+
+      it("tells an admin and an accountant what they can read, deactivated drivers included", () => {
+        expect(row?.roles.admin.note).toBe(
+          "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active.",
+        );
+        expect(row?.roles.accountant.note).toBe(
+          "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages.",
+        );
+      });
+
+      it("tells an account manager and a viewer where they still read work trackers", () => {
+        expect(row?.roles.account_manager.note).toBe(
+          "The Accountant page is for accountants and administrators. An account manager still reads their drivers' work trackers on the Work Trackers pages.",
+        );
+        expect(row?.roles.viewer.note).toBe(
+          "The Accountant page is for accountants and administrators. A viewer still reads work trackers on the Work Trackers pages.",
+        );
+      });
+
+      it("keeps the notes of the developer, driver and maintainer in the wording of the neighbouring rows", () => {
+        const collections = PERMISSIONS.find((p) => p.label === "Collections");
+        expect(row?.roles.developer.note).toBe(
+          "Developer is only meant to work on the developer roadmap and the Dev Tools pages.",
+        );
+        expect(row?.roles.driver.note).toBe(collections?.roles.driver.note);
+        expect(row?.roles.maintainer.note).toBe(collections?.roles.maintainer.note);
+      });
+
+      it("is named in the accountant's role description, before the line about what is hidden", () => {
+        expect(ROLE_DESCRIPTIONS.accountant).toContain(
+          "Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status.",
+        );
+        expect(
+          ROLE_DESCRIPTIONS.accountant.endsWith(
+            "Everything else on the web dashboard is hidden from this role.",
+          ),
+        ).toBe(true);
+      });
+
+      it("leaves the administrator's description as it was: full access", () => {
+        expect(ROLE_DESCRIPTIONS.admin).toBe(
+          "Full access to all features, settings, and team management.",
         );
       });
     });

@@ -5,10 +5,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 // Open PDF stands and which event it is given. What the button does is in `OpenPdfButton.test.tsx`.
 // Spec: docs/specs/accountant-collections-16-customer-page-view.md §3 and §5: the View customer
 // page switch.
+// Spec: docs/specs/accountant-collections-17-open-qi-button.md §3 and §5: the Open Q/I link. The
+// look is the one constant the two header buttons share (`HEADER_BUTTON`); it is a stand-in here,
+// so the test sees that the link uses it, and `OpenPdfButton.test.tsx` pins what it is.
 
 const opened = vi.hoisted(() => ({ props: [] as unknown[] }));
 
 vi.mock("./OpenPdfButton", () => ({
+  HEADER_BUTTON: "stand-in-header-button",
   OpenPdfButton: (props: unknown) => {
     opened.props.push(props);
     return <button type="button">Open PDF</button>;
@@ -63,6 +67,86 @@ describe("InvoiceHeader: Open PDF", () => {
       expect(render({ status, daysOverdue: null })).toContain(">Open PDF<");
     },
   );
+});
+
+describe("InvoiceHeader: Open Q/I link", () => {
+  /** The whole `<a>…</a>` that says Open Q/I; empty when there is none. */
+  const link = (html: string) =>
+    /<a\s(?:(?!<\/a>)[^])*Open Q\/I(?:(?!<\/a>)[^])*<\/a>/.exec(html)?.[0] ?? "";
+  const attr = (tag: string, name: string) =>
+    new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? null;
+
+  it("is a real link to the quote card of the event, not a button", () => {
+    const html = link(render({ eventId: "evt-42" }));
+    expect(html).not.toBe("");
+    expect(attr(html, "href")).toBe("/quotes-bookings/evt-42");
+    expect(html).not.toContain("<button");
+  });
+
+  it("opens in a new tab, cut off from this page, so the browser's own open-in-new-tab works too", () => {
+    const html = link(render());
+    expect(attr(html, "target")).toBe("_blank");
+    expect(attr(html, "rel")?.split(" ")).toContain("noopener");
+    expect(html).not.toContain("onClick");
+  });
+
+  it("adds no tab to the address", () => {
+    expect(attr(link(render()), "href")).not.toContain("?");
+  });
+
+  it("encodes an id that needs it", () => {
+    expect(attr(link(render({ eventId: "a b" })), "href")).toBe("/quotes-bookings/a%20b");
+  });
+
+  it("says Open Q/I, with an icon before the text and the design's tooltip", () => {
+    const html = link(render());
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"/);
+    expect(html.indexOf("<svg")).toBeLessThan(html.indexOf("Open Q/I"));
+    expect(html).toContain(">Open Q/I<");
+    expect(attr(html, "title")).toBe("Opens the quote and invoice page of this event in a new tab");
+  });
+
+  it("has the look of the other header buttons, the one constant they share", () => {
+    expect(attr(link(render()), "class")?.split(" ")).toContain("stand-in-header-button");
+  });
+
+  it("is the first button of the group: before Open PDF, Customer view, Record Payment and the status", () => {
+    const html = render();
+    const at = html.indexOf("Open Q/I");
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(html.indexOf("Open PDF"));
+    expect(at).toBeLessThan(html.indexOf("Customer view"));
+    expect(at).toBeLessThan(html.indexOf("Record Payment"));
+    expect(at).toBeLessThan(html.indexOf(">Collections<"));
+    // Right after the name's box, in the same group as the other buttons.
+    const group = /<div class="[^"]*">(<a\s(?:(?!<\/a>)[^])*Open Q\/I)/.exec(html);
+    expect(group).not.toBeNull();
+  });
+
+  it("is there in the Customer view too, and with it off", () => {
+    expect(render({ customerView: false })).toContain(">Open Q/I<");
+    expect(render({ customerView: true })).toContain(">Open Q/I<");
+    expect(attr(link(render({ customerView: true })), "href")).toBe("/quotes-bookings/evt-1");
+  });
+
+  it("is there for someone who may not record payments", () => {
+    const html = render({ canRecordPayment: false });
+    expect(html).toContain(">Open Q/I<");
+    expect(html).not.toContain("Record Payment");
+    expect(html.indexOf("Open Q/I")).toBeLessThan(html.indexOf("Open PDF"));
+  });
+
+  it.each(["collections", "paid", "schedule", "cancelled", "not_active"] as const)(
+    "is in the header of a %s event too",
+    (status) => {
+      expect(render({ status, daysOverdue: null })).toContain(">Open Q/I<");
+    },
+  );
+
+  it("leaves Open PDF with the event of the page, and the rest of the header as it was", () => {
+    render({ eventId: "evt-42" });
+    expect(opened.props).toEqual([{ eventId: "evt-42" }]);
+  });
 });
 
 describe("InvoiceHeader: Customer view button", () => {

@@ -75,6 +75,10 @@ vi.mock("@/features/quotesAndBookings/components/FilterPanel", () => ({
 vi.mock("@/features/accountantCollections/components/CollectionsTab", () => ({
   CollectionsTab: () => <div data-testid="collections-tab" />,
 }));
+// The Audit tab has its own tests too (docs/specs/accountant-audit-01-tab.md §5).
+vi.mock("@/features/accountantAudit/components/AuditTab", () => ({
+  AuditTab: () => <div data-testid="audit-tab" />,
+}));
 vi.mock("@/features/quotesAndBookings/hooks/useUserNames", () => ({
   useUserNames: () => new Map([["am-1", "Dana Whitfield"]]),
 }));
@@ -186,15 +190,24 @@ describe("/accountant", () => {
 });
 
 describe("/accountant tabs", () => {
-  it("offers Collections, AR Deposits and Need attention, in that order, and nothing else", () => {
+  // docs/specs/accountant-audit-01-tab.md §5: Audit is the last tab.
+  it("offers Collections, AR Deposits, Need attention and Audit, in that order, and nothing else", () => {
     const html = renderAt("");
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tab"/g)).toHaveLength(4);
     expect(html).toContain(">Collections<");
     expect(html).toContain(">AR Deposits<");
     expect(html).toContain(">Need attention<");
+    expect(html).toContain(">Audit<");
     expect(html.indexOf(">Collections<")).toBeLessThan(html.indexOf(">AR Deposits<"));
     expect(html.indexOf(">AR Deposits<")).toBeLessThan(html.indexOf(">Need attention<"));
+    expect(html.indexOf(">Need attention<")).toBeLessThan(html.indexOf(">Audit<"));
     expect(html).not.toContain(">All Events<");
+  });
+
+  it("puts no count badge and no info icon on the Audit tab", () => {
+    const html = renderAt("");
+    expect(html).toMatch(/<button[^>]*role="tab"[^>]*>Audit<\/button>/);
+    expect(html).not.toContain('aria-label="About the Audit tab"');
   });
 
   it("has no AR tab: the Collections tab replaced it", () => {
@@ -240,6 +253,49 @@ describe("/accountant tabs", () => {
       /role="tab"[^>]*aria-selected="true"[^>]*>Need attention</,
     );
     expect(renderAt("")).not.toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Need attention</);
+  });
+
+  it("opens Audit from ?tab=audit, and only then", () => {
+    expect(renderAt("tab=audit")).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Audit</);
+    expect(renderAt("")).not.toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Audit</);
+  });
+});
+
+// docs/specs/accountant-audit-01-tab.md §3 and §5.
+describe("/accountant Audit tab", () => {
+  it("draws the Audit body and none of the other bodies", () => {
+    const html = renderAt("tab=audit");
+    expect(html).toContain('data-testid="audit-tab"');
+    expect(html).not.toContain('data-testid="collections-tab"');
+    expect(html).not.toContain("Event Name (1)");
+    expect(html).not.toContain("No invoice needs attention");
+  });
+
+  it("hides the filter sidebar, the Filter button, the search box, Show Deleted and the chips", () => {
+    const html = renderAt("tab=audit&q=acme&am=am-1&showDeleted=1");
+    expect(mockFilterPanel).not.toHaveBeenCalled();
+    expect(html).not.toContain("Search by name, invoice #");
+    expect(html).not.toContain("Show Deleted");
+    expect(html).not.toContain("Clear all filters");
+    expect(html).not.toContain("Filter");
+  });
+
+  it("keeps Collections the tab a bare /accountant opens, and does not draw the Audit body there", () => {
+    const html = renderAt("");
+    expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Collections</);
+    expect(html).toContain('data-testid="collections-tab"');
+    expect(html).not.toContain('data-testid="audit-tab"');
+  });
+
+  it("does not draw the Audit body on the receivables tabs", () => {
+    for (const query of ["tab=collections", "tab=ar_deposits", "tab=need_attention"]) {
+      expect(renderAt(query), query).not.toContain('data-testid="audit-tab"');
+    }
+  });
+
+  it("offers no Status filter on any tab, Audit included, and ignores a status in the URL", () => {
+    renderAt("tab=audit&statuses=quoted");
+    expect(lastListFilters().statuses).toEqual([]);
   });
 });
 
@@ -497,7 +553,7 @@ describe("/accountant Need attention count", () => {
   it("leaves the tab names as they were", () => {
     const html = renderAt("tab=ar_deposits");
 
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tab"/g)).toHaveLength(4);
     expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR Deposits</);
     expect(renderAt("tab=need_attention")).toMatch(
       /role="tab"[^>]*aria-selected="true"[^>]*>Need attention</,

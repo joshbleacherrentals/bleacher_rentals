@@ -18,7 +18,8 @@ import { pdfTarget } from "../utils/pdfTarget";
 const TOOLTIP = "Opens the signed invoice PDF, or the quote PDF if there is no signed invoice";
 const SIGNED_URL_SECONDS = 3600;
 
-const BUTTON =
+/** The look of a button on the dark header; Open PDF and the Open Q/I link share it. */
+export const HEADER_BUTTON =
   "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-white/55 bg-transparent px-3.5 text-sm font-medium text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
 
 type TabHandle = { opener: unknown; location: { href: string }; close: () => void };
@@ -71,7 +72,7 @@ export function OpenPdfButton({ eventId }: { eventId: string }) {
   // Until the signature is read it is not known which PDF to open.
   if (isLoading) {
     return (
-      <button type="button" disabled title={TOOLTIP} className={BUTTON}>
+      <button type="button" disabled title={TOOLTIP} className={HEADER_BUTTON}>
         {content}
       </button>
     );
@@ -84,7 +85,7 @@ export function OpenPdfButton({ eventId }: { eventId: string }) {
         target="_blank"
         rel="noopener noreferrer"
         title={TOOLTIP}
-        className={BUTTON}
+        className={HEADER_BUTTON}
       >
         {content}
       </a>
@@ -95,7 +96,7 @@ export function OpenPdfButton({ eventId }: { eventId: string }) {
     <button
       type="button"
       title={TOOLTIP}
-      className={BUTTON}
+      className={HEADER_BUTTON}
       onClick={() =>
         void openSignedPdf({
           target,

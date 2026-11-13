@@ -5,7 +5,12 @@ import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useCurrentUser } from "@/hooks/db/useCurrentUser";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { STATUSES } from "@/features/manageTeam/constants";
-import { applyDriverScope, NO_DRIVER_MATCH, resolveDriverScope } from "../db/driverZoneScope";
+import {
+  applyDriverScope,
+  NO_DRIVER_MATCH,
+  resolveDriverScope,
+  type DriverScope,
+} from "../db/driverZoneScope";
 
 type Compiled = {
   driver_uuid: string;
@@ -21,6 +26,7 @@ type Compiled = {
   first_name: string | null;
   last_name: string | null;
   email: string | null;
+  status_uuid: string | null;
 };
 
 export type DriverWithUser = {
@@ -37,14 +43,65 @@ export type DriverWithUser = {
   first_name: string | null;
   last_name: string | null;
   email: string;
+  status_uuid?: string | null;
 };
 
-export function useDrivers(options?: { showAll?: boolean }): {
+const DRIVER_COLUMNS = [
+  "d.id as driver_uuid",
+  "d.user_uuid as user_uuid",
+  "d.tax_dec as taxDec",
+  "d.pay_rate_cents as pay_rate_cents",
+  "d.setup_cents as setup_cents",
+  "d.teardown_cents as teardown_cents",
+  "d.pay_currency as pay_currency",
+  "d.pay_per_unit as pay_per_unit",
+  "d.is_active as is_active",
+  "u.id as user_id",
+  "u.first_name as first_name",
+  "u.last_name as last_name",
+  "u.email as email",
+  "u.status_uuid as status_uuid",
+] as const;
+
+/**
+ * The drivers query. By default only active drivers (active or invited users). With
+ * `includeInactive` the two "active" conditions are dropped (Audit lists every driver,
+ * docs/specs/accountant-audit-02-driver-select.md D4). The scope always applies.
+ */
+export function buildDriversQuery(input: {
+  currentUser: unknown;
+  scope: DriverScope;
+  includeInactive: boolean;
+}) {
+  const base = db
+    .selectFrom("Drivers as d")
+    .innerJoin("Users as u", "u.id", "d.user_uuid")
+    .select([...DRIVER_COLUMNS]);
+
+  // No current user yet: return no rows.
+  if (!input.currentUser) return base.where("d.id", "=", NO_DRIVER_MATCH).compile();
+
+  const query = input.includeInactive
+    ? base
+    : base
+        .where("d.is_active", "=", 1)
+        .where((eb) =>
+          eb.or([
+            eb("u.status_uuid", "=", STATUSES.active),
+            eb("u.status_uuid", "=", STATUSES.invited),
+          ]),
+        );
+  // Shared scoping rule: admins see everyone, account managers see their zones.
+  return applyDriverScope(query, input.scope).orderBy("d.user_uuid", "asc").compile();
+}
+
+export function useDrivers(options?: { showAll?: boolean; includeInactive?: boolean }): {
   data: DriverWithUser[] | null;
   isLoading: boolean;
   error: Error | undefined;
 } {
   const showAll = options?.showAll ?? false;
+  const includeInactive = options?.includeInactive ?? false;
   const { data: currentUserData, isLoading: isCurrentUserLoading } = useCurrentUser();
   const currentUser = currentUserData?.[0];
 
@@ -68,68 +125,21 @@ export function useDrivers(options?: { showAll?: boolean }): {
     expect<{ id: string }>(),
   );
 
-  const compiled = useMemo(() => {
-    // If no current user or they're neither admin nor account manager, return empty query
-    if (!currentUser) {
-      return db
-        .selectFrom("Drivers as d")
-        .innerJoin("Users as u", "u.id", "d.user_uuid")
-        .select([
-          "d.id as driver_uuid",
-          "d.user_uuid as user_uuid",
-          "d.tax_dec as taxDec",
-          "d.pay_rate_cents as pay_rate_cents",
-          "d.setup_cents as setup_cents",
-          "d.teardown_cents as teardown_cents",
-          "d.pay_currency as pay_currency",
-          "d.pay_per_unit as pay_per_unit",
-          "d.is_active as is_active",
-          "u.id as user_id",
-          "u.first_name as first_name",
-          "u.last_name as last_name",
-          "u.email as email",
-        ])
-        .where("d.id", "=", NO_DRIVER_MATCH) // This will return no results
-        .compile();
-    }
-
-    const query = db
-      .selectFrom("Drivers as d")
-      .innerJoin("Users as u", "u.id", "d.user_uuid")
-      .select([
-        "d.id as driver_uuid",
-        "d.user_uuid as user_uuid",
-        "d.tax_dec as taxDec",
-        "d.pay_rate_cents as pay_rate_cents",
-        "d.setup_cents as setup_cents",
-        "d.teardown_cents as teardown_cents",
-        "d.pay_currency as pay_currency",
-        "d.pay_per_unit as pay_per_unit",
-        "d.is_active as is_active",
-        "u.id as user_id",
-        "u.first_name as first_name",
-        "u.last_name as last_name",
-        "u.email as email",
-      ])
-      .where("d.is_active", "=", 1)
-      .where((eb) =>
-        eb.or([
-          eb("u.status_uuid", "=", STATUSES.active),
-          eb("u.status_uuid", "=", STATUSES.invited),
-        ]),
-      );
-    // Shared scoping rule: admins see everyone, account managers see their zones.
-    const scoped = applyDriverScope(
-      query,
-      resolveDriverScope({
-        isAdmin: currentUser.is_admin === 1,
-        accountManagerUuid: accountManagerData?.[0]?.id ?? null,
-        showAll,
+  const compiled = useMemo(
+    () =>
+      buildDriversQuery({
+        currentUser,
+        scope: currentUser
+          ? resolveDriverScope({
+              isAdmin: currentUser.is_admin === 1,
+              accountManagerUuid: accountManagerData?.[0]?.id ?? null,
+              showAll,
+            })
+          : { kind: "none" },
+        includeInactive,
       }),
-    );
-
-    return scoped.orderBy("d.user_uuid", "asc").compile();
-  }, [currentUser, accountManagerData, showAll]);
+    [currentUser, accountManagerData, showAll, includeInactive],
+  );
 
   const { data, isLoading, error } = useTypedQuery(compiled, expect<Compiled>());
 

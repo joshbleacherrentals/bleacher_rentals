@@ -24,7 +24,7 @@ vi.mock("@/utils/supabase/useClerkSupabaseClient", () => ({
 }));
 vi.mock("@/components/toasts/ErrorToast", () => ({ createErrorToastNoThrow: vi.fn() }));
 
-import { OpenPdfButton, openSignedPdf } from "./OpenPdfButton";
+import { HEADER_BUTTON, OpenPdfButton, openSignedPdf } from "./OpenPdfButton";
 
 const TOOLTIP = "Opens the signed invoice PDF, or the quote PDF if there is no signed invoice";
 
@@ -51,6 +51,27 @@ describe("OpenPdfButton: look", () => {
   it("looks the same as the button for the signed PDF", () => {
     mocks.signed = { signedPdfPath: "evt-1/sig.pdf", isLoading: false };
     looksRight(render());
+  });
+});
+
+// docs/specs/accountant-collections-17-open-qi-button.md §3: the look of the header buttons is one
+// exported constant, shared with the Open Q/I link. Open PDF looks exactly as it did before the
+// constant was renamed from BUTTON to HEADER_BUTTON.
+describe("HEADER_BUTTON", () => {
+  const classOfRoot = (html: string) => /^<(?:a|button)\s[^>]*class="([^"]*)"/.exec(html)?.[1];
+
+  it("is the white outline on the dark header, as tall and as round as before", () => {
+    expect(HEADER_BUTTON).toBe(
+      "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-white/55 bg-transparent px-3.5 text-sm font-medium text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60",
+    );
+  });
+
+  it("is what the Open PDF link, button and loading button are drawn with", () => {
+    expect(classOfRoot(render())).toBe(HEADER_BUTTON);
+    mocks.signed = { signedPdfPath: "evt-1/sig.pdf", isLoading: false };
+    expect(classOfRoot(render())).toBe(HEADER_BUTTON);
+    mocks.signed = { signedPdfPath: null, isLoading: true };
+    expect(classOfRoot(render())).toBe(HEADER_BUTTON);
   });
 });
 

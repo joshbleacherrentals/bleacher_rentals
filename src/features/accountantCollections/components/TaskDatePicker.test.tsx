@@ -89,6 +89,44 @@ describe("TaskMonthGrid", () => {
   });
 });
 
+// The booked date button on the quote page (BookedAtButton) picks a day that is already past, so it
+// asks the grid not to switch the past off. Without `allowPast` the grid is the New Task one.
+describe("TaskMonthGrid with allowPast", () => {
+  const render = (over: Partial<React.ComponentProps<typeof TaskMonthGrid>> = {}) =>
+    renderToStaticMarkup(
+      <TaskMonthGrid
+        month="2026-11"
+        today={TODAY}
+        selected="2026-11-05"
+        allowPast
+        onPick={() => {}}
+        onMonthChange={() => {}}
+        {...over}
+      />,
+    );
+
+  const day = (html: string, label: string) =>
+    html.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))![0];
+
+  it("offers the days before today", () => {
+    const html = render();
+    expect(day(html, "November 1, 2026")).not.toContain("disabled");
+    expect(day(html, "November 9, 2026")).not.toContain("disabled");
+    expect(day(html, "November 9, 2026")).not.toContain("text-gray-400");
+  });
+
+  it("lets the previous month arrow work in today's month", () => {
+    expect(render()).toMatch(/<button(?![^>]*disabled)[^>]*aria-label="Previous month"/);
+  });
+
+  it("still rings today and fills the selected day", () => {
+    const html = render();
+    expect(day(html, "November 10, 2026")).toContain("ring-1");
+    expect(day(html, "November 5, 2026")).toContain("bg-darkBlue");
+    expect(day(html, "November 5, 2026")).toContain('aria-pressed="true"');
+  });
+});
+
 // docs/specs/accountant-collections-14-new-task-window.md §3: the calendar is drawn inside the
 // window, under the button, not in a popover.
 describe("TaskDatePicker", () => {

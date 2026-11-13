@@ -30,6 +30,7 @@ const NOTHING: QuotesBookingsCapabilities = {
   seeInvoiceAlerts: false,
   useInternalChat: false,
   openInDashboard: false,
+  openAp: false,
 };
 
 describe("admin", () => {
@@ -44,6 +45,7 @@ describe("admin", () => {
       seeInvoiceAlerts: false,
       useInternalChat: true,
       openInDashboard: true,
+      openAp: true,
     });
   });
 
@@ -69,6 +71,7 @@ describe("lead account manager", () => {
       seeInvoiceAlerts: false,
       useInternalChat: true,
       openInDashboard: true,
+      openAp: false,
     });
   });
 
@@ -225,7 +228,7 @@ describe("accountant", () => {
     expect(capsFor(["accountant"]).seeInvoiceAlerts).toBe(true);
   });
 
-  it("can do nothing else: the flag, the payments, the invoice, its alerts and the chat are the only 'yes' in their column", () => {
+  it("can do nothing else: the flag, the payments, the invoice, its alerts, the chat and Open AR are the only 'yes' in their column", () => {
     expect(capsFor(["accountant"])).toEqual({
       ...NOTHING,
       setQuickBooksFlag: true,
@@ -233,10 +236,11 @@ describe("accountant", () => {
       manageQuickBooksInvoice: true,
       seeInvoiceAlerts: true,
       useInternalChat: true,
+      openAp: true,
     });
   });
 
-  it("stays at the flag, the payments, the invoice, its alerts and the chat even with the zones and the ownership that would help a manager", () => {
+  it("stays at the flag, the payments, the invoice, its alerts, the chat and Open AR even with the zones and the ownership that would help a manager", () => {
     expect(
       capsFor(["accountant"], {
         leadZoneIds: ["zone-a"],
@@ -250,6 +254,7 @@ describe("accountant", () => {
       manageQuickBooksInvoice: true,
       seeInvoiceAlerts: true,
       useInternalChat: true,
+      openAp: true,
     });
   });
 
@@ -503,6 +508,7 @@ describe("roles are additive", () => {
       recordPayment: true,
       manageQuickBooksInvoice: true,
       seeInvoiceAlerts: true,
+      openAp: true,
     });
   });
 
@@ -515,6 +521,7 @@ describe("roles are additive", () => {
       manageQuickBooksInvoice: true,
       seeInvoiceAlerts: true,
       useInternalChat: true,
+      openAp: true,
     });
   });
 });
@@ -537,5 +544,48 @@ describe("no quote (the list)", () => {
         accountManagerZoneIds: [],
       }).createQuote,
     ).toBe(false);
+  });
+});
+
+// Open AR, the header button of the quote card that opens the booking's invoice page
+// (/accountant/invoice) in a new tab. It follows the page's own access rule (accessConfig), so an
+// admin and an accountant are shown it and no other role is. Not tied to the quote.
+describe("openAp: admin and accountant only", () => {
+  const own = { quote: { createdByUserId: ME } };
+  const others = { quote: { createdByUserId: SOMEONE_ELSE } };
+
+  it.each(["admin", "accountant"] as const)(
+    "is true for the %s role, on any quote and on none",
+    (role) => {
+      expect(capsFor([role], own).openAp).toBe(true);
+      expect(capsFor([role], others).openAp).toBe(true);
+      expect(capsFor([role], { quote: undefined }).openAp).toBe(true);
+    },
+  );
+
+  it.each(["account_manager", "viewer", "maintainer", "developer", "driver"] as const)(
+    "is false for the %s role, even on a quote they created",
+    (role) => {
+      expect(capsFor([role], own).openAp).toBe(false);
+      expect(capsFor([role], others).openAp).toBe(false);
+    },
+  );
+
+  it("is false for an account manager with the zones of a lead", () => {
+    expect(
+      capsFor(["account_manager"], { leadZoneIds: ["zone-a"], accountManagerZoneIds: ["zone-a"] })
+        .openAp,
+    ).toBe(false);
+  });
+
+  it("follows the admin or accountant right when a user holds several roles", () => {
+    expect(capsFor(["account_manager", "accountant"], others).openAp).toBe(true);
+    expect(capsFor(["viewer", "admin"], others).openAp).toBe(true);
+    expect(capsFor(["account_manager", "viewer"], own).openAp).toBe(false);
+  });
+
+  it("is false with no roles, and for a role the function does not know", () => {
+    expect(capsFor([]).openAp).toBe(false);
+    expect(capsFor(["superuser" as WebRole]).openAp).toBe(false);
   });
 });

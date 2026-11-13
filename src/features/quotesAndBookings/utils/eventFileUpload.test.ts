@@ -1,4 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Spec: docs/specs/event-change-log-02-file-upload-delete.md §3 and §5. The Log row of an upload is
+// written by `logFileUploaded` once the EventFiles row is in; here it and the toast are captured.
+const mocks = vi.hoisted(() => ({ logFileUploaded: vi.fn(), toast: vi.fn() }));
+
+vi.mock("../db/logEventFile", () => ({
+  logFileUploaded: (p: unknown) => mocks.logFileUploaded(p),
+}));
+vi.mock("@/components/toasts/ErrorToast", () => ({
+  createErrorToastNoThrow: (lines: string[]) => mocks.toast(lines),
+}));
+
 import {
   errorMessage,
   fileRefusal,
@@ -8,6 +20,12 @@ import {
   isOwnEventFilePath,
   EVENT_FILES_BUCKET,
 } from "./eventFileUpload";
+
+beforeEach(() => {
+  mocks.logFileUploaded.mockReset();
+  mocks.logFileUploaded.mockResolvedValue(undefined);
+  mocks.toast.mockReset();
+});
 
 describe("fileRefusal", () => {
   it("accepts a PDF under the limit", () => {
@@ -47,6 +65,7 @@ describe("uploadEventFile", () => {
       file,
       source: "email_attachment",
       uploadedBy: "user_1",
+      changedByUserUuid: "user-9",
     });
     expect(supabase.storage.from).toHaveBeenCalledWith(EVENT_FILES_BUCKET);
     expect((upload.mock.calls[0] as any[])[0]).toMatch(/^ev1\/[0-9a-f-]+\.pdf$/);
@@ -65,7 +84,14 @@ describe("uploadEventFile", () => {
   it("throws on a storage error and inserts no row", async () => {
     const { supabase, insert } = fakeSupabase({ upload: { error: new Error("full") } });
     await expect(
-      uploadEventFile({ supabase, eventId: "ev1", file, source: "upload", uploadedBy: null }),
+      uploadEventFile({
+        supabase,
+        eventId: "ev1",
+        file,
+        source: "upload",
+        uploadedBy: null,
+        changedByUserUuid: null,
+      }),
     ).rejects.toThrow("full");
     expect(insert).not.toHaveBeenCalled();
   });
@@ -73,7 +99,14 @@ describe("uploadEventFile", () => {
   it("throws on an insert error and removes the orphaned storage object", async () => {
     const { supabase, upload, remove } = fakeSupabase({ insert: { error: new Error("rls") } });
     await expect(
-      uploadEventFile({ supabase, eventId: "ev1", file, source: "upload", uploadedBy: null }),
+      uploadEventFile({
+        supabase,
+        eventId: "ev1",
+        file,
+        source: "upload",
+        uploadedBy: null,
+        changedByUserUuid: null,
+      }),
     ).rejects.toThrow("rls");
     const stored = (upload.mock.calls[0] as any[])[0];
     expect(remove).toHaveBeenCalledWith([stored]);
@@ -84,7 +117,14 @@ describe("uploadEventFile", () => {
     remove.mockRejectedValueOnce(new Error("offline"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
-      uploadEventFile({ supabase, eventId: "ev1", file, source: "upload", uploadedBy: null }),
+      uploadEventFile({
+        supabase,
+        eventId: "ev1",
+        file,
+        source: "upload",
+        uploadedBy: null,
+        changedByUserUuid: null,
+      }),
     ).rejects.toThrow("rls");
   });
 
@@ -93,8 +133,99 @@ describe("uploadEventFile", () => {
       insert: { error: { message: "row violates policy", code: "42501" } },
     });
     await expect(
-      uploadEventFile({ supabase, eventId: "ev1", file, source: "upload", uploadedBy: null }),
+      uploadEventFile({
+        supabase,
+        eventId: "ev1",
+        file,
+        source: "upload",
+        uploadedBy: null,
+        changedByUserUuid: null,
+      }),
     ).rejects.toThrow("row violates policy");
+  });
+
+  // ── The Log row (spec 02, R2, R4) ──
+  describe("the Log row", () => {
+    const params = (supabase: any, over: Record<string, unknown> = {}) => ({
+      supabase,
+      eventId: "ev1",
+      file,
+      source: "upload",
+      uploadedBy: "user_1",
+      changedByUserUuid: "user-9",
+      ...over,
+    });
+
+    it("R2: writes one row, with the event, the file's name and the author, after the EventFiles insert", async () => {
+      const order: string[] = [];
+      const { supabase, insert } = fakeSupabase();
+      insert.mockImplementation(async () => {
+        order.push("insert");
+        return { error: null };
+      });
+      mocks.logFileUploaded.mockImplementation(async () => {
+        order.push("log");
+      });
+
+      await uploadEventFile(params(supabase));
+
+      expect(mocks.logFileUploaded).toHaveBeenCalledTimes(1);
+      expect(mocks.logFileUploaded).toHaveBeenCalledWith({
+        eventId: "ev1",
+        fileName: "doc.pdf",
+        changedByUserUuid: "user-9",
+      });
+      expect(order).toEqual(["insert", "log"]);
+    });
+
+    it("still returns the id of the EventFiles row", async () => {
+      const { supabase, insert } = fakeSupabase();
+      const id = await uploadEventFile(params(supabase));
+      expect((insert.mock.calls[0] as any[])[0].id).toBe(id);
+    });
+
+    it("passes a null author when the user id is not loaded", async () => {
+      const { supabase } = fakeSupabase();
+      await uploadEventFile(params(supabase, { changedByUserUuid: null }));
+      expect(mocks.logFileUploaded).toHaveBeenCalledWith(
+        expect.objectContaining({ changedByUserUuid: null }),
+      );
+    });
+
+    it("writes no row when the storage step fails", async () => {
+      const { supabase } = fakeSupabase({ upload: { error: new Error("full") } });
+      await expect(uploadEventFile(params(supabase))).rejects.toThrow("full");
+      expect(mocks.logFileUploaded).not.toHaveBeenCalled();
+    });
+
+    it("writes no row when the insert fails, and still removes the object", async () => {
+      const { supabase, upload, remove } = fakeSupabase({ insert: { error: new Error("rls") } });
+      await expect(uploadEventFile(params(supabase))).rejects.toThrow("rls");
+      expect(mocks.logFileUploaded).not.toHaveBeenCalled();
+      expect(remove).toHaveBeenCalledWith([(upload.mock.calls[0] as any[])[0]]);
+    });
+
+    it("R4: a failing Log write does not throw, keeps the file and shows the toast", async () => {
+      const { supabase, insert } = fakeSupabase();
+      mocks.logFileUploaded.mockRejectedValueOnce(new Error("local db closed"));
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const id = await uploadEventFile(params(supabase));
+
+      expect((insert.mock.calls[0] as any[])[0].id).toBe(id);
+      expect(mocks.toast).toHaveBeenCalledTimes(1);
+      expect(mocks.toast).toHaveBeenCalledWith([
+        "The file was saved, but its Log row could not be written",
+      ]);
+      expect(errors).toHaveBeenCalled();
+      errors.mockRestore();
+    });
+
+    it("shows no toast when the row is written", async () => {
+      const { supabase } = fakeSupabase();
+      await uploadEventFile(params(supabase));
+      expect(mocks.toast).not.toHaveBeenCalled();
+    });
   });
 });
 

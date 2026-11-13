@@ -1,19 +1,12 @@
 "use client";
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import {
-  Upload,
-  Trash2,
-  Loader2,
-  FileText,
-  Download,
-  X,
-  Image as ImageIcon,
-} from "lucide-react";
+import { Upload, Trash2, Loader2, FileText, Download, X, Image as ImageIcon } from "lucide-react";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { useAuth } from "@clerk/nextjs";
+import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import {
   AlertDialog,
@@ -36,8 +29,7 @@ import {
 } from "../../../utils/eventFileUpload";
 import { createEventFileUrl, removeEventFile } from "../../../utils/eventFileStorage";
 
-const isImageType = (mime: string | null) =>
-  !!mime && IMAGE_TYPES.includes(mime);
+const isImageType = (mime: string | null) => !!mime && IMAGE_TYPES.includes(mime);
 
 const isImagePath = (path: string) => {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -86,6 +78,8 @@ type StagedFile = {
 export function FilesTab({ quoteId }: { quoteId: string }) {
   const supabase = useClerkSupabaseClient();
   const { userId } = useAuth();
+  // `Users.id`, for the Log rows of an upload and of a delete. `userId` above is the Clerk id.
+  const userUuid = usePermissionsStore((s) => s.userId);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [staged, setStaged] = useState<StagedFile[]>([]);
@@ -130,9 +124,7 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
     for (const file of Array.from(fileList)) {
       if (!validateFile(file)) continue;
       const id = crypto.randomUUID();
-      const preview = file.type.startsWith("image/")
-        ? URL.createObjectURL(file)
-        : undefined;
+      const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
       newFiles.push({ id, file, preview });
     }
     setStaged((prev) => [...prev, ...newFiles]);
@@ -157,6 +149,7 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
           file: item.file,
           source: "upload",
           uploadedBy: userId,
+          changedByUserUuid: userUuid,
         });
       }
 
@@ -173,10 +166,15 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
     if (!deleteTarget || !deleteTarget.storage_path) return;
     setDeleting(true);
     try {
-      await removeEventFile(supabase, {
-        id: deleteTarget.id,
-        storage_path: deleteTarget.storage_path,
-      });
+      await removeEventFile(
+        supabase,
+        {
+          id: deleteTarget.id,
+          storage_path: deleteTarget.storage_path,
+          file_name: deleteTarget.file_name ?? "",
+        },
+        { eventId: quoteId, changedByUserUuid: userUuid },
+      );
     } catch (err: any) {
       createErrorToast(["Delete failed", err?.message ?? ""]);
     } finally {
@@ -268,9 +266,7 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
             }`}
           >
             <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">
-              Drag & drop files here or click Upload File
-            </p>
+            <p className="text-sm text-gray-500">Drag & drop files here or click Upload File</p>
             <p className="text-xs text-gray-400 mt-1">
               PDF, DOC, PNG, JPG, XLS, CSV — max {MAX_SIZE_MB}MB
             </p>
@@ -287,9 +283,7 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    staged.forEach(
-                      (f) => f.preview && URL.revokeObjectURL(f.preview),
-                    );
+                    staged.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
                     setStaged([]);
                   }}
                   className="text-xs font-medium text-gray-500 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50 transition cursor-pointer"
@@ -383,14 +377,9 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
               </thead>
               <tbody>
                 {fileList.map((file) => {
-                  const isImg =
-                    isImagePath(file.storage_path ?? "") ||
-                    isImageType(file.mime_type);
+                  const isImg = isImagePath(file.storage_path ?? "") || isImageType(file.mime_type);
                   return (
-                    <tr
-                      key={file.id}
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
+                    <tr key={file.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-2.5">
                         <button
                           onClick={() => handleFileClick(file)}
@@ -401,24 +390,16 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
                           ) : (
                             <FileText className="w-4 h-4 text-gray-400 shrink-0" />
                           )}
-                          <span className="truncate max-w-[200px]">
-                            {file.file_name}
-                          </span>
+                          <span className="truncate max-w-[200px]">{file.file_name}</span>
                         </button>
                       </td>
                       <td className="py-2.5 text-gray-500">
                         {file.mime_type?.split("/").pop()?.toUpperCase() ?? "—"}
                       </td>
+                      <td className="py-2.5 text-gray-500">{formatBytes(file.file_size_bytes)}</td>
+                      <td className="py-2.5 text-gray-500">{sourceLabel(file.source)}</td>
                       <td className="py-2.5 text-gray-500">
-                        {formatBytes(file.file_size_bytes)}
-                      </td>
-                      <td className="py-2.5 text-gray-500">
-                        {sourceLabel(file.source)}
-                      </td>
-                      <td className="py-2.5 text-gray-500">
-                        {file.created_at
-                          ? new Date(file.created_at).toLocaleDateString()
-                          : "—"}
+                        {file.created_at ? new Date(file.created_at).toLocaleDateString() : "—"}
                       </td>
                       <td className="py-2.5">
                         <div className="flex items-center gap-1">
@@ -464,10 +445,7 @@ export function FilesTab({ quoteId }: { quoteId: string }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              className="cursor-pointer rounded-sm"
-              disabled={deleting}
-            >
+            <AlertDialogCancel className="cursor-pointer rounded-sm" disabled={deleting}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction

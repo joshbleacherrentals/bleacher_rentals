@@ -43,7 +43,8 @@ vi.mock("./useCollectionsData", () => ({ useCollectionsData: () => mocks.collect
 
 import { useTaskNeighbours } from "./useTaskNeighbours";
 
-function row(id: string, amountDueCents: number): CollectionsRow {
+// By default a row owes all it still has to pay (Amount Due equals Remaining): a Collections row.
+function row(id: string, amountDueCents: number, remainingCents = amountDueCents): CollectionsRow {
   return {
     eventId: id,
     eventName: `Event ${id}`,
@@ -51,12 +52,18 @@ function row(id: string, amountDueCents: number): CollectionsRow {
     dueDate: "2026-11-10",
     note: "Remind the customer about payment",
     amountDueCents,
+    remainingCents,
     currency: "USD",
     daysOverdue: 10,
   };
 }
 
-const BY_AMOUNT: CollectionsListState = { sort: "amount", dir: "desc", showNotDue: false };
+const BY_AMOUNT: CollectionsListState = {
+  sort: "amount",
+  dir: "desc",
+  showNotDue: false,
+  type: "collections",
+};
 // Largest first: a, c, d, b.
 const rows = () => [row("a", 40000), row("b", 10000), row("c", 30000), row("d", 20000)];
 
@@ -136,6 +143,45 @@ describe("useTaskNeighbours", () => {
       isReady: true,
       previousId: "f",
       nextId: "d",
+    });
+  });
+  // docs/specs/accountant-collections-23-amount-type-switch.md §1 (D4), §4 (S77) and §7.
+  it("walks only the events of the chosen type", () => {
+    // Largest Amount Due first: a, c (Collections), then d, b (Deposits), x (nothing overdue).
+    mocks.collections.rows = [
+      row("a", 40000),
+      row("b", 10000, 50000),
+      row("c", 30000),
+      row("d", 20000, 90000),
+      row("x", 0, 90000),
+    ];
+    expect(render("a", { ...BY_AMOUNT, type: "collections" })).toEqual({
+      isReady: true,
+      previousId: null,
+      nextId: "c",
+    });
+
+    mocks.slot.current = undefined;
+    expect(render("d", { ...BY_AMOUNT, type: "deposits" })).toEqual({
+      isReady: true,
+      previousId: null,
+      nextId: "b",
+    });
+
+    mocks.slot.current = undefined;
+    expect(render("d", { ...BY_AMOUNT, type: "all" })).toEqual({
+      isReady: true,
+      previousId: "c",
+      nextId: "b",
+    });
+  });
+
+  it("dims both when the event is not in the chosen type", () => {
+    mocks.collections.rows = [row("a", 40000), row("b", 10000, 50000)];
+    expect(render("a", { ...BY_AMOUNT, type: "deposits" })).toEqual({
+      isReady: true,
+      previousId: null,
+      nextId: null,
     });
   });
 });
