@@ -23,6 +23,8 @@ type WeekEventRow = {
   event_name: string | null;
   event_start: string | null;
   street: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 type AssignmentRow = {
   event_uuid: string | null;
@@ -36,6 +38,8 @@ type PastEventRow = {
   event_name: string | null;
   event_end: string | null;
   street: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 type MaintenanceRow = {
   bleacher_uuid: string | null;
@@ -43,6 +47,8 @@ type MaintenanceRow = {
   event_name: string | null;
   event_end: string | null;
   street: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 type WorkTrackerRow = {
   id: string;
@@ -50,17 +56,30 @@ type WorkTrackerRow = {
   actual_bleacher_uuid: string | null;
   date: string | null;
   street: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 // An event is where its venue's address says it is, or at its own address when it has no venue
 // address. The two are joined as `street` (own) and `venue_street`; the venue's wins.
 const placeStreet = sql<string | null>`coalesce(va.street, a.street)`;
+// The coordinates of the same address the street came from: the venue's when it has a street.
+const placeLatitude = sql<
+  number | null
+>`case when va.street is not null then va.latitude else a.latitude end`;
+const placeLongitude = sql<
+  number | null
+>`case when va.street is not null then va.longitude else a.longitude end`;
 
 /**
  * The events that start in the week beginning `weekStart`, each with the bleachers assigned to it
  * and where every one of those bleachers was last, all from the local database. Nothing is stored.
+ * Given a `zoneId`, only the bleachers in that zone are listed.
  */
-export function useLogisticsPlans(weekStart: string): {
+export function useLogisticsPlans(
+  weekStart: string,
+  zoneId?: string,
+): {
   events: EventLogisticsCheck[];
   isLoading: boolean;
 } {
@@ -79,6 +98,8 @@ export function useLogisticsPlans(weekStart: string): {
         "e.event_name as event_name",
         "e.event_start as event_start",
         placeStreet.as("street"),
+        placeLatitude.as("latitude"),
+        placeLongitude.as("longitude"),
       ])
       .where("e.event_status", "=", "booked")
       .where("e.deleted", "=", 0)
@@ -103,6 +124,8 @@ export function useLogisticsPlans(weekStart: string): {
       eventName: e.name,
       startDate: timestampToDate(byId.get(e.id)!.event_start)!,
       street: byId.get(e.id)!.street,
+      latitude: byId.get(e.id)!.latitude,
+      longitude: byId.get(e.id)!.longitude,
     }));
   }, [weekEventRows, weekStart]);
   const weekEventIds = useMemo(() => weekEvents.map((e) => e.eventId), [weekEvents]);
@@ -122,9 +145,11 @@ export function useLogisticsPlans(weekStart: string): {
         ])
         .where("be.event_uuid", "in", weekEventIds)
         .where("b.deleted", "=", 0)
+        // Only the bleachers of one zone, when a zone is given.
+        .$if(!!zoneId, (qb) => qb.where("b.zone_uuid", "=", zoneId!))
         .compile(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [weekEventIdsKey],
+    [weekEventIdsKey, zoneId],
   );
   const { data: assignments, isLoading: assignmentsLoading } = useTypedQuery(
     compiledAssignments,
@@ -158,6 +183,8 @@ export function useLogisticsPlans(weekStart: string): {
           "e.event_name as event_name",
           "e.event_end as event_end",
           placeStreet.as("street"),
+          placeLatitude.as("latitude"),
+          placeLongitude.as("longitude"),
         ])
         .where("be.bleacher_uuid", "in", bleacherIds)
         .where("e.event_status", "=", "booked")
@@ -183,6 +210,8 @@ export function useLogisticsPlans(weekStart: string): {
           "m.event_name as event_name",
           "m.event_end as event_end",
           "a.street as street",
+          "a.latitude as latitude",
+          "a.longitude as longitude",
         ])
         .where("bm.bleacher_uuid", "in", bleacherIds)
         .where("m.deleted", "=", 0)
@@ -207,6 +236,8 @@ export function useLogisticsPlans(weekStart: string): {
           "w.actual_bleacher_uuid as actual_bleacher_uuid",
           "w.date as date",
           "da.street as street",
+          "da.latitude as latitude",
+          "da.longitude as longitude",
         ])
         .where((eb) =>
           eb.or([
@@ -242,6 +273,8 @@ export function useLogisticsPlans(weekStart: string): {
               id: r.id,
               date,
               street: r.street,
+              latitude: r.latitude,
+              longitude: r.longitude,
               label: r.event_name?.trim() || "Untitled event",
             }
           : null,
@@ -257,6 +290,8 @@ export function useLogisticsPlans(weekStart: string): {
               id: r.id,
               date,
               street: r.street,
+              latitude: r.latitude,
+              longitude: r.longitude,
               label: r.event_name?.trim() || "Maintenance",
             }
           : null,
@@ -267,7 +302,15 @@ export function useLogisticsPlans(weekStart: string): {
       add(
         r.actual_bleacher_uuid ?? r.bleacher_uuid,
         date
-          ? { kind: "work_tracker", id: r.id, date, street: r.street, label: "Work tracker" }
+          ? {
+              kind: "work_tracker",
+              id: r.id,
+              date,
+              street: r.street,
+              latitude: r.latitude,
+              longitude: r.longitude,
+              label: "Work tracker",
+            }
           : null,
       );
     }

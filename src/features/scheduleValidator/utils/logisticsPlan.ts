@@ -21,6 +21,9 @@ export type HistoryItem = {
   date: string;
   /** Street text of where the bleacher was left. Null when that place has no street. */
   street: string | null;
+  /** Where that place is on the map, when the address has coordinates. */
+  latitude?: number | null;
+  longitude?: number | null;
   /** Shown beside the location: the event's name, say. */
   label: string;
 };
@@ -39,6 +42,9 @@ export type PlannedEvent = {
   startDate: string;
   /** Street text of the event's location. Null when it has none. */
   street: string | null;
+  /** Where the event is on the map, when its address has coordinates. */
+  latitude?: number | null;
+  longitude?: number | null;
   bleachers: PlannedBleacher[];
 };
 

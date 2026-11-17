@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateWorkTrackers, type GenerateWorkTrackersResult } from "../api/generateWorkTrackers";
+import { summarizeUnassigned } from "../utils/unassignedSummary";
 
 /** Creates a draft work tracker for every trip the chosen zone needs in the chosen week. */
 export function GenerateWorkTrackersButton({
@@ -38,11 +39,19 @@ export function GenerateWorkTrackersButton({
       </Button>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {result && (
-        <p className="text-sm text-gray-600" data-testid="generate-work-trackers-result">
-          Created {result.created.length} draft work tracker
-          {result.created.length === 1 ? "" : "s"} for {result.bleachers_needing_trips} of{" "}
-          {result.bleachers_in_zone} bleachers.
-        </p>
+        <div className="text-sm text-gray-600" data-testid="generate-work-trackers-result">
+          <p>
+            Created {result.created.length} draft work tracker
+            {result.created.length === 1 ? "" : "s"} with a driver and day for{" "}
+            {new Set(result.created.map((t) => t.bleacher_uuid)).size} of {result.bleachers_in_zone}{" "}
+            bleachers.
+          </p>
+          {result.unassigned.length > 0 && (
+            <p className="text-amber-700" data-testid="generate-work-trackers-unassigned">
+              {summarizeUnassigned(result.unassigned)}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

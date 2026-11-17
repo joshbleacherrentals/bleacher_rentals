@@ -1,9 +1,7 @@
-import { AutoWorkTrackersPage } from "@/features/autoWorkTrackers/components/AutoWorkTrackersPage";
+import { redirect } from "next/navigation";
+import { DEFAULT_TAB } from "@/features/autoWorkTrackers/utils/tabs";
 
+/** /auto-work-trackers itself has no content: it opens the first tab. */
 export default function Page() {
-  return (
-    <div className="p-4">
-      <AutoWorkTrackersPage />
-    </div>
-  );
+  redirect(`/auto-work-trackers/${DEFAULT_TAB.slug}`);
 }

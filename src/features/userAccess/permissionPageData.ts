@@ -506,14 +506,14 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Auto Work Trackers",
     description:
-      "The Auto Work Trackers page in the sidebar, where you pick one zone and one week (Monday to Sunday). It shows that zone's bleachers across the week, laid out like the Dashboard. The Create work trackers button works out which of the zone's bleachers need a trip that week and creates a draft work tracker for each, with the pick-up and drop-off address filled in and no driver, contact or times. It is being built: the days of the grid are still blank.",
+      "The Auto Work Trackers page in the sidebar, where you pick one zone and one week (Monday to Sunday). Its Schedule tab shows that zone's bleachers across the week, laid out like the Dashboard, and its Bleacher Deliveries tab lists every event starting that week with its bleachers, ticking the ones already at the event and showing, for the rest, where each was last, how many days there are to move it and the straight-line distance to the event. Its Event Dashboard tab shows the Dashboard's grid for that week, grouped under the events that start in it (each event, then its bleachers); it is read-only. Its Suggest trips button shows the trips the zone's bleachers need as flashing tiles, and clicking a tile (or Accept all) creates that draft work tracker, only on a day inside the selected week. The Create work trackers button, at the top of the page on every tab, works out which of the zone's bleachers need a trip that week and creates a draft work tracker for each, with the pick-up and drop-off address filled in and no driver, contact or times. It is being built: the Schedule tab's days are still blank.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can open the page, pick a zone and a week, see the zone's bleachers laid out across it, and create the draft work trackers.",
+        "Can open the page, pick a zone and a week, see the zone's bleachers laid out across it, see the Event Dashboard, and create the draft work trackers (all at once, or by accepting suggested trips).",
       ),
       account_manager: full(
-        "Can open the page, pick any zone and a week, see its bleachers laid out across it, and create the draft work trackers.",
+        "Can open the page, pick any zone and a week, see its bleachers laid out across it, see the Event Dashboard, and create the draft work trackers (all at once, or by accepting suggested trips).",
       ),
       developer: none("Does not have this page."),
       viewer: none("Does not have this page."),

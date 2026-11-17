@@ -9,12 +9,24 @@ export type GenerateWorkTrackersResult = {
     from_street: string;
     to_street: string;
     date: string;
+    driver_uuid: string | null;
+  }[];
+  /** Trips that got no driver and day, so no work tracker was created for them. */
+  unassigned: {
+    bleacher_uuid: string;
+    bleacher_number: number | null;
+    from_street: string;
+    to_street: string;
+    earliest_day: string | null;
+    latest_day: string | null;
+    reason: "no_window" | "outside_week" | "no_free_driver_day";
   }[];
 };
 
 /**
  * Asks the Python service to find the trips the zone's bleachers need in the week starting
- * `weekStart` (a Monday) and create a draft work tracker for each. The service reads and writes
+ * `weekStart` (a Monday), give each a driver and a day (one trip per driver per day) and create a
+ * draft work tracker for each that fits. The service reads and writes
  * Supabase itself.
  */
 export async function generateWorkTrackers(params: {
