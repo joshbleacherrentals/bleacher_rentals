@@ -35,10 +35,30 @@ const state = (
 
 // Four rows with distinct values in every column, so each order is unambiguous.
 const ROWS = [
-  row("a", { amountDueCents: 40000, dueDate: "2026-11-04", daysOverdue: 30 }),
-  row("b", { amountDueCents: 10000, dueDate: "2026-11-12", daysOverdue: 3 }),
-  row("c", { amountDueCents: 30000, dueDate: "2026-11-08", daysOverdue: 12 }),
-  row("d", { amountDueCents: 20000, dueDate: "2026-11-01", daysOverdue: 21 }),
+  row("a", {
+    amountDueCents: 40000,
+    dueDate: "2026-11-04",
+    daysOverdue: 30,
+    eventStart: "2027-03-01",
+  }),
+  row("b", {
+    amountDueCents: 10000,
+    dueDate: "2026-11-12",
+    daysOverdue: 3,
+    eventStart: "2027-01-15",
+  }),
+  row("c", {
+    amountDueCents: 30000,
+    dueDate: "2026-11-08",
+    daysOverdue: 12,
+    eventStart: "2027-02-10",
+  }),
+  row("d", {
+    amountDueCents: 20000,
+    dueDate: "2026-11-01",
+    daysOverdue: 21,
+    eventStart: "2027-04-01",
+  }),
 ];
 
 describe("orderedEventIds", () => {
@@ -61,6 +81,11 @@ describe("orderedEventIds", () => {
   it("Payment Overdue, most days first and fewest days first", () => {
     expect(orderedEventIds(ROWS, state("overdue", "desc"), TODAY)).toEqual(["a", "d", "c", "b"]);
     expect(orderedEventIds(ROWS, state("overdue", "asc"), TODAY)).toEqual(["b", "c", "d", "a"]);
+  });
+
+  it("Start Date, latest first and earliest first", () => {
+    expect(orderedEventIds(ROWS, state("startDate", "desc"), TODAY)).toEqual(["d", "a", "c", "b"]);
+    expect(orderedEventIds(ROWS, state("startDate", "asc"), TODAY)).toEqual(["b", "c", "a", "d"]);
   });
 
   it("Show Not Due Yet off drops the tasks dated after today; on keeps them", () => {

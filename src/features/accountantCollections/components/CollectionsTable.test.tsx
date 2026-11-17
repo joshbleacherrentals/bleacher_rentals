@@ -65,7 +65,7 @@ describe("CollectionsTable", () => {
     }
   });
 
-  it("puts Start Date between Next Follow Up and Payment Overdue, as plain text, not a sort button", () => {
+  it("puts Start Date between Next Follow Up and Payment Overdue", () => {
     const html = render({});
     const followUp = html.indexOf("Next Follow Up");
     const startDate = html.indexOf("Start Date");
@@ -73,7 +73,6 @@ describe("CollectionsTable", () => {
     expect(followUp).toBeGreaterThan(-1);
     expect(startDate).toBeGreaterThan(followUp);
     expect(overdue).toBeGreaterThan(startDate);
-    expect(html).not.toMatch(/<th[^>]*aria-sort[^>]*><button[^>]*><span>Start Date</);
   });
 
   it("shows the event's start date as the AR Deposits tab words it, and N/A without one", () => {
@@ -152,9 +151,19 @@ describe("CollectionsTable", () => {
       expect(desc).toContain("lucide-arrow-down ");
     });
 
-    it("makes the three sortable headers buttons, and Name and Task Notes plain text", () => {
+    it("marks Start Date, and follows its direction", () => {
+      expect(sortOf(render({}), "Start Date")).toBe("none");
+      const asc = render({ state: { ...DEFAULT, sort: "startDate", dir: "asc" } });
+      expect(sortOf(asc, "Start Date")).toBe("ascending");
+      expect(sortOf(asc, "Next Follow Up")).toBe("none");
+      const desc = render({ state: { ...DEFAULT, sort: "startDate", dir: "desc" } });
+      expect(sortOf(desc, "Start Date")).toBe("descending");
+    });
+
+    it("makes the four sortable headers buttons, and Name and Task Notes plain text", () => {
       const html = render({});
       expect(html).toMatch(/<button[^>]*>[^]*?Next Follow Up/);
+      expect(html).toMatch(/<button[^>]*>[^]*?Start Date/);
       expect(html).toMatch(/<button[^>]*>[^]*?Payment Overdue/);
       expect(html).toMatch(/<button[^>]*>[^]*?Amount Overdue/);
       expect(html).not.toMatch(/<button[^>]*>[^<]*(<[^b/][^>]*>)*Name</);

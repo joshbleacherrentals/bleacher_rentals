@@ -13,7 +13,7 @@ import { followUpLabel, overdueLabel } from "../utils/relativeDays";
  * The table of the Collections tab. docs/specs/accountant-collections-09-design.md §3.
  *
  * A row is a link: the Name cell holds the link and stretches it over the whole row, so the row
- * stays a table row. The three sortable headers are buttons; `aria-sort` follows the list state.
+ * stays a table row. The four sortable headers are buttons; `aria-sort` follows the list state.
  */
 
 const GRID = "px-5 py-3";
@@ -93,9 +93,13 @@ export function CollectionsTable({
                 align="left"
                 onSort={onSort}
               />
-              <th scope="col" className={`${GRID} ${HEADER} text-left text-gray-500`}>
-                Start Date
-              </th>
+              <SortHeader
+                label="Start Date"
+                sortKey="startDate"
+                state={state}
+                align="left"
+                onSort={onSort}
+              />
               <SortHeader
                 label="Payment Overdue"
                 sortKey="overdue"
