@@ -219,14 +219,14 @@ isOneToOne: false
                   ]
                 },"Bleachers": {
                   Row: {
-                    "bleacher_number": number,"bleacher_rows": number,"bleacher_seats": number,"bleacher_type_uuid": string | null,"created_at": string,"created_by": string | null,"deleted": boolean,"gvwr": number | null,"height_folded_ft": number | null,"hitch_type": string | null,"id": string,"linxup_device_id": string | null,"manufacturer": string | null,"nvis_pdf_path": string | null,"opening_direction": Database["public"]['Enums']["bleacher_opening_dir"] | null,"storage_location_uuid": string | null,"summer_account_manager_uuid": string | null,"summer_home_base_uuid": string | null,"tag_number": string | null,"trailer_height_in": number | null,"trailer_length": number | null,"trailer_length_in": number | null,"updated_at": string | null,"updated_by": string | null,"vin_number": string | null,"winter_account_manager_uuid": string | null,"winter_home_base_uuid": string | null,"zone_uuid": string | null
+                    "asset_value_cents": number | null,"bleacher_number": number,"bleacher_rows": number,"bleacher_seats": number,"bleacher_type_uuid": string | null,"created_at": string,"created_by": string | null,"deleted": boolean,"gvwr": number | null,"height_folded_ft": number | null,"hitch_type": string | null,"id": string,"linxup_device_id": string | null,"manufacturer": string | null,"model_number": string | null,"nvis_pdf_path": string | null,"opening_direction": Database["public"]['Enums']["bleacher_opening_dir"] | null,"storage_location_uuid": string | null,"summer_account_manager_uuid": string | null,"summer_home_base_uuid": string | null,"tag_number": string | null,"trailer_height_in": number | null,"trailer_length": number | null,"trailer_length_in": number | null,"updated_at": string | null,"updated_by": string | null,"vin_number": string | null,"winter_account_manager_uuid": string | null,"winter_home_base_uuid": string | null,"zone_uuid": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "bleacher_number": number,"bleacher_rows": number,"bleacher_seats": number,"bleacher_type_uuid"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"gvwr"?: number | null,"height_folded_ft"?: number | null,"hitch_type"?: string | null,"id"?: string,"linxup_device_id"?: string | null,"manufacturer"?: string | null,"nvis_pdf_path"?: string | null,"opening_direction"?: Database["public"]['Enums']["bleacher_opening_dir"] | null,"storage_location_uuid"?: string | null,"summer_account_manager_uuid"?: string | null,"summer_home_base_uuid"?: string | null,"tag_number"?: string | null,"trailer_height_in"?: number | null,"trailer_length"?: number | null,"trailer_length_in"?: number | null,"updated_at"?: string | null,"updated_by"?: string | null,"vin_number"?: string | null,"winter_account_manager_uuid"?: string | null,"winter_home_base_uuid"?: string | null,"zone_uuid"?: string | null
+                    "asset_value_cents"?: number | null,"bleacher_number": number,"bleacher_rows": number,"bleacher_seats": number,"bleacher_type_uuid"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"gvwr"?: number | null,"height_folded_ft"?: number | null,"hitch_type"?: string | null,"id"?: string,"linxup_device_id"?: string | null,"manufacturer"?: string | null,"model_number"?: string | null,"nvis_pdf_path"?: string | null,"opening_direction"?: Database["public"]['Enums']["bleacher_opening_dir"] | null,"storage_location_uuid"?: string | null,"summer_account_manager_uuid"?: string | null,"summer_home_base_uuid"?: string | null,"tag_number"?: string | null,"trailer_height_in"?: number | null,"trailer_length"?: number | null,"trailer_length_in"?: number | null,"updated_at"?: string | null,"updated_by"?: string | null,"vin_number"?: string | null,"winter_account_manager_uuid"?: string | null,"winter_home_base_uuid"?: string | null,"zone_uuid"?: string | null
                   }
                   Update: {
-                    "bleacher_number"?: number,"bleacher_rows"?: number,"bleacher_seats"?: number,"bleacher_type_uuid"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"gvwr"?: number | null,"height_folded_ft"?: number | null,"hitch_type"?: string | null,"id"?: string,"linxup_device_id"?: string | null,"manufacturer"?: string | null,"nvis_pdf_path"?: string | null,"opening_direction"?: Database["public"]['Enums']["bleacher_opening_dir"] | null,"storage_location_uuid"?: string | null,"summer_account_manager_uuid"?: string | null,"summer_home_base_uuid"?: string | null,"tag_number"?: string | null,"trailer_height_in"?: number | null,"trailer_length"?: number | null,"trailer_length_in"?: number | null,"updated_at"?: string | null,"updated_by"?: string | null,"vin_number"?: string | null,"winter_account_manager_uuid"?: string | null,"winter_home_base_uuid"?: string | null,"zone_uuid"?: string | null
+                    "asset_value_cents"?: number | null,"bleacher_number"?: number,"bleacher_rows"?: number,"bleacher_seats"?: number,"bleacher_type_uuid"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"gvwr"?: number | null,"height_folded_ft"?: number | null,"hitch_type"?: string | null,"id"?: string,"linxup_device_id"?: string | null,"manufacturer"?: string | null,"model_number"?: string | null,"nvis_pdf_path"?: string | null,"opening_direction"?: Database["public"]['Enums']["bleacher_opening_dir"] | null,"storage_location_uuid"?: string | null,"summer_account_manager_uuid"?: string | null,"summer_home_base_uuid"?: string | null,"tag_number"?: string | null,"trailer_height_in"?: number | null,"trailer_length"?: number | null,"trailer_length_in"?: number | null,"updated_at"?: string | null,"updated_by"?: string | null,"vin_number"?: string | null,"winter_account_manager_uuid"?: string | null,"winter_home_base_uuid"?: string | null,"zone_uuid"?: string | null
                   }
                   Relationships: [
                     {
@@ -535,6 +535,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"DamageCategories": {
+                  Row: {
+                    "created_at": string,"id": string,"is_active": boolean,"name": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"is_active"?: boolean,"name": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"is_active"?: boolean,"name"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"DamageReportAcknowledgements": {
                   Row: {
                     "acknowledged_by_user_uuid": string,"created_at": string,"damage_report_uuid": string,"deleted": boolean,"id": string,"inspection_uuid": string | null,"report_resolved_at": string | null,"work_tracker_uuid": string | null
@@ -570,6 +584,32 @@ isOneToOne: false
       columns: ["work_tracker_uuid"]
 isOneToOne: false
       referencedRelation: "WorkTrackers"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"DamageReportCategories": {
+                  Row: {
+                    "created_at": string,"damage_category_uuid": string,"damage_report_uuid": string,"id": string,"report_resolved_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"damage_category_uuid": string,"damage_report_uuid": string,"id"?: string,"report_resolved_at"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"damage_category_uuid"?: string,"damage_report_uuid"?: string,"id"?: string,"report_resolved_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "damagereportcategories_category_fkey"
+      columns: ["damage_category_uuid"]
+isOneToOne: false
+      referencedRelation: "DamageCategories"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "damagereportcategories_report_fkey"
+      columns: ["damage_report_uuid"]
+isOneToOne: false
+      referencedRelation: "DamageReports"
       referencedColumns: ["id"]
     }
                   ]
@@ -1513,16 +1553,30 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"MaintenanceEvents": {
+                },"MaintenanceBudgets": {
                   Row: {
-                    "address_uuid": string | null,"cost_cents": number | null,"created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"event_end": string,"event_name": string,"event_start": string,"id": string,"notes": string | null
+                    "amount_cents": number,"created_at": string,"currency": Database["public"]['Enums']["currency"],"id": string,"year": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "address_uuid"?: string | null,"cost_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"event_end": string,"event_name"?: string,"event_start": string,"id"?: string,"notes"?: string | null
+                    "amount_cents": number,"created_at"?: string,"currency": Database["public"]['Enums']["currency"],"id"?: string,"year": number
                   }
                   Update: {
-                    "address_uuid"?: string | null,"cost_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"deleted"?: boolean,"event_end"?: string,"event_name"?: string,"event_start"?: string,"id"?: string,"notes"?: string | null
+                    "amount_cents"?: number,"created_at"?: string,"currency"?: Database["public"]['Enums']["currency"],"id"?: string,"year"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"MaintenanceEvents": {
+                  Row: {
+                    "address_uuid": string | null,"completed_at": string | null,"cost_cents": number | null,"created_at": string,"created_by_user_uuid": string | null,"currency": Database["public"]['Enums']["currency"],"deleted": boolean,"event_end": string,"event_name": string,"event_start": string,"id": string,"invoice_number": string | null,"notes": string | null,"status": Database["public"]['Enums']["repair_status"],"vendor_uuid": string | null,"zone_uuid": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "address_uuid"?: string | null,"completed_at"?: string | null,"cost_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"currency"?: Database["public"]['Enums']["currency"],"deleted"?: boolean,"event_end": string,"event_name"?: string,"event_start": string,"id"?: string,"invoice_number"?: string | null,"notes"?: string | null,"status"?: Database["public"]['Enums']["repair_status"],"vendor_uuid"?: string | null,"zone_uuid"?: string | null
+                  }
+                  Update: {
+                    "address_uuid"?: string | null,"completed_at"?: string | null,"cost_cents"?: number | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"currency"?: Database["public"]['Enums']["currency"],"deleted"?: boolean,"event_end"?: string,"event_name"?: string,"event_start"?: string,"id"?: string,"invoice_number"?: string | null,"notes"?: string | null,"status"?: Database["public"]['Enums']["repair_status"],"vendor_uuid"?: string | null,"zone_uuid"?: string | null
                   }
                   Relationships: [
                     {
@@ -1536,6 +1590,50 @@ isOneToOne: false
       columns: ["created_by_user_uuid"]
 isOneToOne: false
       referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenanceevents_vendor_uuid_fkey"
+      columns: ["vendor_uuid"]
+isOneToOne: false
+      referencedRelation: "Vendors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenanceevents_zone_uuid_fkey"
+      columns: ["zone_uuid"]
+isOneToOne: false
+      referencedRelation: "Zones"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"MaintenanceLineItems": {
+                  Row: {
+                    "bleacher_uuid": string,"created_at": string,"damage_category_uuid": string | null,"deleted": boolean,"description": string | null,"freight_cents": number,"id": string,"labor_cents": number,"maintenance_event_uuid": string,"parts_cents": number,"severity": Database["public"]['Enums']["maintenance_severity"],"tax_cents": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bleacher_uuid": string,"created_at"?: string,"damage_category_uuid"?: string | null,"deleted"?: boolean,"description"?: string | null,"freight_cents"?: number,"id"?: string,"labor_cents"?: number,"maintenance_event_uuid": string,"parts_cents"?: number,"severity": Database["public"]['Enums']["maintenance_severity"],"tax_cents"?: number
+                  }
+                  Update: {
+                    "bleacher_uuid"?: string,"created_at"?: string,"damage_category_uuid"?: string | null,"deleted"?: boolean,"description"?: string | null,"freight_cents"?: number,"id"?: string,"labor_cents"?: number,"maintenance_event_uuid"?: string,"parts_cents"?: number,"severity"?: Database["public"]['Enums']["maintenance_severity"],"tax_cents"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "maintenancelineitems_bleacher_uuid_fkey"
+      columns: ["bleacher_uuid"]
+isOneToOne: false
+      referencedRelation: "Bleachers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenancelineitems_damage_category_uuid_fkey"
+      columns: ["damage_category_uuid"]
+isOneToOne: false
+      referencedRelation: "DamageCategories"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "maintenancelineitems_maintenance_event_uuid_fkey"
+      columns: ["maintenance_event_uuid"]
+isOneToOne: false
+      referencedRelation: "MaintenanceEvents"
       referencedColumns: ["id"]
     }
                   ]
@@ -2265,17 +2363,23 @@ isOneToOne: false
                   ]
                 },"Vendors": {
                   Row: {
-                    "created_at": string,"display_name": string,"ein": string | null,"hst": string | null,"id": string,"is_active": boolean,"logo_url": string | null,"qbo_connection_uuid": string | null,"qbo_vendor_id": string | null
+                    "address_uuid": string | null,"contact_email": string | null,"contact_name": string | null,"created_at": string,"display_name": string,"does_aluminum_welding": boolean,"does_mobile_repair": boolean,"does_trailer_repair": boolean,"ein": string | null,"hst": string | null,"id": string,"is_active": boolean,"is_parts_supplier": boolean,"logo_url": string | null,"notes": string | null,"phone": string | null,"qbo_connection_uuid": string | null,"qbo_vendor_id": string | null,"status": Database["public"]['Enums']["vendor_status"] | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"display_name": string,"ein"?: string | null,"hst"?: string | null,"id"?: string,"is_active"?: boolean,"logo_url"?: string | null,"qbo_connection_uuid"?: string | null,"qbo_vendor_id"?: string | null
+                    "address_uuid"?: string | null,"contact_email"?: string | null,"contact_name"?: string | null,"created_at"?: string,"display_name": string,"does_aluminum_welding"?: boolean,"does_mobile_repair"?: boolean,"does_trailer_repair"?: boolean,"ein"?: string | null,"hst"?: string | null,"id"?: string,"is_active"?: boolean,"is_parts_supplier"?: boolean,"logo_url"?: string | null,"notes"?: string | null,"phone"?: string | null,"qbo_connection_uuid"?: string | null,"qbo_vendor_id"?: string | null,"status"?: Database["public"]['Enums']["vendor_status"] | null
                   }
                   Update: {
-                    "created_at"?: string,"display_name"?: string,"ein"?: string | null,"hst"?: string | null,"id"?: string,"is_active"?: boolean,"logo_url"?: string | null,"qbo_connection_uuid"?: string | null,"qbo_vendor_id"?: string | null
+                    "address_uuid"?: string | null,"contact_email"?: string | null,"contact_name"?: string | null,"created_at"?: string,"display_name"?: string,"does_aluminum_welding"?: boolean,"does_mobile_repair"?: boolean,"does_trailer_repair"?: boolean,"ein"?: string | null,"hst"?: string | null,"id"?: string,"is_active"?: boolean,"is_parts_supplier"?: boolean,"logo_url"?: string | null,"notes"?: string | null,"phone"?: string | null,"qbo_connection_uuid"?: string | null,"qbo_vendor_id"?: string | null,"status"?: Database["public"]['Enums']["vendor_status"] | null
                   }
                   Relationships: [
                     {
+      foreignKeyName: "vendors_address_uuid_fkey"
+      columns: ["address_uuid"]
+isOneToOne: false
+      referencedRelation: "Addresses"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "vendors_qbo_connection_uuid_fkey"
       columns: ["qbo_connection_uuid"]
 isOneToOne: false
@@ -2737,7 +2841,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "alert_entity_type": "event"|"bleacher_event"|"work_tracker","bleacher_opening_dir": "driver"|"passenger","bleacher_subrental_status": "pending"|"accepted"|"denied","bluebook_region": "CAN"|"US"|"Both","contract_signature_status": "active"|"invalidated","currency": "USD"|"CAD","damage_severity": "none"|"minor"|"major","email_message_status": "draft"|"sending"|"success"|"error","email_send_status": "sent"|"failed","event_lost_reason": "out_of_service_area"|"sold_out"|"size_does_not_work"|"price_too_high"|"other","event_status": "quoted"|"booked"|"lost"|"draft"|"unsigned_changes","pay_currency_type": "CAD"|"USD","pay_per_unit_type": "KM"|"MI"|"HR","payment_installment_status": "unpaid"|"paid","preferred_language": "english"|"french","question_type": "text"|"checkbox"|"photo","roadmap_attachment_parent_type": "task"|"feature","roadmap_feature_status": "draft"|"locked_in"|"in_progress"|"completed","roadmap_task_status": "to_do"|"in_progress"|"completed","roof_type": "canopy"|"none","task_status": "in_progress"|"backlog"|"complete"|"approved"|"in_staging"|"paused","task_type": "feature"|"bug","work_tracker_line_item_type": "hauling"|"deadhead"|"setup"|"teardown"|"maintenance"|"per_diem"|"custom","work_tracker_time_mode": "exact"|"flexible"|"any_time","work_tracker_type_code": "trip"|"repair_maintenance"|"site_visit_cleaning_other","worktracker_group_status": "draft"|"qbo_bill_creating"|"qbo_bill_created"|"qbo_bill_error"|"no_bill_ready_for_payment","worktracker_status": "draft"|"released"|"accepted"|"dest_pickup"|"pickup_inspection"|"dest_dropoff"|"dropoff_inspection"|"completed"|"cancelled"|"declined"|"abandoned"
+            "alert_entity_type": "event"|"bleacher_event"|"work_tracker","bleacher_opening_dir": "driver"|"passenger","bleacher_subrental_status": "pending"|"accepted"|"denied","bluebook_region": "CAN"|"US"|"Both","contract_signature_status": "active"|"invalidated","currency": "USD"|"CAD","damage_severity": "none"|"minor"|"major","email_message_status": "draft"|"sending"|"success"|"error","email_send_status": "sent"|"failed","event_lost_reason": "out_of_service_area"|"sold_out"|"size_does_not_work"|"price_too_high"|"other","event_status": "quoted"|"booked"|"lost"|"draft"|"unsigned_changes","maintenance_severity": "minor"|"major"|"routine","pay_currency_type": "CAD"|"USD","pay_per_unit_type": "KM"|"MI"|"HR","payment_installment_status": "unpaid"|"paid","preferred_language": "english"|"french","question_type": "text"|"checkbox"|"photo","repair_status": "inbound"|"triaged"|"waiting_repair"|"in_repair"|"confirm_repair"|"completed","roadmap_attachment_parent_type": "task"|"feature","roadmap_feature_status": "draft"|"locked_in"|"in_progress"|"completed","roadmap_task_status": "to_do"|"in_progress"|"completed","roof_type": "canopy"|"none","task_status": "in_progress"|"backlog"|"complete"|"approved"|"in_staging"|"paused","task_type": "feature"|"bug","vendor_status": "verified"|"caution"|"under_review"|"prospect"|"do_not_use","work_tracker_line_item_type": "hauling"|"deadhead"|"setup"|"teardown"|"maintenance"|"per_diem"|"custom","work_tracker_time_mode": "exact"|"flexible"|"any_time","work_tracker_type_code": "trip"|"repair_maintenance"|"site_visit_cleaning_other","worktracker_group_status": "draft"|"qbo_bill_creating"|"qbo_bill_created"|"qbo_bill_error"|"no_bill_ready_for_payment","worktracker_status": "draft"|"released"|"accepted"|"dest_pickup"|"pickup_inspection"|"dest_dropoff"|"dropoff_inspection"|"completed"|"cancelled"|"declined"|"abandoned"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -2853,7 +2957,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "alert_entity_type": ["event", "bleacher_event", "work_tracker"],"bleacher_opening_dir": ["driver", "passenger"],"bleacher_subrental_status": ["pending", "accepted", "denied"],"bluebook_region": ["CAN", "US", "Both"],"contract_signature_status": ["active", "invalidated"],"currency": ["USD", "CAD"],"damage_severity": ["none", "minor", "major"],"email_message_status": ["draft", "sending", "success", "error"],"email_send_status": ["sent", "failed"],"event_lost_reason": ["out_of_service_area", "sold_out", "size_does_not_work", "price_too_high", "other"],"event_status": ["quoted", "booked", "lost", "draft", "unsigned_changes"],"pay_currency_type": ["CAD", "USD"],"pay_per_unit_type": ["KM", "MI", "HR"],"payment_installment_status": ["unpaid", "paid"],"preferred_language": ["english", "french"],"question_type": ["text", "checkbox", "photo"],"roadmap_attachment_parent_type": ["task", "feature"],"roadmap_feature_status": ["draft", "locked_in", "in_progress", "completed"],"roadmap_task_status": ["to_do", "in_progress", "completed"],"roof_type": ["canopy", "none"],"task_status": ["in_progress", "backlog", "complete", "approved", "in_staging", "paused"],"task_type": ["feature", "bug"],"work_tracker_line_item_type": ["hauling", "deadhead", "setup", "teardown", "maintenance", "per_diem", "custom"],"work_tracker_time_mode": ["exact", "flexible", "any_time"],"work_tracker_type_code": ["trip", "repair_maintenance", "site_visit_cleaning_other"],"worktracker_group_status": ["draft", "qbo_bill_creating", "qbo_bill_created", "qbo_bill_error", "no_bill_ready_for_payment"],"worktracker_status": ["draft", "released", "accepted", "dest_pickup", "pickup_inspection", "dest_dropoff", "dropoff_inspection", "completed", "cancelled", "declined", "abandoned"]
+            "alert_entity_type": ["event", "bleacher_event", "work_tracker"],"bleacher_opening_dir": ["driver", "passenger"],"bleacher_subrental_status": ["pending", "accepted", "denied"],"bluebook_region": ["CAN", "US", "Both"],"contract_signature_status": ["active", "invalidated"],"currency": ["USD", "CAD"],"damage_severity": ["none", "minor", "major"],"email_message_status": ["draft", "sending", "success", "error"],"email_send_status": ["sent", "failed"],"event_lost_reason": ["out_of_service_area", "sold_out", "size_does_not_work", "price_too_high", "other"],"event_status": ["quoted", "booked", "lost", "draft", "unsigned_changes"],"maintenance_severity": ["minor", "major", "routine"],"pay_currency_type": ["CAD", "USD"],"pay_per_unit_type": ["KM", "MI", "HR"],"payment_installment_status": ["unpaid", "paid"],"preferred_language": ["english", "french"],"question_type": ["text", "checkbox", "photo"],"repair_status": ["inbound", "triaged", "waiting_repair", "in_repair", "confirm_repair", "completed"],"roadmap_attachment_parent_type": ["task", "feature"],"roadmap_feature_status": ["draft", "locked_in", "in_progress", "completed"],"roadmap_task_status": ["to_do", "in_progress", "completed"],"roof_type": ["canopy", "none"],"task_status": ["in_progress", "backlog", "complete", "approved", "in_staging", "paused"],"task_type": ["feature", "bug"],"vendor_status": ["verified", "caution", "under_review", "prospect", "do_not_use"],"work_tracker_line_item_type": ["hauling", "deadhead", "setup", "teardown", "maintenance", "per_diem", "custom"],"work_tracker_time_mode": ["exact", "flexible", "any_time"],"work_tracker_type_code": ["trip", "repair_maintenance", "site_visit_cleaning_other"],"worktracker_group_status": ["draft", "qbo_bill_creating", "qbo_bill_created", "qbo_bill_error", "no_bill_ready_for_payment"],"worktracker_status": ["draft", "released", "accepted", "dest_pickup", "pickup_inspection", "dest_dropoff", "dropoff_inspection", "completed", "cancelled", "declined", "abandoned"]
           }
         }
 } as const
