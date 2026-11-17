@@ -36,6 +36,7 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
   const [quickbookUuid, setQuickbookUuid] = useState<string | null>(null);
   const [stripeConnectionUuid, setStripeConnectionUuid] = useState<string | null>(null);
   const [address, setAddress] = useState<SalesOfficeAddress | null>(null);
+  const [phone, setPhone] = useState("");
   const [paymentInfo, setPaymentInfo] = useState("");
   const [paymentInfoFocused, setPaymentInfoFocused] = useState(false);
   const previewing = open && paymentInfoFocused;
@@ -69,6 +70,7 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
       setQuickbookUuid(editing.quickbook_uuid ?? null);
       setStripeConnectionUuid(editing.stripe_connection_uuid ?? null);
       setPaymentInfo(editing.payment_info ?? "");
+      setPhone(editing.phone ?? "");
       setAddress(
         editing.address_street
           ? {
@@ -84,6 +86,7 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
       setQuickbookUuid(null);
       setStripeConnectionUuid(null);
       setPaymentInfo("");
+      setPhone("");
       setAddress(null);
     }
   }, [open, editing]);
@@ -129,6 +132,7 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
         stripeConnectionUuid,
         address,
         paymentInfo,
+        phone,
       };
       if (isEditing && editing) {
         await updateSalesOffice(editing.id, editing.address_uuid, payload);
@@ -212,6 +216,20 @@ export function AddOfficeModal({ open, onClose, onSaved, editing }: Props) {
                 {address.zipPostal ? ` ${address.zipPostal}` : ""}
               </p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(555) 555-0100"
+              className="w-full h-[40px] px-3 border rounded text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Optional. Printed under the office&apos;s address on its quotes and invoices.
+            </p>
           </div>
 
           <div>

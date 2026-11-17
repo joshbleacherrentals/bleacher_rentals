@@ -215,6 +215,9 @@ export function QuotePdfDocument({ data }: { data: QuoteDocumentData }) {
                 {data.company.city}, {data.company.state} {data.company.zip}
               </Text>
             ) : null}
+            {data.company.phone ? (
+              <Text style={styles.infoText}>{`${s.phonePrefix} ${data.company.phone}`}</Text>
+            ) : null}
           </View>
           <View>
             <Text style={styles.quoteTitle}>
