@@ -100,11 +100,16 @@ SELECT ok(NOT has_schema_privilege('analytics_ro', 'public', 'CREATE'),
 -- ---------------------------------------------------------------------------
 -- What it does (run as the role)
 -- ---------------------------------------------------------------------------
+-- CI resets the database with --no-seed, so Users is empty there. Bring one row of our own: with
+-- none, "the same count as the owner" below would be 0 = 0 and prove nothing.
+INSERT INTO public."Users" (first_name, last_name, email, clerk_user_id)
+VALUES ('Analytics', 'Probe', 'analytics-ro-probe@example.com', 'clerk_analytics_ro_probe');
+
 SELECT count(*) AS owner_users FROM public."Users" \gset
 
 SELECT is(public.ro_run('analytics_ro', 'SELECT count(*) FROM public."Events"'), 'ok',
   'as analytics_ro: a SELECT works');
-SELECT ok(:owner_users > 0, 'the local Users table has rows to compare (seed data)');
+SELECT ok(:owner_users > 0, 'Users has a row to compare (this test inserts one, so it needs no seed data)');
 SELECT is(public.ro_count('analytics_ro', 'SELECT count(*) FROM public."Users"'), :owner_users::bigint,
   'as analytics_ro: an RLS-protected table shows every row, the same count as the owner');
 
