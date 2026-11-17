@@ -188,6 +188,7 @@ describe("useCollectionsData: the rows", () => {
           remainingCents: 100000,
           currency: "CAD",
           daysOverdue: 10,
+          eventStart: "2027-06-01",
         },
       ],
       isLoading: false,

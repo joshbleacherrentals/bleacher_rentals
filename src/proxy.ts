@@ -13,6 +13,10 @@ const isPublicRoute = createRouteMatcher([
   "/api/cron/(.*)",
   // Gmail's push notifications, through Pub/Sub. It checks the subscription's signed token itself.
   "/api/gmail/push",
+  // The analytics MCP endpoint (docs/specs/analytics-mcp.md §6). Claude sends an OAuth bearer token,
+  // not a Clerk session, so auth.protect() would turn it away; the route verifies the token itself.
+  "/api/mcp",
+  "/.well-known/(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

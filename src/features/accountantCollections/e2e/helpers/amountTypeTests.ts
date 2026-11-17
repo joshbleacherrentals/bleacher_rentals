@@ -74,13 +74,13 @@ export function defineAmountTypeTests(role: "accountant" | "admin") {
   const switchOf = (page: Page) => page.getByRole("button", { name: /^Showing: / });
   const showing = (page: Page, label: "Collections" | "Deposits" | "All") =>
     page.getByRole("button", { name: new RegExp(`^Showing: ${label}\\.`) });
-  /** The Amount Overdue cell (the fifth) of an event's row. */
+  /** The Amount Overdue cell (the sixth) of an event's row. */
   const amountOverdue = (page: Page, booking: SeededBooking): Locator =>
     page
       .getByRole("row")
       .filter({ has: link(page, booking) })
       .locator("td")
-      .nth(4);
+      .nth(5);
 
   /** Opens the list with `query` and waits until an event that must be there has appeared. */
   async function openList(page: Page, query: string, proof: SeededBooking) {

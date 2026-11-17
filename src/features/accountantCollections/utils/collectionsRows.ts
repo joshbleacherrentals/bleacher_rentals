@@ -52,6 +52,8 @@ export type CollectionsRow = {
   currency: Currency;
   /** Null when nothing is overdue (an Amount Due of 0). */
   daysOverdue: number | null;
+  /** The event's `event_start`, as stored; null when the event has none. */
+  eventStart: string | null;
 };
 
 const NO_NAME = "—";
@@ -117,6 +119,7 @@ export function buildCollectionsRows(
       remainingCents: balances.remainingCents,
       currency,
       daysOverdue: balances.daysOverdue,
+      eventStart: task.event_start,
     };
   });
 }

@@ -149,18 +149,22 @@ describe("collectionsListStateToParams", () => {
     ).toEqual({ csort: "overdue", cdir: "desc", cnotdue: "1", type: "deposits" });
   });
 
-  it("names the sort columns follow, overdue and amount", () => {
-    const names = (["followUp", "overdue", "amount"] as const).map(
+  it("names the sort columns follow, overdue, amount and start", () => {
+    const names = (["followUp", "overdue", "amount", "startDate"] as const).map(
       (sort) => collectionsListStateToParams({ ...DEFAULT_LIST_STATE, sort, dir: "desc" }).csort,
     );
-    expect(names).toEqual([undefined, "overdue", "amount"]);
+    expect(names).toEqual([undefined, "overdue", "amount", "start"]);
     expect(
       collectionsListStateToParams({ ...DEFAULT_LIST_STATE, sort: "followUp", dir: "desc" }),
     ).not.toHaveProperty("csort");
   });
 
-  it("round-trips all thirty-six states", () => {
-    const keys: CollectionsSortKey[] = ["followUp", "overdue", "amount"];
+  it("reads csort=start as the Start Date column", () => {
+    expect(read("csort=start&cdir=asc")).toMatchObject({ sort: "startDate", dir: "asc" });
+  });
+
+  it("round-trips all forty-eight states", () => {
+    const keys: CollectionsSortKey[] = ["followUp", "overdue", "amount", "startDate"];
     for (const sort of keys) {
       for (const dir of ["asc", "desc"] as const) {
         for (const showNotDue of [false, true]) {

@@ -1,4 +1,5 @@
 import { buildCsv, csvTextField, escapeCsvField } from "@/lib/csv";
+import { formatListDate } from "@/features/quotesAndBookings/components/eventListCells";
 import { formatMoney } from "@/features/quotesAndBookings/utils/formatMoney";
 import type { CollectionsRow } from "./collectionsRows";
 import { followUpLabel, overdueLabel } from "./relativeDays";
@@ -12,6 +13,7 @@ import { followUpLabel, overdueLabel } from "./relativeDays";
 export const COLLECTIONS_CSV_HEADERS = [
   "Name",
   "Next Follow Up",
+  "Start Date",
   "Payment Overdue",
   "Task Notes",
   "Amount Overdue",
@@ -37,6 +39,7 @@ export function buildCollectionsCsv(rows: readonly CollectionsRow[], today: stri
     rows.map((row) => [
       csvTextField(row.eventName),
       escapeCsvField(followUpLabel(row.dueDate, today)),
+      escapeCsvField(formatListDate(row.eventStart)),
       // The table prints a dash for "nothing is overdue"; the file leaves the cell empty.
       escapeCsvField(row.daysOverdue === null ? "" : overdueLabel(row.daysOverdue)),
       csvTextField(row.note),

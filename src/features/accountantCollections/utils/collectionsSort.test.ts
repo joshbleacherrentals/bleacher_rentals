@@ -27,6 +27,7 @@ function row(id: string, overrides: Partial<CollectionsRow> = {}): CollectionsRo
     remainingCents: amountDueCents,
     currency: "USD",
     daysOverdue: 10,
+    eventStart: "2027-06-01",
     ...overrides,
   };
 }
@@ -143,6 +144,70 @@ describe("sortCollectionsRows: Payment Overdue", () => {
   });
 });
 
+describe("sortCollectionsRows: Start Date", () => {
+  const rows = [
+    row("mid", { eventStart: "2027-03-10" }),
+    row("late", { eventStart: "2027-09-01" }),
+    row("early", { eventStart: "2027-01-05" }),
+  ];
+
+  it("latest first, and earliest first", () => {
+    expect(ids(sortCollectionsRows(rows, state("startDate", "desc")))).toEqual([
+      "late",
+      "mid",
+      "early",
+    ]);
+    expect(ids(sortCollectionsRows(rows, state("startDate", "asc")))).toEqual([
+      "early",
+      "mid",
+      "late",
+    ]);
+  });
+
+  it("puts an event with no start date last, whichever way the column goes", () => {
+    const withGap = [row("none", { eventStart: null }), ...rows];
+    expect(ids(sortCollectionsRows(withGap, state("startDate", "asc")))).toEqual([
+      "early",
+      "mid",
+      "late",
+      "none",
+    ]);
+    expect(ids(sortCollectionsRows(withGap, state("startDate", "desc")))).toEqual([
+      "late",
+      "mid",
+      "early",
+      "none",
+    ]);
+  });
+
+  it("breaks a tie by Next Follow Up (oldest), then Amount Overdue (largest), then Payment Overdue (most), then the id", () => {
+    const tied = [
+      row("f", { dueDate: "2026-11-09", amountDueCents: 100 }),
+      row("e", { dueDate: "2026-11-02", amountDueCents: 100, daysOverdue: 5 }),
+      row("d", { dueDate: "2026-11-02", amountDueCents: 700, daysOverdue: 5 }),
+      row("c", { dueDate: "2026-11-02", amountDueCents: 700, daysOverdue: 40 }),
+      row("b", { dueDate: "2026-11-02", amountDueCents: 700, daysOverdue: 40 }),
+    ];
+    for (const dir of ["asc", "desc"] as const) {
+      expect(ids(sortCollectionsRows(tied, state("startDate", dir)))).toEqual([
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+      ]);
+    }
+  });
+
+  it("compares the date part, so a time of day on the same day is a tie", () => {
+    const sameDay = [
+      row("b", { eventStart: "2027-03-10T18:00:00+00:00" }),
+      row("a", { eventStart: "2027-03-10" }),
+    ];
+    expect(ids(sortCollectionsRows(sameDay, state("startDate", "asc")))).toEqual(["a", "b"]);
+  });
+});
+
 describe("sortCollectionsRows: a row with no days figure", () => {
   it("counts as 0 days", () => {
     const rows = [
@@ -197,6 +262,8 @@ describe("sortCollectionsRows: the order is total", () => {
     ["Payment Overdue, fewest", state("overdue", "asc")],
     ["Amount Overdue, largest", state("amount", "desc")],
     ["Amount Overdue, smallest", state("amount", "asc")],
+    ["Start Date, earliest", state("startDate", "asc")],
+    ["Start Date, latest", state("startDate", "desc")],
   ])("gives the same output for any input order: %s", (_name, listState) => {
     const expected = ids(sortCollectionsRows(rows, listState));
     for (let seed = 1; seed <= 25; seed++) {
