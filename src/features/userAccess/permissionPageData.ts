@@ -72,6 +72,11 @@ const MAINTAINER_NO_ACCESS_NOTE =
 const ACCOUNTANT_NO_ACCESS_NOTE =
   "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
 
+// docs/specs/analytics-mcp.md §1 D2: the connector is open to every account that is not deactivated,
+// whatever its role, and it reads the whole database (no per-role or per-owner limit).
+const ANALYTICS_DATA_NOTE =
+  "Can connect Claude and ask questions about the data. Claude can read every table in the database, not only this role's own records, except the QuickBooks connection and the connector's own log. It cannot change anything.";
+
 export const PERMISSIONS: PermissionEntry[] = [
   // Day to Day Operations
   {
@@ -1142,6 +1147,27 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+
+  // Data Access (docs/specs/analytics-mcp.md)
+  {
+    label: "Ask Claude About Our Data",
+    description:
+      "A connector that lets you ask Claude questions about our data, such as how many bookings were signed last month. Claude runs read-only database queries and answers; nothing can be changed. Add it in Claude under Settings → Connectors → Add custom connector, with the address your administrator gives you, and sign in with your usual login. It works for every account that is not deactivated. Every question is logged: who asked, and which query ran.",
+    category: "Data Access",
+    roles: {
+      admin: read(ANALYTICS_DATA_NOTE),
+      account_manager: read(
+        "Can connect Claude and ask questions about the data. Unlike in the app, Claude is not limited to this account manager's own bookings: it can read every table in the database, except the QuickBooks connection and the connector's own log. It cannot change anything.",
+      ),
+      developer: read(ANALYTICS_DATA_NOTE),
+      viewer: read(ANALYTICS_DATA_NOTE),
+      driver: read(
+        "Works for any driver whose account is not deactivated, although drivers cannot open the web dashboard: the connector is separate from the app. Claude can read every table in the database, except the QuickBooks connection and the connector's own log. It cannot change anything.",
+      ),
+      maintainer: read(ANALYTICS_DATA_NOTE),
+      accountant: read(ANALYTICS_DATA_NOTE),
     },
   },
 ];
