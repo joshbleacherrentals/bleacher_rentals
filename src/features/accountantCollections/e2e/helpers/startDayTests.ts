@@ -52,11 +52,11 @@ export function defineStartDayTests(role: "accountant" | "admin") {
   /** The row of the Collections list that holds the event's link. */
   const rowOf = (page: Page, booking: SeededBooking) =>
     page.getByRole("row").filter({ has: page.getByRole("link", { name: booking.name }) });
-  /** The Payment Overdue cell (the third) and the Amount Overdue cell (the fifth) of a row. */
+  /** The Payment Overdue cell (the fourth) and the Amount Overdue cell (the sixth) of a row. */
   const paymentOverdue = (page: Page, booking: SeededBooking) =>
-    rowOf(page, booking).locator("td").nth(2);
+    rowOf(page, booking).locator("td").nth(3);
   const amountOverdue = (page: Page, booking: SeededBooking) =>
-    rowOf(page, booking).locator("td").nth(4);
+    rowOf(page, booking).locator("td").nth(5);
 
   async function openList(page: Page, expected: SeededBooking) {
     await page.goto("/accountant?tab=collections");

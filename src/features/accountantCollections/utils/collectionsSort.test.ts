@@ -27,6 +27,7 @@ function row(id: string, overrides: Partial<CollectionsRow> = {}): CollectionsRo
     remainingCents: amountDueCents,
     currency: "USD",
     daysOverdue: 10,
+    eventStart: "2027-06-01",
     ...overrides,
   };
 }

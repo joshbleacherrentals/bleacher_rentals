@@ -27,6 +27,7 @@ function row(over: Partial<CollectionsRow> = {}): CollectionsRow {
     remainingCents: 173575,
     currency: "CAD",
     daysOverdue: 3,
+    eventStart: "2027-06-01",
     ...over,
   };
 }
@@ -50,17 +51,34 @@ function render(
 const unescape = (html: string) => html.replace(/&amp;/g, "&");
 
 describe("CollectionsTable", () => {
-  it("has the five columns of the list and a chevron column", () => {
+  it("has the six columns of the list and a chevron column", () => {
     const html = render({});
     for (const header of [
       "Name",
       "Next Follow Up",
+      "Start Date",
       "Payment Overdue",
       "Task Notes",
       "Amount Overdue",
     ]) {
       expect(html).toContain(header);
     }
+  });
+
+  it("puts Start Date between Next Follow Up and Payment Overdue, as plain text, not a sort button", () => {
+    const html = render({});
+    const followUp = html.indexOf("Next Follow Up");
+    const startDate = html.indexOf("Start Date");
+    const overdue = html.indexOf("Payment Overdue");
+    expect(followUp).toBeGreaterThan(-1);
+    expect(startDate).toBeGreaterThan(followUp);
+    expect(overdue).toBeGreaterThan(startDate);
+    expect(html).not.toMatch(/<th[^>]*aria-sort[^>]*><button[^>]*><span>Start Date</);
+  });
+
+  it("shows the event's start date as the AR Deposits tab words it, and N/A without one", () => {
+    expect(render({})).toContain("Jun 1, 2027");
+    expect(render({ rows: [row({ eventStart: null })] })).toContain("N/A");
   });
 
   it("draws a row: name, follow-up wording, overdue wording, note, amount", () => {
