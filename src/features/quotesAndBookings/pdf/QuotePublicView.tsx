@@ -8,6 +8,7 @@ import { quoteText } from "./quoteStrings";
 import { LineItemDescription } from "../components/LineItemDescription";
 import { ChecksPayableBox } from "./ChecksPayableBox";
 import { isInvoiceStatus } from "../utils/isInvoiceStatus";
+import { PaidInFullNote, QuoteCtaButton, type QuoteNextStepProps } from "./QuoteNextStep";
 
 function companyFullAddress(c: QuoteDocumentData["company"]): string {
   const parts = [c.street];
@@ -25,11 +26,17 @@ export function QuotePublicView({
   data,
   track,
   highlightPaymentBox = false,
+  cta,
 }: {
   data: QuoteDocumentData;
   track?: (event: TrackEvent) => void;
   /** Only the sales office form's preview turns this on. */
   highlightPaymentBox?: boolean;
+  /**
+   * The next step for the customer (approve, pay, or paid in full). Only the customer's own page
+   * passes it; the sales office preview and the invoice page's frame show the document alone.
+   */
+  cta?: QuoteNextStepProps;
 }) {
   const { currency, language } = data;
   const s = quoteText(language);
@@ -101,6 +108,18 @@ export function QuotePublicView({
             </p>
             <p className="text-sm mt-1">{numberLabel}</p>
             {data.poNumber && <p className="text-sm">{s.poNumberShort(data.poNumber)}</p>}
+            {/* Desktop's big button. On a phone the sticky bar at the bottom of the screen does
+                this job, so only the paid note shows at every width. */}
+            {cta?.kind === "paid" && (
+              <div className="mt-3">
+                <PaidInFullNote language={language} />
+              </div>
+            )}
+            {(cta?.kind === "approve" || cta?.kind === "pay") && (
+              <div className="mt-4 hidden sm:block">
+                <QuoteCtaButton kind={cta.kind} onClick={cta.onClick} language={language} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -250,6 +269,18 @@ export function QuotePublicView({
                     <span>{formatMoney(data.totalCents)}</span>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">{s.convenienceFeesNote}</p>
+                </div>
+              )}
+
+              {/* Second button right after the numbers, where the customer finishes reading. */}
+              {(cta?.kind === "approve" || cta?.kind === "pay") && (
+                <div className="mt-6 hidden sm:block">
+                  <QuoteCtaButton
+                    kind={cta.kind}
+                    onClick={cta.onClick}
+                    language={language}
+                    fullWidth
+                  />
                 </div>
               )}
             </div>
