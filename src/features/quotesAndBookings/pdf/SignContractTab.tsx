@@ -5,6 +5,7 @@ import { QuoteDocumentData } from "./quoteDocumentData";
 import { TrackEvent } from "./useQuoteActivityTracker";
 import { formatQuoteDateTime } from "./quoteFormat";
 import { quoteText } from "./quoteStrings";
+import { QuoteCtaButton } from "./QuoteNextStep";
 
 type ContractData = {
   termsAndConditionsUuid: string | null;
@@ -21,10 +22,20 @@ export function SignContractTab({
   track,
   onQuoteChanged,
   onSigned,
+  onSignatureRecorded,
+  onContinueToPay,
 }: {
   data: QuoteDocumentData;
   track: (e: TrackEvent) => void;
   onQuoteChanged?: () => void;
+  /** The signature was just recorded, so the page's next step moves from approving to paying. */
+  onSignatureRecorded?: () => void;
+  /**
+   * Once signed, the next step is payment. Given only while something is still owed; it shows a
+   * "Continue to Payment" button under the signature, so the customer is never left asking
+   * "now what?".
+   */
+  onContinueToPay?: () => void;
   /**
    * The content hash the signature produced. Signing changes what the page
    * shows, so the freshness baseline has to move with it — otherwise the client
@@ -85,6 +96,7 @@ export function SignContractTab({
               }
             : prev,
         );
+        onSignatureRecorded?.();
         if (typeof result.contentHash === "string" && result.contentHash) {
           onSigned?.(result.contentHash);
         }
@@ -184,38 +196,52 @@ export function SignContractTab({
               </button>
             </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden max-w-lg">
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="border-b">
-                    <td className="px-4 py-3 font-medium text-gray-600 w-36 bg-gray-50">
-                      {s.signature}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="text-2xl"
-                        style={{ fontFamily: "var(--font-dancing-script), cursive" }}
-                      >
-                        {contract.signature!.signerName}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="px-4 py-3 font-medium text-gray-600 bg-gray-50">
-                      {s.printedName}
-                    </td>
-                    <td className="px-4 py-3">{contract.signature!.signerName}</td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3 font-medium text-gray-600 bg-gray-50">
-                      {s.timestamp}
-                    </td>
-                    <td className="px-4 py-3">
-                      {formatQuoteDateTime(contract.signature!.signedAt, data.language)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              <div className="border rounded-lg overflow-hidden max-w-lg">
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b">
+                      <td className="px-4 py-3 font-medium text-gray-600 w-36 bg-gray-50">
+                        {s.signature}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="text-2xl"
+                          style={{ fontFamily: "var(--font-dancing-script), cursive" }}
+                        >
+                          {contract.signature!.signerName}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="px-4 py-3 font-medium text-gray-600 bg-gray-50">
+                        {s.printedName}
+                      </td>
+                      <td className="px-4 py-3">{contract.signature!.signerName}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 font-medium text-gray-600 bg-gray-50">
+                        {s.timestamp}
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatQuoteDateTime(contract.signature!.signedAt, data.language)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {onContinueToPay && (
+                <div className="space-y-3" data-testid="contract-signed-next-step">
+                  <p className="text-sm text-gray-700">{s.contractSignedNextStep}</p>
+                  <QuoteCtaButton
+                    kind="pay"
+                    label={s.continueToPayment}
+                    onClick={onContinueToPay}
+                    language={data.language}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
