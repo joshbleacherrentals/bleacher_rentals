@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repairs - Repair window</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+button{font-family:inherit}
+.rp-h{font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#6b7280;white-space:nowrap}
+.rp-bchip{display:inline-block;padding:2px 8px;border-radius:4px;background:#f3f4f6;color:#10365a;font-size:12px;line-height:16px;font-weight:600}
+.rp-cchip{display:inline-block;padding:1px 8px;border:1px solid #d1d5db;border-radius:999px;background:#ffffff;color:#374151;font-size:12px;line-height:18px;white-space:nowrap}
+.f-in{display:block;width:100%;height:36px;box-sizing:border-box;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;font-family:inherit;font-size:14px;line-height:20px;color:#111827}
+.f-ro{display:flex;align-items:center;width:100%;height:36px;box-sizing:border-box;padding:0 12px;border:1px solid #e5e7eb;border-radius:6px;background:#f3f4f6;font-size:14px;line-height:20px;color:#6b7280}
+.f-combo{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:36px;box-sizing:border-box;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;font-size:14px;line-height:20px;text-align:left;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;box-sizing:border-box;border-radius:6px;font-size:14px;line-height:20px;font-weight:600;text-decoration:none;cursor:pointer}
+.btn-primary{border:0;background:#10365a;color:#ffffff;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)}
+.btn-plain{border:1px solid #d1d5db;background:#ffffff;color:#374151}
+.btn-danger{border:1px solid #b23c36;background:#ffffff;color:#a8403a}
+.rp-addbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;color:#10365a;font-size:13px;font-weight:600;text-decoration:none}
+.rp-addbtn:hover{background:#f3f4f6}
+.rp-svc:hover{background:#f9fafb}
+.x-close{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#6b7280;text-decoration:none}
+.x-close:hover{background:#f3f4f6}
+.file-row{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 12px;box-sizing:border-box;border-top:1px solid #e5e7eb;font-size:14px;line-height:20px}
+</style>
+</helmet>
+<div style="min-height: 1480px; box-sizing: border-box; padding: 48px 24px; background: rgba(15,42,68,0.55); font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; color: #111827;">
+
+<div role="dialog" aria-modal="true" aria-labelledby="rep-title" style="width: 1080px; max-width: 100%; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(15,42,68,0.12), 0 24px 64px -16px rgba(15,42,68,0.24);">
+
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px 16px 24px;">
+<div>
+<div class="rp-h">{{ eyebrow }}</div>
+<h2 id="rep-title" style="margin: 2px 0 0 0; font-size: 20px; line-height: 28px; font-weight: 600; color: #10365a;">{{ title }}</h2>
+<sc-if value="{{ hasCreated }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top: 2px; font-size: 13px; line-height: 20px; color: #6b7280;">Created 2026-09-17</div>
+</sc-if>
+</div>
+<a href="{{ closeHref }}" aria-label="Close" class="x-close">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+</a>
+</div>
+
+<div style="padding: 4px 24px 24px 24px; border-top: 1px solid #e5e7eb;">
+
+<sc-if value="{{ isView }}" hint-placeholder-val="{{ true }}">
+<dl style="margin: 20px 0 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 24px; font-size: 14px; line-height: 20px;">
+<div style="grid-column: span 2;">
+<dt class="rp-h">Vendor</dt>
+<dd style="margin: 4px 0 0 0; font-weight: 500;">Dallas Trailer Repair<div style="font-size: 13px; line-height: 18px; font-weight: 400; color: #6b7280;">Dallas, TX, US</div></dd>
+</div>
+<div><dt class="rp-h">Invoice #</dt><dd style="margin: 4px 0 0 0; font-variant-numeric: tabular-nums;">DTR-2377</dd></div>
+<div><dt class="rp-h">Status</dt><dd style="margin: 4px 0 0 0;"><span style="display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; background: #dcede2; color: #2f6b4c; font-size: 13px; font-weight: 500;">Completed</span></dd></div>
+<div><dt class="rp-h">Currency</dt><dd style="margin: 4px 0 0 0;">USD</dd></div>
+<div><dt class="rp-h">Zone</dt><dd style="margin: 4px 0 0 0;">Zone 3</dd></div>
+<div><dt class="rp-h">Repair from</dt><dd style="margin: 4px 0 0 0; font-variant-numeric: tabular-nums;">2026-09-18</dd></div>
+<div><dt class="rp-h">Repair to</dt><dd style="margin: 4px 0 0 0; font-variant-numeric: tabular-nums;">2026-09-29</dd></div>
+<div><dt class="rp-h">Completed</dt><dd style="margin: 4px 0 0 0; font-variant-numeric: tabular-nums;">2026-09-29</dd></div>
+<div style="grid-column: span 3;"><dt class="rp-h">Notes</dt><dd style="margin: 4px 0 0 0; color: #374151;">Welded new spindle in place and replaced jack</dd></div>
+</dl>
+</sc-if>
+
+<sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top: 20px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 24px;">
+<div style="grid-column: span 2;">
+<label class="rp-h" for="rep-vendor" style="display: block; margin-bottom: 6px;">Vendor</label>
+<button id="rep-vendor" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" class="f-combo" style="color: {{ f.vendorColor }};">
+<span>{{ f.vendor }}</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+<div style="margin-top: 4px; font-size: 13px; line-height: 18px; color: #6b7280;">{{ f.vendorAddress }}</div>
+</div>
+<div>
+<label class="rp-h" for="rep-inv" style="display: block; margin-bottom: 6px;">Invoice #</label>
+<input id="rep-inv" type="text" readonly placeholder="e.g. DTR-2377" value="{{ f.invoice }}" class="f-in">
+</div>
+<div>
+<label class="rp-h" for="rep-status" style="display: block; margin-bottom: 6px;">Status</label>
+<button id="rep-status" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" class="f-combo">
+<span style="display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; background: {{ f.statusBg }}; color: {{ f.statusInk }}; font-size: 13px; font-weight: 500;">{{ f.status }}</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+</div>
+<div>
+<label class="rp-h" for="rep-cur" style="display: block; margin-bottom: 6px;">Currency</label>
+<button id="rep-cur" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" class="f-combo">
+<span>USD</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+</div>
+<div>
+<span class="rp-h" id="rep-zone-l" style="display: block; margin-bottom: 6px;">Zone</span>
+<div aria-labelledby="rep-zone-l" class="f-ro">{{ f.zone }}</div>
+<div style="margin-top: 4px; font-size: 13px; line-height: 18px; color: #6b7280;">Set from the bleachers</div>
+</div>
+<div>
+<label class="rp-h" for="rep-from" style="display: block; margin-bottom: 6px;">Repair from</label>
+<input id="rep-from" type="text" readonly placeholder="yyyy-mm-dd" value="{{ f.from }}" class="f-in" style="font-variant-numeric: tabular-nums;">
+</div>
+<div>
+<label class="rp-h" for="rep-to" style="display: block; margin-bottom: 6px;">Repair to</label>
+<input id="rep-to" type="text" readonly placeholder="yyyy-mm-dd" value="{{ f.to }}" class="f-in" style="font-variant-numeric: tabular-nums;">
+</div>
+<div>
+<span class="rp-h" id="rep-done-l" style="display: block; margin-bottom: 6px;">Completed</span>
+<div aria-labelledby="rep-done-l" class="f-ro" style="font-variant-numeric: tabular-nums;">{{ f.completed }}</div>
+<div style="margin-top: 4px; font-size: 13px; line-height: 18px; color: #6b7280;">Set when the status becomes Completed</div>
+</div>
+<div style="grid-column: span 3;">
+<label class="rp-h" for="rep-notes" style="display: block; margin-bottom: 6px;">Notes</label>
+<textarea id="rep-notes" rows="2" readonly placeholder="Notes about the repair" value="{{ f.notes }}" style="display: block; width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #ffffff; resize: none; font-family: inherit; font-size: 14px; line-height: 20px; color: #111827;"></textarea>
+</div>
+</div>
+</sc-if>
+
+<h3 style="margin: 28px 0 0 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #10365a;">Services</h3>
+
+<sc-if value="{{ hasServices }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; overflow: hidden;">
+<div role="row" style="display: grid; grid-template-columns: 76px 120px 84px 108px minmax(120px, 1fr) 88px 88px 72px 72px 100px 16px; column-gap: 8px; align-items: center; min-height: 36px; padding: 0 16px; background: #f9fafb;">
+<div role="columnheader" class="rp-h">Bleacher</div>
+<div role="columnheader" class="rp-h">Category</div>
+<div role="columnheader" class="rp-h">Severity</div>
+<div role="columnheader" class="rp-h">Reported</div>
+<div role="columnheader" class="rp-h">Description</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Labor</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Parts</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Tax</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Freight</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Total</div>
+<div role="columnheader"></div>
+</div>
+<sc-for list="{{ services }}" as="s" hint-placeholder-count="2">
+<a href="ServiceModal.dc.html" aria-label="{{ s.label }}" class="rp-svc" style="display: grid; grid-template-columns: 76px 120px 84px 108px minmax(120px, 1fr) 88px 88px 72px 72px 100px 16px; column-gap: 8px; align-items: center; min-height: 48px; padding: 8px 16px; box-sizing: border-box; border-top: 1px solid #e5e7eb; color: #111827; text-decoration: none; background: #ffffff; font-size: 14px; line-height: 20px;">
+<div role="cell"><span class="rp-bchip">{{ s.bleacher }}</span></div>
+<div role="cell"><span class="rp-cchip">{{ s.cat }}</span></div>
+<div role="cell"><span style="display: inline-block; padding: 1px 8px; border-radius: 999px; background: {{ s.sevBg }}; color: {{ s.sevInk }}; font-size: 12px; line-height: 18px; font-weight: 500;">{{ s.sev }}</span></div>
+<div role="cell" style="white-space: nowrap; font-variant-numeric: tabular-nums;">{{ s.rep }}</div>
+<div role="cell" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4b5563;">{{ s.desc }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ s.labor }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ s.parts }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ s.tax }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ s.freight }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">{{ s.total }}</div>
+<div role="cell" style="display: flex; justify-content: flex-end; color: #9ca3af;"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></div>
+</a>
+</sc-for>
+<div role="row" style="display: grid; grid-template-columns: 76px 120px 84px 108px minmax(120px, 1fr) 88px 88px 72px 72px 100px 16px; column-gap: 8px; align-items: center; min-height: 44px; padding: 0 16px; border-top: 1px solid #e5e7eb; background: #f9fafb; font-size: 14px; line-height: 20px; font-weight: 600;">
+<div role="cell" style="grid-column: 1 / 6;">Total</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ totals.labor }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ totals.parts }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ totals.tax }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{ totals.freight }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums; color: #10365a;">{{ totals.total }}</div>
+<div role="cell"></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ noServices }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top: 10px; padding: 28px 16px; border: 1px dashed #d1d5db; border-radius: 8px; text-align: center; font-size: 14px; line-height: 20px; color: #6b7280;">No services yet. Add the first one.</div>
+</sc-if>
+<div style="margin-top: 12px;">
+<a href="ServiceModalNew.dc.html" class="rp-addbtn">
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+Add service
+</a>
+</div>
+
+<h3 style="margin: 28px 0 0 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #10365a;">Files</h3>
+
+<sc-if value="{{ hasFiles }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top: 10px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+<sc-for list="{{ files }}" as="fl" hint-placeholder-count="2">
+<div class="file-row" style="border-top: {{ fl.top }};">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+<span style="flex: 1 1 auto; min-width: 0; font-weight: 500; color: #1d62a3;">{{ fl.name }}</span>
+<span style="font-size: 13px; color: #6b7280;">{{ fl.meta }}</span>
+<button type="button" aria-label="Open {{ fl.name }}" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #4b5563; cursor: pointer;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg>
+</button>
+<sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+<button type="button" aria-label="Delete {{ fl.name }}" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #a8403a; cursor: pointer;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+</button>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ noFilesView }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top: 10px; font-size: 14px; line-height: 20px; color: #6b7280;">No files.</div>
+</sc-if>
+
+<sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 16px; border: 1px dashed #9ca3af; border-radius: 8px; background: #f9fafb; text-align: center; font-size: 14px; line-height: 20px; color: #4b5563;">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m17 8-5-5-5 5"></path><path d="M12 3v12"></path></svg>
+<div>Drag files here or <button type="button" style="padding: 0; border: 0; background: none; font-size: 14px; line-height: 20px; color: #1d62a3; text-decoration: underline; cursor: pointer;">choose files</button></div>
+<div style="font-size: 13px; color: #6b7280;">PDF, photos, Word or Excel</div>
+</div>
+</sc-if>
+
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid #e5e7eb; background: #ffffff;">
+<div>
+<sc-if value="{{ isView }}" hint-placeholder-val="{{ true }}">
+<button type="button" class="btn btn-danger">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+Delete
+</button>
+</sc-if>
+</div>
+<div style="display: flex; align-items: center; gap: 8px;">
+<sc-if value="{{ isView }}" hint-placeholder-val="{{ true }}">
+<a href="InvoiceModalEdit.dc.html" class="btn btn-primary">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+Edit
+</a>
+</sc-if>
+<sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+<a href="{{ closeHref }}" class="btn btn-plain">Cancel</a>
+<a href="{{ closeHref }}" class="btn btn-primary">{{ saveLabel }}</a>
+</sc-if>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"view","options":["view","edit","new"]},"$preview":{"width":1440,"height":1480}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props || {};
+    const mode = P.mode === 'edit' || P.mode === 'new' ? P.mode : 'view';
+    const isNew = mode === 'new';
+    const isEdit = mode === 'edit';
+    const isView = mode === 'view';
+
+    // One sample repair: Dallas Trailer Repair, invoice DTR-2377, two services on bleacher 26 (made-up amounts).
+    const SV = [
+      { label: 'Open service: bleacher 26, Welding', bleacher: '#26', cat: 'Welding', sev: 'Minor', sevBg: '#fbf0da', sevInk: '#7d5a1c', rep: '2026-09-17', desc: 'Needed spindles rewelded', labor: '$1,260.00', parts: '$348.60', tax: '$34.55', freight: '$0.00', total: '$1,643.15' },
+      { label: 'Open service: bleacher 26, Jacks', bleacher: '#26', cat: 'Jacks', sev: 'Minor', sevBg: '#fbf0da', sevInk: '#7d5a1c', rep: '2026-09-17', desc: 'Needed replacement jack', labor: '$0.00', parts: '$70.44', tax: '$0.00', freight: '$0.00', total: '$70.44' },
+    ];
+    const FILES = [
+      { name: 'DTR-2377.pdf', meta: 'PDF · 214 KB', top: 'none' },
+      { name: 'Spindle-weld.jpg', meta: 'Photo · 1.2 MB', top: '1px solid #e5e7eb' },
+    ];
+    const form = isNew
+      ? { vendor: 'Select a vendor', vendorColor: '#9ca3af', vendorAddress: 'The currency is filled from the vendor’s country', invoice: '', status: 'Inbound', statusBg: '#dce9f7', statusInk: '#1a5892', zone: 'Set from the bleachers', from: '', to: '', completed: '—', notes: '' }
+      : { vendor: 'Dallas Trailer Repair', vendorColor: '#111827', vendorAddress: 'Dallas, TX, US', invoice: 'DTR-2377', status: 'Completed', statusBg: '#dcede2', statusInk: '#2f6b4c', zone: 'Zone 3', from: '2026-09-18', to: '2026-09-29', completed: '2026-09-29', notes: 'Welded new spindle in place and replaced jack' };
+
+    return {
+      isView: isView,
+      isForm: !isView,
+      eyebrow: isNew ? 'New repair' : isEdit ? 'Edit repair' : 'Repair',
+      title: isNew ? 'New repair' : 'DTR-2377 · Dallas Trailer Repair',
+      hasCreated: !isNew,
+      closeHref: isEdit ? 'InvoiceModal.dc.html' : 'Main.dc.html',
+      saveLabel: isNew ? 'Add repair' : 'Save',
+      f: form,
+      hasServices: !isNew,
+      noServices: isNew,
+      services: isNew ? [] : SV,
+      totals: { labor: '$1,260.00', parts: '$419.04', tax: '$34.55', freight: '$0.00', total: '$1,713.59' },
+      hasFiles: !isNew,
+      noFilesView: false,
+      files: isNew ? [] : FILES,
+    };
+  }
+}
+</script>
+</body>
+</html>
