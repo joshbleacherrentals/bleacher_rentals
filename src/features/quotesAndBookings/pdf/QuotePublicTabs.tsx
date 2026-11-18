@@ -5,6 +5,9 @@ import { Check } from "lucide-react";
 import { QuoteDocumentData } from "./quoteDocumentData";
 import { QuotePublicView } from "./QuotePublicView";
 import { SignContractTab } from "./SignContractTab";
+import { QuoteCtaStickyBar } from "./QuoteNextStep";
+import { determineQuoteCta } from "./quoteCta";
+import { scrollToTop } from "./scrollToTop";
 import { PayInvoiceTab } from "./PayInvoiceTab";
 import { useQuoteActivityTracker } from "./useQuoteActivityTracker";
 import { useQuoteFreshness } from "./useQuoteFreshness";
@@ -77,13 +80,13 @@ export function QuotePublicTabs({
   // Activity tracking always logs the ENGLISH label so staff reading the audit
   // trail see one consistent vocabulary regardless of the client's language.
   const tabLabels: Record<Tab, string> = {
-    quote: s.tabApprovedQuote,
-    contract: s.tabSignedContract,
+    quote: s.tabReviewQuote,
+    contract: s.tabApproveAndSign,
     pay: s.tabPayInvoice,
   };
   const trackedTabLabels: Record<Tab, string> = {
-    quote: quoteText("en").tabApprovedQuote,
-    contract: quoteText("en").tabSignedContract,
+    quote: quoteText("en").tabReviewQuote,
+    contract: quoteText("en").tabApproveAndSign,
     pay: quoteText("en").tabPayInvoice,
   };
   const liveTrack = useQuoteActivityTracker(data.eventId);
@@ -100,6 +103,21 @@ export function QuotePublicTabs({
   // Set when the sign endpoint rejects with 409 (quote changed at sign time).
   const [signConflict, setSignConflict] = useState(false);
   const quoteChanged = isStale || signConflict;
+
+  // The one next step in front of the customer: approve, then pay. The server already knows
+  // whether the quote is signed and what is owed, so it is right on first paint; signing here
+  // moves it on without a reload. Framed by the invoice page there is no customer to guide.
+  const [justSigned, setJustSigned] = useState(false);
+  const signed = data.contractSignature !== null || justSigned;
+  const nextStep = embeddedAndFramed
+    ? null
+    : determineQuoteCta({
+        signed,
+        hasContract: !!data.termsHtml,
+        paymentSchedule: data.paymentSchedule,
+        totalCents: data.totalCents,
+      });
+  const showStickyCta = activeTab === "quote" && (nextStep === "approve" || nextStep === "pay");
 
   useEffect(() => {
     track({ action_type: "client_page_view", next_value: data.quoteNumber });
@@ -163,6 +181,12 @@ export function QuotePublicTabs({
     setActiveTab(tab);
   }
 
+  /** The next-step buttons: change tab like the bar does (so it is logged the same), then start at the top. */
+  function goToTab(tab: Tab) {
+    handleTabChange(tab);
+    scrollToTop(rootRef.current);
+  }
+
   return (
     <div ref={rootRef}>
       {/* Staleness wins over presence: refreshing also proves the client is here. */}
@@ -189,6 +213,7 @@ export function QuotePublicTabs({
                   return (
                     <button
                       key={tabKey}
+                      data-testid={`quote-tab-${tabKey}`}
                       onClick={() => handleTabChange(tabKey)}
                       className={`flex flex-1 sm:flex-none flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 text-[13px] sm:text-sm font-semibold sm:font-medium border-b-2 transition-colors cursor-pointer ${
                         isActive
@@ -223,15 +248,38 @@ export function QuotePublicTabs({
       )}
 
       {/* Tab content — all tabs stay mounted to preserve state */}
-      <div className={activeTab === "quote" ? undefined : "hidden"}>
-        <QuotePublicView data={localized} track={track} />
+      {/* Room under the quote for the phone's sticky button, so it never covers the last lines. */}
+      <div
+        className={activeTab === "quote" ? (showStickyCta ? "pb-24 sm:pb-0" : undefined) : "hidden"}
+      >
+        <QuotePublicView
+          data={localized}
+          track={track}
+          cta={
+            nextStep
+              ? {
+                  kind: nextStep,
+                  onClick: () => goToTab(nextStep === "approve" ? "contract" : "pay"),
+                }
+              : undefined
+          }
+        />
       </div>
+      {showStickyCta && (nextStep === "approve" || nextStep === "pay") && (
+        <QuoteCtaStickyBar
+          kind={nextStep}
+          language={shownLanguage}
+          onClick={() => goToTab(nextStep === "approve" ? "contract" : "pay")}
+        />
+      )}
       <div className={activeTab === "contract" ? undefined : "hidden"}>
         <SignContractTab
           data={localized}
           track={track}
           onQuoteChanged={() => setSignConflict(true)}
           onSigned={setContentBaseline}
+          onSignatureRecorded={() => setJustSigned(true)}
+          onContinueToPay={nextStep === "pay" ? () => goToTab("pay") : undefined}
         />
       </div>
       <div className={activeTab === "pay" ? undefined : "hidden"}>
