@@ -32,9 +32,19 @@ type QuoteStringDict = Record<string, Bilingual<string> | Bilingual<(...args: ne
 
 export const quoteStrings = {
   // ── Tab bar (public page) ────────────────────────────────────────────
-  tabApprovedQuote: { en: "Approved Quote", fr: "Devis approuvé" },
-  tabSignedContract: { en: "Signed Contract", fr: "Contrat signé" },
+  // Named for what the customer does on each step, not for how it looks when finished.
+  tabReviewQuote: { en: "Review Quote", fr: "Consulter le devis" },
+  tabApproveAndSign: { en: "Approve & Sign", fr: "Approuver et signer" },
   tabPayInvoice: { en: "Pay Invoice", fr: "Payer la facture" },
+
+  // ── Next-step buttons (Quote tab, and after signing) ─────────────────
+  approveQuoteCta: { en: "Approve Quote", fr: "Approuver le devis" },
+  payInvoiceCta: { en: "Pay Invoice", fr: "Payer la facture" },
+  continueToPayment: { en: "Continue to Payment", fr: "Passer au paiement" },
+  contractSignedNextStep: {
+    en: "Thank you, your contract is signed. The next step is payment.",
+    fr: "Merci, votre contrat est signé. La prochaine étape est le paiement.",
+  },
 
   // ── Quote tab: header ────────────────────────────────────────────────
   eventInformation: { en: "Event Information", fr: "Renseignements sur l'événement" },

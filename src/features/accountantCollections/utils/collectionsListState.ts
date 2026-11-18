@@ -9,7 +9,7 @@
  * `useListPageState` does not own either.
  */
 
-export type CollectionsSortKey = "followUp" | "overdue" | "amount";
+export type CollectionsSortKey = "followUp" | "startDate" | "overdue" | "amount";
 
 /** The three lists of the switch: Collections and Deposits never overlap; All is every row. */
 export type CollectionsAmountType = "collections" | "deposits" | "all";
@@ -35,6 +35,7 @@ const PARAM = { sort: "csort", dir: "cdir", showNotDue: "cnotdue", type: "type" 
 
 const SORT_TO_PARAM: Record<CollectionsSortKey, string> = {
   followUp: "follow",
+  startDate: "start",
   overdue: "overdue",
   amount: "amount",
 };

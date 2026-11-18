@@ -57,6 +57,7 @@ function row(over: Partial<CollectionsRow> = {}): CollectionsRow {
     remainingCents: amountDueCents,
     currency: "CAD",
     daysOverdue: 3,
+    eventStart: "2027-06-01",
     ...over,
   };
 }

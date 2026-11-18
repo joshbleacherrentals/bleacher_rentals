@@ -30,8 +30,8 @@ test.describe("Public quote — language", () => {
       await page.goto(`/quote/${quote.eventId}`);
 
       // ── The contact's language decides what the client sees ──────────────
-      await expect(page.getByRole("button", { name: "Devis approuvé" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Contrat signé" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Consulter le devis" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Approuver et signer" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Payer la facture" })).toBeVisible();
       await expect(page.getByText("Articles en location")).toBeVisible();
 
@@ -49,20 +49,20 @@ test.describe("Public quote — language", () => {
       await page.getByRole("button", { name: "Langue du devis" }).click();
       await page.getByRole("menuitem", { name: "English" }).click();
 
-      await expect(page.getByRole("button", { name: "Approved Quote" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Review Quote" })).toBeVisible();
       await expect(page.getByText(ENGLISH_TOTAL).first()).toBeVisible();
       await expect(page.getByText(FRENCH_TOTAL)).toHaveCount(0);
 
       // ── The correction survives a reload, without touching the contact ───
       await page.reload();
-      await expect(page.getByRole("button", { name: "Approved Quote" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Review Quote" })).toBeVisible();
 
       // The contact record is deliberately NOT rewritten from the public page:
       // anyone with the link could otherwise mutate a shared CRM row.
       const response = await page.request.get(`/quote/${quote.eventId}`, {
         headers: { "Cache-Control": "no-cache" },
       });
-      expect(await response.text()).toContain("Devis approuvé");
+      expect(await response.text()).toContain("Consulter le devis");
     } finally {
       if (quote) await cleanupQuote(quote.eventId, undefined, contactId);
     }

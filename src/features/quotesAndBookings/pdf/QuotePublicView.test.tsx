@@ -250,3 +250,47 @@ describe("QuotePublicView — line item description", () => {
     expect(html).toContain('<span class="font-medium">Bleacher 15 row</span></td>');
   });
 });
+
+describe("QuotePublicView: the next-step button", () => {
+  const html = (cta?: { kind: "approve" | "pay" | "paid" }, language: QuoteLanguage = "en") =>
+    renderToStaticMarkup(
+      <QuotePublicView
+        data={{ ...quote(language), status: "quoted", contractSignature: null }}
+        cta={cta && { ...cta, onClick: () => {} }}
+      />,
+    );
+
+  const count = (markup: string, needle: string) => markup.split(needle).length - 1;
+
+  it("shows no button or note without one, as the sales office preview and the invoice frame do", () => {
+    const markup = html();
+    expect(markup).not.toContain("quote-cta");
+    expect(markup).not.toContain("quote-paid-note");
+  });
+
+  it("puts the Approve Quote button in the header and again under the totals, desktop only", () => {
+    const markup = html({ kind: "approve" });
+    expect(count(markup, 'data-testid="quote-cta"')).toBe(2);
+    expect(count(markup, ">Approve Quote<")).toBe(2);
+    // Hidden below the sm breakpoint: a phone gets the sticky bar from the tabs instead.
+    expect(count(markup, "hidden sm:block")).toBe(2);
+  });
+
+  it("says Pay Invoice when asking for payment", () => {
+    const markup = html({ kind: "pay" });
+    expect(count(markup, ">Pay Invoice<")).toBe(2);
+    expect(markup).not.toContain("Approve Quote");
+  });
+
+  it("shows a paid in full note, not a button", () => {
+    const markup = html({ kind: "paid" });
+    expect(markup).toContain('data-testid="quote-paid-note"');
+    expect(markup).toContain("Paid in Full");
+    expect(markup).not.toContain('data-testid="quote-cta"');
+  });
+
+  it("is in French for a French contact", () => {
+    expect(html({ kind: "approve" }, "fr")).toContain(">Approuver le devis<");
+    expect(html({ kind: "paid" }, "fr")).toContain("Payé en totalité");
+  });
+});

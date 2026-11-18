@@ -1559,6 +1559,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"McpQueryLog": {
+                  Row: {
+                    "clerk_user_id": string,"created_at": string,"duration_ms": number | null,"error": string | null,"id": string,"row_count": number | null,"sql": string | null,"tool": string,"truncated": boolean,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "clerk_user_id": string,"created_at"?: string,"duration_ms"?: number | null,"error"?: string | null,"id"?: string,"row_count"?: number | null,"sql"?: string | null,"tool": string,"truncated"?: boolean,"user_id"?: string | null
+                  }
+                  Update: {
+                    "clerk_user_id"?: string,"created_at"?: string,"duration_ms"?: number | null,"error"?: string | null,"id"?: string,"row_count"?: number | null,"sql"?: string | null,"tool"?: string,"truncated"?: boolean,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "McpQueryLog_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"Notifications": {
                   Row: {
                     "body": string,"created_at": string,"id": string,"title": string,"user_id": string

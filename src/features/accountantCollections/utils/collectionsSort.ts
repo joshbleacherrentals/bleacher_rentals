@@ -50,14 +50,27 @@ const eventId: Compare = (a, b) => cmp(a.eventId, b.eventId);
 /** The chain after the chosen column (spec 07 §1); the event id makes the order total. */
 const TIE_CHAIN: Record<CollectionsListState["sort"], Compare[]> = {
   followUp: [amountLargest, daysMost, eventId],
+  startDate: [followUpOldest, amountLargest, daysMost, eventId],
   amount: [daysMost, followUpOldest, eventId],
   overdue: [amountLargest, followUpOldest, eventId],
 };
 
+/** The day of an event's start (`YYYY-MM-DD`); a time of day on it does not change the day. */
+const startDay = (row: CollectionsRow): string => (row.eventStart ?? "").slice(0, 10);
+
 const PRIMARY: Record<CollectionsListState["sort"], Compare> = {
   followUp: followUpOldest,
+  startDate: (a, b) => cmp(startDay(a), startDay(b)),
   amount: (a, b) => cmp(a.amountDueCents, b.amountDueCents),
   overdue: (a, b) => cmp(a.daysOverdue ?? 0, b.daysOverdue ?? 0),
+};
+
+/**
+ * A row with no value in the sorted column goes after every row that has one, in either direction,
+ * as on the AR tabs. Only the start date can be missing.
+ */
+const MISSING: Partial<Record<CollectionsListState["sort"], (row: CollectionsRow) => boolean>> = {
+  startDate: (row) => startDay(row) === "",
 };
 
 export function sortCollectionsRows(
@@ -67,8 +80,13 @@ export function sortCollectionsRows(
   const primary = PRIMARY[state.sort];
   const sign = state.dir === "asc" ? 1 : -1;
   const chain = TIE_CHAIN[state.sort];
+  const missing = MISSING[state.sort];
 
   return [...rows].sort((a, b) => {
+    if (missing) {
+      const aMissing = missing(a);
+      if (aMissing !== missing(b)) return aMissing ? 1 : -1;
+    }
     const first = primary(a, b) * sign;
     if (first !== 0) return first;
     for (const compare of chain) {
