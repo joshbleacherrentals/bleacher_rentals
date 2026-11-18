@@ -103,7 +103,7 @@ test.describe("Public quote — staleness & presence", () => {
       termsId = await assignTerms(quote.eventId);
 
       await page.goto(`/quote/${quote.eventId}`);
-      await page.getByRole("button", { name: "Signed Contract" }).click();
+      await page.getByRole("button", { name: "Approve & Sign" }).click();
       // Tabs stay mounted (hidden), so scope to the visible signer input.
       await page.locator('input[placeholder="Full name"]:visible').fill("Jane Client");
 
@@ -133,7 +133,7 @@ test.describe("Public quote — staleness & presence", () => {
       termsId = await assignTerms(quote.eventId);
 
       await page.goto(`/quote/${quote.eventId}?pollMs=400`);
-      await page.getByRole("button", { name: "Signed Contract" }).click();
+      await page.getByRole("button", { name: "Approve & Sign" }).click();
       await page.locator('input[placeholder="Full name"]:visible').fill("Jane Client");
 
       // Signing renders a PDF and sends two emails, so wait for the response
