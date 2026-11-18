@@ -1,0 +1,46 @@
+import { test, expect } from "@playwright/test";
+import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import { bleacherQuery, cellOf, openRepairsPage, rowWith } from "./helpers/repairsPage";
+
+/**
+ * The Repairs page as a viewer sees it: the whole table, vendors and money included, no Restore
+ * and no click on a row. Written, not run (project rule).
+ * Spec: docs/specs/repairs-04-table.md §6 (S10, D52).
+ */
+test.describe("Repairs page (viewer)", () => {
+  let seeded: SeededRepairs;
+
+  test.beforeAll(async () => {
+    seeded = await seedRepairs();
+  });
+
+  test.afterAll(async () => {
+    await seeded?.cleanup();
+  });
+
+  test("S10: sees the vendor, the invoice number, the amounts and the strip", async ({ page }) => {
+    await openRepairsPage(page, bleacherQuery(seeded.bleacherA.uuid, "&tab=completed"));
+    const done = rowWith(page, seeded.completed.invoice);
+    await expect(done).toBeVisible({ timeout: 60_000 });
+    await expect(cellOf(done, "vendor")).toHaveText(seeded.vendorName);
+    await expect(cellOf(done, "invoice")).toHaveText(seeded.completed.invoice);
+    await expect(cellOf(done, "total")).toHaveText(usd(seeded.completed.totalCents));
+    await expect(page.getByTestId("repairs-strip-usd")).toHaveText(
+      usd(seeded.completed.totalCents),
+    );
+  });
+
+  test("S10: a click on a row does nothing and there is no Restore", async ({ page }) => {
+    await openRepairsPage(page, bleacherQuery(seeded.bleacherA.uuid, "&tab=completed"));
+    const done = rowWith(page, seeded.completed.invoice);
+    await expect(done).toBeVisible({ timeout: 60_000 });
+    await done.click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByTestId("repair-restore")).toHaveCount(0);
+  });
+
+  test("S10: the Show Deleted button is not there", async ({ page }) => {
+    await openRepairsPage(page);
+    await expect(page.getByRole("button", { name: "Show Deleted" })).toHaveCount(0);
+  });
+});

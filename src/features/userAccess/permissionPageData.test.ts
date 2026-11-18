@@ -1104,3 +1104,40 @@ describe("Send Emails", () => {
     expect(row?.roles.viewer.note).toMatch(/dimmed/i);
   });
 });
+
+// docs/specs/repairs-04-table.md §5: the Repairs page shows vendors, invoices and costs to the four
+// roles that open it, and for now it only lists repairs (editing is on the Dashboard).
+describe("Repairs page rows", () => {
+  const maintenance = PERMISSIONS.find((p) => p.label === "Repairs & Maintenance");
+  const costs = PERMISSIONS.find((p) => p.label === "Repair Costs & Vendors");
+
+  it("has the Repair Costs & Vendors row right after Repairs & Maintenance", () => {
+    expect(costs).toBeDefined();
+    expect(PERMISSIONS.indexOf(costs!)).toBe(PERMISSIONS.indexOf(maintenance!) + 1);
+    expect(costs?.category).toBe("Day to Day Operations");
+  });
+
+  it("is read for the four roles that open the page and none for the others", () => {
+    for (const role of ["admin", "account_manager", "viewer", "maintainer"] as WebRole[]) {
+      expect(costs?.roles[role].level, role).toBe("read");
+    }
+    for (const role of ["developer", "driver", "accountant"] as WebRole[]) {
+      expect(costs?.roles[role].level, role).toBe("none");
+    }
+  });
+
+  it("says every role that opens the page sees all of it, and that it only reads for now", () => {
+    expect(costs?.description).toMatch(/Every role that opens the Repairs page sees all of it/);
+    expect(costs?.description).toMatch(/The page only reads for now/);
+    expect(costs?.roles.account_manager.note).toMatch(/not only the ones they created/);
+  });
+
+  it("tells the old row that the Repairs page only lists repairs for now", () => {
+    expect(maintenance?.description).toMatch(
+      /For now the Repairs page only lists repairs and, for an administrator or a maintainer, shows and restores deleted ones; a repair is edited from the Dashboard until the repair window arrives\./,
+    );
+    expect(maintenance?.roles.maintainer.note).toMatch(
+      /Uses the Repairs page to look repairs up and restore deleted ones, and the Dashboard to edit them\./,
+    );
+  });
+});

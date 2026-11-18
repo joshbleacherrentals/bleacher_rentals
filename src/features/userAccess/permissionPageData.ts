@@ -600,7 +600,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Repairs & Maintenance",
     description:
-      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard.",
+      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard. For now the Repairs page only lists repairs and, for an administrator or a maintainer, shows and restores deleted ones; a repair is edited from the Dashboard until the repair window arrives.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
@@ -617,8 +617,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: full(
-        "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page.",
+        "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up and restore deleted ones, and the Dashboard to edit them.",
       ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  // docs/specs/repairs-04-table.md §5: what the Repairs page shows. Editing comes with later specs.
+  {
+    label: "Repair Costs & Vendors",
+    description:
+      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The page only reads for now.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: read("Sees every column and the total cost strip."),
+      account_manager: read(
+        "Sees every column and the total cost strip, for every repair and not only the ones they created.",
+      ),
+      developer: none(
+        "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
+      ),
+      viewer: read("Sees every column and the total cost strip, vendors included."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: read("Sees every column and the total cost strip, vendors included."),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },

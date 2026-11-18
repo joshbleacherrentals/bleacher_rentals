@@ -1,4 +1,4 @@
-import RepairsPage from "@/features/qualityAssurance/components/RepairsPage";
+import RepairsPage from "@/features/repairs/components/RepairsPage";
 
 export default function Page() {
   return <RepairsPage />;
