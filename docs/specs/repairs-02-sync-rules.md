@@ -1,7 +1,7 @@
 # Repairs 02: web sync rules for the data of the Repairs page
 
-Status: **APPROVED and IMPLEMENTED 2026-11-18**, the change in `../br_powersync` is not committed
-(0 open decisions; the results are in §8). Build order: **02 of 11**. Needs: [repairs-01-design.md](repairs-01-design.md) (approved) and the migration of
+Status: **APPROVED and IMPLEMENTED 2026-11-18**, the change in `../br_powersync` is committed
+there as 692b21c on the user's word, not pushed (0 open decisions; the results are in §8). Build order: **02 of 11**. Needs: [repairs-01-design.md](repairs-01-design.md) (approved) and the migration of
 [maintenance-01-database-schema.md](maintenance-01-database-schema.md). Needed by: 03 and the specs
 after it. Plan: [repairs-plan.md](repairs-plan.md). Branch: `q4-sprint4-maintenance`, in this
 repository and in `../br_powersync` (the user created it there and it is checked out).
@@ -213,7 +213,7 @@ of the file is not touched.
 
 ## 6. Files
 
-- `../br_powersync/config/sync_rules.yaml` (changed, not committed).
+- `../br_powersync/config/sync_rules.yaml` (changed; committed there as 692b21c, not pushed).
 - This spec, and its Ukrainian copy as an artifact (not committed).
 
 ## 7. Definition of done
@@ -224,13 +224,14 @@ of the file is not touched.
 - `npx prettier --check` on this spec.
 - `npm run tc`, `npm run test` and Playwright in this repository: SKIPPED, because nothing but this
   spec changes here.
-- The change in `../br_powersync` stays uncommitted until the user says to commit it.
+- The change in `../br_powersync` stayed uncommitted until the user said to commit it; it was
+  committed there as 692b21c (2026-11-18), not pushed.
 
 ## 8. Result (2026-11-18)
 
 - **Implemented:** fourteen queries (and one comment line above each role's block, 18 added lines
   in all) in `../br_powersync/config/sync_rules.yaml`, on the branch `q4-sprint4-maintenance`.
-  Nothing is committed there.
+  Committed there afterwards as 692b21c on the user's word (2026-11-18), not pushed.
 - **Compile.** Run in the container `br_powersync-powersync-1` (OrbStack, image
   `journeyapps/powersync-service:1.20.5`) with `SqlSyncRules.fromYaml`, on copies of the file
   before and after the change: 0 errors in both, 25 data sources in both.
