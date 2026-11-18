@@ -1,6 +1,7 @@
 # Repairs 02: web sync rules for the data of the Repairs page
 
-Status: **APPROVED 2026-11-18** (0 open decisions). Build order: **02 of 11**. Needs: [repairs-01-design.md](repairs-01-design.md) (approved) and the migration of
+Status: **APPROVED and IMPLEMENTED 2026-11-18**, the change in `../br_powersync` is not committed
+(0 open decisions; the results are in §8). Build order: **02 of 11**. Needs: [repairs-01-design.md](repairs-01-design.md) (approved) and the migration of
 [maintenance-01-database-schema.md](maintenance-01-database-schema.md). Needed by: 03 and the specs
 after it. Plan: [repairs-plan.md](repairs-plan.md). Branch: `q4-sprint4-maintenance`, in this
 repository and in `../br_powersync` (the user created it there and it is checked out).
@@ -224,3 +225,25 @@ of the file is not touched.
 - `npm run tc`, `npm run test` and Playwright in this repository: SKIPPED, because nothing but this
   spec changes here.
 - The change in `../br_powersync` stays uncommitted until the user says to commit it.
+
+## 8. Result (2026-11-18)
+
+- **Implemented:** fourteen queries (and one comment line above each role's block, 18 added lines
+  in all) in `../br_powersync/config/sync_rules.yaml`, on the branch `q4-sprint4-maintenance`.
+  Nothing is committed there.
+- **Compile.** Run in the container `br_powersync-powersync-1` (OrbStack, image
+  `journeyapps/powersync-service:1.20.5`) with `SqlSyncRules.fromYaml`, on copies of the file
+  before and after the change: 0 errors in both, 25 data sources in both.
+- **Buckets.** Web data sources with bucket parameters: 2 before (`web|0`, `web|7`) and 2 after.
+  All sources with parameters: 15 before and 15 after.
+- **Tables per role (text read of the web queries).** Account manager +3, admin +3, viewer +4,
+  maintainer +4; accountant and developer unchanged; nothing removed. The number of web queries
+  with a column list is the same before and after.
+- **Compiled web tables.** The union grew from 96 to 99: `DamageCategories`,
+  `DamageReportCategories` and `MaintenanceLineItems`. `Vendors` was already in it for other
+  roles.
+- **Not done.** The running local service was not restarted, so it still serves the old rules
+  until the user restarts it. That rows arrive on a device is not checked (§3). The files copied
+  into the container's `/tmp` for the check were removed afterwards.
+- **This repository.** No code changed, so `npm run tc` and `npm run test` were not run again;
+  the run before the commit c82093c9 was green (tc exit 0; 542 test files, 7873 tests).
