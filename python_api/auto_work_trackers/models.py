@@ -45,3 +45,13 @@ class NeededTrip:
     to_event_uuid: str
     available_from: str  # earliest day the move can happen: the day after the first event's last day
     must_arrive_by: str  # latest day: the day the next event starts
+    # The days the bleacher is actually free: the day after the prior event ends through the day before
+    # the next one starts. Empty (earliest_day > latest_day) when the events are back to back.
+    earliest_day: str | None = None
+    latest_day: str | None = None
+
+
+@dataclass(frozen=True)
+class Driver:
+    driver_uuid: str
+    home_address_uuid: str | None  # where the driver starts from; None when none is on file

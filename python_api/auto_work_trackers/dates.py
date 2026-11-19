@@ -33,3 +33,7 @@ def week_end_of(week_start: str) -> str:
 
 def day_after(day: str) -> str:
     return (date.fromisoformat(day) + timedelta(days=1)).isoformat()
+
+
+def day_before(day: str) -> str:
+    return (date.fromisoformat(day) - timedelta(days=1)).isoformat()

@@ -94,3 +94,15 @@ def test_a_next_event_starting_before_the_day_after_keeps_the_move_due_that_day(
     b = bleacher([stop("a", "1 Main", "2026-11-01", "2026-11-10"), stop("b", "2 Oak", "2026-11-10", "2026-11-14")])
     (trip,) = discover_trips([b], WEEK)
     assert (trip.available_from, trip.must_arrive_by) == ("2026-11-10", "2026-11-10")
+
+
+def test_a_trip_can_happen_from_the_day_after_the_prior_event_to_the_day_before_the_next():
+    b = bleacher([stop("a", "1 Main", "2026-11-01", "2026-11-08"), stop("b", "2 Oak", "2026-11-12", "2026-11-14")])
+    (trip,) = discover_trips([b], WEEK)
+    assert (trip.earliest_day, trip.latest_day) == ("2026-11-09", "2026-11-11")
+
+
+def test_back_to_back_events_still_need_a_trip_but_with_an_empty_window():
+    b = bleacher([stop("a", "1 Main", "2026-11-01", "2026-11-10"), stop("b", "2 Oak", "2026-11-11", "2026-11-14")])
+    (trip,) = discover_trips([b], WEEK)
+    assert (trip.earliest_day, trip.latest_day) == ("2026-11-11", "2026-11-10")

@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from python_api.auto_work_trackers.dates import to_local_date
-from python_api.auto_work_trackers.models import BleacherInput, ExistingTrip, NeededTrip, Stop
+from python_api.auto_work_trackers.dates import day_after, day_before, to_local_date, week_end_of
+from python_api.auto_work_trackers.models import BleacherInput, Driver, ExistingTrip, NeededTrip, Stop
 from python_api.core.supabase import SupabaseRest
 
 # Work trackers that are off: nobody is going to make the trip, so they do not cover it.
@@ -43,6 +43,77 @@ class WorkTrackerRepository:
                 "dropoff_address_uuid": trip.to_address_uuid,
             }
             for trip, day in zip(trips, dates, strict=True)
+        ]
+        return [row["id"] for row in self._db.insert("WorkTrackers", rows)]
+
+    def load_zone_drivers(self, zone_id: str) -> list[Driver]:
+        """The active drivers assigned to the zone, with the address each starts from. Ordered by id."""
+        links = self._db.select("DriverZones", "driver_uuid", {"zone_uuid": f"eq.{zone_id}"})
+        driver_ids = sorted({link["driver_uuid"] for link in links})
+        drivers = self._db.select_in("Drivers", "id,is_active,address_uuid", "id", driver_ids)
+        return sorted(
+            (Driver(d["id"], d["address_uuid"]) for d in drivers if d["is_active"]),
+            key=lambda d: d.driver_uuid,
+        )
+
+    def load_address_points(self, address_ids: list[str]) -> dict[str, tuple[float, float]]:
+        """(latitude, longitude) of each address that has coordinates. Others are left out."""
+        rows = self._db.select_in("Addresses", "id,latitude,longitude", "id", sorted(set(address_ids)))
+        return {
+            r["id"]: (float(r["latitude"]), float(r["longitude"]))
+            for r in rows
+            if r.get("latitude") is not None and r.get("longitude") is not None
+        }
+
+    def load_blocked_days(self, driver_ids: list[str], week_start: str, tz: str) -> set[tuple[str, str]]:
+        """(driver, day) pairs inside the week a driver cannot take a trip.
+
+        A day the driver marked unavailable, or one they already have an active work tracker on.
+        """
+        # The dates are fetched with a day to spare each side and trimmed to the local days after.
+        window = f"(date.gte.{day_before(week_start)},date.lte.{day_after(week_end_of(week_start))})"
+        unavailable_window = window.replace("date.", "date_unavailable.")
+        week_end = week_end_of(week_start)
+
+        blocked: set[tuple[str, str]] = set()
+        for row in self._db.select_in(
+            "DriverUnavailability", "driver_uuid,date_unavailable", "driver_uuid", driver_ids, {"and": unavailable_window}
+        ):
+            day = to_local_date(row["date_unavailable"], tz)
+            if day and week_start <= day <= week_end:
+                blocked.add((row["driver_uuid"], day))
+        for row in self._db.select_in(
+            "WorkTrackers", "driver_uuid,date,status", "driver_uuid", driver_ids, {"and": window}
+        ):
+            day = to_local_date(row["date"], tz)
+            if day and week_start <= day <= week_end and row["status"] not in OFF_STATUSES:
+                blocked.add((row["driver_uuid"], day))
+        return blocked
+
+    def existing_work_tracker_keys(self, trips: list[Any], tz: str) -> set[tuple[str, str, str | None]]:
+        """(bleacher, local day, drop-off address) of the active work trackers matching the given trips."""
+        bleacher_ids = sorted({t.bleacher_uuid for t in trips})
+        rows = self._db.select_in(
+            "WorkTrackers", "bleacher_uuid,date,status,dropoff_address_uuid", "bleacher_uuid", bleacher_ids
+        )
+        return {
+            (row["bleacher_uuid"], to_local_date(row["date"], tz) or "", row["dropoff_address_uuid"])
+            for row in rows
+            if row["status"] not in OFF_STATUSES
+        }
+
+    def create_accepted_work_trackers(self, trips: list[Any]) -> list[str]:
+        """One draft work tracker per accepted trip, in order. Returns the new work trackers' ids."""
+        rows = [
+            {
+                "bleacher_uuid": t.bleacher_uuid,
+                "date": t.date,
+                "status": "draft",
+                "pickup_address_uuid": t.from_address_uuid,
+                "dropoff_address_uuid": t.to_address_uuid,
+                **({"driver_uuid": t.driver_uuid} if getattr(t, "driver_uuid", None) else {}),
+            }
+            for t in trips
         ]
         return [row["id"] for row in self._db.insert("WorkTrackers", rows)]
 

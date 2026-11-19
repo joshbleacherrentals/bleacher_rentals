@@ -9,7 +9,7 @@ to its drop-off, and only the rest of the way is still needed.
 Pure: no database, no clock. A port of src/features/autoWorkTrackers/utils/discoverTrips.ts.
 """
 
-from python_api.auto_work_trackers.dates import day_after, week_end_of
+from python_api.auto_work_trackers.dates import day_after, day_before, week_end_of
 from python_api.auto_work_trackers.models import BleacherInput, NeededTrip
 from python_api.auto_work_trackers.streets import normalize_street
 
@@ -62,6 +62,8 @@ def _trips_for_bleacher(bleacher: BleacherInput, week_start: str, week_end: str)
                 to_event_uuid=target.event_uuid,
                 available_from=available_from,
                 must_arrive_by=must_arrive_by,
+                earliest_day=day_after(origin.end_date),
+                latest_day=day_before(target.start_date),
             )
         )
     return needed
