@@ -7,6 +7,12 @@ import { logSingleChange } from "@/features/quotesAndBookings/db/logEventChanges
 import { sendTriggerEmail } from "@/features/automaticEmails/server/sendTriggerEmail";
 import { QUOTE_SIGNED_CLIENT, QUOTE_SIGNED_AM } from "@/features/automaticEmails/triggers";
 
+// Signing renders and uploads the signed PDF (~8 s), then sends the client and account-manager
+// emails. On the 10 s default Vercel killed the request before the last email went out, so account
+// managers silently stopped hearing about signatures. This raises the real limit for this route
+// only, as create-bill does.
+export const maxDuration = 60;
+
 function getSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
