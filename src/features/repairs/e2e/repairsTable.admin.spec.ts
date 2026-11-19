@@ -13,16 +13,19 @@ import {
 import {
   bleacherQuery,
   cellOf,
+  columnHeader,
   openRepairsPage,
   repairRows,
   rowWith,
   tab,
+  toggleOption,
 } from "./helpers/repairsPage";
 
 /**
  * The Repairs table as an administrator sees it: tabs, columns, strip, pager, Bleacher select,
  * Show Deleted and Restore. Written, not run (project rule); the admin project cannot run locally.
- * Spec: docs/specs/repairs-04-table.md §6 (S1 to S9).
+ * Spec: docs/specs/repairs-04-table.md §6 (S1 to S9; S1 and S6 changed by
+ * docs/specs/repairs-05-toolbar.md §6).
  */
 const HEADERS = [
   "Bleachers",
@@ -69,7 +72,11 @@ test.describe("Repairs table (admin)", () => {
     await expect(page.getByText("Total cost · USD")).toBeVisible();
     await expect(page.getByRole("columnheader")).toHaveText(HEADERS);
     await expect(page.getByRole("button", { name: "New repair" })).toHaveCount(0);
-    await expect(page.getByRole("columnheader").getByRole("button")).toHaveCount(0);
+    // Spec 05: the fourteen columns with one value per row sort; the other three do not.
+    await expect(page.getByRole("columnheader").getByRole("button")).toHaveCount(14);
+    for (const plain of ["Bleachers", "Severity", "Categories"]) {
+      await expect(columnHeader(page, plain).getByRole("button")).toHaveCount(0);
+    }
   });
 
   test("S2: Open and Completed hold different repairs, and the tab lives in the URL", async ({
@@ -150,16 +157,16 @@ test.describe("Repairs table (admin)", () => {
     await expect(repairRows(page)).toHaveCount(PAGER_REPAIRS - 25, { timeout: 60_000 });
   });
 
-  test("S6: the Bleacher select narrows the list and the empty state reads No repairs found.", async ({
+  test("S6: the Bleacher filter narrows the list and the empty state reads No repairs found.", async ({
     page,
   }) => {
     await openRepairsPage(page, "?tab=completed");
-    const select = page.getByLabel("Bleacher", { exact: true });
-    await select.selectOption({ label: `Bleacher #${seeded.bleacherA.number}` });
-    await expect(page).toHaveURL(new RegExp(`bleacher_uuid=${seeded.bleacherA.uuid}`));
+    await toggleOption(page, "bleacher", `#${seeded.bleacherA.number}`);
+    await expect(page).toHaveURL(new RegExp(`bleachers=${seeded.bleacherA.uuid}`));
     await expect(rowWith(page, seeded.completed.invoice)).toHaveCount(1, { timeout: 60_000 });
 
-    await select.selectOption({ label: `Bleacher #${seeded.emptyBleacher.number}` });
+    await toggleOption(page, "bleacher", `#${seeded.bleacherA.number}`);
+    await toggleOption(page, "bleacher", `#${seeded.emptyBleacher.number}`);
     await expect(page.getByTestId("repairs-empty")).toContainText("No repairs found.");
   });
 

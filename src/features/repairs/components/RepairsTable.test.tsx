@@ -4,7 +4,8 @@ import type { RepairStatus } from "../utils/repairRows";
 import { repairRow } from "../utils/repairRowFixture";
 import { RepairsTable, type RepairsTableProps } from "./RepairsTable";
 
-// docs/specs/repairs-04-table.md §2.2 to §2.5, §2.10 and §7. The table is rendered on the server:
+// docs/specs/repairs-04-table.md §2.2 to §2.5, §2.10 and §7, and docs/specs/repairs-05-toolbar.md
+// §2.5 (the sort headers). The table is rendered on the server:
 // what is under test is which words and colours each cell gets. Clicks are covered by e2e.
 
 const report = (id: string, day: string) => ({ id, day, createdAt: `${day}T12:00:00Z` });
@@ -16,6 +17,8 @@ const render = (props: Partial<RepairsTableProps> = {}) =>
       isLoading={false}
       showRestore={false}
       onRestore={() => {}}
+      sort={null}
+      onSort={() => {}}
       {...props}
     />,
   );
@@ -108,14 +111,98 @@ describe("RepairsTable headers", () => {
     expect(headers(render({ rows: [full] }))).toEqual(HEADERS);
   });
 
-  it("has no sort button, no New repair and no row arrow (D43)", () => {
+  it("has no New repair, no row arrow and no clickable row (D40, D43)", () => {
     const markup = render({ rows: [full, old] });
-    expect(markup).not.toContain("<button");
-    expect(markup).not.toContain("cursor-pointer");
+    expect(text(markup)).not.toContain("New repair");
+    const rowsOnly = markup.slice(markup.indexOf('data-testid="repair-row"'));
+    expect(rowsOnly).not.toContain("<button");
+    expect(rowsOnly).not.toContain("cursor-pointer");
   });
 
   it("has no Restore column unless the view asks for it", () => {
     expect(headers(render({ rows: [full] }))).not.toContain("Actions");
+  });
+});
+
+/** The whole header cell of a column, found by its label. */
+function headerCell(markup: string, label: string): string {
+  const found = [...markup.matchAll(/<div role="columnheader"[^>]*>.*?<\/div>/g)]
+    .map((m) => m[0])
+    .find((h) => text(h) === label);
+  expect(found, `no "${label}" header`).toBeDefined();
+  return found as string;
+}
+
+// docs/specs/repairs-05-toolbar.md §2.5: D15, D72.
+describe("RepairsTable sort headers", () => {
+  const SORTABLE = [
+    "Reported",
+    "Repair from",
+    "Repair to",
+    "Zone",
+    "Notes",
+    "Status",
+    "Vendor",
+    "Invoice #",
+    "Labor",
+    "Parts",
+    "Tax",
+    "Freight",
+    "Total",
+    "Completed",
+  ];
+  const PLAIN = ["Bleachers", "Severity", "Categories"];
+
+  it("makes the fourteen columns with one value per row buttons", () => {
+    const markup = render({ rows: [full] });
+    for (const label of SORTABLE) {
+      expect(headerCell(markup, label), label).toContain('<button type="button"');
+    }
+  });
+
+  it("leaves Bleachers, Severity, Categories and the Restore header as plain text (D15)", () => {
+    const markup = render({ rows: [full], showRestore: true });
+    for (const label of [...PLAIN, "Actions"]) {
+      expect(headerCell(markup, label), label).not.toContain("<button");
+    }
+  });
+
+  it("sets no aria-sort anywhere while there is no sort, and draws the two-way arrow", () => {
+    const markup = render({ rows: [full] });
+    expect(markup).not.toContain("aria-sort");
+    for (const label of SORTABLE) {
+      expect(headerCell(markup, label), label).toContain("lucide-arrow-up-down");
+    }
+  });
+
+  it("sets aria-sort and a solid arrow on the sorted header only", () => {
+    const markup = render({ rows: [full], sort: { key: "total", direction: "desc" } });
+    const total = headerCell(markup, "Total");
+    expect(total).toContain('aria-sort="descending"');
+    expect(total).toContain("lucide-arrow-down");
+    expect(total).not.toContain("lucide-arrow-up-down");
+    expect(markup.match(/aria-sort=/g)).toHaveLength(1);
+    expect(headerCell(markup, "Vendor")).toContain("lucide-arrow-up-down");
+
+    const up = render({ rows: [full], sort: { key: "zone", direction: "asc" } });
+    const zone = headerCell(up, "Zone");
+    expect(zone).toContain('aria-sort="ascending"');
+    expect(zone).toContain("lucide-arrow-up");
+    expect(zone).not.toContain("lucide-arrow-up-down");
+  });
+
+  it("keeps the money headers at the right", () => {
+    const markup = render({ rows: [full] });
+    for (const label of ["Labor", "Parts", "Tax", "Freight", "Total"]) {
+      expect(headerCell(markup, label), label).toContain("text-right");
+    }
+    expect(headerCell(markup, "Vendor")).not.toContain("text-right");
+  });
+
+  it("keeps the 17 headers in order and the first column sticky", () => {
+    const markup = render({ rows: [full], sort: { key: "vendor", direction: "asc" } });
+    expect(headers(markup)).toEqual(HEADERS);
+    expect(headerCell(markup, "Bleachers")).toContain("sticky");
   });
 });
 

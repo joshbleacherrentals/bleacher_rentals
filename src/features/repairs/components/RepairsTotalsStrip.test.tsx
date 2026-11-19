@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RepairsTotalsStrip } from "./RepairsTotalsStrip";
 
-// docs/specs/repairs-04-table.md §2.7 and §7.
+// docs/specs/repairs-04-table.md §2.7 and §7, and docs/specs/repairs-05-toolbar.md D70.
 
 const text = (markup: string) =>
   markup
@@ -21,7 +21,7 @@ function testIdText(markup: string, id: string): string {
 describe("RepairsTotalsStrip", () => {
   it("puts CAD first and USD second (D49)", () => {
     const markup = renderToStaticMarkup(
-      <RepairsTotalsStrip tab="open" totals={{ USD: 100, CAD: 200 }} />,
+      <RepairsTotalsStrip tab="open" deleted={false} totals={{ USD: 100, CAD: 200 }} />,
     );
     const cad = markup.indexOf("Total cost · CAD");
     const usd = markup.indexOf("Total cost · USD");
@@ -31,7 +31,7 @@ describe("RepairsTotalsStrip", () => {
 
   it("writes the amounts with cents, CAD with C$ and USD with $ (D48)", () => {
     const markup = renderToStaticMarkup(
-      <RepairsTotalsStrip tab="completed" totals={{ USD: 1234567, CAD: 123450 }} />,
+      <RepairsTotalsStrip tab="completed" deleted={false} totals={{ USD: 1234567, CAD: 123450 }} />,
     );
     expect(testIdText(markup, "repairs-strip-cad")).toBe("C$1,234.50");
     expect(testIdText(markup, "repairs-strip-usd")).toBe("$12,345.67");
@@ -39,24 +39,37 @@ describe("RepairsTotalsStrip", () => {
 
   it("keeps both amounts for an empty tab, as $0.00 and C$0.00", () => {
     const markup = renderToStaticMarkup(
-      <RepairsTotalsStrip tab="open" totals={{ USD: 0, CAD: 0 }} />,
+      <RepairsTotalsStrip tab="open" deleted={false} totals={{ USD: 0, CAD: 0 }} />,
     );
     expect(testIdText(markup, "repairs-strip-cad")).toBe("C$0.00");
     expect(testIdText(markup, "repairs-strip-usd")).toBe("$0.00");
   });
 
   it("writes a dash for each amount while the list loads (D51)", () => {
-    const markup = renderToStaticMarkup(<RepairsTotalsStrip tab="open" totals={null} />);
+    const markup = renderToStaticMarkup(
+      <RepairsTotalsStrip tab="open" deleted={false} totals={null} />,
+    );
     expect(testIdText(markup, "repairs-strip-cad")).toBe("—");
     expect(testIdText(markup, "repairs-strip-usd")).toBe("—");
   });
 
   it("writes the caption of each tab", () => {
-    expect(text(renderToStaticMarkup(<RepairsTotalsStrip tab="open" totals={null} />))).toContain(
-      "Open repairs that match the filters",
-    );
     expect(
-      text(renderToStaticMarkup(<RepairsTotalsStrip tab="completed" totals={null} />)),
+      text(renderToStaticMarkup(<RepairsTotalsStrip tab="open" deleted={false} totals={null} />)),
+    ).toContain("Open repairs that match the filters");
+    expect(
+      text(
+        renderToStaticMarkup(<RepairsTotalsStrip tab="completed" deleted={false} totals={null} />),
+      ),
     ).toContain("Completed repairs that match the filters");
+  });
+
+  it("adds the word Deleted to the caption in the Show Deleted view (D70)", () => {
+    expect(
+      text(renderToStaticMarkup(<RepairsTotalsStrip tab="open" deleted totals={null} />)),
+    ).toContain("Deleted open repairs that match the filters");
+    expect(
+      text(renderToStaticMarkup(<RepairsTotalsStrip tab="completed" deleted totals={null} />)),
+    ).toContain("Deleted completed repairs that match the filters");
   });
 });

@@ -23,5 +23,32 @@ export const cellOf = (row: Locator, key: string) => row.locator(`[data-col="${k
 
 export const tab = (page: Page, name: "Open" | "Completed") => page.getByRole("tab", { name });
 
-/** `?bleacher_uuid=` for a seeded bleacher, with extra query parts after it. */
-export const bleacherQuery = (uuid: string, extra = "") => `?bleacher_uuid=${uuid}${extra}`;
+/** `?bleachers=` for one or more seeded bleachers, with extra query parts after it. */
+export const bleacherQuery = (uuids: string | string[], extra = "") =>
+  `?bleachers=${Array.isArray(uuids) ? uuids.join(",") : uuids}${extra}`;
+
+/** The one-bleacher link of spec 04, which the page still reads (spec 05 D63). */
+export const legacyBleacherQuery = (uuid: string, extra = "") => `?bleacher_uuid=${uuid}${extra}`;
+
+export type FilterName = "bleacher" | "zone" | "vendor" | "category";
+
+/** The button of a filter, and its dropdown while it is open (spec 05). */
+export const filterButton = (page: Page, key: FilterName) =>
+  page.getByTestId(`repairs-filter-${key}`);
+export const filterList = (page: Page, key: FilterName) =>
+  page.getByTestId(`repairs-filter-list-${key}`);
+export const searchBox = (page: Page) => page.getByTestId("repairs-search");
+
+/** Opens a filter, ticks (or unticks) one option by its label and closes the dropdown again. */
+export async function toggleOption(page: Page, key: FilterName, label: string) {
+  await filterButton(page, key).click();
+  await filterList(page, key).getByRole("menuitemcheckbox", { name: label, exact: true }).click();
+  await page.keyboard.press("Escape");
+}
+
+/** The sort button in the header of a column. */
+export const sortButton = (page: Page, column: string) =>
+  page.getByRole("columnheader").getByRole("button", { name: column, exact: true });
+
+export const columnHeader = (page: Page, column: string) =>
+  page.getByRole("columnheader").filter({ hasText: new RegExp(`^${column}$`) });

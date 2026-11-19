@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 /**
  * Seeds the repairs the Repairs page specs look at, straight into the database with the service
  * role (the page cannot create them yet). Everything is namespaced and `cleanup` removes it all.
- * docs/specs/repairs-04-table.md §6.
+ * docs/specs/repairs-04-table.md §6 and docs/specs/repairs-05-toolbar.md §6 (the zones, the vendor
+ * uuid and the notes, which the toolbar specs look for).
  *
  * It writes `MaintenanceLineItems` and `Vendors`, which reach a user's device only where the sync
  * rules of docs/specs/repairs-02-sync-rules.md are deployed.
@@ -40,10 +41,17 @@ export type SeededRepairs = {
   /** Has no repair at all. */
   emptyBleacher: { uuid: string; number: number };
   vendorName: string;
+  vendorUuid: string;
+  /**
+   * Bleacher A is in the first existing zone and bleacher B in the second one, so the Zone filter
+   * has something to tell apart. Null when the database has fewer than two zones (the zone
+   * scenarios skip themselves).
+   */
+  zones: { a: { uuid: string; name: string }; b: { uuid: string; name: string } } | null;
   /** Completed, USD, a vendor, two services, two linked reports. */
-  completed: { invoice: string; totalCents: number };
+  completed: { invoice: string; totalCents: number; notes: string };
   /** In repair, CAD, no vendor, one service, one linked report. */
-  cad: { totalCents: number };
+  cad: { totalCents: number; notes: string };
   /** Completed and deleted. */
   deleted: { invoice: string };
   cleanup: () => Promise<void>;
@@ -76,6 +84,31 @@ export async function seedRepairs(): Promise<SeededRepairs> {
   const bleacherA = byNumber(base);
   const bleacherB = byNumber(base + 1);
   const emptyBleacher = byNumber(base + 2);
+
+  // Two existing zones, one for each of the two bleachers that hold repairs.
+  const zoneRes = await supabase
+    .from("Zones")
+    .select("id, display_name")
+    .order("created_at", { ascending: true })
+    .limit(2);
+  const zoneRows = check(zoneRes.data, zoneRes.error, "zones");
+  let zones: SeededRepairs["zones"] = null;
+  if (zoneRows.length === 2) {
+    for (const [bleacher, zone] of [
+      [bleacherA, zoneRows[0]],
+      [bleacherB, zoneRows[1]],
+    ] as const) {
+      const update = await supabase
+        .from("Bleachers")
+        .update({ zone_uuid: zone.id })
+        .eq("id", bleacher.uuid);
+      if (update.error) throw new Error(`fixture bleacher zone failed: ${update.error.message}`);
+    }
+    zones = {
+      a: { uuid: zoneRows[0].id as string, name: zoneRows[0].display_name as string },
+      b: { uuid: zoneRows[1].id as string, name: zoneRows[1].display_name as string },
+    };
+  }
 
   const vendorName = `E2E Vendor ${suffix}`;
   const vendorRes = await supabase
@@ -142,6 +175,8 @@ export async function seedRepairs(): Promise<SeededRepairs> {
 
   // The completed USD repair: a vendor, an invoice number and two services.
   const invoice = `E2E-${suffix}`;
+  const completedNotes = `e2e notes ${suffix}`;
+  const cadNotes = `e2e cad ${suffix}`;
   const completedId = await insertEvent(
     {
       event_start: "2026-09-18",
@@ -151,7 +186,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
       vendor_uuid: vendorId,
       invoice_number: invoice,
       completed_at: "2026-09-29T16:00:00Z",
-      notes: `e2e notes ${suffix}`,
+      notes: completedNotes,
     },
     bleacherA.uuid,
   );
@@ -165,7 +200,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
       event_end: "2026-10-02",
       status: "in_repair",
       currency: "CAD",
-      notes: `e2e cad ${suffix}`,
+      notes: cadNotes,
     },
     bleacherA.uuid,
   );
@@ -242,8 +277,10 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     bleacherB,
     emptyBleacher,
     vendorName,
-    completed: { invoice, totalCents: completedTotal },
-    cad: { totalCents: cadTotal },
+    vendorUuid: vendorId,
+    zones,
+    completed: { invoice, totalCents: completedTotal, notes: completedNotes },
+    cad: { totalCents: cadTotal, notes: cadNotes },
     deleted: { invoice: deletedInvoice },
     cleanup: async () => {
       await supabase.from("DamageReports").delete().in("id", reportIds);

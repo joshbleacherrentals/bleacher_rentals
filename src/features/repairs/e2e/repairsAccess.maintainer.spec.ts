@@ -1,11 +1,20 @@
 import { test, expect } from "@playwright/test";
 import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
-import { bleacherQuery, cellOf, openRepairsPage, rowWith } from "./helpers/repairsPage";
+import {
+  bleacherQuery,
+  cellOf,
+  filterButton,
+  openRepairsPage,
+  repairRows,
+  rowWith,
+  searchBox,
+  toggleOption,
+} from "./helpers/repairsPage";
 
 /**
  * The Repairs page as a maintainer sees it: the whole table, vendors and money included, no Restore
  * and no click on a row. Written, not run (project rule).
- * Spec: docs/specs/repairs-04-table.md §6 (S10, D52).
+ * Spec: docs/specs/repairs-04-table.md §6 (S10, D52) and docs/specs/repairs-05-toolbar.md §6 (S20).
  */
 test.describe("Repairs page (maintainer)", () => {
   let seeded: SeededRepairs;
@@ -42,5 +51,25 @@ test.describe("Repairs page (maintainer)", () => {
   test("S10: the Show Deleted button is there", async ({ page }) => {
     await openRepairsPage(page);
     await expect(page.getByRole("button", { name: "Show Deleted" })).toHaveCount(1);
+  });
+
+  test("S20: the search and the Vendor filter narrow the list, and ?showDeleted=1 shows the deleted repair", async ({
+    page,
+  }) => {
+    await openRepairsPage(page, bleacherQuery(seeded.bleacherA.uuid, "&tab=completed"));
+    await expect(rowWith(page, seeded.completed.invoice)).toHaveCount(1, { timeout: 60_000 });
+    await searchBox(page).fill(seeded.completed.invoice);
+    await expect(repairRows(page)).toHaveCount(1);
+    await searchBox(page).fill("");
+    await toggleOption(page, "vendor", seeded.vendorName);
+    await expect(filterButton(page, "vendor")).toContainText("1");
+    await expect(repairRows(page)).toHaveCount(1);
+
+    await openRepairsPage(
+      page,
+      bleacherQuery(seeded.bleacherA.uuid, "&tab=completed&showDeleted=1"),
+    );
+    await expect(rowWith(page, seeded.deleted.invoice)).toHaveCount(1, { timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Showing Deleted" })).toBeVisible();
   });
 });

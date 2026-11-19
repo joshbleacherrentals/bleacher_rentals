@@ -1132,6 +1132,24 @@ describe("Repairs page rows", () => {
     expect(costs?.roles.account_manager.note).toMatch(/not only the ones they created/);
   });
 
+  // docs/specs/repairs-05-toolbar.md §5 (D61): the Vendor filter lists every vendor.
+  it("says the Vendor filter lists every vendor, and tells the viewer so", () => {
+    expect(costs?.description).toMatch(
+      /Every role that opens the Repairs page sees all of it\. The Vendor filter lists every vendor, not only the ones that have repairs\. The page only reads for now\./,
+    );
+    expect(costs?.roles.viewer.note).toBe(
+      "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter.",
+    );
+    expect(costs?.roles.viewer.level).toBe("read");
+  });
+
+  it("leaves the notes of the other roles as they were", () => {
+    expect(costs?.roles.admin.note).toBe("Sees every column and the total cost strip.");
+    expect(costs?.roles.maintainer.note).toBe(
+      "Sees every column and the total cost strip, vendors included.",
+    );
+  });
+
   it("tells the old row that the Repairs page only lists repairs for now", () => {
     expect(maintenance?.description).toMatch(
       /For now the Repairs page only lists repairs and, for an administrator or a maintainer, shows and restores deleted ones; a repair is edited from the Dashboard until the repair window arrives\./,

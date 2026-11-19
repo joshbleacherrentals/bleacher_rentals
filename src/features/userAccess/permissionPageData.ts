@@ -623,10 +623,11 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   // docs/specs/repairs-04-table.md §5: what the Repairs page shows. Editing comes with later specs.
+  // docs/specs/repairs-05-toolbar.md §5: the Vendor filter lists every vendor (D61).
   {
     label: "Repair Costs & Vendors",
     description:
-      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The page only reads for now.",
+      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The Vendor filter lists every vendor, not only the ones that have repairs. The page only reads for now.",
     category: "Day to Day Operations",
     roles: {
       admin: read("Sees every column and the total cost strip."),
@@ -636,7 +637,9 @@ export const PERMISSIONS: PermissionEntry[] = [
       developer: none(
         "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
       ),
-      viewer: read("Sees every column and the total cost strip, vendors included."),
+      viewer: read(
+        "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter.",
+      ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: read("Sees every column and the total cost strip, vendors included."),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),

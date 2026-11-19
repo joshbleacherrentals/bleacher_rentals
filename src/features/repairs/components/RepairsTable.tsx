@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
-import { RotateCcw, Wrench } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, RotateCcw, Wrench } from "lucide-react";
 import { formatRepairDay, formatRepairMoney, reportedCell } from "../utils/repairFormat";
 import type { RepairCurrency, RepairListRow } from "../utils/repairRows";
+import type { RepairSort, RepairSortKey } from "../utils/repairSort";
 import { BleacherChip, CategoryChip, SeverityPill, StatusPill } from "./RepairChips";
 
 export type RepairsTableProps = {
@@ -11,6 +12,10 @@ export type RepairsTableProps = {
   /** The Show Deleted view for a role that may restore: adds the last column with Restore. */
   showRestore: boolean;
   onRestore: (repairId: string) => void;
+  /** The column the rows are sorted by, or null for the starting order. */
+  sort: RepairSort | null;
+  /** A click on the header of a sortable column. */
+  onSort: (key: RepairSortKey) => void;
 };
 
 /**
@@ -42,6 +47,8 @@ type Column = {
   width: number;
   /** Money columns: the header and the cells are right-aligned. */
   align?: "right";
+  /** Set on the columns whose header sorts the table; this key is what `onSort` receives. */
+  sortKey?: RepairSortKey;
   /** Classes of every cell of the column (on top of the grid cell's own). */
   cellClass?: string;
   /** The `title` of the cell, for text that is cut to one line. */
@@ -67,6 +74,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "reported",
+    sortKey: "reported",
     label: "Reported",
     width: 124,
     cellClass: NUMERIC,
@@ -83,6 +91,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "from",
+    sortKey: "from",
     label: "Repair from",
     width: 124,
     cellClass: NUMERIC,
@@ -90,6 +99,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "to",
+    sortKey: "to",
     label: "Repair to",
     width: 124,
     cellClass: NUMERIC,
@@ -97,6 +107,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "zone",
+    sortKey: "zone",
     label: "Zone",
     width: 84,
     render: (row) =>
@@ -128,6 +139,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "notes",
+    sortKey: "notes",
     label: "Notes",
     width: 220,
     cellClass: `${TRUNCATE} whitespace-nowrap text-[#4b5563]`,
@@ -136,12 +148,14 @@ const COLUMNS: Column[] = [
   },
   {
     key: "status",
+    sortKey: "status",
     label: "Status",
     width: 160,
     render: (row) => <StatusPill status={row.status} />,
   },
   {
     key: "vendor",
+    sortKey: "vendor",
     label: "Vendor",
     width: 200,
     cellClass: `${TRUNCATE} whitespace-nowrap`,
@@ -150,6 +164,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "invoice",
+    sortKey: "invoice",
     label: "Invoice #",
     width: 132,
     cellClass: NUMERIC,
@@ -157,6 +172,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "labor",
+    sortKey: "labor",
     label: "Labor",
     width: 100,
     align: "right",
@@ -165,6 +181,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "parts",
+    sortKey: "parts",
     label: "Parts",
     width: 100,
     align: "right",
@@ -173,6 +190,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "tax",
+    sortKey: "tax",
     label: "Tax",
     width: 92,
     align: "right",
@@ -181,6 +199,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "freight",
+    sortKey: "freight",
     label: "Freight",
     width: 92,
     align: "right",
@@ -189,6 +208,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "total",
+    sortKey: "total",
     label: "Total",
     width: 112,
     align: "right",
@@ -197,6 +217,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "completed",
+    sortKey: "completed",
     label: "Completed",
     width: 116,
     cellClass: NUMERIC,
@@ -221,7 +242,21 @@ function gridFor(showRestore: boolean): { style: CSSProperties; minWidth: number
   };
 }
 
-export function RepairsTable({ rows, isLoading, showRestore, onRestore }: RepairsTableProps) {
+function SortIcon({ direction }: { direction: "asc" | "desc" | null }) {
+  const className = "size-3 shrink-0";
+  if (direction === "asc") return <ArrowUp className={className} aria-hidden="true" />;
+  if (direction === "desc") return <ArrowDown className={className} aria-hidden="true" />;
+  return <ArrowUpDown className={`${className} opacity-50`} aria-hidden="true" />;
+}
+
+export function RepairsTable({
+  rows,
+  isLoading,
+  showRestore,
+  onRestore,
+  sort,
+  onSort,
+}: RepairsTableProps) {
   const grid = gridFor(showRestore);
 
   return (
@@ -234,19 +269,42 @@ export function RepairsTable({ rows, isLoading, showRestore, onRestore }: Repair
         className="text-sm leading-5 text-gray-900"
       >
         <div role="row" style={grid.style} className="grid min-h-11 items-center bg-[#f9fafb] pr-4">
-          {COLUMNS.map((col, index) => (
-            <div
-              key={col.key}
-              role="columnheader"
-              className={`${HEADER_BASE} ${
-                index === 0
-                  ? "sticky left-0 z-[2] flex items-center self-stretch bg-[#f9fafb] pl-4"
-                  : ""
-              } ${col.align === "right" ? "text-right" : ""}`}
-            >
-              {col.label}
-            </div>
-          ))}
+          {COLUMNS.map((col, index) => {
+            const direction = sort && sort.key === col.sortKey ? sort.direction : null;
+            return (
+              <div
+                key={col.key}
+                role="columnheader"
+                aria-sort={
+                  direction === "asc"
+                    ? "ascending"
+                    : direction === "desc"
+                      ? "descending"
+                      : undefined
+                }
+                className={`${HEADER_BASE} ${
+                  index === 0
+                    ? "sticky left-0 z-[2] flex items-center self-stretch bg-[#f9fafb] pl-4"
+                    : ""
+                } ${col.align === "right" ? "text-right" : ""}`}
+              >
+                {col.sortKey ? (
+                  <button
+                    type="button"
+                    onClick={() => onSort(col.sortKey as RepairSortKey)}
+                    className={`inline-flex cursor-pointer items-center gap-1 uppercase select-none hover:text-gray-800 focus-visible:text-gray-800 focus-visible:outline-none ${
+                      direction ? "text-gray-800" : ""
+                    }`}
+                  >
+                    {col.label}
+                    <SortIcon direction={direction} />
+                  </button>
+                ) : (
+                  col.label
+                )}
+              </div>
+            );
+          })}
           {showRestore && (
             <div role="columnheader" className="sticky right-0 z-[2] self-stretch bg-[#f9fafb]">
               <span className="sr-only">Actions</span>
