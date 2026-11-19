@@ -77,7 +77,7 @@ vi.mock("@/features/quotesAndBookings/db/logEventChanges", () => ({
   logSingleChange: () => Promise.resolve(),
 }));
 
-import { POST } from "./route";
+import { POST, maxDuration } from "./route";
 import { NextRequest } from "next/server";
 
 function signRequest(body: Record<string, unknown>) {
@@ -99,6 +99,13 @@ describe("POST /api/contracts/sign — sign-time guard", () => {
     writes.length = 0;
     currentContractHash = "HASH_CURRENT";
     signatureRecorded = false;
+  });
+
+  it("sets a longer maxDuration so the signed emails are not cut off", () => {
+    // Rendering the signed PDF takes ~8 s, and the client and account-manager emails are sent
+    // after it. On the 10 s default, Vercel killed the request before the account-manager email
+    // (sent last) went out, so account managers were never told a client had signed.
+    expect(maxDuration).toBe(60);
   });
 
   it("returns 409 and performs NO write when the contract hash changed", async () => {
