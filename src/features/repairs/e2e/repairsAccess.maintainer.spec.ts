@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import { readServicesAndReport } from "./helpers/serviceFlow";
 import {
   bleacherQuery,
   cellOf,
@@ -13,8 +14,9 @@ import {
 
 /**
  * The Repairs page as a maintainer sees it: the whole table, vendors and money included, no Restore
- * and no click on a row. Written, not run (project rule).
- * Spec: docs/specs/repairs-04-table.md §6 (S10, D52) and docs/specs/repairs-05-toolbar.md §6 (S20).
+ * and a click on a row that opens its block of services. Written, not run (project rule).
+ * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
+ * and docs/specs/repairs-06-expanded-row.md §6 (S27).
  */
 test.describe("Repairs page (maintainer)", () => {
   let seeded: SeededRepairs;
@@ -39,7 +41,7 @@ test.describe("Repairs page (maintainer)", () => {
     );
   });
 
-  test("S10: a click on a row does nothing and there is no Restore", async ({ page }) => {
+  test("S10: there is no Restore, and a click on a row opens no dialog", async ({ page }) => {
     await openRepairsPage(page, bleacherQuery(seeded.bleacherA.uuid, "&tab=completed"));
     const done = rowWith(page, seeded.completed.invoice);
     await expect(done).toBeVisible({ timeout: 60_000 });
@@ -71,5 +73,11 @@ test.describe("Repairs page (maintainer)", () => {
     );
     await expect(rowWith(page, seeded.deleted.invoice)).toHaveCount(1, { timeout: 60_000 });
     await expect(page.getByRole("button", { name: "Showing Deleted" })).toBeVisible();
+  });
+
+  test("S27: opens a repair's services, a service window with the bleacher card, and the damage report", async ({
+    page,
+  }) => {
+    await readServicesAndReport(page, seeded);
   });
 });

@@ -46,3 +46,12 @@ export function StatusPill({ status }: { status: string }) {
     </span>
   );
 }
+
+/** The small grey mark of a service that was deleted on its own (spec 06 D89). */
+export function DeletedBadge() {
+  return (
+    <span className="inline-block shrink-0 rounded-full bg-[#f3f4f6] px-2 py-px text-xs leading-[18px] font-medium whitespace-nowrap text-[#4b5563]">
+      Deleted
+    </span>
+  );
+}

@@ -1135,12 +1135,33 @@ describe("Repairs page rows", () => {
   // docs/specs/repairs-05-toolbar.md §5 (D61): the Vendor filter lists every vendor.
   it("says the Vendor filter lists every vendor, and tells the viewer so", () => {
     expect(costs?.description).toMatch(
-      /Every role that opens the Repairs page sees all of it\. The Vendor filter lists every vendor, not only the ones that have repairs\. The page only reads for now\./,
+      /Every role that opens the Repairs page sees all of it\. The Vendor filter lists every vendor, not only the ones that have repairs\. /,
     );
     expect(costs?.roles.viewer.note).toBe(
       "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter.",
     );
     expect(costs?.roles.viewer.level).toBe("read");
+  });
+
+  // docs/specs/repairs-06-expanded-row.md §5: the expanded row, the service window and the damage
+  // report window show data every one of the four roles already reads, so only the description
+  // grows; the notes of the roles do not change.
+  it("describes the open repair, the service window and the damage report, before the last sentence", () => {
+    expect(costs?.description).toMatch(
+      /A repair opens in place to show its services, one row for each bleacher and category with its amounts\. /,
+    );
+    expect(costs?.description).toMatch(
+      /A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved\. The page only reads for now\.$/,
+    );
+    expect(costs?.description).toMatch(
+      /have repairs\. A repair opens in place[\s\S]*The page only reads for now\.$/,
+    );
+  });
+
+  it("leaves the level of every role as it was", () => {
+    for (const role of ["admin", "account_manager", "viewer", "maintainer"] as WebRole[]) {
+      expect(costs?.roles[role].level, role).toBe("read");
+    }
   });
 
   it("leaves the notes of the other roles as they were", () => {

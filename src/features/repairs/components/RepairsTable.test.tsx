@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { RepairStatus } from "../utils/repairRows";
-import { repairRow } from "../utils/repairRowFixture";
+import { repairRow, repairService } from "../utils/repairRowFixture";
 import { RepairsTable, type RepairsTableProps } from "./RepairsTable";
 
 // docs/specs/repairs-04-table.md §2.2 to §2.5, §2.10 and §7, and docs/specs/repairs-05-toolbar.md
-// §2.5 (the sort headers). The table is rendered on the server:
+// §2.5 (the sort headers), and docs/specs/repairs-06-expanded-row.md §2.1, §2.2 and §7 (the arrow,
+// the open block and the Reported link). The table is rendered on the server:
 // what is under test is which words and colours each cell gets. Clicks are covered by e2e.
 
 const report = (id: string, day: string) => ({ id, day, createdAt: `${day}T12:00:00Z` });
@@ -19,6 +20,10 @@ const render = (props: Partial<RepairsTableProps> = {}) =>
       onRestore={() => {}}
       sort={null}
       onSort={() => {}}
+      expandedIds={new Set<string>()}
+      onToggleRepair={() => {}}
+      onOpenService={() => {}}
+      onOpenReports={() => {}}
       {...props}
     />,
   );
@@ -111,12 +116,12 @@ describe("RepairsTable headers", () => {
     expect(headers(render({ rows: [full] }))).toEqual(HEADERS);
   });
 
-  it("has no New repair, no row arrow and no clickable row (D40, D43)", () => {
+  it("has no New repair, no button at the end of a row and no chevron on the status pill (D43)", () => {
     const markup = render({ rows: [full, old] });
     expect(text(markup)).not.toContain("New repair");
-    const rowsOnly = markup.slice(markup.indexOf('data-testid="repair-row"'));
-    expect(rowsOnly).not.toContain("<button");
-    expect(rowsOnly).not.toContain("cursor-pointer");
+    expect(cell(markup, "status")).not.toContain("<button");
+    expect(cell(markup, "status")).not.toContain("<svg");
+    expect(cell(markup, "completed")).not.toContain("<button");
   });
 
   it("has no Restore column unless the view asks for it", () => {
@@ -213,9 +218,10 @@ describe("RepairsTable cells of a full row", () => {
     expect(cellText(markup, "bleachers")).toBe("#26 #?");
   });
 
-  it("writes Reported as the first day as text with +N, and no link (D44, D45)", () => {
+  it("writes Reported as the first day with +N, the day being the link (D44, D87)", () => {
     expect(cellText(markup, "reported")).toBe("2026-09-17 +1");
     expect(cell(markup, "reported")).not.toContain("<a ");
+    expect(cell(markup, "reported")).toContain('data-testid="repair-reported-link"');
   });
 
   it("writes the repair days and the completed day as stored (D44)", () => {
@@ -294,6 +300,132 @@ describe("RepairsTable cells of an old row", () => {
     expect(cellText(bare, "bleachers")).toBe("—");
     expect(cellText(bare, "total")).toBe("—");
     expect(cellText(bare, "completed")).toBe("—");
+  });
+});
+
+// docs/specs/repairs-06-expanded-row.md §2.1, §2.2 (D80 to D83, D87).
+describe("RepairsTable arrow and open block", () => {
+  const withService = repairRow({
+    id: "svc",
+    status: "completed",
+    invoiceNumber: "DTR-2377",
+    bleachers: [{ uuid: "b1", number: 26 }],
+    services: [repairService({ id: "s1" })],
+  });
+
+  it("draws one arrow button per row with aria-expanded false and an Expand label", () => {
+    const markup = render({ rows: [withService, old] });
+    expect(markup.match(/data-testid="repair-toggle"/g)).toHaveLength(2);
+    expect(markup.match(/aria-expanded="false"/g)).toHaveLength(2);
+    expect(markup).toContain('aria-label="Expand repair DTR-2377"');
+    expect(markup).toContain('aria-label="Expand repair of bleacher #7"');
+  });
+
+  it("points the arrow at the id of the block", () => {
+    const markup = render({ rows: [withService] });
+    expect(markup).toContain('aria-controls="repair-services-svc"');
+  });
+
+  it("keeps the chips in the first cell and the cell sticky", () => {
+    const markup = render({ rows: [withService, full] });
+    const first = cell(markup, "bleachers");
+    expect(first).toContain("sticky");
+    expect(first).toContain('data-testid="repair-toggle"');
+    expect(cellText(markup, "bleachers")).toBe("#26");
+  });
+
+  it("makes each repair a group holding its row, and draws the row clickable", () => {
+    const markup = render({ rows: [withService, old] });
+    expect(markup.match(/role="rowgroup"/g)).toHaveLength(2);
+    expect(markup.match(/data-testid="repair-row"/g)).toHaveLength(2);
+    const rowsOnly = markup.slice(markup.indexOf('data-testid="repair-row"'));
+    expect(rowsOnly).toContain("cursor-pointer");
+  });
+
+  it("draws no block while the repair is closed", () => {
+    const markup = render({ rows: [withService, old] });
+    expect(markup).not.toContain('data-testid="repair-services"');
+  });
+
+  it("draws the block of an open repair right after its row, and not the others", () => {
+    const markup = render({ rows: [withService, old], expandedIds: new Set(["svc"]) });
+    expect(markup.match(/data-testid="repair-services"/g)).toHaveLength(1);
+    const row = markup.indexOf('data-testid="repair-row"');
+    const block = markup.indexOf('data-testid="repair-services"');
+    const nextRow = markup.indexOf('data-testid="repair-row"', row + 1);
+    expect(block).toBeGreaterThan(row);
+    expect(block).toBeLessThan(nextRow);
+  });
+
+  it("turns the arrow of an open repair to aria-expanded true with a Collapse label", () => {
+    const markup = render({ rows: [withService, old], expandedIds: new Set(["svc"]) });
+    expect(markup.match(/aria-expanded="true"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-label="Collapse repair DTR-2377"');
+    expect(markup).toContain('aria-label="Expand repair of bleacher #7"');
+  });
+
+  it("tints an open row and not a closed one", () => {
+    const markup = render({ rows: [withService, old], expandedIds: new Set(["svc"]) });
+    const [openRow, closedRow] = markup
+      .split('data-testid="repair-row"')
+      .slice(1)
+      .map((p) => p.slice(0, p.indexOf(">")));
+    expect(openRow).toContain("bg-[#f1f6fc]");
+    expect(closedRow).not.toContain("bg-[#f1f6fc]");
+  });
+
+  it("says No services on this repair. in an open old repair (D83)", () => {
+    const markup = render({ rows: [old], expandedIds: new Set(["old"]) });
+    expect(text(markup)).toContain("No services on this repair.");
+  });
+
+  it("gives the block the services of that repair", () => {
+    const markup = render({ rows: [withService], expandedIds: new Set(["svc"]) });
+    expect(markup.match(/data-testid="repair-service-row"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-label="Open service: bleacher 26, Welding"');
+  });
+
+  it("draws the arrow and the block in the Show Deleted view too, beside Restore", () => {
+    const markup = render({
+      rows: [withService],
+      showRestore: true,
+      expandedIds: new Set(["svc"]),
+    });
+    expect(markup).toContain('data-testid="repair-toggle"');
+    expect(markup).toContain('data-testid="repair-services"');
+    expect(markup).toContain('data-testid="repair-restore"');
+  });
+});
+
+describe("RepairsTable Reported link (D87, D92)", () => {
+  it("makes the day a button and keeps +N as plain text next to it", () => {
+    const markup = render({ rows: [full] });
+    const reported = cell(markup, "reported");
+    const button = reported.slice(
+      reported.indexOf('<button type="button"'),
+      reported.indexOf("</button>") + "</button>".length,
+    );
+    expect(text(button)).toBe("2026-09-17");
+    expect(reported).toContain('data-testid="repair-reported-link"');
+    expect(text(reported.slice(reported.indexOf("</button>")))).toBe("+1");
+  });
+
+  it("titles the link Open damage reports for several reports and Open damage report for one", () => {
+    const several = cell(render({ rows: [full] }), "reported");
+    expect(several).toContain('title="Open damage reports"');
+    const one = repairRow({ id: "one", reported: [report("x", "2026-10-01")] });
+    expect(cell(render({ rows: [one] }), "reported")).toContain('title="Open damage report"');
+  });
+
+  it("writes no +N for one report", () => {
+    const one = repairRow({ id: "one", reported: [report("x", "2026-10-01")] });
+    expect(cellText(render({ rows: [one] }), "reported")).toBe("2026-10-01");
+  });
+
+  it("writes a dash and no button for a repair with no report", () => {
+    const markup = render({ rows: [old] });
+    expect(cellText(markup, "reported")).toBe("—");
+    expect(cell(markup, "reported")).not.toContain("<button");
   });
 });
 

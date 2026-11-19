@@ -5,7 +5,9 @@ import { randomUUID } from "node:crypto";
  * Seeds the repairs the Repairs page specs look at, straight into the database with the service
  * role (the page cannot create them yet). Everything is namespaced and `cleanup` removes it all.
  * docs/specs/repairs-04-table.md §6 and docs/specs/repairs-05-toolbar.md §6 (the zones, the vendor
- * uuid and the notes, which the toolbar specs look for).
+ * uuid and the notes, which the toolbar specs look for) and docs/specs/repairs-06-expanded-row.md
+ * §6 (a model number and a type on bleacher A, a photo on the first report, and a deleted repair
+ * with a service that was deleted on its own).
  *
  * It writes `MaintenanceLineItems` and `Vendors`, which reach a user's device only where the sync
  * rules of docs/specs/repairs-02-sync-rules.md are deployed.
@@ -34,8 +36,11 @@ export const PAGER_REPAIRS = 26;
 export const REPORT_DAYS = { first: "2026-09-17", second: "2026-09-19", cad: "2026-09-20" };
 
 export type SeededRepairs = {
-  /** Holds the completed USD repair and the in-repair CAD repair. */
-  bleacherA: { uuid: string; number: number };
+  /**
+   * Holds the completed USD repair and the in-repair CAD repair. It has a model number and, when
+   * the database has a bleacher type, the first type (`typeName` is null otherwise).
+   */
+  bleacherA: { uuid: string; number: number; modelNumber: string; typeName: string | null };
   /** Holds the 26 cheap completed repairs. */
   bleacherB: { uuid: string; number: number };
   /** Has no repair at all. */
@@ -54,6 +59,15 @@ export type SeededRepairs = {
   cad: { totalCents: number; notes: string };
   /** Completed and deleted. */
   deleted: { invoice: string };
+  /**
+   * Completed and deleted, on bleacher A, with two services: a Tires one that is live and a Welding
+   * one that was deleted on its own (spec 06 D89).
+   */
+  deletedServices: { invoice: string; liveCategory: string; removedCategory: string };
+  /** The note of every seeded damage report. */
+  reportNote: string;
+  /** The storage path of the one photo of the first report (the picture itself does not exist). */
+  photoPath: string;
   cleanup: () => Promise<void>;
 };
 
@@ -84,6 +98,22 @@ export async function seedRepairs(): Promise<SeededRepairs> {
   const bleacherA = byNumber(base);
   const bleacherB = byNumber(base + 1);
   const emptyBleacher = byNumber(base + 2);
+
+  // Bleacher A gets a model number and the first existing type, for the bleacher card (spec 06).
+  const modelNumber = `E2E-MODEL-${suffix}`;
+  const typeRes = await supabase
+    .from("BleacherTypes")
+    .select("id, name")
+    .eq("deleted", false)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  const type = typeRes.data?.[0] ?? null;
+  const cardUpdate = await supabase
+    .from("Bleachers")
+    .update({ model_number: modelNumber, ...(type ? { bleacher_type_uuid: type.id } : {}) })
+    .eq("id", bleacherA.uuid);
+  if (cardUpdate.error)
+    throw new Error(`fixture bleacher card failed: ${cardUpdate.error.message}`);
 
   // Two existing zones, one for each of the two bleachers that hold repairs.
   const zoneRes = await supabase
@@ -150,6 +180,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     categoryName: string,
     severity: "minor" | "major",
     amounts: { labor: number; parts: number; tax: number; freight: number },
+    deleted = false,
   ) => {
     const res = await supabase.from("MaintenanceLineItems").insert({
       maintenance_event_uuid: repairId,
@@ -160,6 +191,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
       parts_cents: amounts.parts,
       tax_cents: amounts.tax,
       freight_cents: amounts.freight,
+      deleted,
     });
     if (res.error) throw new Error(`fixture service failed: ${res.error.message}`);
   };
@@ -221,6 +253,23 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     bleacherA.uuid,
   );
 
+  // A second deleted repair, for the "Deleted" mark: one live service and one deleted on its own.
+  const deletedServicesInvoice = `E2E-DELSVC-${suffix}`;
+  const deletedServicesId = await insertEvent(
+    {
+      event_start: "2026-08-20",
+      event_end: "2026-08-21",
+      status: "completed",
+      currency: "USD",
+      invoice_number: deletedServicesInvoice,
+      completed_at: "2026-08-21T16:00:00Z",
+      deleted: true,
+    },
+    bleacherA.uuid,
+  );
+  await insertService(deletedServicesId, bleacherA.uuid, "Tires", "minor", SERVICE_TIRES);
+  await insertService(deletedServicesId, bleacherA.uuid, "Welding", "major", SERVICE_WELDING, true);
+
   // 26 cheap completed repairs on the second bleacher, for the pager.
   const pagerRes = await supabase
     .from("MaintenanceEvents")
@@ -247,6 +296,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
 
   // Damage reports linked to the repairs: two on the completed one, one on the CAD one.
   const reportIds: string[] = [];
+  const reportNote = `e2e-report-${suffix}`;
   const insertReport = async (repairId: string, createdDay: string) => {
     const res = await supabase
       .from("DamageReports")
@@ -256,7 +306,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
         haul_damage: "none",
         is_safe_to_sit: false,
         is_safe_to_haul: true,
-        note: `e2e-report-${suffix}`,
+        note: reportNote,
         maintenance_event_uuid: repairId,
         created_at: `${createdDay}T16:00:00Z`,
         resolved_at: `${createdDay}T20:00:00Z`,
@@ -269,11 +319,18 @@ export async function seedRepairs(): Promise<SeededRepairs> {
   await insertReport(completedId, REPORT_DAYS.second);
   await insertReport(cadId, REPORT_DAYS.cad);
 
+  // One photo on the first report. Its picture is not in storage; the page links to its path.
+  const photoPath = `e2e/${suffix}/photo.jpg`;
+  const photoRes = await supabase
+    .from("DamageReportPhotos")
+    .insert({ damage_report_uuid: reportIds[0], photo_path: photoPath });
+  if (photoRes.error) throw new Error(`fixture photo failed: ${photoRes.error.message}`);
+
   const completedTotal = await costOf(completedId);
   const cadTotal = await costOf(cadId);
 
   return {
-    bleacherA,
+    bleacherA: { ...bleacherA, modelNumber, typeName: (type?.name as string | undefined) ?? null },
     bleacherB,
     emptyBleacher,
     vendorName,
@@ -282,7 +339,15 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     completed: { invoice, totalCents: completedTotal, notes: completedNotes },
     cad: { totalCents: cadTotal, notes: cadNotes },
     deleted: { invoice: deletedInvoice },
+    deletedServices: {
+      invoice: deletedServicesInvoice,
+      liveCategory: "Tires",
+      removedCategory: "Welding",
+    },
+    reportNote,
+    photoPath,
     cleanup: async () => {
+      await supabase.from("DamageReportPhotos").delete().in("damage_report_uuid", reportIds);
       await supabase.from("DamageReports").delete().in("id", reportIds);
       await supabase.from("MaintenanceLineItems").delete().in("maintenance_event_uuid", eventIds);
       await supabase.from("BleacherMaintEvents").delete().in("maintenance_event_uuid", eventIds);

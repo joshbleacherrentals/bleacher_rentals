@@ -52,3 +52,16 @@ export const sortButton = (page: Page, column: string) =>
 
 export const columnHeader = (page: Page, column: string) =>
   page.getByRole("columnheader").filter({ hasText: new RegExp(`^${column}$`) });
+
+/** The service rows of every open block (spec 06). */
+export const serviceRows = (page: Page) => page.getByTestId("repair-service-row");
+
+/** The arrow button of a repair row. */
+export const toggleOf = (row: Locator) => row.getByTestId("repair-toggle");
+
+/** The block of services under a repair row: the group that holds the row, then its block. */
+export const blockOf = (row: Locator) => row.locator("xpath=..").getByTestId("repair-services");
+
+/** The service window and the damage report window. */
+export const windowOf = (page: Page, which: "service" | "reports") =>
+  page.getByTestId(which === "service" ? "service-window" : "damage-report-window");

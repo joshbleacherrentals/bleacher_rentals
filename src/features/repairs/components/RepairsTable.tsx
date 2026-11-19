@@ -1,9 +1,11 @@
 import type { CSSProperties, ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, RotateCcw, Wrench } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, RotateCcw, Wrench } from "lucide-react";
+import { repairLabel } from "../utils/repairDetails";
 import { formatRepairDay, formatRepairMoney, reportedCell } from "../utils/repairFormat";
-import type { RepairCurrency, RepairListRow } from "../utils/repairRows";
+import type { RepairCurrency, RepairListRow, ReportedReport } from "../utils/repairRows";
 import type { RepairSort, RepairSortKey } from "../utils/repairSort";
 import { BleacherChip, CategoryChip, SeverityPill, StatusPill } from "./RepairChips";
+import { RepairServicesBlock } from "./RepairServices";
 
 export type RepairsTableProps = {
   /** The rows of the page shown. */
@@ -16,13 +18,23 @@ export type RepairsTableProps = {
   sort: RepairSort | null;
   /** A click on the header of a sortable column. */
   onSort: (key: RepairSortKey) => void;
+  /** The repairs whose block of services is open (spec 06 D80 to D82). */
+  expandedIds: ReadonlySet<string>;
+  /** A click on a row or on its arrow. */
+  onToggleRepair: (repairId: string) => void;
+  /** A click on a service row of an open block. */
+  onOpenService: (repairId: string, serviceId: string) => void;
+  /** A click on the Reported day of a row: the reports found for that repair (D87). */
+  onOpenReports: (reported: ReportedReport[]) => void;
 };
 
 /**
  * The Repairs table: 17 columns drawn as a CSS grid, the first column sticky, inside a box that
- * scrolls sideways. Read-only: no row click, no arrows, no sort buttons (spec 04 D40, D43). The
- * last column exists only to hold Restore in the Show Deleted view (D41).
- * docs/specs/repairs-04-table.md §2.2 to §2.5 and §2.10; the widths and looks are the canvas's.
+ * scrolls sideways. Read-only. A click on a row, or on the arrow in its first cell, opens its block
+ * of services under it (spec 06 D80); the Reported day opens the damage reports (D87). The last
+ * column exists only to hold Restore in the Show Deleted view (spec 04 D41).
+ * docs/specs/repairs-04-table.md §2.2 to §2.5 and §2.10 and docs/specs/repairs-06-expanded-row.md
+ * §2.1; the widths and looks are the canvas's.
  */
 
 const GAP = 12;
@@ -53,7 +65,15 @@ type Column = {
   cellClass?: string;
   /** The `title` of the cell, for text that is cut to one line. */
   title?: (row: RepairListRow) => string | null;
-  render: (row: RepairListRow) => ReactNode;
+  render: (row: RepairListRow, ctx: CellContext) => ReactNode;
+};
+
+/** What a cell needs of the table besides its row: the open state and the two actions. */
+type CellContext = {
+  expanded: boolean;
+  blockId: string;
+  onToggle: () => void;
+  onOpenReports: (reported: ReportedReport[]) => void;
 };
 
 const money = (pick: (row: RepairListRow) => number | null) => (row: RepairListRow) =>
@@ -64,13 +84,36 @@ const COLUMNS: Column[] = [
     key: "bleachers",
     label: "Bleachers",
     width: 176,
-    cellClass: "flex flex-wrap content-center gap-1 self-stretch py-3.5 pl-4",
-    render: (row) =>
-      row.bleachers.length ? (
-        row.bleachers.map((b) => <BleacherChip key={b.uuid} number={b.number} />)
-      ) : (
-        <Dash />
-      ),
+    cellClass: "flex items-start gap-1.5 self-stretch py-3.5 pl-3",
+    render: (row, ctx) => (
+      <>
+        <button
+          type="button"
+          data-testid="repair-toggle"
+          aria-expanded={ctx.expanded}
+          aria-controls={ctx.blockId}
+          aria-label={`${ctx.expanded ? "Collapse" : "Expand"} ${repairLabel(row)}`}
+          onClick={(event) => {
+            // The row toggles on a click too; this click must count once.
+            event.stopPropagation();
+            ctx.onToggle();
+          }}
+          className="-mt-px inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-[#6b7280] hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[#1d62a3] focus-visible:outline-none"
+        >
+          <ChevronRight
+            className={`size-4 transition-transform ${ctx.expanded ? "rotate-90" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+        <div className="flex min-w-0 flex-wrap content-center gap-1">
+          {row.bleachers.length ? (
+            row.bleachers.map((b) => <BleacherChip key={b.uuid} number={b.number} />)
+          ) : (
+            <Dash />
+          )}
+        </div>
+      </>
+    ),
   },
   {
     key: "reported",
@@ -78,12 +121,24 @@ const COLUMNS: Column[] = [
     label: "Reported",
     width: 124,
     cellClass: NUMERIC,
-    render: (row) => {
+    render: (row, ctx) => {
       const cell = reportedCell(row.reported);
       if (!cell) return <Dash />;
       return (
         <>
-          <span>{cell.day}</span>
+          <button
+            type="button"
+            data-testid="repair-reported-link"
+            title={row.reported.length > 1 ? "Open damage reports" : "Open damage report"}
+            onClick={(event) => {
+              // Opening the reports must not also open or close the row.
+              event.stopPropagation();
+              ctx.onOpenReports(row.reported);
+            }}
+            className="cursor-pointer text-[#1d62a3] underline decoration-[#1d62a3]/35 underline-offset-[3px] hover:decoration-[#1d62a3]"
+          >
+            {cell.day}
+          </button>
           {cell.more && <span className="ml-1.5 text-xs text-[#6b7280]">{cell.more}</span>}
         </>
       );
@@ -256,6 +311,10 @@ export function RepairsTable({
   onRestore,
   sort,
   onSort,
+  expandedIds,
+  onToggleRepair,
+  onOpenService,
+  onOpenReports,
 }: RepairsTableProps) {
   const grid = gridFor(showRestore);
 
@@ -328,46 +387,71 @@ export function RepairsTable({
             No repairs found.
           </div>
         ) : (
-          rows.map((row) => (
-            <div
-              key={row.id}
-              role="row"
-              data-testid="repair-row"
-              style={grid.style}
-              className="grid min-h-16 items-center border-t border-[#e5e7eb] bg-white pr-4 hover:bg-[#f9fafb]"
-            >
-              {COLUMNS.map((col, index) => (
+          rows.map((row) => {
+            const expanded = expandedIds.has(row.id);
+            const blockId = `repair-services-${row.id}`;
+            const ctx: CellContext = {
+              expanded,
+              blockId,
+              onToggle: () => onToggleRepair(row.id),
+              onOpenReports,
+            };
+            return (
+              <div key={row.id} role="rowgroup" className="border-t border-[#e5e7eb]">
                 <div
-                  key={col.key}
-                  data-col={col.key}
-                  role="cell"
-                  title={col.title?.(row) ?? undefined}
-                  className={`${col.cellClass ?? ""} ${
-                    index === 0 ? "sticky left-0 z-[2] bg-inherit" : ""
+                  role="row"
+                  data-testid="repair-row"
+                  style={grid.style}
+                  onClick={() => onToggleRepair(row.id)}
+                  className={`grid min-h-16 cursor-pointer items-center pr-4 ${
+                    expanded ? "bg-[#f1f6fc] hover:bg-[#f1f6fc]" : "bg-white hover:bg-[#f9fafb]"
                   }`}
                 >
-                  {col.render(row)}
+                  {COLUMNS.map((col, index) => (
+                    <div
+                      key={col.key}
+                      data-col={col.key}
+                      role="cell"
+                      title={col.title?.(row) ?? undefined}
+                      className={`${col.cellClass ?? ""} ${
+                        index === 0 ? "sticky left-0 z-[2] bg-inherit" : ""
+                      }`}
+                    >
+                      {col.render(row, ctx)}
+                    </div>
+                  ))}
+                  {showRestore && (
+                    <div
+                      data-col="restore"
+                      role="cell"
+                      className="sticky right-0 z-[2] flex items-center justify-end self-stretch bg-inherit pl-2"
+                    >
+                      <button
+                        type="button"
+                        data-testid="repair-restore"
+                        onClick={(event) => {
+                          // Restoring must not also open or close the row.
+                          event.stopPropagation();
+                          onRestore(row.id);
+                        }}
+                        className="flex cursor-pointer items-center gap-1 text-sm text-green-700 hover:text-green-900"
+                      >
+                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                        Restore
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
-              {showRestore && (
-                <div
-                  data-col="restore"
-                  role="cell"
-                  className="sticky right-0 z-[2] flex items-center justify-end self-stretch bg-inherit pl-2"
-                >
-                  <button
-                    type="button"
-                    data-testid="repair-restore"
-                    onClick={() => onRestore(row.id)}
-                    className="flex cursor-pointer items-center gap-1 text-sm text-green-700 hover:text-green-900"
-                  >
-                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                    Restore
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
+                {expanded && (
+                  <RepairServicesBlock
+                    repair={row}
+                    id={blockId}
+                    onOpenService={(serviceId) => onOpenService(row.id, serviceId)}
+                  />
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
