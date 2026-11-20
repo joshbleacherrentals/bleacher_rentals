@@ -59,3 +59,41 @@ export function eventNamesQuery(ids: string[]) {
     .where("e.id", "in", ids.length > 0 ? ids : [NO_MATCH])
     .compile();
 }
+
+/**
+ * The Dashboard's map: the work trackers dated in the week for the zone's bleachers, unless off,
+ * with the coordinates of the driver's home, the pickup and the drop-off.
+ */
+export function workTrackerMapQuery(zoneId: string, weekStart: string, weekEnd: string) {
+  return db
+    .selectFrom("WorkTrackers as w")
+    .innerJoin("Bleachers as b", "b.id", "w.bleacher_uuid")
+    .leftJoin("Drivers as d", "d.id", "w.driver_uuid")
+    .leftJoin("Users as u", "u.id", "d.user_uuid")
+    .leftJoin("Addresses as ha", "ha.id", "d.address_uuid")
+    .leftJoin("Addresses as pa", "pa.id", "w.pickup_address_uuid")
+    .leftJoin("Addresses as da", "da.id", "w.dropoff_address_uuid")
+    .select([
+      "w.id as id",
+      "w.date as date",
+      "w.driver_uuid as driver_uuid",
+      "u.first_name as first_name",
+      "u.last_name as last_name",
+      "b.bleacher_number as bleacher_number",
+      "ha.latitude as home_lat",
+      "ha.longitude as home_lng",
+      "ha.street as home_street",
+      "pa.latitude as pickup_lat",
+      "pa.longitude as pickup_lng",
+      "pa.street as pickup_street",
+      "da.latitude as dropoff_lat",
+      "da.longitude as dropoff_lng",
+      "da.street as dropoff_street",
+    ])
+    .where("b.zone_uuid", "=", zoneId)
+    .where("b.deleted", "=", 0)
+    .where("w.date", ">=", weekStart)
+    .where("w.date", "<=", weekEnd)
+    .where((eb) => eb.or([eb("w.status", "is", null), eb("w.status", "not in", OFF_STATUSES)]))
+    .compile();
+}
