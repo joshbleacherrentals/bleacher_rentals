@@ -5,7 +5,7 @@ import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { timestampToDate } from "@/features/autoWorkTrackers/utils/discoverTrips";
 import { weekEndOf } from "@/features/autoWorkTrackers/utils/week";
-import { checkDriverAvailability, type DriverTripCheck } from "../utils/driverAvailability";
+import { buildDriverAvailability, type DriverAvailability } from "../utils/driverAvailability";
 
 /** Work trackers that are off: nobody is making the trip, so the driver's availability is moot. */
 const OFF_STATUSES = ["cancelled", "declined", "abandoned"];
@@ -19,15 +19,23 @@ type TripRow = {
   pickup_street: string | null;
   dropoff_street: string | null;
 };
-type UnavailabilityRow = { driver_uuid: string | null; date_unavailable: string | null };
+type UnavailabilityRow = {
+  driver_uuid: string | null;
+  date_unavailable: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+const fullName = (first: string | null, last: string | null) =>
+  [first, last].filter(Boolean).join(" ") || "Unnamed driver";
 
 /**
- * The work trackers dated in the week beginning `weekStart` that have a driver, each with whether
- * that driver is free that day, from the local database. A work tracker with no driver has no one
- * to check, so it is left out.
+ * For the week beginning `weekStart`, each driver with a work tracker or an unavailable day: per day,
+ * whether they marked it unavailable and the trips they are on, from the local database. A work
+ * tracker with no driver has no one to check, so it is left out.
  */
 export function useDriverAvailability(weekStart: string): {
-  trips: DriverTripCheck[];
+  drivers: DriverAvailability[];
   isLoading: boolean;
 } {
   const weekEnd = weekEndOf(weekStart);
@@ -64,7 +72,14 @@ export function useDriverAvailability(weekStart: string): {
     () =>
       db
         .selectFrom("DriverUnavailability as du")
-        .select(["du.driver_uuid as driver_uuid", "du.date_unavailable as date_unavailable"])
+        .innerJoin("Drivers as d", "d.id", "du.driver_uuid")
+        .innerJoin("Users as u", "u.id", "d.user_uuid")
+        .select([
+          "du.driver_uuid as driver_uuid",
+          "du.date_unavailable as date_unavailable",
+          "u.first_name as first_name",
+          "u.last_name as last_name",
+        ])
         .where("du.date_unavailable", ">=", weekStart)
         .where("du.date_unavailable", "<=", weekEnd)
         .compile(),
@@ -75,10 +90,11 @@ export function useDriverAvailability(weekStart: string): {
     expect<UnavailabilityRow>(),
   );
 
-  const trips = useMemo(() => {
+  const drivers = useMemo(() => {
     const unavailability = (unavailabilityRows ?? []).flatMap((r) => {
       const date = timestampToDate(r.date_unavailable);
-      return r.driver_uuid && date ? [{ driverUuid: r.driver_uuid, date }] : [];
+      if (!r.driver_uuid || !date) return [];
+      return [{ driverUuid: r.driver_uuid, driverName: fullName(r.first_name, r.last_name), date }];
     });
     const driverTrips = (tripRows ?? []).flatMap((r) => {
       const date = timestampToDate(r.date);
@@ -88,14 +104,14 @@ export function useDriverAvailability(weekStart: string): {
           workTrackerId: r.id,
           date,
           driverUuid: r.driver_uuid,
-          driverName: [r.first_name, r.last_name].filter(Boolean).join(" ") || "Unnamed driver",
+          driverName: fullName(r.first_name, r.last_name),
           fromStreet: r.pickup_street,
           toStreet: r.dropoff_street,
         },
       ];
     });
-    return checkDriverAvailability(driverTrips, unavailability);
-  }, [tripRows, unavailabilityRows]);
+    return buildDriverAvailability(driverTrips, unavailability, weekStart);
+  }, [tripRows, unavailabilityRows, weekStart]);
 
-  return { trips, isLoading: tripsLoading || unavailabilityLoading };
+  return { drivers, isLoading: tripsLoading || unavailabilityLoading };
 }

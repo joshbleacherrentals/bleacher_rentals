@@ -1,12 +1,9 @@
 "use client";
 
-import { DateTime } from "luxon";
 import { useDriverWorkload } from "../hooks/useDriverWorkload";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import { MAX_DRIVING_HOURS, formatHours, type WorkloadDay } from "../utils/driverWorkload";
-import { weekDays } from "@/features/autoWorkTrackers/utils/week";
-
-const LINES = "border-r border-b border-black/15";
+import { DriverWeekGrid, GRID_LINES as LINES } from "./DriverWeekGrid";
 
 function WorkloadCell({ day }: { day: WorkloadDay }) {
   if (day.trips === 0) return <div className={`min-h-12 ${LINES}`} />;
@@ -46,33 +43,11 @@ export function DriverWorkloadTab() {
   }
 
   return (
-    <div
-      className="grid border-t border-l border-black/15"
-      style={{ gridTemplateColumns: "175px repeat(7, minmax(0, 1fr))" }}
-      data-testid="driver-workload"
-    >
-      <div className={`flex h-10 items-center bg-gray-200 px-2 text-sm font-semibold ${LINES}`}>
-        Driver
-      </div>
-      {weekDays(weekStart).map((date) => (
-        <div
-          key={date}
-          className={`flex h-10 items-center justify-center bg-gray-200 text-[13px] font-semibold ${LINES}`}
-        >
-          {DateTime.fromISO(date).toFormat("EEE, MMM d")}
-        </div>
-      ))}
-
-      {drivers.map((driver) => (
-        <div key={driver.driverUuid} className="contents">
-          <div className={`flex min-h-12 items-center px-2 text-sm font-medium ${LINES}`}>
-            {driver.driverName}
-          </div>
-          {driver.days.map((day) => (
-            <WorkloadCell key={day.date} day={day} />
-          ))}
-        </div>
-      ))}
-    </div>
+    <DriverWeekGrid
+      weekStart={weekStart}
+      drivers={drivers}
+      renderDay={(day) => <WorkloadCell day={day} />}
+      testId="driver-workload"
+    />
   );
 }
