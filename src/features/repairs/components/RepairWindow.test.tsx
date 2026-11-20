@@ -52,6 +52,7 @@ const render = (
     vendorAddress?: string | null;
     files?: ReactNode;
     Title?: "h2" | "h3";
+    onChangeStatus?: () => void;
   } = {},
 ) =>
   renderToStaticMarkup(
@@ -63,6 +64,7 @@ const render = (
       onOpenReports={() => {}}
       files={over.files === undefined ? null : over.files}
       Title={over.Title}
+      onChangeStatus={over.onChangeStatus}
     />,
   );
 
@@ -266,5 +268,43 @@ describe("RepairWindowContent is read-only (D84)", () => {
     expect(words).not.toContain("Add service");
     expect(words).not.toContain("Open repair");
     expect(markup).not.toContain("<footer");
+  });
+});
+
+// docs/specs/repairs-08-status.md §2.1, §2.2 and §7 (D110, D111, D118): the Status field of the
+// window holds the menu where the page gives `onChangeStatus` and the repair is live, and the plain
+// pill everywhere else.
+describe("RepairWindowContent status menu (spec 08)", () => {
+  const statusField = (markup: string) => field(markup, "status");
+  const onChangeStatus = () => {};
+  const live = repairRow({ id: "live", status: "in_repair", invoiceNumber: "JJ-5" });
+  const gone = repairRow({ id: "gone", status: "completed", deleted: true, invoiceNumber: "JJ-6" });
+
+  it("draws the menu trigger in the Status field when the page allows the change", () => {
+    const field = statusField(render({ repair: live, onChangeStatus }));
+    expect(field).toContain('data-testid="repair-status-menu"');
+    expect(field).toContain('aria-label="Change status of repair JJ-5, now In repair"');
+    expect(text(field)).toBe("In repair");
+  });
+
+  it("draws the plain pill without a handler, as spec 07 did", () => {
+    const field = statusField(render({ repair: live }));
+    expect(field).not.toContain("repair-status-menu");
+    expect(field).not.toContain("<button");
+    expect(text(field)).toBe("In repair");
+  });
+
+  it("draws the plain pill on a deleted repair even when the page allows the change (D118)", () => {
+    const field = statusField(render({ repair: gone, onChangeStatus }));
+    expect(field).not.toContain("repair-status-menu");
+    expect(field).not.toContain("<button");
+    expect(text(field)).toBe("Completed");
+  });
+
+  it("changes nothing else in the window", () => {
+    const markup = render({ repair: live, onChangeStatus });
+    expect(markup.match(/data-testid="repair-status-menu"/g)).toHaveLength(1);
+    expect(text(markup)).not.toContain("Edit");
+    expect(text(markup)).not.toContain("Open repair");
   });
 });

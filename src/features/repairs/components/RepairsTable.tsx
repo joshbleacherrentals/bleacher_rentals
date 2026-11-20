@@ -10,10 +10,17 @@ import {
 } from "lucide-react";
 import { repairLabel, repairOpenLabel } from "../utils/repairDetails";
 import { formatRepairDay, formatRepairMoney, reportedCell } from "../utils/repairFormat";
-import type { RepairCurrency, RepairListRow, ReportedReport } from "../utils/repairRows";
+import type {
+  RepairCurrency,
+  RepairListRow,
+  RepairStatus,
+  ReportedReport,
+} from "../utils/repairRows";
 import type { RepairSort, RepairSortKey } from "../utils/repairSort";
+import { canChangeRepairStatus } from "../utils/repairStatus";
 import { BleacherChip, CategoryChip, SeverityPill, StatusPill } from "./RepairChips";
 import { RepairServicesBlock } from "./RepairServices";
+import { RepairStatusMenu } from "./RepairStatusMenu";
 
 export type RepairsTableProps = {
   /** The rows of the page shown. */
@@ -36,6 +43,11 @@ export type RepairsTableProps = {
   onOpenReports: (reported: ReportedReport[]) => void;
   /** A click on the button at the end of a row: the repair window (spec 07 D94). */
   onOpenRepair: (repairId: string) => void;
+  /**
+   * A status chosen in the menu of a row's pill (spec 08 D110). Given only to a role that may change
+   * the status; without it every pill is the plain one. A deleted row never gets the menu (D118).
+   */
+  onChangeStatus?: (repair: RepairListRow, to: RepairStatus) => void;
 };
 
 /**
@@ -79,12 +91,14 @@ type Column = {
   render: (row: RepairListRow, ctx: CellContext) => ReactNode;
 };
 
-/** What a cell needs of the table besides its row: the open state and the two actions. */
+/** What a cell needs of the table besides its row: the open state and the actions. */
 type CellContext = {
   expanded: boolean;
   blockId: string;
   onToggle: () => void;
   onOpenReports: (reported: ReportedReport[]) => void;
+  /** Present only when this row's pill is a menu: already bound to the row (spec 08). */
+  onChangeStatus?: (to: RepairStatus) => void;
 };
 
 const money = (pick: (row: RepairListRow) => number | null) => (row: RepairListRow) =>
@@ -217,7 +231,16 @@ const COLUMNS: Column[] = [
     sortKey: "status",
     label: "Status",
     width: 160,
-    render: (row) => <StatusPill status={row.status} />,
+    render: (row, ctx) =>
+      ctx.onChangeStatus ? (
+        <RepairStatusMenu
+          status={row.status}
+          repairLabel={repairLabel(row)}
+          onChange={ctx.onChangeStatus}
+        />
+      ) : (
+        <StatusPill status={row.status} />
+      ),
   },
   {
     key: "vendor",
@@ -329,6 +352,7 @@ export function RepairsTable({
   onOpenService,
   onOpenReports,
   onOpenRepair,
+  onChangeStatus,
 }: RepairsTableProps) {
   const grid = gridFor(showRestore);
 
@@ -407,6 +431,10 @@ export function RepairsTable({
               blockId,
               onToggle: () => onToggleRepair(row.id),
               onOpenReports,
+              onChangeStatus:
+                onChangeStatus && canChangeRepairStatus({ allowed: true, deleted: row.deleted })
+                  ? (to) => onChangeStatus(row, to)
+                  : undefined,
             };
             return (
               <div key={row.id} role="rowgroup" className="border-t border-[#e5e7eb]">

@@ -4,13 +4,15 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { useVendorAddress } from "../hooks/useRepairDetails";
-import { reportsButtonLabel } from "../utils/repairDetails";
+import { repairLabel, reportsButtonLabel } from "../utils/repairDetails";
 import { reportedCell } from "../utils/repairFormat";
-import type { RepairListRow } from "../utils/repairRows";
+import type { RepairListRow, RepairStatus } from "../utils/repairRows";
+import { canChangeRepairStatus } from "../utils/repairStatus";
 import { canReadRepairFiles, repairCreatedLine, repairWindowTitle } from "../utils/repairWindow";
 import { BleacherChip, DeletedBadge, StatusPill } from "./RepairChips";
 import { RepairFiles } from "./RepairFiles";
 import { RepairWindowServices } from "./RepairServices";
+import { RepairStatusMenu } from "./RepairStatusMenu";
 
 /**
  * The repair window: the fields of one repair, its services with a Total row and its files.
@@ -67,6 +69,11 @@ export type RepairWindowContentProps = {
   files: ReactNode;
   /** The element the title is drawn with: `h2`, or the dialog's own title. */
   Title?: ElementType;
+  /**
+   * A status chosen in the menu of the Status field (spec 08 D110, D111). Given only to a role that
+   * may change the status; without it, and for a deleted repair (D118), the field is the plain pill.
+   */
+  onChangeStatus?: (to: RepairStatus) => void;
 };
 
 /** The whole content of the window, a plain component so that a test can render it. */
@@ -78,6 +85,7 @@ export function RepairWindowContent({
   onOpenReports,
   files,
   Title = "h2",
+  onChangeStatus,
 }: RepairWindowContentProps) {
   const created = repairCreatedLine(repair, timezone);
   const reported = reportedCell(repair.reported);
@@ -120,7 +128,15 @@ export function RepairWindowContent({
             {orDash(repair.invoiceNumber)}
           </Field>
           <Field name="status" label="Status">
-            <StatusPill status={repair.status} />
+            {onChangeStatus && canChangeRepairStatus({ allowed: true, deleted: repair.deleted }) ? (
+              <RepairStatusMenu
+                status={repair.status}
+                repairLabel={repairLabel(repair)}
+                onChange={onChangeStatus}
+              />
+            ) : (
+              <StatusPill status={repair.status} />
+            )}
           </Field>
 
           <Field name="currency" label="Currency">
@@ -207,10 +223,18 @@ export type RepairWindowProps = {
   onOpenService: (serviceId: string) => void;
   onOpenReports: () => void;
   onClose: () => void;
+  /** Given only to a role that may change the status (spec 08 D110); see `RepairWindowContentProps`. */
+  onChangeStatus?: (to: RepairStatus) => void;
 };
 
 /** The dialog around the content; it also reads the vendor's address and, for three roles, the files. */
-export function RepairWindow({ repair, onOpenService, onOpenReports, onClose }: RepairWindowProps) {
+export function RepairWindow({
+  repair,
+  onOpenService,
+  onOpenReports,
+  onClose,
+  onChangeStatus,
+}: RepairWindowProps) {
   const timezone = useTimezoneStore((s) => s.timezone);
   const { address } = useVendorAddress(repair.vendorUuid);
   const { isAdmin, isAccountManager, isMaintainer } = useTeamPermissions();
@@ -228,7 +252,7 @@ export function RepairWindow({ repair, onOpenService, onOpenReports, onClose }: 
         className="max-h-[90vh] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-[1080px]"
       >
         <DialogDescription className="sr-only">
-          A repair with its services and files. Read-only.
+          A repair with its services and files.
         </DialogDescription>
         <RepairWindowContent
           repair={repair}
@@ -238,6 +262,7 @@ export function RepairWindow({ repair, onOpenService, onOpenReports, onClose }: 
           onOpenReports={onOpenReports}
           files={canReadFiles ? <RepairFiles repairId={repair.id} /> : null}
           Title={DialogTitle}
+          onChangeStatus={onChangeStatus}
         />
       </DialogContent>
     </Dialog>

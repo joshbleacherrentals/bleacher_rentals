@@ -9,6 +9,7 @@ import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissio
 import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
 import { setMaintenanceEventDeleted } from "@/features/maintenanceEvents/db/deleteMaintenanceEvent";
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
+import { changeRepairStatus } from "../db/repairStatusWrite";
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
 import { useRepairList } from "../hooks/useRepairList";
 import { closeFrom, openWindow, resolveWindows, type WindowEntry } from "../utils/repairDetails";
@@ -27,6 +28,7 @@ import {
   type RepairsUrlPatch,
   type RepairsUrlState,
 } from "../utils/repairPageState";
+import type { RepairListRow, RepairStatus } from "../utils/repairRows";
 import { nextRepairSort, type RepairSortKey } from "../utils/repairSort";
 import { DamageReportWindow } from "./DamageReportWindow";
 import { RepairWindow } from "./RepairWindow";
@@ -40,9 +42,11 @@ import { ServiceWindow } from "./ServiceWindow";
  * filters, Show Deleted), the sortable table and the pager. The state of the list lives in the
  * address. Which repairs are open lives in React (spec 06 D81), and so do the windows: the repair
  * window, the service window and the damage report window are one stack, each over the one that
- * opened it (spec 07 D95, D96). It only reads; the one write is Restore in the Show Deleted view (an
- * administrator or a maintainer). docs/specs/repairs-04-table.md, docs/specs/repairs-05-toolbar.md,
- * docs/specs/repairs-06-expanded-row.md and docs/specs/repairs-07-repair-window.md §2.7.
+ * opened it (spec 07 D95, D96). It writes two things, both for an administrator or a maintainer:
+ * Restore in the Show Deleted view, and the status chosen in the menu of a pill, in a row or in the
+ * repair window (spec 08 D110, D111). docs/specs/repairs-04-table.md,
+ * docs/specs/repairs-05-toolbar.md, docs/specs/repairs-06-expanded-row.md,
+ * docs/specs/repairs-07-repair-window.md §2.7 and docs/specs/repairs-08-status.md §2.1.
  */
 export default function RepairsPage() {
   const router = useRouter();
@@ -92,6 +96,18 @@ export default function RepairsPage() {
     void setMaintenanceEventDeleted(repairId, false).catch(() => {});
   };
 
+  // One clock reading is the moment of the whole change (D112, D116). The function shows its own
+  // error toast (D119); the catch only stops an unhandled rejection.
+  const changeStatus = (repair: RepairListRow, to: RepairStatus) => {
+    void changeRepairStatus({
+      repairId: repair.id,
+      from: repair.status,
+      to,
+      reported: repair.reported,
+      now: new Date().toISOString(),
+    }).catch(() => {});
+  };
+
   return (
     <>
       <PageHeader title="Repairs" subtitle="All maintenance and repair events across the fleet" />
@@ -139,6 +155,7 @@ export default function RepairsPage() {
           onOpenService={(repairId, serviceId) => open({ kind: "service", repairId, serviceId })}
           onOpenReports={(reported) => open({ kind: "reports", reported })}
           onOpenRepair={(repairId) => open({ kind: "repair", repairId })}
+          onChangeStatus={canManage ? changeStatus : undefined}
         />
       </div>
 
@@ -153,6 +170,7 @@ export default function RepairsPage() {
               }
               onOpenReports={() => open({ kind: "reports", reported: w.repair.reported })}
               onClose={() => close(w.index)}
+              onChangeStatus={canManage ? (to) => changeStatus(w.repair, to) : undefined}
             />
           );
         }

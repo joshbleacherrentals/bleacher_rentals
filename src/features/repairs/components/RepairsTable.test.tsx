@@ -541,3 +541,61 @@ describe("RepairsTable loading and empty states (D51, §2.10)", () => {
     expect(markup).not.toContain('data-testid="repairs-empty"');
   });
 });
+
+// docs/specs/repairs-08-status.md §2.1, §2.2 and §7 (D110, D111, D118): the pill is a menu where the
+// page gives the table `onChangeStatus` and the repair is live; everywhere else it is the plain
+// pill of spec 04, with no chevron and no button.
+describe("RepairsTable status menu (spec 08)", () => {
+  const live = repairRow({ id: "live", status: "in_repair", invoiceNumber: "JJ-5" });
+  const gone = repairRow({
+    id: "gone",
+    status: "completed",
+    deleted: true,
+    invoiceNumber: "JJ-6",
+  });
+  const onChangeStatus = () => {};
+
+  it("draws the menu trigger on a live row when the page allows the change (D110)", () => {
+    const status = cell(render({ rows: [live], onChangeStatus }), "status");
+    expect(status).toContain('data-testid="repair-status-menu"');
+    expect(status).toContain('aria-haspopup="menu"');
+    expect(status).toContain("<svg");
+    expect(text(status)).toBe("In repair");
+    expect(status).toContain("bg-[#fde6d2]");
+  });
+
+  it("names the repair in the label of the trigger", () => {
+    const status = cell(render({ rows: [live], onChangeStatus }), "status");
+    expect(status).toContain('aria-label="Change status of repair JJ-5, now In repair"');
+  });
+
+  it("draws the plain pill when the page gives no handler (an account manager, a viewer)", () => {
+    const status = cell(render({ rows: [live] }), "status");
+    expect(status).not.toContain("repair-status-menu");
+    expect(status).not.toContain("<button");
+    expect(status).not.toContain("<svg");
+    expect(text(status)).toBe("In repair");
+  });
+
+  it("draws the plain pill on a deleted repair, whoever looks (D118)", () => {
+    const markup = render({ rows: [gone], onChangeStatus, showRestore: true });
+    const status = cell(markup, "status");
+    expect(status).not.toContain("repair-status-menu");
+    expect(status).not.toContain("<button");
+    expect(status).not.toContain("<svg");
+    expect(text(status)).toBe("Completed");
+  });
+
+  it("draws the menu on the live rows and the plain pill on the deleted ones of one list", () => {
+    const markup = render({ rows: [live, gone], onChangeStatus });
+    expect(markup.match(/data-testid="repair-status-menu"/g)).toHaveLength(1);
+  });
+
+  it("leaves the open button, the arrow and the other cells as they were", () => {
+    const markup = render({ rows: [live], onChangeStatus });
+    expect(markup).toContain('data-testid="repair-open"');
+    expect(markup).toContain('data-testid="repair-toggle"');
+    expect(cell(markup, "completed")).not.toContain("<button");
+    expect(headers(markup)).toEqual(ALL_HEADERS);
+  });
+});

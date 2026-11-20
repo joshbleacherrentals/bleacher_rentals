@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import type { RepairSeverity } from "../utils/repairRows";
 import { severityPill, statusPill } from "../utils/repairFormat";
 
@@ -35,14 +36,20 @@ export function SeverityPill({ severity }: { severity: RepairSeverity }) {
   );
 }
 
-/** A plain pill, with no chevron: it becomes a menu in spec 08. */
-export function StatusPill({ status }: { status: string }) {
+/**
+ * The pill of a status. Plain by default; with `chevron` it is the face of the status menu
+ * (`RepairStatusMenu`, spec 08), drawn only where the menu works.
+ */
+export function StatusPill({ status, chevron = false }: { status: string; chevron?: boolean }) {
   const pill = statusPill(status);
   return (
     <span
-      className={`inline-flex h-7 items-center rounded-full px-3 text-[13px] leading-5 font-medium whitespace-nowrap ${pill.className}`}
+      className={`inline-flex h-7 items-center rounded-full text-[13px] leading-5 font-medium whitespace-nowrap ${
+        chevron ? "gap-1 pr-2 pl-3" : "px-3"
+      } ${pill.className}`}
     >
       {pill.label}
+      {chevron && <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />}
     </span>
   );
 }
