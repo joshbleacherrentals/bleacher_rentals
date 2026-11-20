@@ -24,6 +24,7 @@ type EventRow = {
   event_end: string | null;
   teardown_end: string | null;
   street: string | null;
+  address_uuid: string | null;
 };
 
 type WorkTrackerRow = {
@@ -32,6 +33,7 @@ type WorkTrackerRow = {
   date: string | null;
   pickup_street: string | null;
   dropoff_street: string | null;
+  dropoff_address_uuid: string | null;
 };
 
 /** Work trackers that are off: nobody is going to make the trip, so they do not count as covering it. */
@@ -79,6 +81,10 @@ export function useTripsNeeded(
           "e.event_end as event_end",
           "e.teardown_end as teardown_end",
           sql<string | null>`coalesce(a.street, va.street)`.as("street"),
+          // The row the street came from, so the trip carries its address (as the model does).
+          sql<string | null>`case when a.street is not null then a.id else va.id end`.as(
+            "address_uuid",
+          ),
         ])
         .where("b.zone_uuid", "=", zoneId)
         .where("b.deleted", "=", 0)
@@ -105,6 +111,7 @@ export function useTripsNeeded(
           "w.date as date",
           "pa.street as pickup_street",
           "da.street as dropoff_street",
+          "w.dropoff_address_uuid as dropoff_address_uuid",
         ])
         .where("b.zone_uuid", "=", zoneId)
         .where("b.deleted", "=", 0)
@@ -130,6 +137,7 @@ export function useTripsNeeded(
         eventUuid: row.event_uuid,
         eventName: row.event_name,
         street: row.street,
+        addressUuid: row.address_uuid,
         startDate,
         endDate,
       });
@@ -145,6 +153,7 @@ export function useTripsNeeded(
         date: timestampToDate(row.date),
         pickupStreet: row.pickup_street,
         dropoffStreet: row.dropoff_street,
+        dropoffAddressUuid: row.dropoff_address_uuid,
       });
       tripsByBleacher.set(row.bleacher_uuid, existing);
     }

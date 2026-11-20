@@ -11,6 +11,8 @@ import { useDriverWorkload } from "@/features/scheduleValidator/hooks/useDriverW
 import { useDriverAvailability } from "@/features/scheduleValidator/hooks/useDriverAvailability";
 import { useDriverData } from "@/features/scheduleValidator/hooks/useDriverData";
 import { useEventData } from "@/features/scheduleValidator/hooks/useEventData";
+import { useBleacherMoves } from "@/features/scheduleValidator/hooks/useBleacherMoves";
+import type { BleacherMove } from "@/features/scheduleValidator/utils/bleacherMoves";
 import { eventDataRoles, type EventData } from "@/features/scheduleValidator/utils/eventData";
 import {
   findOverbookedBleachers,
@@ -26,6 +28,7 @@ import {
   summarizeDriverAvailability,
   summarizeDriverData,
   summarizeEventData,
+  summarizeBleacherData,
   summarizeDriverWorkload,
   summarizeEventBleacherRequirements,
   summarizeEventFulfilment,
@@ -48,6 +51,7 @@ type Checks = {
   driverAvailability: { drivers: DriverAvailability[]; isLoading: boolean };
   driverData: { drivers: DriverData[]; isLoading: boolean };
   eventData: { events: EventData[]; isLoading: boolean };
+  bleacherData: { moves: BleacherMove[]; eventNames: Map<string, string>; isLoading: boolean };
   /** Keyed by page slug; a page with no entry (the Dashboard) is a view, not a check. */
   statuses: Record<string, CheckStatus>;
 };
@@ -86,6 +90,7 @@ export function ChecksProvider({
     [zoneId, logistics.events],
   );
   const eventData = useEventData(eventRoles);
+  const bleacherMoves = useBleacherMoves(zoneId, weekStart);
 
   const bookings = useBleacherBookings(zoneId, weekStart);
   const overbooked = useMemo(
@@ -112,6 +117,11 @@ export function ChecksProvider({
       driverAvailability: { drivers: availability.drivers, isLoading: availability.isLoading },
       driverData: { drivers: driverData.drivers, isLoading: driverData.isLoading },
       eventData: { events: eventData.events, isLoading: eventDataLoading },
+      bleacherData: {
+        moves: bleacherMoves.moves,
+        eventNames: bleacherMoves.eventNames,
+        isLoading: bleacherMoves.isLoading,
+      },
       statuses: {
         "event-fulfilment": {
           isLoading: !!zoneId && logistics.isLoading,
@@ -130,6 +140,10 @@ export function ChecksProvider({
         "overbooked-bleachers": {
           isLoading: !!zoneId && bookings.isLoading,
           summary: zoneId ? summarizeOverbookedBleachers(bookings.bookings, overbooked) : null,
+        },
+        "bleacher-data": {
+          isLoading: bleacherMoves.isLoading,
+          summary: zoneId ? summarizeBleacherData(bleacherMoves.moves) : null,
         },
         "driver-workload": {
           isLoading: !!zoneId && workload.isLoading,
@@ -164,6 +178,9 @@ export function ChecksProvider({
     driverData.isLoading,
     eventData.events,
     eventData.isLoading,
+    bleacherMoves.moves,
+    bleacherMoves.eventNames,
+    bleacherMoves.isLoading,
   ]);
 
   return <ChecksContext.Provider value={value}>{children}</ChecksContext.Provider>;

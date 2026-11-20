@@ -12,7 +12,7 @@ describe("auto work trackers pages", () => {
   it("groups the pages under Events, Bleachers and Drivers", () => {
     expect(AUTO_WORK_TRACKERS_SECTIONS.map((s) => [s.label, s.pages.map((p) => p.slug)])).toEqual([
       ["Events", ["event-fulfilment", "event-bleacher-requirements", "event-data"]],
-      ["Bleachers", ["overbooked-bleachers"]],
+      ["Bleachers", ["overbooked-bleachers", "bleacher-data"]],
       ["Drivers", ["driver-workload", "driver-availability", "driver-data"]],
     ]);
   });

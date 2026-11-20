@@ -9,10 +9,12 @@ import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWo
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
 import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
 import type { EventData } from "@/features/scheduleValidator/utils/eventData";
+import type { BleacherMove } from "@/features/scheduleValidator/utils/bleacherMoves";
 import {
   summarizeDriverAvailability,
   summarizeDriverData,
   summarizeEventData,
+  summarizeBleacherData,
   summarizeDriverWorkload,
   summarizeEventBleacherRequirements,
   summarizeEventFulfilment,
@@ -100,5 +102,12 @@ describe("summarizeEventData", () => {
   it("counts the events with every piece of data", () => {
     const events = [{ ok: true }, { ok: false }, { ok: false }] as EventData[];
     expect(summarizeEventData(events)).toEqual({ passed: 1, total: 3 });
+  });
+});
+
+describe("summarizeBleacherData", () => {
+  it("counts the moves with both addresses complete", () => {
+    const moves = [{ ok: true }, { ok: false }] as BleacherMove[];
+    expect(summarizeBleacherData(moves)).toEqual({ passed: 1, total: 2 });
   });
 });

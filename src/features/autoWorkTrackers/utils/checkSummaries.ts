@@ -8,6 +8,7 @@ import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWo
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
 import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
 import type { EventData } from "@/features/scheduleValidator/utils/eventData";
+import type { BleacherMove } from "@/features/scheduleValidator/utils/bleacherMoves";
 
 /**
  * How a check came out for the week: how many of the things it checks passed, out of how many. Each
@@ -67,6 +68,11 @@ export function summarizeDriverData(drivers: DriverData[]): CheckSummary {
 /** The week's events and their pickup events, passing when they have every piece of data. */
 export function summarizeEventData(events: EventData[]): CheckSummary {
   return count(events, (e) => e.ok);
+}
+
+/** The zone's bleacher moves this week, passing when both pickup and drop-off are complete. */
+export function summarizeBleacherData(moves: BleacherMove[]): CheckSummary {
+  return count(moves, (m) => m.ok);
 }
 
 /** Green when everything passed (nothing to check counts as passing), red otherwise. */

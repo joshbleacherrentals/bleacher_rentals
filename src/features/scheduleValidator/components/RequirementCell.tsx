@@ -18,9 +18,12 @@ export function RequirementCell({
   result,
   onFix,
   testId,
+  label,
 }: {
   result: RequirementResult;
   testId?: string;
+  /** What is being checked, e.g. the address line; shown above what is missing. */
+  label?: string;
   /** Opens the fix for this requirement; absent when it has none or the user may not fix it. */
   onFix?: () => void;
 }) {
@@ -30,7 +33,14 @@ export function RequirementCell({
   const content = (
     <>
       <Mark ok={result.ok} label={result.ok ? "Complete" : "Incomplete"} />
-      {result.problem && <span>{result.problem}</span>}
+      {label ? (
+        <span className="min-w-0">
+          <span className={`block truncate ${result.ok ? "" : "text-gray-800"}`}>{label}</span>
+          {result.problem && <span className="block text-xs">{result.problem}</span>}
+        </span>
+      ) : (
+        result.problem && <span>{result.problem}</span>
+      )}
       {onFix && <Pencil className="ml-auto h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />}
     </>
   );

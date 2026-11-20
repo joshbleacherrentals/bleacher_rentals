@@ -21,6 +21,8 @@ export type BleacherStop = {
   eventName: string | null;
   /** Street text of the event's address (or its venue's). Null when the event has none. */
   street: string | null;
+  /** The Addresses row that street comes from. */
+  addressUuid?: string | null;
   /** First day the bleacher has to be there: setup start, else event start. */
   startDate: string;
   /** Last day it has to be there: teardown end, else event end. */
@@ -33,6 +35,8 @@ export type ExistingTrip = {
   date: string | null;
   pickupStreet: string | null;
   dropoffStreet: string | null;
+  /** The Addresses row of the drop-off. */
+  dropoffAddressUuid?: string | null;
 };
 
 export type BleacherInput = {
@@ -47,6 +51,10 @@ export type NeededTrip = {
   bleacherNumber: number | null;
   fromStreet: string;
   toStreet: string;
+  /** Where the bleacher is picked up: the event it leaves, or an earlier work tracker's drop-off. */
+  fromAddressUuid: string | null;
+  /** Where it is dropped off: the next event's address. */
+  toAddressUuid: string | null;
   /** The event the bleacher is leaving. */
   fromEventUuid: string;
   /** The event it has to reach. */
@@ -110,6 +118,7 @@ function tripsForBleacher(
     // Follow the work trackers already in the window: each one that picks the bleacher up where
     // it currently is moves it on to its drop-off.
     let position = from.street!;
+    let positionAddressUuid = from.addressUuid ?? null;
     const inWindow = bleacher.trips
       .filter((t) => t.date !== null && t.date >= availableFrom && t.date <= mustArriveBy)
       .sort((x, y) => x.date!.localeCompare(y.date!));
@@ -117,6 +126,7 @@ function tripsForBleacher(
       if (normalizeStreet(trip.dropoffStreet) === "") continue;
       if (normalizeStreet(trip.pickupStreet) === normalizeStreet(position)) {
         position = trip.dropoffStreet!;
+        positionAddressUuid = trip.dropoffAddressUuid ?? null;
       }
     }
 
@@ -127,6 +137,8 @@ function tripsForBleacher(
       bleacherNumber: bleacher.bleacherNumber,
       fromStreet: position,
       toStreet: to.street!,
+      fromAddressUuid: positionAddressUuid,
+      toAddressUuid: to.addressUuid ?? null,
       fromEventUuid: from.eventUuid,
       toEventUuid: to.eventUuid,
       availableFrom,

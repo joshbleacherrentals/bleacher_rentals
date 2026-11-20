@@ -19,7 +19,10 @@ export const AUTO_WORK_TRACKERS_SECTIONS: AutoWorkTrackersSection[] = [
   },
   {
     label: "Bleachers",
-    pages: [{ slug: "overbooked-bleachers", label: "Overbooked Bleachers" }],
+    pages: [
+      { slug: "overbooked-bleachers", label: "Overbooked Bleachers" },
+      { slug: "bleacher-data", label: "Bleacher Data" },
+    ],
   },
   {
     label: "Drivers",

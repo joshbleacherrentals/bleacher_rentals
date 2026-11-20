@@ -108,6 +108,8 @@ describe("discoverTrips: a move between two events", () => {
         bleacherNumber: 1,
         fromStreet: "1 Main St",
         toStreet: "2 Oak Ave",
+        fromAddressUuid: null,
+        toAddressUuid: null,
         fromEventUuid: "a",
         toEventUuid: "b",
         availableFrom: "2026-11-10",
@@ -334,5 +336,25 @@ describe("discoverTrips: several bleachers", () => {
       6,
     );
     expect(discoverTrips([fine, needs], WEEK).map((t) => t.bleacherNumber)).toEqual([6]);
+  });
+
+  it("carries the address rows: the event left, or the work tracker drop-off it stopped at", () => {
+    const withAddress = (s: BleacherStop, addressUuid: string) => ({ ...s, addressUuid });
+    const from = withAddress(stop("a", "1 Main St", "2026-11-06", "2026-11-09"), "addr-a");
+    const to = withAddress(stop("b", "2 Oak Ave", "2026-11-15", "2026-11-16"), "addr-b");
+
+    expect(discoverTrips([bleacher([from, to])], WEEK)[0]).toMatchObject({
+      fromAddressUuid: "addr-a",
+      toAddressUuid: "addr-b",
+    });
+
+    const shortTrip = {
+      ...trip("w1", "2026-11-11", "1 Main St", "9 Depot Dr"),
+      dropoffAddressUuid: "addr-depot",
+    };
+    expect(discoverTrips([bleacher([from, to], [shortTrip])], WEEK)[0]).toMatchObject({
+      fromAddressUuid: "addr-depot",
+      toAddressUuid: "addr-b",
+    });
   });
 });
