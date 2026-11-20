@@ -2,6 +2,7 @@
 
 import { Check, X } from "lucide-react";
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
+import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import type { AvailabilityDay } from "../utils/driverAvailability";
 import { DriverWeekGrid, GRID_LINES } from "./DriverWeekGrid";
@@ -39,19 +40,23 @@ function AvailabilityCell({ day }: { day: AvailabilityDay }) {
 }
 
 /**
- * A grid of the selected week: a row per driver with a trip or a day off, a column per day. Each cell
+ * A grid of the selected week: a row per driver in the selected zone with a trip or a day off, a column per day. Each cell
  * shows whether the driver marked the day unavailable and how many trips they are on; both at once
  * is a conflict, in red. The driver gets a check when no day conflicts, and an X when one does.
  */
 export function DriverAvailabilityTab() {
   const [weekStart] = useSelectedWeek();
+  const { zoneId } = useZoneWeekParams();
   const { drivers, isLoading } = useChecks().driverAvailability;
 
+  if (!zoneId) {
+    return <p className="text-sm text-gray-500">Select a zone to see its drivers.</p>;
+  }
   if (isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
   if (drivers.length === 0) {
     return (
       <p className="text-sm text-gray-500">
-        No drivers are scheduled or marked unavailable this week.
+        No drivers in this zone are scheduled or marked unavailable this week.
       </p>
     );
   }

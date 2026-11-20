@@ -1,14 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { timestampToDate } from "@/features/autoWorkTrackers/utils/discoverTrips";
 import { weekEndOf } from "@/features/autoWorkTrackers/utils/week";
 import { buildDriverWorkload, type DriverWorkload } from "../utils/driverWorkload";
-
-/** Work trackers that are off: nobody is making the trip, so it adds no driving. */
-const OFF_STATUSES = ["cancelled", "declined", "abandoned"];
+import { driverWorkloadQuery } from "../db/driverQueries";
 
 type Row = {
   driver_uuid: string | null;
@@ -19,33 +16,21 @@ type Row = {
 };
 
 /**
- * Each driver's driving hours and trips per day for the week beginning `weekStart`, from the local
- * database. A work tracker's hours are its `drive_minutes`.
+ * Each driver in the zone's driving hours and trips per day for the week beginning `weekStart`, from
+ * the local database. A work tracker's hours are its `drive_minutes`. No zone: no drivers.
  */
-export function useDriverWorkload(weekStart: string): {
+export function useDriverWorkload(
+  zoneId: string,
+  weekStart: string,
+): {
   drivers: DriverWorkload[];
   isLoading: boolean;
 } {
   const weekEnd = weekEndOf(weekStart);
 
   const compiled = useMemo(
-    () =>
-      db
-        .selectFrom("WorkTrackers as w")
-        .innerJoin("Drivers as d", "d.id", "w.driver_uuid")
-        .innerJoin("Users as u", "u.id", "d.user_uuid")
-        .select([
-          "w.driver_uuid as driver_uuid",
-          "w.date as date",
-          "w.drive_minutes as drive_minutes",
-          "u.first_name as first_name",
-          "u.last_name as last_name",
-        ])
-        .where("w.date", ">=", weekStart)
-        .where("w.date", "<=", weekEnd)
-        .where((eb) => eb.or([eb("w.status", "is", null), eb("w.status", "not in", OFF_STATUSES)]))
-        .compile(),
-    [weekStart, weekEnd],
+    () => driverWorkloadQuery(zoneId, weekStart, weekEnd),
+    [zoneId, weekStart, weekEnd],
   );
   const { data, isLoading } = useTypedQuery(compiled, expect<Row>());
 

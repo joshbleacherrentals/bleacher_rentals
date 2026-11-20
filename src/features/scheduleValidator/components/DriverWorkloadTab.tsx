@@ -1,6 +1,7 @@
 "use client";
 
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
+import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import { MAX_DRIVING_HOURS, formatHours, type WorkloadDay } from "../utils/driverWorkload";
 import { DriverWeekGrid, GRID_LINES as LINES } from "./DriverWeekGrid";
@@ -30,16 +31,22 @@ function WorkloadCell({ day }: { day: WorkloadDay }) {
 }
 
 /**
- * A grid of the selected week: a row per driver, a column per day, each cell the hours that driver
+ * A grid of the selected week: a row per driver in the selected zone, a column per day, each cell the hours that driver
  * drives that day and how many trips that is. A day over 12 hours is shown as an error.
  */
 export function DriverWorkloadTab() {
   const [weekStart] = useSelectedWeek();
+  const { zoneId } = useZoneWeekParams();
   const { drivers, isLoading } = useChecks().driverWorkload;
 
+  if (!zoneId) {
+    return <p className="text-sm text-gray-500">Select a zone to see its drivers.</p>;
+  }
   if (isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
   if (drivers.length === 0) {
-    return <p className="text-sm text-gray-500">No drivers have work trackers this week.</p>;
+    return (
+      <p className="text-sm text-gray-500">No drivers in this zone have work trackers this week.</p>
+    );
   }
 
   return (

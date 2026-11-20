@@ -73,8 +73,8 @@ export function ChecksProvider({
     [bookings.bookings, weekStart],
   );
 
-  const workload = useDriverWorkload(weekStart);
-  const availability = useDriverAvailability(weekStart);
+  const workload = useDriverWorkload(zoneId, weekStart);
+  const availability = useDriverAvailability(zoneId, weekStart);
 
   const value = useMemo<Checks>(() => {
     const requirementsLoading = weekEvents.isLoading || eventsBleachers.isLoading;
@@ -102,12 +102,12 @@ export function ChecksProvider({
           summary: summarizeOverbookedBleachers(bookings.bookings, overbooked),
         },
         "driver-workload": {
-          isLoading: workload.isLoading,
-          summary: summarizeDriverWorkload(workload.drivers),
+          isLoading: !!zoneId && workload.isLoading,
+          summary: zoneId ? summarizeDriverWorkload(workload.drivers) : null,
         },
         "driver-availability": {
-          isLoading: availability.isLoading,
-          summary: summarizeDriverAvailability(availability.drivers),
+          isLoading: !!zoneId && availability.isLoading,
+          summary: zoneId ? summarizeDriverAvailability(availability.drivers) : null,
         },
       },
     };
