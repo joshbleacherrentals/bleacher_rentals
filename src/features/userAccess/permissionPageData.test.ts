@@ -1110,10 +1110,10 @@ describe("Send Emails", () => {
 describe("Repairs page rows", () => {
   const maintenance = PERMISSIONS.find((p) => p.label === "Repairs & Maintenance");
   const costs = PERMISSIONS.find((p) => p.label === "Repair Costs & Vendors");
-  // docs/specs/repairs-08-status.md §5 (D121): what the old last sentence, "The page only reads for
-  // now.", became when the status menu arrived.
-  const STATUS_SENTENCE =
-    "The status is the one thing the page changes: an administrator and a maintainer change it from the pill, in a row or in the repair window. Moving a repair into Completed records the moment it was completed and closes the damage reports found for it, which then leave the drivers' phones; moving it out of Completed clears that moment and leaves the reports closed. Nothing else on the page can be edited yet.";
+  // docs/specs/repairs-09a-repair-writes.md §5 (D146): what the three last sentences of the row, the
+  // ones about the status, became when the repair window began to write.
+  const WRITES_SENTENCE =
+    "An administrator and a maintainer can add a repair and, in the repair window, change its vendor, invoice number, status, currency, repair days and notes; the status can also be changed from the pill in a row. Moving a repair into Completed records the moment it was completed and closes the damage reports found for it, which then leave the drivers' phones; moving it out of Completed clears that moment and leaves the reports closed. The amounts, the services and the files cannot be edited yet.";
 
   it("has the Repair Costs & Vendors row right after Repairs & Maintenance", () => {
     expect(costs).toBeDefined();
@@ -1130,10 +1130,11 @@ describe("Repairs page rows", () => {
     }
   });
 
-  it("says every role that opens the page sees all of it, and that the status is the one thing it changes", () => {
+  it("says every role that opens the page sees all of it, and what an administrator and a maintainer can change", () => {
     expect(costs?.description).toMatch(/Every role that opens the Repairs page sees all of it/);
-    expect(costs?.description).toContain(STATUS_SENTENCE);
+    expect(costs?.description).toContain(WRITES_SENTENCE);
     expect(costs?.description).not.toMatch(/The page only reads for now/);
+    expect(costs?.description).not.toMatch(/The status is the one thing the page changes/);
     expect(costs?.roles.account_manager.note).toMatch(/not only the ones they created/);
   });
 
@@ -1159,7 +1160,7 @@ describe("Repairs page rows", () => {
       /A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved\. /,
     );
     expect(costs?.description).toMatch(
-      /have repairs\. A repair opens in place[\s\S]*Nothing else on the page can be edited yet\.$/,
+      /have repairs\. A repair opens in place[\s\S]*The amounts, the services and the files cannot be edited yet\.$/,
     );
   });
 
@@ -1167,9 +1168,9 @@ describe("Repairs page rows", () => {
   // read; only the files are not for every role, because the database does not give them to a viewer.
   it("describes the repair window, with its files, right before the last sentence", () => {
     expect(costs?.description).toContain(
-      `whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. ${STATUS_SENTENCE}`,
+      `whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. ${WRITES_SENTENCE}`,
     );
-    expect(costs?.description?.endsWith(STATUS_SENTENCE)).toBe(true);
+    expect(costs?.description?.endsWith(WRITES_SENTENCE)).toBe(true);
   });
 
   it("tells every role that opens the page about the repair window, and the viewer about the files", () => {
@@ -1189,12 +1190,12 @@ describe("Repairs page rows", () => {
 
   // docs/specs/repairs-08-status.md §5 (D110, D121): the administrator and the maintainer change the
   // status; the account manager and the viewer see a label. The levels stay as they were.
-  it("tells the administrator and the maintainer that the pill changes the status", () => {
+  it("tells the administrator and the maintainer that they change the status and edit the repair", () => {
     expect(costs?.roles.admin.note).toBe(
-      "Sees every column and the total cost strip, and opens the repair window with its files. Changes the status from the pill.",
+      "Sees every column and the total cost strip, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; the amounts are read-only.",
     );
     expect(costs?.roles.maintainer.note).toBe(
-      "Sees every column and the total cost strip, vendors included, and opens the repair window with its files. Changes the status from the pill.",
+      "Sees every column and the total cost strip, vendors included, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; the amounts are read-only.",
     );
   });
 
@@ -1218,26 +1219,27 @@ describe("Repairs page rows", () => {
     expect(costs?.roles.driver.note).toBe("Drivers only have access to the Driver Mobile App.");
   });
 
-  // docs/specs/repairs-08-status.md §5 (D110, D121): the old row says who changes the status and
-  // that the rest of a repair is still edited from the Dashboard.
-  it("tells the old row that the Repairs page changes the status and the Dashboard edits the rest", () => {
+  // docs/specs/repairs-09a-repair-writes.md §5 (D124, D146): the old row says what an administrator
+  // and a maintainer do on the Repairs page, and what is still left to the Dashboard.
+  it("tells the old row that the Repairs page adds, edits, deletes and restores repairs", () => {
     expect(maintenance?.description).toContain(
-      "For now the Repairs page lists repairs and, for an administrator or a maintainer, shows and restores deleted ones and changes the status of a repair, in its row or in its window; the rest of a repair is edited from the Dashboard until the repair window can edit.",
+      "On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. A repair's bleachers and files are still edited from the Dashboard, and its services cannot be added or edited yet.",
     );
+    expect(maintenance?.description).not.toMatch(/until the repair window can edit/);
     expect(maintenance?.description).not.toMatch(/only lists repairs/);
-    expect(maintenance?.description).not.toMatch(/until the repair window arrives/);
   });
 
-  it("tells the administrator, the account manager, the viewer and the maintainer about the status", () => {
+  it("tells the administrator, the account manager, the viewer and the maintainer what they do on the page", () => {
     expect(maintenance?.roles.admin.note).toMatch(
-      /Changes the status of any repair from the Repairs page\.$/,
+      /Changes the status of any repair from the Repairs page\. On the Repairs page adds, edits, deletes and restores repairs, but not yet their services, bleachers or files\.$/,
     );
     expect(maintenance?.roles.account_manager.note).toMatch(
-      /Does not get the status menu on the Repairs page\.$/,
+      /On the Repairs page sees every repair but cannot add, edit, delete or restore one, or change its status\.$/,
     );
+    expect(maintenance?.roles.account_manager.note).not.toMatch(/status menu/);
     expect(maintenance?.roles.viewer.note).toMatch(/Sees the status but cannot change it\.$/);
     expect(maintenance?.roles.maintainer.note).toBe(
-      "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, change their status and restore deleted ones, and the Dashboard to edit them.",
+      "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details and status, delete and restore them, and the Dashboard for their bleachers and files.",
     );
   });
 

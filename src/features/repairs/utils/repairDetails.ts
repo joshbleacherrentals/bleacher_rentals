@@ -153,7 +153,9 @@ export function buildDamageReportViews(input: {
 export type WindowEntry =
   | { kind: "repair"; repairId: string }
   | { kind: "service"; repairId: string; serviceId: string }
-  | { kind: "reports"; reported: ReportedReport[] };
+  | { kind: "reports"; reported: ReportedReport[] }
+  /** The New repair window: it has no repair behind it (spec 09a D126). */
+  | { kind: "new" };
 
 /** A window ready to draw. `index` is its place in the stack: its key, and what closes it. */
 export type ResolvedWindow =
@@ -166,9 +168,11 @@ export type ResolvedWindow =
       /** False when a repair window of that same repair is already under it (D98). */
       showOpenRepair: boolean;
     }
-  | { kind: "reports"; index: number; reported: ReportedReport[] };
+  | { kind: "reports"; index: number; reported: ReportedReport[] }
+  | { kind: "new"; index: number };
 
 function sameWindow(a: WindowEntry, b: WindowEntry): boolean {
+  if (a.kind === "new" && b.kind === "new") return true;
   if (a.kind === "repair" && b.kind === "repair") return a.repairId === b.repairId;
   if (a.kind === "service" && b.kind === "service") {
     return a.repairId === b.repairId && a.serviceId === b.serviceId;
@@ -208,7 +212,9 @@ export function resolveWindows(
 ): ResolvedWindow[] {
   const windows: ResolvedWindow[] = [];
   stack.forEach((entry, index) => {
-    if (entry.kind === "reports") {
+    if (entry.kind === "new") {
+      windows.push({ kind: "new", index });
+    } else if (entry.kind === "reports") {
       windows.push({ kind: "reports", index, reported: entry.reported });
     } else if (entry.kind === "repair") {
       const repair = rows.find((row) => row.id === entry.repairId);

@@ -600,14 +600,14 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Repairs & Maintenance",
     description:
-      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard. For now the Repairs page lists repairs and, for an administrator or a maintainer, shows and restores deleted ones and changes the status of a repair, in its row or in its window; the rest of a repair is edited from the Dashboard until the repair window can edit.",
+      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard. On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. A repair's bleachers and files are still edited from the Dashboard, and its services cannot be added or edited yet.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can create, edit, and delete any repair or maintenance event regardless of who created it. Can reassign maintenance events between account managers. Changes the status of any repair from the Repairs page.",
+        "Can create, edit, and delete any repair or maintenance event regardless of who created it. Can reassign maintenance events between account managers. Changes the status of any repair from the Repairs page. On the Repairs page adds, edits, deletes and restores repairs, but not yet their services, bleachers or files.",
       ),
       account_manager: custom(
-        "Can create new repair and maintenance events, but can only edit or delete ones they created themselves. Can view all maintenance events regardless of the creator. Does not get the status menu on the Repairs page.",
+        "Can create new repair and maintenance events, but can only edit or delete ones they created themselves. Can view all maintenance events regardless of the creator. On the Repairs page sees every repair but cannot add, edit, delete or restore one, or change its status.",
       ),
       developer: none(
         "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
@@ -617,7 +617,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: full(
-        "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, change their status and restore deleted ones, and the Dashboard to edit them.",
+        "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details and status, delete and restore them, and the Dashboard for their bleachers and files.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -630,14 +630,16 @@ export const PERMISSIONS: PermissionEntry[] = [
   // only to the roles the database lets read them (not the viewer).
   // docs/specs/repairs-08-status.md §5: an administrator and a maintainer change the status from the
   // pill; the account manager and the viewer see a label. The levels do not change.
+  // docs/specs/repairs-09a-repair-writes.md §5: the same two roles add and edit a repair in its window,
+  // delete it and restore it; the account manager and the viewer only read. The levels do not change.
   {
     label: "Repair Costs & Vendors",
     description:
-      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The Vendor filter lists every vendor, not only the ones that have repairs. A repair opens in place to show its services, one row for each bleacher and category with its amounts. A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. The status is the one thing the page changes: an administrator and a maintainer change it from the pill, in a row or in the repair window. Moving a repair into Completed records the moment it was completed and closes the damage reports found for it, which then leave the drivers' phones; moving it out of Completed clears that moment and leaves the reports closed. Nothing else on the page can be edited yet.",
+      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The Vendor filter lists every vendor, not only the ones that have repairs. A repair opens in place to show its services, one row for each bleacher and category with its amounts. A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. An administrator and a maintainer can add a repair and, in the repair window, change its vendor, invoice number, status, currency, repair days and notes; the status can also be changed from the pill in a row. Moving a repair into Completed records the moment it was completed and closes the damage reports found for it, which then leave the drivers' phones; moving it out of Completed clears that moment and leaves the reports closed. The amounts, the services and the files cannot be edited yet.",
     category: "Day to Day Operations",
     roles: {
       admin: read(
-        "Sees every column and the total cost strip, and opens the repair window with its files. Changes the status from the pill.",
+        "Sees every column and the total cost strip, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; the amounts are read-only.",
       ),
       account_manager: read(
         "Sees every column and the total cost strip, for every repair and not only the ones they created, and opens the repair window with its files. The status is a label; it cannot be changed here.",
@@ -650,7 +652,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: read(
-        "Sees every column and the total cost strip, vendors included, and opens the repair window with its files. Changes the status from the pill.",
+        "Sees every column and the total cost strip, vendors included, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; the amounts are read-only.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },

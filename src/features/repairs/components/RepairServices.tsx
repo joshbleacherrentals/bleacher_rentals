@@ -37,7 +37,8 @@ const WINDOW_GRID: CSSProperties = {
   gridTemplateColumns: "76px 120px 84px 108px minmax(120px, 1fr) 88px 88px 72px 72px 100px 16px",
   columnGap: 8,
 };
-const WINDOW_MIN_WIDTH = 1056;
+/** The table never gets narrower than this; the repair window is wide enough for it (spec 09a). */
+export const WINDOW_MIN_WIDTH = 1056;
 
 const HEADER_BASE =
   "text-xs leading-4 font-medium tracking-wider whitespace-nowrap text-[#6b7280] uppercase";

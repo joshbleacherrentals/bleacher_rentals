@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { repairRow, repairService } from "../utils/repairRowFixture";
 import type { RepairListRow } from "../utils/repairRows";
-import { RepairWindowContent } from "./RepairWindow";
+import {
+  REPAIR_WINDOW_CLASS,
+  REPAIR_WINDOW_WIDTH,
+  RepairWindowContent,
+  RepairWindowFooter,
+  type RepairWindowFooterProps,
+} from "./RepairWindow";
+import { WINDOW_MIN_WIDTH } from "./RepairServices";
 
 // docs/specs/repairs-07-repair-window.md §2.2, §2.3 and §7 (D95 to D108). The window's content is
 // rendered on the server (a Radix dialog needs a portal, which Vitest's node environment does not
@@ -53,6 +60,8 @@ const render = (
     files?: ReactNode;
     Title?: "h2" | "h3";
     onChangeStatus?: () => void;
+    eyebrow?: string;
+    fields?: ReactNode;
   } = {},
 ) =>
   renderToStaticMarkup(
@@ -65,6 +74,8 @@ const render = (
       files={over.files === undefined ? null : over.files}
       Title={over.Title}
       onChangeStatus={over.onChangeStatus}
+      eyebrow={over.eyebrow}
+      fields={over.fields}
     />,
   );
 
@@ -306,5 +317,129 @@ describe("RepairWindowContent status menu (spec 08)", () => {
     expect(markup.match(/data-testid="repair-status-menu"/g)).toHaveLength(1);
     expect(text(markup)).not.toContain("Edit");
     expect(text(markup)).not.toContain("Open repair");
+  });
+});
+
+// docs/specs/repairs-09a-repair-writes.md §2.2 and §3 (D128): in Edit mode the page gives the window
+// an eyebrow and its own fields; the services and the files stay as they are.
+describe("RepairWindowContent in Edit mode (spec 09a)", () => {
+  const fields = <div id="custom-fields">the inputs</div>;
+  const live = repairRow({ id: "live", status: "in_repair", invoiceNumber: "JJ-5" });
+
+  it("draws the eyebrow it is given, and Repair by default", () => {
+    expect(text(render({ repair: live, eyebrow: "Edit repair" }))).toContain("Edit repair");
+    expect(text(render({ repair: live }))).not.toContain("Edit repair");
+  });
+
+  it("replaces the fields grid with the fields it is given", () => {
+    const markup = render({ repair: live, fields });
+    expect(markup).toContain('id="custom-fields"');
+    expect(markup).not.toContain('data-field="vendor"');
+    expect(markup).not.toContain('data-field="notes"');
+  });
+
+  it("draws no status menu, even when the page allows the change, because the select replaces it", () => {
+    const markup = render({ repair: live, fields, onChangeStatus: () => {} });
+    expect(markup).not.toContain("repair-status-menu");
+  });
+
+  it("still draws the services with their Total row and the files section it is given", () => {
+    const markup = render({
+      repair: full,
+      fields,
+      files: <section data-testid="repair-files">files</section>,
+    });
+    expect(text(markup)).toContain("Services");
+    expect(markup).toContain("repair-files");
+  });
+});
+
+describe("RepairWindowFooter (D124, D128, D143, D145)", () => {
+  const footer = (over: Partial<RepairWindowFooterProps> = {}) =>
+    renderToStaticMarkup(
+      <RepairWindowFooter
+        mode="view"
+        deleted={false}
+        saving={false}
+        onEdit={() => {}}
+        onDelete={() => {}}
+        onRestore={() => {}}
+        onCancel={() => {}}
+        onSave={() => {}}
+        {...over}
+      />,
+    );
+  const has = (markup: string, testId: string) => markup.includes(`data-testid="${testId}"`);
+
+  it("draws Delete and Edit for a live repair in view mode", () => {
+    const markup = footer();
+    expect(has(markup, "repair-delete")).toBe(true);
+    expect(has(markup, "repair-edit")).toBe(true);
+    expect(has(markup, "repair-restore")).toBe(false);
+    expect(has(markup, "repair-save")).toBe(false);
+    expect(has(markup, "repair-cancel")).toBe(false);
+    expect(text(markup)).toBe("Delete Edit");
+  });
+
+  it("puts Delete before Edit, at the left", () => {
+    const markup = footer();
+    expect(markup.indexOf("repair-delete")).toBeLessThan(markup.indexOf("repair-edit"));
+  });
+
+  it("draws only Restore for a deleted repair, with no Edit and no Delete (D145)", () => {
+    const markup = footer({ deleted: true });
+    expect(has(markup, "repair-restore")).toBe(true);
+    expect(has(markup, "repair-edit")).toBe(false);
+    expect(has(markup, "repair-delete")).toBe(false);
+    expect(text(markup)).toBe("Restore");
+  });
+
+  it("draws Cancel and Save in Edit mode", () => {
+    const markup = footer({ mode: "edit" });
+    expect(has(markup, "repair-cancel")).toBe(true);
+    expect(has(markup, "repair-save")).toBe(true);
+    expect(has(markup, "repair-edit")).toBe(false);
+    expect(has(markup, "repair-delete")).toBe(false);
+    expect(text(markup)).toBe("Cancel Save");
+  });
+
+  it("draws Cancel and Add repair in New repair", () => {
+    const markup = footer({ mode: "new" });
+    expect(text(markup)).toBe("Cancel Add repair");
+    expect(has(markup, "repair-save")).toBe(true);
+  });
+
+  it("reads Saving... and disables Save and Cancel while the write runs", () => {
+    const markup = footer({ mode: "edit", saving: true });
+    expect(text(markup)).toContain("Saving...");
+    expect(markup).toMatch(
+      /<button[^>]*data-testid="repair-save"[^>]*disabled=""|<button[^>]*disabled=""[^>]*data-testid="repair-save"/,
+    );
+    expect(markup).toMatch(
+      /<button[^>]*data-testid="repair-cancel"[^>]*disabled=""|<button[^>]*disabled=""[^>]*data-testid="repair-cancel"/,
+    );
+  });
+
+  it("leaves Save enabled otherwise", () => {
+    const markup = footer({ mode: "edit" });
+    expect(markup).not.toMatch(/<button[^>]*data-testid="repair-save"[^>]*disabled=""/);
+  });
+});
+
+// The table of services has a minimum width of its own. When the window was narrower than that, the
+// table scrolled sideways inside the window (the window was 1080 px, its table needed 1056 px and had
+// 1030 px). The window is now wide enough, and a sideways scroll of the window itself is off.
+describe("the repair window has no side scroll", () => {
+  it("is wide enough for the table of services, after its borders and its 24 px of padding", () => {
+    const DIALOG_BORDER = 2; // 1 px at each side of the dialog
+    const CONTENT_PADDING = 48; // `px-6` at each side of the content
+    const TABLE_BORDER = 2; // 1 px at each side of the table's box
+    const room = REPAIR_WINDOW_WIDTH - DIALOG_BORDER - CONTENT_PADDING - TABLE_BORDER;
+    expect(room).toBeGreaterThanOrEqual(WINDOW_MIN_WIDTH);
+  });
+
+  it("sets that width on the dialog and hides a sideways overflow of the dialog itself", () => {
+    expect(REPAIR_WINDOW_CLASS).toContain(`sm:max-w-[${REPAIR_WINDOW_WIDTH}px]`);
+    expect(REPAIR_WINDOW_CLASS).toContain("overflow-x-hidden");
   });
 });

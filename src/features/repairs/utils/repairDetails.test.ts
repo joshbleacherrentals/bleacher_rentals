@@ -488,3 +488,38 @@ describe("resolveWindows (D96, D98)", () => {
     expect(second.kind === "repair" && second.repair.invoiceNumber).toBe("NEW");
   });
 });
+
+// docs/specs/repairs-09a-repair-writes.md §2.8, §3 and §7 (D126): the stack gets a `new` entry for
+// the New repair window.
+describe("the new entry of the stack (spec 09a)", () => {
+  const newEntry: WindowEntry = { kind: "new" };
+
+  it("opens on an empty stack and on top of another window", () => {
+    expect(openWindow([], newEntry)).toEqual([newEntry]);
+    expect(openWindow([repairEntry("r1")], newEntry)).toEqual([repairEntry("r1"), newEntry]);
+  });
+
+  it("is the same as another new entry on the top: it is not opened twice", () => {
+    expect(openWindow([newEntry], newEntry)).toEqual([newEntry]);
+  });
+
+  it("closes with closeFrom, with the windows above it", () => {
+    expect(closeFrom([repairEntry("r1"), newEntry, reportsEntry("a")], 1)).toEqual([
+      repairEntry("r1"),
+    ]);
+    expect(closeFrom([newEntry], 0)).toEqual([]);
+  });
+
+  it("is drawn by resolveWindows with its index and no repair behind it", () => {
+    const rows = [repairRow({ id: "r1" })];
+    const windows = resolveWindows(rows, [repairEntry("r1"), newEntry]);
+    expect(windows.map((w) => [w.kind, w.index])).toEqual([
+      ["repair", 0],
+      ["new", 1],
+    ]);
+  });
+
+  it("is drawn even when the rows are empty", () => {
+    expect(resolveWindows([], [newEntry]).map((w) => w.kind)).toEqual(["new"]);
+  });
+});

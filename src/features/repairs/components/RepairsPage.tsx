@@ -7,9 +7,9 @@ import { Pagination } from "@/components/Pagination";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
-import { setMaintenanceEventDeleted } from "@/features/maintenanceEvents/db/deleteMaintenanceEvent";
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { changeRepairStatus } from "../db/repairStatusWrite";
+import { createRepair, deleteRepair, restoreRepair, updateRepair } from "../db/repairWrite";
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
 import { useRepairList } from "../hooks/useRepairList";
 import { closeFrom, openWindow, resolveWindows, type WindowEntry } from "../utils/repairDetails";
@@ -31,7 +31,7 @@ import {
 import type { RepairListRow, RepairStatus } from "../utils/repairRows";
 import { nextRepairSort, type RepairSortKey } from "../utils/repairSort";
 import { DamageReportWindow } from "./DamageReportWindow";
-import { RepairWindow } from "./RepairWindow";
+import { NewRepairWindow, RepairWindow, type RepairEditing } from "./RepairWindow";
 import { RepairsTable } from "./RepairsTable";
 import { RepairsToolbar } from "./RepairsToolbar";
 import { RepairsTotalsStrip } from "./RepairsTotalsStrip";
@@ -42,11 +42,12 @@ import { ServiceWindow } from "./ServiceWindow";
  * filters, Show Deleted), the sortable table and the pager. The state of the list lives in the
  * address. Which repairs are open lives in React (spec 06 D81), and so do the windows: the repair
  * window, the service window and the damage report window are one stack, each over the one that
- * opened it (spec 07 D95, D96). It writes two things, both for an administrator or a maintainer:
- * Restore in the Show Deleted view, and the status chosen in the menu of a pill, in a row or in the
- * repair window (spec 08 D110, D111). docs/specs/repairs-04-table.md,
+ * opened it (spec 07 D95, D96). It writes, for an administrator or a maintainer: the status chosen in
+ * the menu of a pill (spec 08 D110, D111), and the repair itself, from the New repair button and from
+ * the repair window: Add, Edit, Delete and Restore (spec 09a D124 to D145). docs/specs/repairs-04-table.md,
  * docs/specs/repairs-05-toolbar.md, docs/specs/repairs-06-expanded-row.md,
- * docs/specs/repairs-07-repair-window.md §2.7 and docs/specs/repairs-08-status.md §2.1.
+ * docs/specs/repairs-07-repair-window.md §2.7, docs/specs/repairs-08-status.md §2.1 and
+ * docs/specs/repairs-09a-repair-writes.md §2.1 and §2.8.
  */
 export default function RepairsPage() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function RepairsPage() {
 
   // Show Deleted and Restore are for the same two roles as before (D41); the address cannot give
   // the other roles deleted repairs (D65).
-  const { isAdmin, isMaintainer } = useTeamPermissions();
+  const { isAdmin, isMaintainer, userId } = useTeamPermissions();
   const canManage = canManageDamageAndMaintenance({ isAdmin, isMaintainer });
 
   const urlState = useMemo(() => readRepairsUrlState(searchParams), [searchParams]);
@@ -91,10 +92,39 @@ export default function RepairsPage() {
   };
   const change = (patch: RepairsUrlPatch) => go(narrowRepairsUrlState(urlState, patch));
 
+  // Restore of the row and of the window: the duplicate check and the red toasts are the writer's
+  // (spec 09a D145); the catch only stops an unhandled rejection.
   const restore = (repairId: string) => {
-    // The function shows its own error toast; the catch only stops an unhandled rejection.
-    void setMaintenanceEventDeleted(repairId, false).catch(() => {});
+    const repair = rows.find((row) => row.id === repairId);
+    if (!repair) return;
+    return restoreRepair({
+      repairId,
+      vendorUuid: repair.vendorUuid,
+      invoiceNumber: repair.invoiceNumber,
+    });
   };
+
+  // What the repair window gets for an administrator or a maintainer (D124). `repair` is the row as
+  // the page holds it at this render, so `liveStatus` and `reported` are the newest (D135).
+  const editingFor = (repair: RepairListRow): RepairEditing | undefined =>
+    canManage
+      ? {
+          vendors: options.vendor,
+          onSave: (initial, values) =>
+            updateRepair({
+              repairId: repair.id,
+              initial,
+              values,
+              liveStatus: repair.status,
+              reported: repair.reported,
+              now: new Date().toISOString(),
+            }),
+          onDelete: () => deleteRepair(repair.id),
+          onRestore: async () => {
+            await restore(repair.id);
+          },
+        }
+      : undefined;
 
   // One clock reading is the moment of the whole change (D112, D116). The function shows its own
   // error toast (D119); the catch only stops an unhandled rejection.
@@ -110,7 +140,22 @@ export default function RepairsPage() {
 
   return (
     <>
-      <PageHeader title="Repairs" subtitle="All maintenance and repair events across the fleet" />
+      <PageHeader
+        title="Repairs"
+        subtitle="All maintenance and repair events across the fleet"
+        action={
+          canManage ? (
+            <button
+              type="button"
+              data-testid="new-repair"
+              onClick={() => open({ kind: "new" })}
+              className="cursor-pointer rounded-sm bg-darkBlue px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-lightBlue"
+            >
+              New repair
+            </button>
+          ) : undefined
+        }
+      />
 
       <RepairsTotalsStrip
         tab={urlState.tab}
@@ -147,7 +192,7 @@ export default function RepairsPage() {
           rows={view.pageRows}
           isLoading={isLoading}
           showRestore={showDeleted}
-          onRestore={restore}
+          onRestore={(repairId) => void restore(repairId)?.catch(() => {})}
           sort={urlState.sort}
           onSort={(key: RepairSortKey) => change({ sort: nextRepairSort(urlState.sort, key) })}
           expandedIds={expandedIds}
@@ -160,6 +205,22 @@ export default function RepairsPage() {
       </div>
 
       {windows.map((w) => {
+        if (w.kind === "new") {
+          return (
+            <NewRepairWindow
+              key={w.index}
+              vendors={options.vendor}
+              onCreate={(values) =>
+                createRepair({
+                  values,
+                  createdByUserUuid: userId,
+                  now: new Date().toISOString(),
+                })
+              }
+              onClose={() => close(w.index)}
+            />
+          );
+        }
         if (w.kind === "repair") {
           return (
             <RepairWindow
@@ -171,6 +232,7 @@ export default function RepairsPage() {
               onOpenReports={() => open({ kind: "reports", reported: w.repair.reported })}
               onClose={() => close(w.index)}
               onChangeStatus={canManage ? (to) => changeStatus(w.repair, to) : undefined}
+              editing={editingFor(w.repair)}
             />
           );
         }
