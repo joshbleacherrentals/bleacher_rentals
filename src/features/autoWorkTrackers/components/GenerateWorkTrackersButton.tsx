@@ -10,9 +10,11 @@ import { summarizeUnassigned } from "../utils/unassignedSummary";
 export function GenerateWorkTrackersButton({
   zoneId,
   weekStart,
+  fullWidth = false,
 }: {
   zoneId: string;
   weekStart: string;
+  fullWidth?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerateWorkTrackersResult | null>(null);
@@ -33,7 +35,12 @@ export function GenerateWorkTrackersButton({
 
   return (
     <div className="flex flex-col gap-1">
-      <Button onClick={handleClick} disabled={!zoneId || loading}>
+      <Button
+        onClick={handleClick}
+        disabled={!zoneId || loading}
+        size={fullWidth ? "lg" : "default"}
+        className={fullWidth ? "w-full" : undefined}
+      >
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Create work trackers
       </Button>

@@ -56,15 +56,15 @@ describe("useSidebarItems", () => {
     }
   });
 
-  it("admin and account manager see Schedule Validator right after Auto Work Trackers", () => {
-    for (const role of ["admin", "account_manager"] as const) {
-      const keys = useSidebarItems([role]).map((i) => i.key);
-      expect(keys.indexOf("schedule-validator"), role).toBe(keys.indexOf("auto-work-trackers") + 1);
-    }
-  });
-
-  it("no other role sees Schedule Validator", () => {
-    for (const role of ["viewer", "developer", "maintainer", "accountant"] as const) {
+  it("nobody sees Schedule Validator: its checks live in Auto Work Trackers", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "developer",
+      "maintainer",
+      "accountant",
+    ] as const) {
       expect(
         useSidebarItems([role]).map((i) => i.key),
         role,

@@ -12,8 +12,6 @@ import {
   HEADER_ROW_HEIGHT,
 } from "@/features/dashboard/values/constants";
 import { toDashboardRows, type GridRow } from "../utils/rows";
-import type { SuggestedTrip } from "../utils/suggestions";
-import { GhostPulse } from "./GhostTrip";
 import {
   EventRowsLeftRenderer,
   EventRowsMainRenderer,
@@ -23,11 +21,6 @@ import {
 export type EventDashboardData = {
   rows: GridRow[];
   weekStart: string;
-  suggestions: SuggestedTrip[];
-};
-
-type Options = EventDashboardData & {
-  onAccept: (trip: SuggestedTrip) => void;
 };
 
 /**
@@ -51,21 +44,17 @@ export class EventDashboard {
   private readonly dates: string[];
   private readonly columns: number;
   private readonly resize: ResizeManager;
-  private pulse: GhostPulse;
   private data: EventDashboardData;
-  private readonly onAccept: (trip: SuggestedTrip) => void;
 
   constructor(
     private readonly app: Application,
-    opts: Options,
+    opts: EventDashboardData,
   ) {
     PngManager.fetchAndCachePng(app);
     const { columns, dates } = getColumnsAndDates();
     this.dates = dates;
     this.columns = columns;
     this.data = opts;
-    this.onAccept = opts.onAccept;
-    this.pulse = new GhostPulse(app.ticker);
 
     this.build(this.initialScrollX(opts.weekStart), 0);
 
@@ -76,7 +65,7 @@ export class EventDashboard {
     this.resize.start();
   }
 
-  /** Replace the data (rows, week, suggestions). Scrolls to the week only when the week changed. */
+  /** Replace the data (rows, week). Scrolls to the week only when the week changed. */
   setData(data: EventDashboardData) {
     const weekChanged = data.weekStart !== this.data.weekStart;
     this.data = data;
@@ -104,11 +93,8 @@ export class EventDashboard {
 
   private build(scrollX: number, scrollY: number) {
     const { app, dates, columns } = this;
-    const { rows, weekStart, suggestions } = this.data;
+    const { rows, weekStart } = this.data;
     const bleachers = toDashboardRows(rows);
-
-    this.pulse.destroy();
-    this.pulse = new GhostPulse(app.ticker);
 
     this.mainRenderer = new EventRowsMainRenderer({
       app,
@@ -116,9 +102,6 @@ export class EventDashboard {
       bleachers,
       dates,
       weekStart,
-      suggestions,
-      onAccept: this.onAccept,
-      pulse: this.pulse,
     });
     this.leftRenderer = new EventRowsLeftRenderer(app, rows, bleachers);
     this.pinnedRenderer = new EventRowsPinnedRenderer(app, rows, bleachers, dates);
@@ -258,7 +241,6 @@ export class EventDashboard {
     try {
       this.resize.destroy();
     } catch {}
-    this.pulse.destroy();
     this.teardown();
   }
 }

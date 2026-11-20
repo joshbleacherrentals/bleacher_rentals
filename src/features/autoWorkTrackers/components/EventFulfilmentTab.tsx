@@ -115,7 +115,7 @@ function EventSection({ event, hideReady }: { event: EventDeliveries; hideReady:
  * the crow flies). Bleachers already at the event are ticked, and an event with all of them ready is
  * ticked and folded. "Hide ready" narrows the list to what still needs doing.
  */
-export function BleacherDeliveriesTab() {
+export function EventFulfilmentTab() {
   const { zoneId, weekStart } = useZoneWeekParams();
   const { events, isLoading } = useLogisticsPlans(weekStart, zoneId || undefined);
   const deliveries = useMemo(() => buildDeliveryList(events), [events]);

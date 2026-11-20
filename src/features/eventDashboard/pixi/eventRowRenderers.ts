@@ -5,8 +5,6 @@ import { MainGridCellRenderer } from "@/features/dashboard/cellRenderers/MainGri
 import { StickyLeftColumnCellRenderer } from "@/features/dashboard/cellRenderers/StickyLeftColumnCellRenderer";
 import { PinnedYCellRenderer } from "@/features/dashboard/cellRenderers/PinnedYCellRenderer";
 import type { GridRow, EventHeaderRow } from "../utils/rows";
-import { ghostsByCell, type SuggestedTrip } from "../utils/suggestions";
-import { GhostPulse, GhostTrip } from "./GhostTrip";
 
 /**
  * The dashboard's own renderers, wrapped so some rows are event headers. A bleacher row is drawn by
@@ -56,17 +54,13 @@ export type MainRendererOptions = {
   rows: GridRow[];
   bleachers: Bleacher[];
   dates: string[];
-  /** The Monday of the selected week: its days are tinted, as the range trips can be created in. */
+  /** The Monday of the selected week: its days are tinted. */
   weekStart: string;
-  suggestions: SuggestedTrip[];
-  onAccept: (trip: SuggestedTrip) => void;
-  pulse: GhostPulse;
 };
 
-/** Main grid: the dashboard's cells, the event header bands, the week tint and the ghost trips. */
+/** Main grid: the dashboard's cells, the event header bands, and the week tint. */
 export class EventRowsMainRenderer implements ICellRenderer {
   private readonly dashboard: MainGridCellRenderer;
-  private readonly ghosts: Map<string, SuggestedTrip[]>;
   private readonly weekCols: Set<number>;
 
   constructor(private readonly opts: MainRendererOptions) {
@@ -78,7 +72,6 @@ export class EventRowsMainRenderer implements ICellRenderer {
       "Bleachers",
       undefined,
     );
-    this.ghosts = ghostsByCell(opts.suggestions, opts.bleachers, opts.dates);
     this.weekCols = new Set<number>();
     const start = opts.dates.indexOf(opts.weekStart);
     if (start >= 0)
@@ -124,17 +117,6 @@ export class EventRowsMainRenderer implements ICellRenderer {
       tint.zIndex = 99998;
       parent.sortableChildren = true;
       parent.addChild(tint);
-    }
-
-    const trips = this.ghosts.get(`${row}:${col}`);
-    if (trips?.length) {
-      parent.sortableChildren = true;
-      // Above everything else in the cell, and above the neighbouring cells' event bodies.
-      parent.zIndex = Math.max(parent.zIndex, 20_000_000);
-      const ghost = new GhostTrip(trips[0], this.opts.onAccept);
-      ghost.zIndex = 200000;
-      parent.addChild(ghost);
-      this.opts.pulse.track(ghost);
     }
     return parent;
   }

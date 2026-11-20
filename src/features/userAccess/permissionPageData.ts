@@ -511,30 +511,15 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Auto Work Trackers",
     description:
-      "The Auto Work Trackers page in the sidebar, where you pick one zone and one week (Monday to Sunday). Its Schedule tab shows that zone's bleachers across the week, laid out like the Dashboard, and its Bleacher Deliveries tab lists every event starting that week with its bleachers, ticking the ones already at the event and showing, for the rest, where each was last, how many days there are to move it and the straight-line distance to the event. Its Event Dashboard tab shows the Dashboard's grid for that week, grouped under the events that start in it (each event, then its bleachers); it is read-only. Its Suggest trips button shows the trips the zone's bleachers need as flashing tiles, and clicking a tile (or Accept all) creates that draft work tracker, only on a day inside the selected week. The Create work trackers button, at the top of the page on every tab, works out which of the zone's bleachers need a trip that week and creates a draft work tracker for each, with the pick-up and drop-off address filled in and no driver, contact or times. It is being built: the Schedule tab's days are still blank.",
+      "The Auto Work Trackers page in the sidebar. A folding panel on its left holds the zone and the week (Monday to Sunday), the Create work trackers button, and the page list, grouped under Events, Bleachers and Drivers. The Create work trackers button works out which of the zone's bleachers need a trip that week and creates a draft work tracker for each, with a driver and a day where one can be found. Events: the Event Dashboard (opened first) shows the Dashboard's grid for that week, grouped under the events that start in it. Event Fulfilment lists every event starting that week with its bleachers, ticking the ones already at the event and showing, for the rest, where each was last, how many days there are to move it and the straight-line distance to the event. Event Bleacher Requirements checks whether the bleachers selected on each event match what it requires. Bleachers: Overbooked Bleachers lists bleachers booked on two events that overlap. Drivers: Driver Workload shows each driver's driving hours per day and flags any day over 12 hours, and Driver Availability checks that no driver on a work tracker that week has marked that date as unavailable. Every page only reads (only the Create work trackers button changes anything): the checks are there so the work trackers the model creates can be trusted. The checks other than Event Dashboard and Event Fulfilment cover every zone for now, whichever zone is picked.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can open the page, pick a zone and a week, see the zone's bleachers laid out across it, see the Event Dashboard, and create the draft work trackers (all at once, or by accepting suggested trips).",
+        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it.",
       ),
       account_manager: full(
-        "Can open the page, pick any zone and a week, see its bleachers laid out across it, see the Event Dashboard, and create the draft work trackers (all at once, or by accepting suggested trips).",
+        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it.",
       ),
-      developer: none("Does not have this page."),
-      viewer: none("Does not have this page."),
-      driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
-    },
-  },
-  {
-    label: "Schedule Validator",
-    description:
-      "The Schedule Validator page in the sidebar, which checks the schedule for one week (Monday to Sunday). Its Event Bleacher Requirements tab lists the events that start that week and whether the bleachers selected match what each requires, its Overbooked Bleachers tab lists bleachers booked on two events that overlap, and its Bleacher Deliveries tab checks that each bleacher on an event starting that week was last left at the event's street, and its Driver Availability tab checks that no driver on a work tracker that week has marked that date as unavailable, and its Driver Workload tab shows each driver's driving hours per day and flags any day over 12 hours. It only reads: it changes nothing.",
-    category: "Day to Day Operations",
-    roles: {
-      admin: full("Can open the page and see every tab for any week."),
-      account_manager: full("Can open the page and see every tab for any week."),
       developer: none("Does not have this page."),
       viewer: none("Does not have this page."),
       driver: none("Drivers only have access to the Driver Mobile App."),

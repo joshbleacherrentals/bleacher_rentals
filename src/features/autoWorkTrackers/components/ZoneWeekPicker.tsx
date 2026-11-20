@@ -9,7 +9,8 @@ import { currentWeekStart, formatWeekLabel, shiftWeek } from "../utils/week";
 /**
  * A zone and a week (Monday to Sunday), shared by the pages that work a week at a time.
  * `weekStart` is the week's Monday, "YYYY-MM-DD"; `children` sit beside the pickers. The zone
- * select shows only when `onZoneChange` is given.
+ * select shows only when `onZoneChange` is given. `stacked` lays the controls out one above another
+ * at full width, for a narrow side panel.
  */
 export function ZoneWeekPicker({
   idPrefix,
@@ -17,6 +18,7 @@ export function ZoneWeekPicker({
   weekStart,
   onZoneChange,
   onWeekChange,
+  stacked = false,
   children,
 }: {
   idPrefix: string;
@@ -24,13 +26,14 @@ export function ZoneWeekPicker({
   weekStart: string;
   onZoneChange?: (zoneId: string) => void;
   onWeekChange: (weekStart: string) => void;
+  stacked?: boolean;
   children?: ReactNode;
 }) {
   const zones = useZones();
   const isCurrentWeek = weekStart === currentWeekStart();
 
   return (
-    <div className="flex flex-wrap items-end gap-6">
+    <div className={stacked ? "flex flex-col gap-4" : "flex flex-wrap items-end gap-6"}>
       {onZoneChange && (
         <div className="flex flex-col gap-1">
           <label htmlFor={`${idPrefix}-zone`} className="text-sm font-medium">
@@ -40,7 +43,7 @@ export function ZoneWeekPicker({
             id={`${idPrefix}-zone`}
             value={zoneId}
             onChange={(e) => onZoneChange(e.target.value)}
-            className="h-9 min-w-56 rounded-md border bg-background px-3 text-sm shadow-xs"
+            className={`h-9 ${stacked ? "w-full" : "min-w-56"} rounded-md border bg-background px-3 text-sm shadow-xs`}
           >
             <option value="" disabled>
               Select a zone
@@ -56,7 +59,7 @@ export function ZoneWeekPicker({
 
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium">Week</span>
-        <div className="flex items-center gap-2">
+        <div className={stacked ? "flex flex-wrap items-center gap-2" : "flex items-center gap-2"}>
           <Button
             variant="outline"
             size="icon"
@@ -66,7 +69,7 @@ export function ZoneWeekPicker({
             <ChevronLeft />
           </Button>
           <span
-            className="min-w-52 text-center text-sm font-medium"
+            className={`${stacked ? "min-w-0 flex-1" : "min-w-52"} text-center text-sm font-medium`}
             data-testid={`${idPrefix}-week`}
           >
             {formatWeekLabel(weekStart)}
@@ -82,6 +85,7 @@ export function ZoneWeekPicker({
           <Button
             variant="ghost"
             size="sm"
+            className={stacked ? "w-full" : undefined}
             disabled={isCurrentWeek}
             onClick={() => onWeekChange(currentWeekStart())}
           >
