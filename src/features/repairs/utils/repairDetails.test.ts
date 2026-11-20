@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDamageReportViews,
+  closeFrom,
   findService,
+  openWindow,
   repairLabel,
+  repairOpenLabel,
   reportsButtonLabel,
   reportsWindowTitle,
+  resolveWindows,
   serviceRowLabel,
   serviceWindowTitle,
+  type WindowEntry,
 } from "./repairDetails";
 import { repairRow, repairService as service } from "./repairRowFixture";
 import type { RawReportDetailRow, RawReportPhotoRow } from "../db/serviceWindowQueries";
 
-// docs/specs/repairs-06-expanded-row.md §2.2 to §2.4, §3 and §7.
+// docs/specs/repairs-06-expanded-row.md §2.2 to §2.4, §3 and §7, and docs/specs/repairs-07-repair-window.md
+// §2.1, §2.7, §3 and §7 (the open button's name and the stack of windows).
 
 describe("findService", () => {
   const welding = service({ id: "s1" });
@@ -311,5 +317,174 @@ describe("buildDamageReportViews", () => {
       null,
       null,
     ]);
+  });
+});
+
+describe("repairOpenLabel (D94)", () => {
+  it("names the button after the repair's invoice number", () => {
+    expect(repairOpenLabel(repairRow({ id: "r", invoiceNumber: "JJ-5" }))).toBe("Open repair JJ-5");
+  });
+
+  it("names it after the bleachers when there is no invoice number, #? for an unknown number", () => {
+    const row = repairRow({
+      id: "r",
+      bleachers: [
+        { uuid: "b1", number: 52 },
+        { uuid: "b2", number: null },
+      ],
+    });
+    expect(repairOpenLabel(row)).toBe("Open repair of bleacher #52, #?");
+  });
+
+  it("is just Open repair when it has neither", () => {
+    expect(repairOpenLabel(repairRow({ id: "r" }))).toBe("Open repair");
+  });
+});
+
+const repairEntry = (repairId: string): WindowEntry => ({ kind: "repair", repairId });
+const serviceEntry = (repairId: string, serviceId: string): WindowEntry => ({
+  kind: "service",
+  repairId,
+  serviceId,
+});
+const reportsEntry = (...ids: string[]): WindowEntry => ({
+  kind: "reports",
+  reported: ids.map((id) => ({ id, day: "2026-09-17", createdAt: "2026-09-17T16:00:00Z" })),
+});
+
+describe("openWindow (D96)", () => {
+  it("puts a window on top of the stack", () => {
+    const stack = openWindow([serviceEntry("r1", "s1")], repairEntry("r1"));
+    expect(stack).toEqual([serviceEntry("r1", "s1"), repairEntry("r1")]);
+  });
+
+  it("starts a stack from nothing", () => {
+    expect(openWindow([], repairEntry("r1"))).toEqual([repairEntry("r1")]);
+  });
+
+  it("changes nothing when the window asked for is the one already on top", () => {
+    const stack = [repairEntry("r1"), serviceEntry("r1", "s1")];
+    expect(openWindow(stack, serviceEntry("r1", "s1"))).toEqual(stack);
+    expect(openWindow([reportsEntry("a", "b")], reportsEntry("a", "b"))).toEqual([
+      reportsEntry("a", "b"),
+    ]);
+    expect(openWindow([repairEntry("r1")], repairEntry("r1"))).toEqual([repairEntry("r1")]);
+  });
+
+  it("does push the same window when it is only under another one, or another of its kind", () => {
+    expect(
+      openWindow([repairEntry("r1"), serviceEntry("r1", "s1")], repairEntry("r1")),
+    ).toHaveLength(3);
+    expect(openWindow([serviceEntry("r1", "s1")], serviceEntry("r1", "s2"))).toHaveLength(2);
+    expect(openWindow([reportsEntry("a")], reportsEntry("a", "b"))).toHaveLength(2);
+    expect(openWindow([repairEntry("r1")], repairEntry("r2"))).toHaveLength(2);
+  });
+
+  it("does not change the stack it is given", () => {
+    const stack: WindowEntry[] = [repairEntry("r1")];
+    openWindow(stack, serviceEntry("r1", "s1"));
+    expect(stack).toEqual([repairEntry("r1")]);
+  });
+});
+
+describe("closeFrom (D96)", () => {
+  const stack = [serviceEntry("r1", "s1"), repairEntry("r1"), serviceEntry("r1", "s2")];
+
+  it("removes the window at the index and every window above it", () => {
+    expect(closeFrom(stack, 2)).toEqual([serviceEntry("r1", "s1"), repairEntry("r1")]);
+    expect(closeFrom(stack, 1)).toEqual([serviceEntry("r1", "s1")]);
+  });
+
+  it("empties the stack at index 0", () => {
+    expect(closeFrom(stack, 0)).toEqual([]);
+  });
+
+  it("changes nothing for an index past the end", () => {
+    expect(closeFrom(stack, 3)).toEqual(stack);
+    expect(closeFrom(stack, 10)).toEqual(stack);
+  });
+
+  it("does not change the stack it is given", () => {
+    const copy = [...stack];
+    closeFrom(stack, 0);
+    expect(stack).toEqual(copy);
+  });
+});
+
+describe("resolveWindows (D96, D98)", () => {
+  const rows = [
+    repairRow({ id: "r1", services: [service({ id: "s1" }), service({ id: "s2" })] }),
+    repairRow({ id: "r2", services: [service({ id: "s3" })] }),
+  ];
+
+  it("resolves a repair, a service and a reports entry in order, each with its index", () => {
+    const reports = reportsEntry("a");
+    const windows = resolveWindows(rows, [serviceEntry("r2", "s3"), repairEntry("r1"), reports]);
+    expect(windows.map((w) => [w.kind, w.index])).toEqual([
+      ["service", 0],
+      ["repair", 1],
+      ["reports", 2],
+    ]);
+    const [svc, rep, rpt] = windows;
+    expect(svc.kind === "service" && svc.repair.id).toBe("r2");
+    expect(svc.kind === "service" && svc.service.id).toBe("s3");
+    expect(rep.kind === "repair" && rep.repair.id).toBe("r1");
+    expect(rpt.kind === "reports" && rpt.reported).toBe(
+      reports.kind === "reports" && reports.reported,
+    );
+  });
+
+  it("gives nothing for an empty stack", () => {
+    expect(resolveWindows(rows, [])).toEqual([]);
+  });
+
+  it("leaves out a window whose repair or service is not in the rows, and keeps the others", () => {
+    const windows = resolveWindows(rows, [
+      repairEntry("gone"),
+      serviceEntry("r1", "gone"),
+      serviceEntry("gone", "s1"),
+      repairEntry("r2"),
+    ]);
+    expect(windows.map((w) => [w.kind, w.index])).toEqual([["repair", 3]]);
+  });
+
+  it("does not draw Open repair in a service window that has a repair window of that repair below it", () => {
+    const [, service] = resolveWindows(rows, [repairEntry("r1"), serviceEntry("r1", "s1")]);
+    expect(service.kind === "service" && service.showOpenRepair).toBe(false);
+  });
+
+  it("draws Open repair in a service window that is the only window", () => {
+    const [only] = resolveWindows(rows, [serviceEntry("r1", "s1")]);
+    expect(only.kind === "service" && only.showOpenRepair).toBe(true);
+  });
+
+  it("draws Open repair when the repair window below it is another repair's", () => {
+    const [, service] = resolveWindows(rows, [repairEntry("r2"), serviceEntry("r1", "s1")]);
+    expect(service.kind === "service" && service.showOpenRepair).toBe(true);
+  });
+
+  it("draws Open repair in a service window that is below the repair window", () => {
+    const [service] = resolveWindows(rows, [serviceEntry("r1", "s1"), repairEntry("r1")]);
+    expect(service.kind === "service" && service.showOpenRepair).toBe(true);
+  });
+
+  it("decides each service window on its own in a deep stack", () => {
+    const windows = resolveWindows(rows, [
+      serviceEntry("r1", "s1"),
+      repairEntry("r1"),
+      serviceEntry("r1", "s2"),
+      reportsEntry("a"),
+    ]);
+    const flags = windows.map((w) => (w.kind === "service" ? w.showOpenRepair : null));
+    expect(flags).toEqual([true, null, false, null]);
+  });
+
+  it("finds the newest values of the rows on every call", () => {
+    const stack = [repairEntry("r1")];
+    const first = resolveWindows(rows, stack)[0];
+    const renamed = [repairRow({ id: "r1", invoiceNumber: "NEW" }), rows[1]];
+    const second = resolveWindows(renamed, stack)[0];
+    expect(first.kind === "repair" && first.repair.invoiceNumber).toBeNull();
+    expect(second.kind === "repair" && second.repair.invoiceNumber).toBe("NEW");
   });
 });

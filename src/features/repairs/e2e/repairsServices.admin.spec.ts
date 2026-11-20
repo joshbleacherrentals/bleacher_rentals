@@ -26,7 +26,8 @@ import {
 /**
  * The expanded row, the service window and the damage report window as an administrator sees
  * them: all read-only. Written, not run (project rule); the admin project cannot run locally.
- * Spec: docs/specs/repairs-06-expanded-row.md §6 (S21 to S26).
+ * Spec: docs/specs/repairs-06-expanded-row.md §6 (S21 to S26); S21 and S23 changed by
+ * docs/specs/repairs-07-repair-window.md §6 (every row has an open button; Open repair exists).
  */
 const sum = (amounts: typeof SERVICE_TIRES) =>
   amounts.labor + amounts.parts + amounts.tax + amounts.freight;
@@ -89,10 +90,8 @@ test.describe("Repairs expanded row and windows (admin)", () => {
     await expect(page.getByTestId("repair-services-empty")).toBeVisible();
     await expect(page.getByText("No services on this repair.")).toBeVisible();
 
-    // Nothing that writes is drawn (D84).
-    await expect(
-      page.getByRole("button", { name: /Add service|^Edit|^Delete|Open repair/ }),
-    ).toHaveCount(0);
+    // Nothing that writes is drawn (D84). Every row has its open button (spec 07 D94).
+    await expect(page.getByRole("button", { name: /Add service|^Edit|^Delete/ })).toHaveCount(0);
   });
 
   test("S22: every change of the list closes the open repairs", async ({ page }) => {
@@ -198,10 +197,10 @@ test.describe("Repairs expanded row and windows (admin)", () => {
     if (seeded.bleacherA.typeName) await expect(card).toContainText(seeded.bleacherA.typeName);
     if (seeded.zones) await expect(card).toContainText(seeded.zones.a.name);
 
-    // Nothing that writes (D84): only the cross and the report button.
-    await expect(
-      win.getByRole("button", { name: /Edit|Delete|Open repair|Add service/ }),
-    ).toHaveCount(0);
+    // Nothing that writes (D84): the cross, the report button and, opened from the table, Open
+    // repair (spec 07 D98).
+    await expect(win.getByRole("button", { name: /Edit|Delete|Add service/ })).toHaveCount(0);
+    await expect(win.getByTestId("service-window-open-repair")).toBeVisible();
     await expect(win.getByRole("button", { name: "Close" })).toBeVisible();
 
     // Esc, the cross and a click on the dimmed page each close it; the row stays open.

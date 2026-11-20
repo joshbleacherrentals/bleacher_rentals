@@ -63,14 +63,17 @@ test.describe("Repairs table (admin)", () => {
     await seeded?.cleanup();
   });
 
-  test("S1: the page opens with the tabs, the strip and the 17 headers", async ({ page }) => {
+  test("S1: the page opens with the tabs, the strip, the 17 headers and the Actions column", async ({
+    page,
+  }) => {
     await openRepairsPage(page);
 
     await expect(tab(page, "Open")).toBeVisible();
     await expect(tab(page, "Completed")).toBeVisible();
     await expect(page.getByText("Total cost · CAD")).toBeVisible();
     await expect(page.getByText("Total cost · USD")).toBeVisible();
-    await expect(page.getByRole("columnheader")).toHaveText(HEADERS);
+    // The last header is the hidden "Actions" of the button at the end of a row (spec 07 D94).
+    await expect(page.getByRole("columnheader")).toHaveText([...HEADERS, "Actions"]);
     await expect(page.getByRole("button", { name: "New repair" })).toHaveCount(0);
     // Spec 05: the fourteen columns with one value per row sort; the other three do not.
     await expect(page.getByRole("columnheader").getByRole("button")).toHaveCount(14);

@@ -13,7 +13,7 @@ import {
  * What every role that opens the Repairs page can do with a repair and its services, read-only:
  * open the block, open a service, read the repair strip and the bleacher card, open the damage
  * report. Shared by scenario S27 of the three role specs.
- * docs/specs/repairs-06-expanded-row.md §6.
+ * docs/specs/repairs-06-expanded-row.md §6 and docs/specs/repairs-07-repair-window.md §6.
  */
 export async function readServicesAndReport(page: Page, seeded: SeededRepairs) {
   await openRepairsPage(page, bleacherQuery(seeded.bleacherA.uuid, "&tab=completed"));
@@ -35,9 +35,9 @@ export async function readServicesAndReport(page: Page, seeded: SeededRepairs) {
   await expect(service.getByTestId("service-window-bleacher")).toContainText(
     seeded.bleacherA.modelNumber,
   );
-  await expect(
-    service.getByRole("button", { name: /Edit|Delete|Open repair|Add service/ }),
-  ).toHaveCount(0);
+  // Opened from the table the window has Open repair (spec 07 D98); nothing that writes.
+  await expect(service.getByRole("button", { name: /Edit|Delete|Add service/ })).toHaveCount(0);
+  await expect(service.getByTestId("service-window-open-repair")).toBeVisible();
 
   // The damage report opens over it and shows the note.
   await service.getByTestId("service-window-reports").click();

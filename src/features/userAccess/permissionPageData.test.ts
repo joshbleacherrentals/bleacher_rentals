@@ -1137,8 +1137,8 @@ describe("Repairs page rows", () => {
     expect(costs?.description).toMatch(
       /Every role that opens the Repairs page sees all of it\. The Vendor filter lists every vendor, not only the ones that have repairs\. /,
     );
-    expect(costs?.roles.viewer.note).toBe(
-      "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter.",
+    expect(costs?.roles.viewer.note).toMatch(
+      /^Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter\./,
     );
     expect(costs?.roles.viewer.level).toBe("read");
   });
@@ -1151,10 +1151,33 @@ describe("Repairs page rows", () => {
       /A repair opens in place to show its services, one row for each bleacher and category with its amounts\. /,
     );
     expect(costs?.description).toMatch(
-      /A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved\. The page only reads for now\.$/,
+      /A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved\. /,
     );
     expect(costs?.description).toMatch(
       /have repairs\. A repair opens in place[\s\S]*The page only reads for now\.$/,
+    );
+  });
+
+  // docs/specs/repairs-07-repair-window.md §5: the repair window shows data the four roles already
+  // read; only the files are not for every role, because the database does not give them to a viewer.
+  it("describes the repair window, with its files, right before the last sentence", () => {
+    expect(costs?.description).toMatch(
+      /whether it was resolved\. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files\. The page only reads for now\.$/,
+    );
+  });
+
+  it("tells every role that opens the page about the repair window, and the viewer about the files", () => {
+    expect(costs?.roles.admin.note).toBe(
+      "Sees every column and the total cost strip, and opens the repair window with its files.",
+    );
+    expect(costs?.roles.account_manager.note).toBe(
+      "Sees every column and the total cost strip, for every repair and not only the ones they created, and opens the repair window with its files.",
+    );
+    expect(costs?.roles.viewer.note).toBe(
+      "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter. Opens the repair window but does not see its files.",
+    );
+    expect(costs?.roles.maintainer.note).toBe(
+      "Sees every column and the total cost strip, vendors included, and opens the repair window with its files.",
     );
   });
 
@@ -1164,17 +1187,17 @@ describe("Repairs page rows", () => {
     }
   });
 
-  it("leaves the notes of the other roles as they were", () => {
-    expect(costs?.roles.admin.note).toBe("Sees every column and the total cost strip.");
-    expect(costs?.roles.maintainer.note).toBe(
-      "Sees every column and the total cost strip, vendors included.",
-    );
+  it("leaves the notes of the roles that do not open the page as they were", () => {
+    expect(costs?.roles.developer.note).toMatch(/Developers do not have access to repairs/);
+    expect(costs?.roles.driver.note).toBe("Drivers only have access to the Driver Mobile App.");
   });
 
-  it("tells the old row that the Repairs page only lists repairs for now", () => {
+  // docs/specs/repairs-07-repair-window.md §5: the window exists but only shows a repair.
+  it("tells the old row that the repair window only shows a repair and the Dashboard edits it", () => {
     expect(maintenance?.description).toMatch(
-      /For now the Repairs page only lists repairs and, for an administrator or a maintainer, shows and restores deleted ones; a repair is edited from the Dashboard until the repair window arrives\./,
+      /For now the Repairs page only lists repairs and, for an administrator or a maintainer, shows and restores deleted ones; the repair window only shows a repair, and a repair is edited from the Dashboard until that window can edit\./,
     );
+    expect(maintenance?.description).not.toMatch(/until the repair window arrives/);
     expect(maintenance?.roles.maintainer.note).toMatch(
       /Uses the Repairs page to look repairs up and restore deleted ones, and the Dashboard to edit them\./,
     );

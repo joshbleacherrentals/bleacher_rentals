@@ -6,7 +6,8 @@ import { RepairsTable, type RepairsTableProps } from "./RepairsTable";
 
 // docs/specs/repairs-04-table.md §2.2 to §2.5, §2.10 and §7, and docs/specs/repairs-05-toolbar.md
 // §2.5 (the sort headers), and docs/specs/repairs-06-expanded-row.md §2.1, §2.2 and §7 (the arrow,
-// the open block and the Reported link). The table is rendered on the server:
+// the open block and the Reported link), and docs/specs/repairs-07-repair-window.md §2.1 and §7 (the
+// button at the end of a row and the always-there last column). The table is rendered on the server:
 // what is under test is which words and colours each cell gets. Clicks are covered by e2e.
 
 const report = (id: string, day: string) => ({ id, day, createdAt: `${day}T12:00:00Z` });
@@ -24,6 +25,7 @@ const render = (props: Partial<RepairsTableProps> = {}) =>
       onToggleRepair={() => {}}
       onOpenService={() => {}}
       onOpenReports={() => {}}
+      onOpenRepair={() => {}}
       {...props}
     />,
   );
@@ -49,6 +51,7 @@ function headers(markup: string): string[] {
   return [...markup.matchAll(/<div role="columnheader"[^>]*>(.*?)<\/div>/g)].map((m) => text(m[1]));
 }
 
+/** The 17 columns of the canvas; the last column (Actions) comes after them (spec 07 D94). */
 const HEADERS = [
   "Bleachers",
   "Reported",
@@ -68,6 +71,7 @@ const HEADERS = [
   "Total",
   "Completed",
 ];
+const ALL_HEADERS = [...HEADERS, "Actions"];
 
 const full = repairRow({
   id: "r1",
@@ -112,11 +116,11 @@ const old = repairRow({
 });
 
 describe("RepairsTable headers", () => {
-  it("draws the 17 headers of the canvas, in order", () => {
-    expect(headers(render({ rows: [full] }))).toEqual(HEADERS);
+  it("draws the 17 headers of the canvas, in order, and the Actions header after them (D94)", () => {
+    expect(headers(render({ rows: [full] }))).toEqual(ALL_HEADERS);
   });
 
-  it("has no New repair, no button at the end of a row and no chevron on the status pill (D43)", () => {
+  it("has no New repair and no chevron on the status pill (D43 still holds)", () => {
     const markup = render({ rows: [full, old] });
     expect(text(markup)).not.toContain("New repair");
     expect(cell(markup, "status")).not.toContain("<button");
@@ -124,8 +128,12 @@ describe("RepairsTable headers", () => {
     expect(cell(markup, "completed")).not.toContain("<button");
   });
 
-  it("has no Restore column unless the view asks for it", () => {
-    expect(headers(render({ rows: [full] }))).not.toContain("Actions");
+  it("draws the Actions header with or without the Show Deleted view, as hidden text", () => {
+    for (const showRestore of [false, true]) {
+      const markup = render({ rows: [full], showRestore });
+      expect(headers(markup)).toEqual(ALL_HEADERS);
+      expect(headerCell(markup, "Actions")).toContain("sr-only");
+    }
   });
 });
 
@@ -206,7 +214,7 @@ describe("RepairsTable sort headers", () => {
 
   it("keeps the 17 headers in order and the first column sticky", () => {
     const markup = render({ rows: [full], sort: { key: "vendor", direction: "asc" } });
-    expect(headers(markup)).toEqual(HEADERS);
+    expect(headers(markup)).toEqual(ALL_HEADERS);
     expect(headerCell(markup, "Bleachers")).toContain("sticky");
   });
 });
@@ -438,16 +446,74 @@ describe("RepairsTable status pill", () => {
   });
 });
 
-describe("RepairsTable Restore column (D41, D43)", () => {
-  it("adds the Actions header and one Restore button per row when asked", () => {
+describe("RepairsTable Restore beside the open button (D41, D43, D94)", () => {
+  it("adds one Restore button per row after the open button, in the same cell, when asked", () => {
     const markup = render({ rows: [full, old], showRestore: true });
-    expect(headers(markup)).toEqual([...HEADERS, "Actions"]);
+    expect(headers(markup)).toEqual(ALL_HEADERS);
     expect(markup.match(/data-testid="repair-restore"/g)).toHaveLength(2);
-    expect(cellText(markup, "restore")).toBe("Restore");
+    expect(markup.match(/data-testid="repair-open"/g)).toHaveLength(2);
+    const actions = cell(markup, "actions");
+    expect(cellText(markup, "actions")).toBe("Restore");
+    expect(actions.indexOf("repair-open")).toBeGreaterThan(-1);
+    expect(actions.indexOf("repair-restore")).toBeGreaterThan(actions.indexOf("repair-open"));
   });
 
-  it("has no Restore button otherwise", () => {
-    expect(render({ rows: [full, old] })).not.toContain('data-testid="repair-restore"');
+  it("has no Restore button otherwise, and the open button stays", () => {
+    const markup = render({ rows: [full, old] });
+    expect(markup).not.toContain('data-testid="repair-restore"');
+    expect(markup.match(/data-testid="repair-open"/g)).toHaveLength(2);
+  });
+
+  it("makes the last column 48 px wide, and 160 px with Restore (the 112 px of spec 04 after it)", () => {
+    expect(render({ rows: [full] })).toMatch(/grid-template-columns:[^";]*116px 48px;/);
+    expect(render({ rows: [full], showRestore: true })).toMatch(
+      /grid-template-columns:[^";]*116px 160px;/,
+    );
+  });
+});
+
+// docs/specs/repairs-07-repair-window.md §2.1 (D94).
+describe("RepairsTable open button (D94)", () => {
+  it("draws one open button per row, named after the repair", () => {
+    const markup = render({ rows: [full, old] });
+    expect(markup.match(/data-testid="repair-open"/g)).toHaveLength(2);
+    expect(markup).toContain('aria-label="Open repair DTR-2377"');
+    expect(markup).toContain('aria-label="Open repair of bleacher #7"');
+  });
+
+  it("titles each button Open repair and makes it a plain button with no text", () => {
+    const markup = render({ rows: [full] });
+    const actions = cell(markup, "actions");
+    const button = actions.slice(actions.indexOf("<button"), actions.indexOf("</button>") + 9);
+    expect(button).toContain('type="button"');
+    expect(button).toContain('title="Open repair"');
+    expect(text(button)).toBe("");
+    expect(button).toContain("<svg");
+  });
+
+  it("puts the button in the last, sticky cell and not in the first one", () => {
+    const markup = render({ rows: [full] });
+    const actions = cell(markup, "actions");
+    expect(actions).toContain("sticky");
+    expect(actions).toContain("right-0");
+    expect(actions).toContain('data-testid="repair-open"');
+    expect(cell(markup, "bleachers")).not.toContain('data-testid="repair-open"');
+  });
+
+  it("is 32 by 32 px with a border, as the canvas draws it", () => {
+    const actions = cell(render({ rows: [full] }), "actions");
+    expect(actions).toContain("size-8");
+    expect(actions).toContain("border-[#d1d5db]");
+  });
+
+  it("is in the Show Deleted view's rows too", () => {
+    const markup = render({ rows: [old], showRestore: true });
+    expect(markup).toContain('data-testid="repair-open"');
+  });
+
+  it("draws no button for a list that is loading or empty", () => {
+    expect(render({ rows: [full], isLoading: true })).not.toContain("repair-open");
+    expect(render({ rows: [] })).not.toContain("repair-open");
   });
 });
 
@@ -458,7 +524,7 @@ describe("RepairsTable loading and empty states (D51, §2.10)", () => {
     expect(markup).not.toContain('data-testid="repair-row"');
     expect(markup).not.toContain('data-testid="repairs-empty"');
     expect(text(markup)).toContain("Loading...");
-    expect(headers(markup)).toEqual(HEADERS);
+    expect(headers(markup)).toEqual(ALL_HEADERS);
   });
 
   it("draws the empty state when there is no row", () => {

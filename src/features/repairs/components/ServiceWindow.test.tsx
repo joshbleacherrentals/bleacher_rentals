@@ -5,7 +5,8 @@ import type { RepairListRow, RepairService } from "../utils/repairRows";
 import type { RawServiceBleacherRow } from "../db/serviceWindowQueries";
 import { ServiceWindowContent } from "./ServiceWindow";
 
-// docs/specs/repairs-06-expanded-row.md §2.3 and §7 (D4, D84, D86, D88, D89). The window's content
+// docs/specs/repairs-06-expanded-row.md §2.3 and §7 (D4, D84, D86, D88, D89), and
+// docs/specs/repairs-07-repair-window.md §2.6 (Open repair). The window's content
 // is rendered on the server (a Radix dialog needs a portal, which Vitest's node environment does
 // not have); what is under test is which words, pills and amounts each part gets.
 
@@ -44,6 +45,7 @@ const render = (
     repair?: RepairListRow;
     service?: RepairService;
     bleacher?: RawServiceBleacherRow | null;
+    onOpenRepair?: () => void;
   } = {},
 ) =>
   renderToStaticMarkup(
@@ -52,6 +54,7 @@ const render = (
       service={over.service ?? service}
       bleacher={over.bleacher === undefined ? bleacher : over.bleacher}
       onOpenReports={() => {}}
+      onOpenRepair={over.onOpenRepair}
     />,
   );
 
@@ -123,8 +126,29 @@ describe("ServiceWindowContent repair strip", () => {
     expect(text(band)).toBe("Repair — · — In repair CAD");
   });
 
-  it("has no Open repair button (D84)", () => {
-    expect(text(render())).not.toContain("Open repair");
+  // docs/specs/repairs-07-repair-window.md §2.6 (D84, D98): the button of spec 07.
+  it("has no Open repair button when it is not given the handler (D98)", () => {
+    const markup = render();
+    expect(text(markup)).not.toContain("Open repair");
+    expect(markup).not.toContain("service-window-open-repair");
+  });
+
+  it("draws Open repair at the right end of the strip when it is given the handler", () => {
+    const markup = render({ onOpenRepair: () => {} });
+    const band = strip(markup);
+    expect(text(band)).toBe("Repair Dallas Trailer Repair · DTR-2377 Completed USD Open repair");
+    const button = band.slice(band.indexOf("<button"), band.indexOf("</button>") + 9);
+    expect(button).toContain('data-testid="service-window-open-repair"');
+    expect(button).toContain('type="button"');
+    expect(button).toContain("ml-auto");
+    expect(text(button)).toBe("Open repair");
+  });
+
+  it("still has no Edit, Delete or Add service button with Open repair drawn", () => {
+    const words = text(render({ onOpenRepair: () => {} }));
+    expect(words).not.toContain("Edit");
+    expect(words).not.toContain("Delete ");
+    expect(words).not.toContain("Add service");
   });
 });
 

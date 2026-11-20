@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { repairRow, repairService } from "../utils/repairRowFixture";
 import type { RepairListRow } from "../utils/repairRows";
-import { RepairServicesBlock } from "./RepairServices";
+import { RepairServicesBlock, RepairWindowServices } from "./RepairServices";
 
-// docs/specs/repairs-06-expanded-row.md §2.2 and §7. The block is rendered on the server: what is
+// docs/specs/repairs-06-expanded-row.md §2.2 and §7, and docs/specs/repairs-07-repair-window.md §2.4
+// and §7 (the table in the repair window). The block is rendered on the server: what is
 // under test is which words, chips and amounts each cell gets. Clicks and keys are covered by e2e.
 
 const report = (id: string, day: string) => ({ id, day, createdAt: `${day}T12:00:00Z` });
@@ -262,5 +263,150 @@ describe("RepairServicesBlock with no services (D83)", () => {
 
   it("does not say it when the repair has services", () => {
     expect(render()).not.toContain("repair-services-empty");
+  });
+});
+
+// docs/specs/repairs-07-repair-window.md §2.4 (D84, D89, D101): the table of services in the repair
+// window, on the canvas's window grid, with a Total row.
+describe("RepairWindowServices", () => {
+  const renderWindow = (over: Partial<RepairListRow> = {}) =>
+    renderToStaticMarkup(
+      <RepairWindowServices
+        repair={repairRow({
+          id: "r1",
+          currency: "USD",
+          invoiceNumber: "DTR-2377",
+          services: [tires, welding],
+          laborCents: 43000,
+          partsCents: 11600,
+          taxCents: 783,
+          freightCents: 6500,
+          totalCents: 61883,
+          ...over,
+        })}
+        onOpenService={() => {}}
+      />,
+    );
+
+  /** The Total row: from the start of its opening tag to the end of the markup. */
+  const totalRow = (markup: string) => {
+    const at = markup.indexOf('data-testid="repair-window-total"');
+    expect(at, "no Total row").toBeGreaterThan(-1);
+    return markup.slice(markup.lastIndexOf("<div", at));
+  };
+
+  it("is a table named after the repair, with its own test id", () => {
+    const markup = renderWindow();
+    expect(markup).toContain('data-testid="repair-window-services"');
+    expect(markup).toContain('role="table"');
+    expect(markup).toContain('aria-label="Services of repair DTR-2377"');
+  });
+
+  it("draws the ten headers of the canvas and a last empty one, in order", () => {
+    const headers = [...renderWindow().matchAll(/<div role="columnheader"[^>]*>(.*?)<\/div>/g)].map(
+      (m) => text(m[1]),
+    );
+    expect(headers).toEqual([...HEADERS, ""]);
+  });
+
+  it("uses the canvas's window grid, narrower than the block's", () => {
+    const markup = renderWindow();
+    expect(markup).toContain(
+      "grid-template-columns:76px 120px 84px 108px minmax(120px, 1fr) 88px 88px 72px 72px 100px 16px",
+    );
+    expect(markup).toContain("column-gap:8px");
+  });
+
+  it("draws a row per service with the label, cells and amounts of the block's rows", () => {
+    const markup = renderWindow();
+    const rows = serviceRows(markup);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain('aria-label="Open service: bleacher 26, Tires"');
+    expect(rows[1]).toContain('aria-label="Open service: bleacher 27, Welding"');
+    expect(cellText(rows[0], "service-total")).toBe("$138.83");
+    expect(cellText(rows[1], "service-reported")).toBe("2026-09-17 +2");
+    expect(rows[0]).toContain('tabindex="0"');
+  });
+
+  it("marks a service deleted on its own, and no other (D89)", () => {
+    const removed = repairService({ id: "gone", deleted: true, description: "Removed on its own" });
+    const rows = serviceRows(renderWindow({ services: [tires, removed] }));
+    expect(cellText(rows[0], "service-description")).toBe("Needed new tires");
+    expect(cellText(rows[1], "service-description")).toBe("Deleted Removed on its own");
+  });
+
+  it("ends with a Total row: the sums of the services and the repair's total (D101)", () => {
+    const row = totalRow(renderWindow());
+    expect(cellText(row, "total-label")).toBe("Total");
+    expect(cellText(row, "total-labor")).toBe("$430.00");
+    expect(cellText(row, "total-parts")).toBe("$116.00");
+    expect(cellText(row, "total-tax")).toBe("$7.83");
+    expect(cellText(row, "total-freight")).toBe("$65.00");
+    expect(cellText(row, "total-total")).toBe("$618.83");
+  });
+
+  it("shows the repair's total from totalCents, not the sum of the services' totals", () => {
+    // The two differ for a moment after a service is saved (spec 03 D32).
+    const row = totalRow(renderWindow({ totalCents: 99999 }));
+    expect(cellText(row, "total-total")).toBe("$999.99");
+    expect(cellText(row, "total-labor")).toBe("$430.00");
+  });
+
+  it("writes the Total row in the currency of the repair, semibold, navy under Total", () => {
+    const row = totalRow(renderWindow({ currency: "CAD" }));
+    expect(cellText(row, "total-labor")).toBe("C$430.00");
+    expect(cellText(row, "total-total")).toBe("C$618.83");
+    expect(cell(row, "total-total")).toContain("text-[#10365a]");
+    expect(row.slice(0, row.indexOf('<div data-col="'))).toContain("font-semibold");
+  });
+
+  it("writes a dash for a sum the repair does not have, and for a missing total", () => {
+    const row = totalRow(
+      renderWindow({
+        services: [],
+        laborCents: null,
+        partsCents: null,
+        taxCents: null,
+        freightCents: null,
+        totalCents: null,
+      }),
+    );
+    for (const key of ["total-labor", "total-parts", "total-tax", "total-freight", "total-total"]) {
+      expect(cellText(row, key), key).toBe("—");
+    }
+  });
+
+  it("with no services keeps the header band, says so, and still draws the repair's Total", () => {
+    const markup = renderWindow({
+      services: [],
+      laborCents: null,
+      partsCents: null,
+      taxCents: null,
+      freightCents: null,
+      totalCents: 4500,
+    });
+    expect(serviceRows(markup)).toHaveLength(0);
+    expect(markup).toContain('data-testid="repair-services-empty"');
+    expect(text(markup)).toContain("No services on this repair.");
+    const headers = [...markup.matchAll(/<div role="columnheader"[^>]*>(.*?)<\/div>/g)].map((m) =>
+      text(m[1]),
+    );
+    expect(headers).toEqual([...HEADERS, ""]);
+    const row = totalRow(markup);
+    expect(cellText(row, "total-total")).toBe("$45.00");
+    expect(cellText(row, "total-labor")).toBe("—");
+  });
+
+  it("draws no Add service button, no edit control and no button at all (D84)", () => {
+    const markup = renderWindow();
+    expect(text(markup)).not.toContain("Add service");
+    expect(text(markup)).not.toContain("Edit");
+    expect(markup).not.toContain("<button");
+  });
+
+  it("leaves the block of spec 06 as it was: no Total row, its own grid", () => {
+    const markup = render();
+    expect(markup).not.toContain("repair-window-total");
+    expect(markup).toContain("grid-template-columns:84px 148px 96px 124px");
   });
 });

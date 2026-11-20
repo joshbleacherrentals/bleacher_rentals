@@ -11,7 +11,7 @@ import { setMaintenanceEventDeleted } from "@/features/maintenanceEvents/db/dele
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
 import { useRepairList } from "../hooks/useRepairList";
-import { findService, type ServiceRef } from "../utils/repairDetails";
+import { closeFrom, openWindow, resolveWindows, type WindowEntry } from "../utils/repairDetails";
 import {
   NO_EXPANSION,
   openRepairIds,
@@ -27,9 +27,9 @@ import {
   type RepairsUrlPatch,
   type RepairsUrlState,
 } from "../utils/repairPageState";
-import type { ReportedReport } from "../utils/repairRows";
 import { nextRepairSort, type RepairSortKey } from "../utils/repairSort";
 import { DamageReportWindow } from "./DamageReportWindow";
+import { RepairWindow } from "./RepairWindow";
 import { RepairsTable } from "./RepairsTable";
 import { RepairsToolbar } from "./RepairsToolbar";
 import { RepairsTotalsStrip } from "./RepairsTotalsStrip";
@@ -38,10 +38,11 @@ import { ServiceWindow } from "./ServiceWindow";
 /**
  * The Repairs page: the totals strip, the Open and Completed tabs, the toolbar (search, four
  * filters, Show Deleted), the sortable table and the pager. The state of the list lives in the
- * address. Which repairs are open, the service window and the damage report window live in React
- * (spec 06 D81, D85). It only reads; the one write is Restore in the Show Deleted view (an
- * administrator or a maintainer). docs/specs/repairs-04-table.md, docs/specs/repairs-05-toolbar.md
- * and docs/specs/repairs-06-expanded-row.md.
+ * address. Which repairs are open lives in React (spec 06 D81), and so do the windows: the repair
+ * window, the service window and the damage report window are one stack, each over the one that
+ * opened it (spec 07 D95, D96). It only reads; the one write is Restore in the Show Deleted view (an
+ * administrator or a maintainer). docs/specs/repairs-04-table.md, docs/specs/repairs-05-toolbar.md,
+ * docs/specs/repairs-06-expanded-row.md and docs/specs/repairs-07-repair-window.md §2.7.
  */
 export default function RepairsPage() {
   const router = useRouter();
@@ -68,11 +69,13 @@ export default function RepairsPage() {
   if (reconciled !== expansion) setExpansion(reconciled);
   const expandedIds = openRepairIds(reconciled, listKey);
 
-  // The service window and the damage report window are found again on every render, so they show
-  // the newest values; a service that is no longer in the list is not drawn (§2.5).
-  const [serviceRef, setServiceRef] = useState<ServiceRef | null>(null);
-  const [reported, setReported] = useState<ReportedReport[] | null>(null);
-  const target = findService(rows, serviceRef);
+  // The windows are a stack: a new one opens over the one that opened it. They are found again in
+  // the whole list on every render, so they show the newest values; one whose repair or service is
+  // no longer in the list is not drawn (spec 06 §2.5, spec 07 §2.7).
+  const [stack, setStack] = useState<WindowEntry[]>([]);
+  const windows = resolveWindows(rows, stack);
+  const open = (entry: WindowEntry) => setStack(openWindow(stack, entry));
+  const close = (index: number) => setStack(closeFrom(stack, index));
 
   // The page reads its state from the URL and writes it only when the person acts.
   const go = (next: RepairsUrlState) => {
@@ -133,21 +136,44 @@ export default function RepairsPage() {
           onSort={(key: RepairSortKey) => change({ sort: nextRepairSort(urlState.sort, key) })}
           expandedIds={expandedIds}
           onToggleRepair={(repairId) => setExpansion(toggleRepair(reconciled, listKey, repairId))}
-          onOpenService={(repairId, serviceId) => setServiceRef({ repairId, serviceId })}
-          onOpenReports={setReported}
+          onOpenService={(repairId, serviceId) => open({ kind: "service", repairId, serviceId })}
+          onOpenReports={(reported) => open({ kind: "reports", reported })}
+          onOpenRepair={(repairId) => open({ kind: "repair", repairId })}
         />
       </div>
 
-      {target && (
-        <ServiceWindow
-          repair={target.repair}
-          service={target.service}
-          onOpenReports={() => setReported(target.service.reported)}
-          onClose={() => setServiceRef(null)}
-        />
-      )}
-
-      {reported && <DamageReportWindow reported={reported} onClose={() => setReported(null)} />}
+      {windows.map((w) => {
+        if (w.kind === "repair") {
+          return (
+            <RepairWindow
+              key={w.index}
+              repair={w.repair}
+              onOpenService={(serviceId) =>
+                open({ kind: "service", repairId: w.repair.id, serviceId })
+              }
+              onOpenReports={() => open({ kind: "reports", reported: w.repair.reported })}
+              onClose={() => close(w.index)}
+            />
+          );
+        }
+        if (w.kind === "service") {
+          return (
+            <ServiceWindow
+              key={w.index}
+              repair={w.repair}
+              service={w.service}
+              onOpenReports={() => open({ kind: "reports", reported: w.service.reported })}
+              onOpenRepair={
+                w.showOpenRepair ? () => open({ kind: "repair", repairId: w.repair.id }) : undefined
+              }
+              onClose={() => close(w.index)}
+            />
+          );
+        }
+        return (
+          <DamageReportWindow key={w.index} reported={w.reported} onClose={() => close(w.index)} />
+        );
+      })}
 
       {!isLoading && (
         <Pagination

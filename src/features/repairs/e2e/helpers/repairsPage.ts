@@ -62,6 +62,15 @@ export const toggleOf = (row: Locator) => row.getByTestId("repair-toggle");
 /** The block of services under a repair row: the group that holds the row, then its block. */
 export const blockOf = (row: Locator) => row.locator("xpath=..").getByTestId("repair-services");
 
-/** The service window and the damage report window. */
-export const windowOf = (page: Page, which: "service" | "reports") =>
-  page.getByTestId(which === "service" ? "service-window" : "damage-report-window");
+/** The service window, the damage report window and the repair window (spec 07). */
+export const windowOf = (page: Page, which: "service" | "reports" | "repair") =>
+  page.getByTestId(
+    which === "service"
+      ? "service-window"
+      : which === "reports"
+        ? "damage-report-window"
+        : "repair-window",
+  );
+
+/** The button at the end of a repair row that opens the repair window (spec 07 D94). */
+export const openButtonOf = (row: Locator) => row.getByTestId("repair-open");

@@ -600,7 +600,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Repairs & Maintenance",
     description:
-      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard. For now the Repairs page only lists repairs and, for an administrator or a maintainer, shows and restores deleted ones; a repair is edited from the Dashboard until the repair window arrives.",
+      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard. For now the Repairs page only lists repairs and, for an administrator or a maintainer, shows and restores deleted ones; the repair window only shows a repair, and a repair is edited from the Dashboard until that window can edit.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
@@ -626,24 +626,30 @@ export const PERMISSIONS: PermissionEntry[] = [
   // docs/specs/repairs-05-toolbar.md §5: the Vendor filter lists every vendor (D61).
   // docs/specs/repairs-06-expanded-row.md §5: the open repair, the service window and the damage
   // report window show data the four roles already read.
+  // docs/specs/repairs-07-repair-window.md §5: the repair window shows the same data, and its files
+  // only to the roles the database lets read them (not the viewer).
   {
     label: "Repair Costs & Vendors",
     description:
-      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The Vendor filter lists every vendor, not only the ones that have repairs. A repair opens in place to show its services, one row for each bleacher and category with its amounts. A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved. The page only reads for now.",
+      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The Vendor filter lists every vendor, not only the ones that have repairs. A repair opens in place to show its services, one row for each bleacher and category with its amounts. A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. The page only reads for now.",
     category: "Day to Day Operations",
     roles: {
-      admin: read("Sees every column and the total cost strip."),
+      admin: read(
+        "Sees every column and the total cost strip, and opens the repair window with its files.",
+      ),
       account_manager: read(
-        "Sees every column and the total cost strip, for every repair and not only the ones they created.",
+        "Sees every column and the total cost strip, for every repair and not only the ones they created, and opens the repair window with its files.",
       ),
       developer: none(
         "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
       ),
       viewer: read(
-        "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter.",
+        "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter. Opens the repair window but does not see its files.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: read("Sees every column and the total cost strip, vendors included."),
+      maintainer: read(
+        "Sees every column and the total cost strip, vendors included, and opens the repair window with its files.",
+      ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },

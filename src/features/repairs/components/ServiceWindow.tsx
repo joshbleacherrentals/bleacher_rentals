@@ -1,5 +1,5 @@
 import type { ElementType, ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { RawServiceBleacherRow } from "../db/serviceWindowQueries";
 import { useServiceBleacher } from "../hooks/useRepairDetails";
@@ -11,7 +11,9 @@ import { BleacherChip, CategoryChip, DeletedBadge, SeverityPill, StatusPill } fr
 /**
  * The service window: the fields and amounts of one service, the repair it belongs to, the damage
  * reports found for it and the bleacher's card. Read-only, with only the cross of the dialog to
- * close it (spec 06 D84). docs/specs/repairs-06-expanded-row.md §2.3; the looks are the canvas's.
+ * close it (spec 06 D84). Its repair strip has an Open repair button when the page gives it the
+ * handler (spec 07 D98). docs/specs/repairs-06-expanded-row.md §2.3 and
+ * docs/specs/repairs-07-repair-window.md §2.6; the looks are the canvas's.
  */
 
 const EYEBROW =
@@ -37,6 +39,8 @@ export type ServiceWindowContentProps = {
   /** The card of the service's bleacher; null while it loads or when it is not on the device. */
   bleacher: RawServiceBleacherRow | null;
   onOpenReports: () => void;
+  /** Opens the repair window over this one; the button is drawn only when it is given (D98). */
+  onOpenRepair?: () => void;
   /** The element the title is drawn with: `h2`, or the dialog's own title. */
   Title?: ElementType;
 };
@@ -47,6 +51,7 @@ export function ServiceWindowContent({
   service,
   bleacher,
   onOpenReports,
+  onOpenRepair,
   Title = "h2",
 }: ServiceWindowContentProps) {
   const money = (cents: number) => formatRepairMoney(cents, repair.currency);
@@ -84,6 +89,17 @@ export function ServiceWindowContent({
         <span className="tabular-nums">{orDash(repair.invoiceNumber)}</span>
         <StatusPill status={repair.status} />
         <CategoryChip name={repair.currency} />
+        {onOpenRepair && (
+          <button
+            type="button"
+            data-testid="service-window-open-repair"
+            onClick={onOpenRepair}
+            className="ml-auto inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-[#d1d5db] bg-white px-3 text-[13px] font-semibold text-[#10365a] hover:bg-[#f3f4f6] focus-visible:ring-2 focus-visible:ring-[#1d62a3] focus-visible:outline-none"
+          >
+            Open repair
+            <ArrowUpRight className="size-3.5" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <div className="grid gap-6 px-6 pt-5 pb-2 sm:grid-cols-[minmax(0,1fr)_264px]">
@@ -173,11 +189,19 @@ export type ServiceWindowProps = {
   repair: RepairListRow;
   service: RepairService;
   onOpenReports: () => void;
+  /** Opens the repair window over this one; the button is drawn only when it is given (D98). */
+  onOpenRepair?: () => void;
   onClose: () => void;
 };
 
 /** The dialog around the content; it also reads the bleacher's card. */
-export function ServiceWindow({ repair, service, onOpenReports, onClose }: ServiceWindowProps) {
+export function ServiceWindow({
+  repair,
+  service,
+  onOpenReports,
+  onOpenRepair,
+  onClose,
+}: ServiceWindowProps) {
   const { bleacher } = useServiceBleacher(service.bleacherUuid);
 
   return (
@@ -197,6 +221,7 @@ export function ServiceWindow({ repair, service, onOpenReports, onClose }: Servi
           service={service}
           bleacher={bleacher}
           onOpenReports={onOpenReports}
+          onOpenRepair={onOpenRepair}
           Title={DialogTitle}
         />
       </DialogContent>

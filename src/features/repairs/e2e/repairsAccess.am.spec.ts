@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import { readRepairWindow } from "./helpers/repairWindowFlow";
 import { readServicesAndReport } from "./helpers/serviceFlow";
 import {
   bleacherQuery,
@@ -16,7 +17,7 @@ import {
  * The Repairs page as a account manager sees it: the whole table, vendors and money included, no Restore
  * and a click on a row that opens its block of services. Written, not run (project rule).
  * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
- * and docs/specs/repairs-06-expanded-row.md §6 (S27).
+ * docs/specs/repairs-06-expanded-row.md §6 (S27) and docs/specs/repairs-07-repair-window.md §6 (S33).
  */
 test.describe("Repairs page (account manager)", () => {
   let seeded: SeededRepairs;
@@ -82,5 +83,11 @@ test.describe("Repairs page (account manager)", () => {
     page,
   }) => {
     await readServicesAndReport(page, seeded);
+  });
+
+  test("S33: opens the repair window with the vendor, its address, the services and the Total row, and the files", async ({
+    page,
+  }) => {
+    await readRepairWindow(page, seeded, { canSeeFiles: true });
   });
 });

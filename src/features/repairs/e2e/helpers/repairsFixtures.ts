@@ -7,7 +7,8 @@ import { randomUUID } from "node:crypto";
  * docs/specs/repairs-04-table.md §6 and docs/specs/repairs-05-toolbar.md §6 (the zones, the vendor
  * uuid and the notes, which the toolbar specs look for) and docs/specs/repairs-06-expanded-row.md
  * §6 (a model number and a type on bleacher A, a photo on the first report, and a deleted repair
- * with a service that was deleted on its own).
+ * with a service that was deleted on its own), and docs/specs/repairs-07-repair-window.md §6 (the
+ * vendor's address and two files of the completed repair).
  *
  * It writes `MaintenanceLineItems` and `Vendors`, which reach a user's device only where the sync
  * rules of docs/specs/repairs-02-sync-rules.md are deployed.
@@ -68,6 +69,13 @@ export type SeededRepairs = {
   reportNote: string;
   /** The storage path of the one photo of the first report (the picture itself does not exist). */
   photoPath: string;
+  /** The vendor's address as the repair window writes it (spec 07 D100). */
+  vendorAddress: string;
+  /**
+   * The two files of the completed repair, a `.jpg` then a `.pdf` added a minute later: the window
+   * names them "Photo 1" and "PDF 1". The objects do not exist in storage; the links are tested.
+   */
+  repairFiles: { photoPath: string; pdfPath: string };
   cleanup: () => Promise<void>;
 };
 
@@ -140,10 +148,24 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     };
   }
 
+  // The vendor has an address, so that the repair window draws the line under its name.
+  const addressRes = await supabase
+    .from("Addresses")
+    .insert({
+      street: "1 E2E Way",
+      city: "E2E City",
+      state_province: "TX",
+      zip_postal: "75201",
+      country: "US",
+    })
+    .select("id")
+    .single();
+  const addressId = check(addressRes.data, addressRes.error, "address").id as string;
+
   const vendorName = `E2E Vendor ${suffix}`;
   const vendorRes = await supabase
     .from("Vendors")
-    .insert({ display_name: vendorName })
+    .insert({ display_name: vendorName, address_uuid: addressId })
     .select("id")
     .single();
   const vendorId = check(vendorRes.data, vendorRes.error, "vendor").id as string;
@@ -326,6 +348,25 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     .insert({ damage_report_uuid: reportIds[0], photo_path: photoPath });
   if (photoRes.error) throw new Error(`fixture photo failed: ${photoRes.error.message}`);
 
+  // Two files on the completed repair, a minute apart, in the order Photo 1 then PDF 1.
+  const repairFiles = {
+    photoPath: `${completedId}/${suffix}-a.jpg`,
+    pdfPath: `${completedId}/${suffix}-b.pdf`,
+  };
+  const filesRes = await supabase.from("MaintenancePhotos").insert([
+    {
+      maintenance_event_uuid: completedId,
+      photo_path: repairFiles.photoPath,
+      created_at: "2026-09-18T16:00:00Z",
+    },
+    {
+      maintenance_event_uuid: completedId,
+      photo_path: repairFiles.pdfPath,
+      created_at: "2026-09-18T16:01:00Z",
+    },
+  ]);
+  if (filesRes.error) throw new Error(`fixture files failed: ${filesRes.error.message}`);
+
   const completedTotal = await costOf(completedId);
   const cadTotal = await costOf(cadId);
 
@@ -346,13 +387,17 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     },
     reportNote,
     photoPath,
+    vendorAddress: "E2E City, TX, US",
+    repairFiles,
     cleanup: async () => {
       await supabase.from("DamageReportPhotos").delete().in("damage_report_uuid", reportIds);
       await supabase.from("DamageReports").delete().in("id", reportIds);
+      await supabase.from("MaintenancePhotos").delete().in("maintenance_event_uuid", eventIds);
       await supabase.from("MaintenanceLineItems").delete().in("maintenance_event_uuid", eventIds);
       await supabase.from("BleacherMaintEvents").delete().in("maintenance_event_uuid", eventIds);
       await supabase.from("MaintenanceEvents").delete().in("id", eventIds);
       await supabase.from("Vendors").delete().eq("id", vendorId);
+      await supabase.from("Addresses").delete().eq("id", addressId);
       await supabase
         .from("Bleachers")
         .delete()

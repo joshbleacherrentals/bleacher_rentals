@@ -17,6 +17,9 @@ export type RepairServicesBlockProps = {
  * Severity, Reported, Description, Labor, Parts, Tax, Freight, Total). A click, Enter or Space on a
  * row opens the service window. Read-only: no Add service and no total row (spec 06 D84).
  * docs/specs/repairs-06-expanded-row.md §2.2; the grid and the looks are the canvas's.
+ *
+ * The same rows, on the canvas's narrower window grid and with a Total row, are the table of the
+ * repair window (`RepairWindowServices`, docs/specs/repairs-07-repair-window.md §2.4).
  */
 
 const GAP = 12;
@@ -27,6 +30,14 @@ const GRID: CSSProperties = {
   gridTemplateColumns: "84px 148px 96px 124px minmax(220px, 1fr) 100px 100px 88px 88px 112px 20px",
   columnGap: GAP,
 };
+
+/** The repair window's grid (the canvas's `InvoiceModal`): 76 + 120 + 84 + 108 + 120 + 88 + 88 + 72
+ *  + 72 + 100 + 16 + 10 gaps of 8 + 32 padding. */
+const WINDOW_GRID: CSSProperties = {
+  gridTemplateColumns: "76px 120px 84px 108px minmax(120px, 1fr) 88px 88px 72px 72px 100px 16px",
+  columnGap: 8,
+};
+const WINDOW_MIN_WIDTH = 1056;
 
 const HEADER_BASE =
   "text-xs leading-4 font-medium tracking-wider whitespace-nowrap text-[#6b7280] uppercase";
@@ -49,14 +60,17 @@ function Dash() {
   return <span className="text-[#9ca3af]">—</span>;
 }
 
-function ServiceRow({
+/** One service of a repair: a focusable row that opens the service window. The grid is the caller's. */
+export function ServiceRow({
   repair,
   service,
   onOpen,
+  grid,
 }: {
   repair: RepairListRow;
   service: RepairService;
   onOpen: () => void;
+  grid: CSSProperties;
 }) {
   const money = (cents: number) => formatRepairMoney(cents, repair.currency);
   const reported = reportedCell(service.reported);
@@ -83,7 +97,7 @@ function ServiceRow({
       aria-label={serviceRowLabel(service)}
       onClick={onOpen}
       onKeyDown={onKeyDown}
-      style={GRID}
+      style={grid}
       className="grid min-h-12 cursor-pointer items-center border-t border-[#e5e7eb] bg-white px-4 py-2 text-gray-900 hover:bg-[#f9fafb] focus-visible:bg-[#f9fafb] focus-visible:outline-none"
     >
       {cell("bleacher", "", <BleacherChip number={service.bleacherNumber} />)}
@@ -132,6 +146,24 @@ function ServiceRow({
   );
 }
 
+/** The band with the ten headers of the table of services and an empty one for the chevron. */
+function ServicesHeader({ grid }: { grid: CSSProperties }) {
+  return (
+    <div role="row" style={grid} className="grid min-h-9 items-center bg-[#f9fafb] px-4">
+      {HEADERS.map((h) => (
+        <div
+          key={h.label}
+          role="columnheader"
+          className={`${HEADER_BASE} ${h.align === "right" ? "text-right" : ""}`}
+        >
+          {h.label}
+        </div>
+      ))}
+      <div role="columnheader" />
+    </div>
+  );
+}
+
 export function RepairServicesBlock({ repair, id, onOpenService }: RepairServicesBlockProps) {
   const label = `Services of ${repairLabel(repair)}`;
   const isEmpty = repair.services.length === 0;
@@ -156,28 +188,89 @@ export function RepairServicesBlock({ repair, id, onOpenService }: RepairService
           </div>
         ) : (
           <div style={{ minWidth: MIN_WIDTH }}>
-            <div role="row" style={GRID} className="grid min-h-9 items-center bg-[#f9fafb] px-4">
-              {HEADERS.map((h) => (
-                <div
-                  key={h.label}
-                  role="columnheader"
-                  className={`${HEADER_BASE} ${h.align === "right" ? "text-right" : ""}`}
-                >
-                  {h.label}
-                </div>
-              ))}
-              <div role="columnheader" />
-            </div>
+            <ServicesHeader grid={GRID} />
             {repair.services.map((service) => (
               <ServiceRow
                 key={service.id}
                 repair={repair}
                 service={service}
+                grid={GRID}
                 onOpen={() => onOpenService(service.id)}
               />
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+export type RepairWindowServicesProps = {
+  repair: RepairListRow;
+  onOpenService: (serviceId: string) => void;
+};
+
+/**
+ * The table of services in the repair window: the canvas's window grid, the same rows as the block,
+ * and a Total row (D101): the sums of the services under Labor, Parts, Tax and Freight, and the
+ * repair's own total (`cost_cents`) under Total, which may differ from the sum for a moment (spec 03
+ * D32). A repair with no services keeps the header band, says so, and still draws the Total row.
+ * Read-only: no Add service (D84).
+ */
+export function RepairWindowServices({ repair, onOpenService }: RepairWindowServicesProps) {
+  const isEmpty = repair.services.length === 0;
+  const sum = (key: string, cents: number | null, className = "") => {
+    const text = formatRepairMoney(cents, repair.currency);
+    return (
+      <div data-col={`total-${key}`} role="cell" className={`${MONEY} ${className}`}>
+        {text === "—" ? <Dash /> : text}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      role="table"
+      aria-label={`Services of ${repairLabel(repair)}`}
+      data-testid="repair-window-services"
+      className="overflow-x-auto rounded-lg border border-[#e5e7eb] bg-white"
+    >
+      <div style={{ minWidth: WINDOW_MIN_WIDTH }}>
+        <ServicesHeader grid={WINDOW_GRID} />
+        {isEmpty ? (
+          <div
+            data-testid="repair-services-empty"
+            className="border-t border-[#e5e7eb] px-4 py-3.5 text-center text-sm text-[#9ca3af]"
+          >
+            No services on this repair.
+          </div>
+        ) : (
+          repair.services.map((service) => (
+            <ServiceRow
+              key={service.id}
+              repair={repair}
+              service={service}
+              grid={WINDOW_GRID}
+              onOpen={() => onOpenService(service.id)}
+            />
+          ))
+        )}
+        <div
+          role="row"
+          data-testid="repair-window-total"
+          style={WINDOW_GRID}
+          className="grid min-h-11 items-center border-t border-[#e5e7eb] bg-[#f9fafb] px-4 text-sm leading-5 font-semibold"
+        >
+          <div data-col="total-label" role="cell" style={{ gridColumn: "1 / 6" }}>
+            Total
+          </div>
+          {sum("labor", repair.laborCents)}
+          {sum("parts", repair.partsCents)}
+          {sum("tax", repair.taxCents)}
+          {sum("freight", repair.freightCents)}
+          {sum("total", repair.totalCents, "text-[#10365a]")}
+          <div role="cell" />
+        </div>
       </div>
     </div>
   );

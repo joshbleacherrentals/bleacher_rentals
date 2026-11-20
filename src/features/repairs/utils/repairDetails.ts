@@ -7,7 +7,8 @@ import type { RepairListRow, RepairService, ReportedReport } from "./repairRows"
 /**
  * The words and rules behind the expanded row, the service window and the damage report window:
  * labels, titles, the service a window shows, and the view of a damage report. Pure, so it is
- * tested without React. docs/specs/repairs-06-expanded-row.md §2 and §3.
+ * tested without React. docs/specs/repairs-06-expanded-row.md §2 and §3, and the stack of windows
+ * and the open button's name of docs/specs/repairs-07-repair-window.md §2.1, §2.7 and §3.
  */
 
 export type ServiceRef = { repairId: string; serviceId: string };
@@ -33,6 +34,11 @@ export function repairLabel(row: RepairListRow): string {
     return `repair of bleacher ${row.bleachers.map((b) => bleacherName(b.number)).join(", ")}`;
   }
   return "repair";
+}
+
+/** "Open repair JJ-5": the name of the button at the end of a row (spec 07 D94). */
+export function repairOpenLabel(row: RepairListRow): string {
+  return `Open ${repairLabel(row)}`;
 }
 
 /** "Open service: bleacher 26, Welding"; with no category "Open service: bleacher 26". */
@@ -139,4 +145,88 @@ export function buildDamageReportViews(input: {
     });
   }
   return views;
+}
+
+// ── The stack of windows (spec 07 §2.7, D95, D96, D98) ────────────────────────────────────────────
+
+/** A window the page has opened: what it shows, by id; the rows are looked up again on every render. */
+export type WindowEntry =
+  | { kind: "repair"; repairId: string }
+  | { kind: "service"; repairId: string; serviceId: string }
+  | { kind: "reports"; reported: ReportedReport[] };
+
+/** A window ready to draw. `index` is its place in the stack: its key, and what closes it. */
+export type ResolvedWindow =
+  | { kind: "repair"; index: number; repair: RepairListRow }
+  | {
+      kind: "service";
+      index: number;
+      repair: RepairListRow;
+      service: RepairService;
+      /** False when a repair window of that same repair is already under it (D98). */
+      showOpenRepair: boolean;
+    }
+  | { kind: "reports"; index: number; reported: ReportedReport[] };
+
+function sameWindow(a: WindowEntry, b: WindowEntry): boolean {
+  if (a.kind === "repair" && b.kind === "repair") return a.repairId === b.repairId;
+  if (a.kind === "service" && b.kind === "service") {
+    return a.repairId === b.repairId && a.serviceId === b.serviceId;
+  }
+  if (a.kind === "reports" && b.kind === "reports") {
+    return (
+      a.reported.length === b.reported.length &&
+      a.reported.every((r, i) => r.id === b.reported[i].id)
+    );
+  }
+  return false;
+}
+
+/**
+ * Puts a window on top of the stack. Asking again for the window that is already on top changes
+ * nothing, so a double click cannot open it twice. The stack it is given is not changed.
+ */
+export function openWindow(stack: readonly WindowEntry[], entry: WindowEntry): WindowEntry[] {
+  const top = stack[stack.length - 1];
+  if (top && sameWindow(top, entry)) return [...stack];
+  return [...stack, entry];
+}
+
+/** Removes the window at `index` and every window above it. The stack it is given is not changed. */
+export function closeFrom(stack: readonly WindowEntry[], index: number): WindowEntry[] {
+  return stack.slice(0, Math.max(0, index));
+}
+
+/**
+ * The windows to draw, bottom first. A window whose repair or service is no longer in `rows` is left
+ * out and the others stay, so a window follows the newest data (spec 06 §2.5). A service window
+ * has no Open repair button when the repair window of its own repair is already under it (D98).
+ */
+export function resolveWindows(
+  rows: readonly RepairListRow[],
+  stack: readonly WindowEntry[],
+): ResolvedWindow[] {
+  const windows: ResolvedWindow[] = [];
+  stack.forEach((entry, index) => {
+    if (entry.kind === "reports") {
+      windows.push({ kind: "reports", index, reported: entry.reported });
+    } else if (entry.kind === "repair") {
+      const repair = rows.find((row) => row.id === entry.repairId);
+      if (repair) windows.push({ kind: "repair", index, repair });
+    } else {
+      const found = findService(rows, { repairId: entry.repairId, serviceId: entry.serviceId });
+      if (!found) return;
+      const repairBelow = stack
+        .slice(0, index)
+        .some((below) => below.kind === "repair" && below.repairId === entry.repairId);
+      windows.push({
+        kind: "service",
+        index,
+        repair: found.repair,
+        service: found.service,
+        showOpenRepair: !repairBelow,
+      });
+    }
+  });
+  return windows;
 }

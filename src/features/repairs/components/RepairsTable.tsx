@@ -1,6 +1,14 @@
 import type { CSSProperties, ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, RotateCcw, Wrench } from "lucide-react";
-import { repairLabel } from "../utils/repairDetails";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronRight,
+  ExternalLink,
+  RotateCcw,
+  Wrench,
+} from "lucide-react";
+import { repairLabel, repairOpenLabel } from "../utils/repairDetails";
 import { formatRepairDay, formatRepairMoney, reportedCell } from "../utils/repairFormat";
 import type { RepairCurrency, RepairListRow, ReportedReport } from "../utils/repairRows";
 import type { RepairSort, RepairSortKey } from "../utils/repairSort";
@@ -26,15 +34,18 @@ export type RepairsTableProps = {
   onOpenService: (repairId: string, serviceId: string) => void;
   /** A click on the Reported day of a row: the reports found for that repair (D87). */
   onOpenReports: (reported: ReportedReport[]) => void;
+  /** A click on the button at the end of a row: the repair window (spec 07 D94). */
+  onOpenRepair: (repairId: string) => void;
 };
 
 /**
  * The Repairs table: 17 columns drawn as a CSS grid, the first column sticky, inside a box that
  * scrolls sideways. Read-only. A click on a row, or on the arrow in its first cell, opens its block
  * of services under it (spec 06 D80); the Reported day opens the damage reports (D87). The last
- * column exists only to hold Restore in the Show Deleted view (spec 04 D41).
- * docs/specs/repairs-04-table.md §2.2 to §2.5 and §2.10 and docs/specs/repairs-06-expanded-row.md
- * §2.1; the widths and looks are the canvas's.
+ * column is always there: it holds the button that opens the repair window and, in the Show Deleted
+ * view, Restore beside it (spec 07 D94, spec 04 D41).
+ * docs/specs/repairs-04-table.md §2.2 to §2.5 and §2.10, docs/specs/repairs-06-expanded-row.md §2.1
+ * and docs/specs/repairs-07-repair-window.md §2.1; the widths and looks are the canvas's.
  */
 
 const GAP = 12;
@@ -280,6 +291,8 @@ const COLUMNS: Column[] = [
   },
 ];
 
+/** The last column: the open button (32 px with its padding), or that and Restore (112 px). */
+const ACTIONS_WIDTH = 48;
 const RESTORE_WIDTH = 112;
 
 const HEADER_BASE =
@@ -287,7 +300,7 @@ const HEADER_BASE =
 
 function gridFor(showRestore: boolean): { style: CSSProperties; minWidth: number } {
   const widths = COLUMNS.map((c) => c.width);
-  if (showRestore) widths.push(RESTORE_WIDTH);
+  widths.push(showRestore ? ACTIONS_WIDTH + RESTORE_WIDTH : ACTIONS_WIDTH);
   return {
     style: {
       gridTemplateColumns: widths.map((w) => `${w}px`).join(" "),
@@ -315,6 +328,7 @@ export function RepairsTable({
   onToggleRepair,
   onOpenService,
   onOpenReports,
+  onOpenRepair,
 }: RepairsTableProps) {
   const grid = gridFor(showRestore);
 
@@ -364,11 +378,9 @@ export function RepairsTable({
               </div>
             );
           })}
-          {showRestore && (
-            <div role="columnheader" className="sticky right-0 z-[2] self-stretch bg-[#f9fafb]">
-              <span className="sr-only">Actions</span>
-            </div>
-          )}
+          <div role="columnheader" className="sticky right-0 z-[2] self-stretch bg-[#f9fafb]">
+            <span className="sr-only">Actions</span>
+          </div>
         </div>
 
         {isLoading ? (
@@ -420,12 +432,26 @@ export function RepairsTable({
                       {col.render(row, ctx)}
                     </div>
                   ))}
-                  {showRestore && (
-                    <div
-                      data-col="restore"
-                      role="cell"
-                      className="sticky right-0 z-[2] flex items-center justify-end self-stretch bg-inherit pl-2"
+                  <div
+                    data-col="actions"
+                    role="cell"
+                    className="sticky right-0 z-[2] flex items-center justify-end gap-2 self-stretch bg-inherit pl-2"
+                  >
+                    <button
+                      type="button"
+                      data-testid="repair-open"
+                      aria-label={repairOpenLabel(row)}
+                      title="Open repair"
+                      onClick={(event) => {
+                        // Opening the window must not also open or close the row.
+                        event.stopPropagation();
+                        onOpenRepair(row.id);
+                      }}
+                      className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-[#d1d5db] bg-white text-[#374151] hover:bg-[#f3f4f6] focus-visible:ring-2 focus-visible:ring-[#1d62a3] focus-visible:outline-none"
                     >
+                      <ExternalLink className="size-4" aria-hidden="true" />
+                    </button>
+                    {showRestore && (
                       <button
                         type="button"
                         data-testid="repair-restore"
@@ -439,8 +465,8 @@ export function RepairsTable({
                         <RotateCcw className="h-4 w-4" aria-hidden="true" />
                         Restore
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
                 {expanded && (
                   <RepairServicesBlock
