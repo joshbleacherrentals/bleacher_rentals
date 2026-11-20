@@ -599,3 +599,51 @@ describe("RepairsTable status menu (spec 08)", () => {
     expect(headers(markup)).toEqual(ALL_HEADERS);
   });
 });
+
+// docs/specs/repairs-09b1-services.md §2.1 and §7 (D158): the open block of a live repair has Add
+// service when the table gets the handler; the block of a deleted repair never has it.
+describe("RepairsTable Add service in the open block (09b1 D158)", () => {
+  const live = repairRow({
+    id: "live",
+    status: "completed",
+    invoiceNumber: "DTR-2377",
+    services: [repairService({ id: "s1" })],
+  });
+  const gone = repairRow({
+    id: "gone",
+    deleted: true,
+    status: "completed",
+    invoiceNumber: "DTR-9999",
+    services: [repairService({ id: "s9" })],
+  });
+
+  it("draws the button in the open block of a live repair when it gets the handler", () => {
+    const markup = render({
+      rows: [live],
+      expandedIds: new Set(["live"]),
+      onAddService: () => {},
+    });
+    expect(markup.match(/data-testid="add-service"/g)).toHaveLength(1);
+  });
+
+  it("draws no button without the handler", () => {
+    const markup = render({ rows: [live], expandedIds: new Set(["live"]) });
+    expect(markup).not.toContain('data-testid="add-service"');
+  });
+
+  it("never draws it in the open block of a deleted repair", () => {
+    const markup = render({
+      rows: [gone],
+      showRestore: true,
+      expandedIds: new Set(["gone"]),
+      onAddService: () => {},
+    });
+    expect(markup).toContain('data-testid="repair-services"');
+    expect(markup).not.toContain('data-testid="add-service"');
+  });
+
+  it("draws it only in the blocks that are open", () => {
+    const markup = render({ rows: [live], onAddService: () => {} });
+    expect(markup).not.toContain('data-testid="add-service"');
+  });
+});

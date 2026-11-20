@@ -523,3 +523,49 @@ describe("the new entry of the stack (spec 09a)", () => {
     expect(resolveWindows([], [newEntry]).map((w) => w.kind)).toEqual(["new"]);
   });
 });
+
+// docs/specs/repairs-09b1-services.md §2.4, §3 and §7 (D158): the stack gets a `newService` entry for
+// the New service window of a live repair.
+describe("the newService entry of the stack (spec 09b1)", () => {
+  const entry = (repairId: string): WindowEntry => ({ kind: "newService", repairId });
+  const rows = [repairRow({ id: "r1" }), repairRow({ id: "r2", deleted: true })];
+
+  it("opens on an empty stack and on top of another window", () => {
+    expect(openWindow([], entry("r1"))).toEqual([entry("r1")]);
+    expect(openWindow([repairEntry("r1")], entry("r1"))).toEqual([repairEntry("r1"), entry("r1")]);
+  });
+
+  it("is the same as another of the same repair on the top, and different for another repair", () => {
+    expect(openWindow([entry("r1")], entry("r1"))).toEqual([entry("r1")]);
+    expect(openWindow([entry("r1")], entry("r2"))).toEqual([entry("r1"), entry("r2")]);
+  });
+
+  it("is not the same as a repair window or a service window of that repair", () => {
+    expect(openWindow([repairEntry("r1")], entry("r1"))).toHaveLength(2);
+    expect(openWindow([serviceEntry("r1", "s1")], entry("r1"))).toHaveLength(2);
+  });
+
+  it("closes with closeFrom, with the windows above it", () => {
+    expect(closeFrom([repairEntry("r1"), entry("r1"), reportsEntry("a")], 1)).toEqual([
+      repairEntry("r1"),
+    ]);
+  });
+
+  it("is drawn by resolveWindows with its index and its repair", () => {
+    const windows = resolveWindows(rows, [repairEntry("r1"), entry("r1")]);
+    expect(windows.map((w) => [w.kind, w.index])).toEqual([
+      ["repair", 0],
+      ["newService", 1],
+    ]);
+    const added = windows[1];
+    expect(added.kind === "newService" && added.repair.id).toBe("r1");
+  });
+
+  it("is left out when its repair is not in the rows or is deleted", () => {
+    expect(resolveWindows(rows, [entry("nope")])).toEqual([]);
+    expect(resolveWindows(rows, [entry("r2")])).toEqual([]);
+    expect(resolveWindows(rows, [entry("r2"), repairEntry("r1")]).map((w) => w.kind)).toEqual([
+      "repair",
+    ]);
+  });
+});

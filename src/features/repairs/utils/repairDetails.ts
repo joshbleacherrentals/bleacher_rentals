@@ -155,7 +155,9 @@ export type WindowEntry =
   | { kind: "service"; repairId: string; serviceId: string }
   | { kind: "reports"; reported: ReportedReport[] }
   /** The New repair window: it has no repair behind it (spec 09a D126). */
-  | { kind: "new" };
+  | { kind: "new" }
+  /** The New service window of a live repair (spec 09b1 D158). */
+  | { kind: "newService"; repairId: string };
 
 /** A window ready to draw. `index` is its place in the stack: its key, and what closes it. */
 export type ResolvedWindow =
@@ -169,11 +171,13 @@ export type ResolvedWindow =
       showOpenRepair: boolean;
     }
   | { kind: "reports"; index: number; reported: ReportedReport[] }
-  | { kind: "new"; index: number };
+  | { kind: "new"; index: number }
+  | { kind: "newService"; index: number; repair: RepairListRow };
 
 function sameWindow(a: WindowEntry, b: WindowEntry): boolean {
   if (a.kind === "new" && b.kind === "new") return true;
   if (a.kind === "repair" && b.kind === "repair") return a.repairId === b.repairId;
+  if (a.kind === "newService" && b.kind === "newService") return a.repairId === b.repairId;
   if (a.kind === "service" && b.kind === "service") {
     return a.repairId === b.repairId && a.serviceId === b.serviceId;
   }
@@ -219,6 +223,10 @@ export function resolveWindows(
     } else if (entry.kind === "repair") {
       const repair = rows.find((row) => row.id === entry.repairId);
       if (repair) windows.push({ kind: "repair", index, repair });
+    } else if (entry.kind === "newService") {
+      // A repair that is gone, or deleted, cannot get a service (spec 09b1 D158).
+      const repair = rows.find((row) => row.id === entry.repairId);
+      if (repair && !repair.deleted) windows.push({ kind: "newService", index, repair });
     } else {
       const found = findService(rows, { repairId: entry.repairId, serviceId: entry.serviceId });
       if (!found) return;

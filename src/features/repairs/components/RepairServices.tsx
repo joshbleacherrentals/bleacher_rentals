@@ -1,5 +1,5 @@
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { formatRepairMoney, reportedCell } from "../utils/repairFormat";
 import { repairLabel, serviceRowLabel } from "../utils/repairDetails";
 import type { RepairListRow, RepairService } from "../utils/repairRows";
@@ -10,12 +10,15 @@ export type RepairServicesBlockProps = {
   /** The id the arrow of the row points to with `aria-controls`. */
   id: string;
   onOpenService: (serviceId: string) => void;
+  /** Add service under the table; the button is drawn only when it is given (spec 09b1 D158). */
+  onAddService?: () => void;
 };
 
 /**
  * The block under an open repair: a card with the table of its services (Bleacher, Category,
  * Severity, Reported, Description, Labor, Parts, Tax, Freight, Total). A click, Enter or Space on a
- * row opens the service window. Read-only: no Add service and no total row (spec 06 D84).
+ * row opens the service window. It has no total row (spec 06 D84); it has Add service under the
+ * table when the page gives the handler (spec 09b1 D158).
  * docs/specs/repairs-06-expanded-row.md §2.2; the grid and the looks are the canvas's.
  *
  * The same rows, on the canvas's narrower window grid and with a Total row, are the table of the
@@ -59,6 +62,21 @@ const HEADERS: { label: string; align?: "right" }[] = [
 
 function Dash() {
   return <span className="text-[#9ca3af]">—</span>;
+}
+
+/** The Add service button under a table of services (the canvas's `rp-addbtn`; spec 09b1 D158). */
+function AddServiceButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="add-service"
+      onClick={onClick}
+      className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#d1d5db] bg-white px-3 text-sm leading-5 font-semibold text-[#10365a] hover:bg-[#f3f4f6] focus-visible:ring-2 focus-visible:ring-[#1d62a3] focus-visible:outline-none"
+    >
+      <Plus className="size-3.5" aria-hidden="true" />
+      Add service
+    </button>
+  );
 }
 
 /** One service of a repair: a focusable row that opens the service window. The grid is the caller's. */
@@ -165,7 +183,12 @@ function ServicesHeader({ grid }: { grid: CSSProperties }) {
   );
 }
 
-export function RepairServicesBlock({ repair, id, onOpenService }: RepairServicesBlockProps) {
+export function RepairServicesBlock({
+  repair,
+  id,
+  onOpenService,
+  onAddService,
+}: RepairServicesBlockProps) {
   const label = `Services of ${repairLabel(repair)}`;
   const isEmpty = repair.services.length === 0;
 
@@ -202,6 +225,11 @@ export function RepairServicesBlock({ repair, id, onOpenService }: RepairService
           </div>
         )}
       </div>
+      {onAddService && (
+        <div className="mt-3">
+          <AddServiceButton onClick={onAddService} />
+        </div>
+      )}
     </div>
   );
 }
@@ -209,6 +237,8 @@ export function RepairServicesBlock({ repair, id, onOpenService }: RepairService
 export type RepairWindowServicesProps = {
   repair: RepairListRow;
   onOpenService: (serviceId: string) => void;
+  /** Add service under the table; the button is drawn only when it is given (spec 09b1 D158). */
+  onAddService?: () => void;
 };
 
 /**
@@ -216,9 +246,13 @@ export type RepairWindowServicesProps = {
  * and a Total row (D101): the sums of the services under Labor, Parts, Tax and Freight, and the
  * repair's own total (`cost_cents`) under Total, which may differ from the sum for a moment (spec 03
  * D32). A repair with no services keeps the header band, says so, and still draws the Total row.
- * Read-only: no Add service (D84).
+ * Add service is under it when the window gives the handler (spec 09b1 D158).
  */
-export function RepairWindowServices({ repair, onOpenService }: RepairWindowServicesProps) {
+export function RepairWindowServices({
+  repair,
+  onOpenService,
+  onAddService,
+}: RepairWindowServicesProps) {
   const isEmpty = repair.services.length === 0;
   const sum = (key: string, cents: number | null, className = "") => {
     const text = formatRepairMoney(cents, repair.currency);
@@ -229,7 +263,7 @@ export function RepairWindowServices({ repair, onOpenService }: RepairWindowServ
     );
   };
 
-  return (
+  const table = (
     <div
       role="table"
       aria-label={`Services of ${repairLabel(repair)}`}
@@ -272,6 +306,16 @@ export function RepairWindowServices({ repair, onOpenService }: RepairWindowServ
           {sum("total", repair.totalCents, "text-[#10365a]")}
           <div role="cell" />
         </div>
+      </div>
+    </div>
+  );
+
+  if (!onAddService) return table;
+  return (
+    <div>
+      {table}
+      <div className="mt-3">
+        <AddServiceButton onClick={onAddService} />
       </div>
     </div>
   );

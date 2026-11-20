@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type ElementType,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
@@ -31,22 +40,39 @@ import {
 } from "../utils/repairForm";
 import type { FilterOption } from "../utils/repairFilters";
 import { reportedCell } from "../utils/repairFormat";
-import type { RepairListRow, RepairStatus } from "../utils/repairRows";
+import type { RepairListRow, RepairStatus, ReportedReport } from "../utils/repairRows";
 import { canChangeRepairStatus } from "../utils/repairStatus";
+import {
+  addDraftService,
+  isServicesDraftChanged,
+  newRepairDisplayRow,
+  removeDraftService,
+  repairWithServicesDraft,
+  serviceLookups,
+  servicesDraftFromRepair,
+  updateDraftService,
+  validateServiceForm,
+  type ServiceFormErrors,
+  type ServiceFormValues,
+  type ServicesDraft,
+} from "../utils/serviceForm";
 import { canReadRepairFiles, repairCreatedLine, repairWindowTitle } from "../utils/repairWindow";
 import { BleacherChip, DeletedBadge, StatusPill } from "./RepairChips";
 import { RepairFiles } from "./RepairFiles";
 import { RepairFormFields, firstErrorFieldId } from "./RepairForm";
 import { RepairWindowServices } from "./RepairServices";
 import { RepairStatusMenu } from "./RepairStatusMenu";
+import { NewServiceWindow, ServiceWindow } from "./ServiceWindow";
 
 /**
  * The repair window: the fields of one repair, its services with a Total row and its files. Read-only
  * for every role but an administrator and a maintainer; for those two (the page gives `editing`) it
  * has a footer with Edit and Delete, or Restore on a deleted repair, an Edit mode that turns the
- * fields into inputs in place, and a sibling window for New repair. docs/specs/repairs-07-repair-window.md
- * §2.2 to §2.5 and docs/specs/repairs-09a-repair-writes.md §2.1 to §2.4; the looks are the canvas's
- * (`InvoiceModal`, `InvoiceModalEdit`, `InvoiceModalNew`).
+ * fields into inputs in place, and a sibling window for New repair. Its services have Add service, and
+ * in Edit and in New repair they are a draft that Save writes with the repair (spec 09b1).
+ * docs/specs/repairs-07-repair-window.md §2.2 to §2.5, docs/specs/repairs-09a-repair-writes.md §2.1 to
+ * §2.4 and docs/specs/repairs-09b1-services.md §2.6; the looks are the canvas's (`InvoiceModal`,
+ * `InvoiceModalEdit`, `InvoiceModalNew`).
  */
 
 const EYEBROW =
@@ -85,6 +111,33 @@ function Field({
   );
 }
 
+export type RepairServicesSectionProps = {
+  repair: RepairListRow;
+  onOpenService: (serviceId: string) => void;
+  /** Add service under the table; the button is drawn only when it is given (spec 09b1 D158). */
+  onAddService?: () => void;
+};
+
+/** The Services heading and the table of services of a window (also the New repair window's draft). */
+export function RepairServicesSection({
+  repair,
+  onOpenService,
+  onAddService,
+}: RepairServicesSectionProps) {
+  return (
+    <>
+      <h3 className="mt-7 text-base leading-6 font-semibold text-[#10365a]">Services</h3>
+      <div className="mt-2.5">
+        <RepairWindowServices
+          repair={repair}
+          onOpenService={onOpenService}
+          onAddService={onAddService}
+        />
+      </div>
+    </>
+  );
+}
+
 export type RepairWindowContentProps = {
   repair: RepairListRow;
   /** The app time zone, for the Created day. */
@@ -107,6 +160,8 @@ export type RepairWindowContentProps = {
   eyebrow?: string;
   /** Replaces the fields grid in Edit mode (spec 09a); the services and the files stay. */
   fields?: ReactNode;
+  /** Add service under the table of services; absent, no button (spec 09b1 D158). */
+  onAddService?: () => void;
 };
 
 /** The whole content of the window, a plain component so that a test can render it. */
@@ -121,6 +176,7 @@ export function RepairWindowContent({
   onChangeStatus,
   eyebrow = "Repair",
   fields,
+  onAddService,
 }: RepairWindowContentProps) {
   const created = repairCreatedLine(repair, timezone);
   const reported = reportedCell(repair.reported);
@@ -247,10 +303,11 @@ export function RepairWindowContent({
           </dl>
         )}
 
-        <h3 className="mt-7 text-base leading-6 font-semibold text-[#10365a]">Services</h3>
-        <div className="mt-2.5">
-          <RepairWindowServices repair={repair} onOpenService={onOpenService} />
-        </div>
+        <RepairServicesSection
+          repair={repair}
+          onOpenService={onOpenService}
+          onAddService={onAddService}
+        />
 
         {files}
       </div>
@@ -355,30 +412,121 @@ export function RepairWindowFooter({
   );
 }
 
-/** What the page gives the window of a role that may write (spec 09a D124). */
+/** What the page gives the window of a role that may write (spec 09a D124, spec 09b1 D158, D161). */
 export type RepairEditing = {
   /** Every vendor, for the Vendor select (D131). */
   vendors: readonly FilterOption[];
-  /** Save of an Edit: null when written, the errors when nothing was written (D138). */
-  onSave: (initial: RepairFormValues, values: RepairFormValues) => Promise<RepairFormErrors | null>;
+  /** The lists of the service selects (09b1 D153). */
+  bleachers: readonly FilterOption[];
+  categories: readonly FilterOption[];
+  /**
+   * Save of an Edit: the fields and the services draft (09b1 D161). Null when written, the errors when
+   * nothing was written (D138).
+   */
+  onSave: (
+    initial: RepairFormValues,
+    values: RepairFormValues,
+    services: ServicesDraft,
+  ) => Promise<RepairFormErrors | null>;
   onDelete: () => Promise<void>;
   onRestore: () => Promise<void>;
+  /** Add service in the view mode: the page opens the New service window (09b1 D158). */
+  onAddService: () => void;
+  /** The damage reports of a stored service of an Edit draft, opened through the page. */
+  onOpenServiceReports: (reported: ReportedReport[]) => void;
 };
+
+/** The service window a draft has open (spec 09b1 D162): one service of the draft, or Add service. */
+type DraftServiceWindowState = { kind: "view"; id: string } | { kind: "new" } | null;
+
+/**
+ * The service windows of a draft, drawn by the repair window itself over it: the stack of the page
+ * finds services in the stored list, and a draft is not there (09b1 §0). A change goes into the draft
+ * and nothing is written; a service that has left the draft closes its window.
+ */
+function DraftServiceWindows({
+  state,
+  repair,
+  bleachers,
+  categories,
+  setServices,
+  onOpenReports,
+  onClose,
+}: {
+  state: DraftServiceWindowState;
+  repair: RepairListRow;
+  bleachers: readonly FilterOption[];
+  categories: readonly FilterOption[];
+  setServices: Dispatch<SetStateAction<ServicesDraft>>;
+  onOpenReports: (reported: ReportedReport[]) => void;
+  onClose: () => void;
+}) {
+  if (!state) return null;
+
+  if (state.kind === "new") {
+    return (
+      <NewServiceWindow
+        repair={repair}
+        bleachers={bleachers}
+        categories={categories}
+        onCreate={async (values) => {
+          const errors = validateServiceForm(values);
+          if (Object.keys(errors).length > 0) return errors;
+          setServices((draft) => addDraftService(draft, crypto.randomUUID(), values));
+          return null;
+        }}
+        onClose={onClose}
+      />
+    );
+  }
+
+  const service = repair.services.find((row) => row.id === state.id);
+  if (!service) return null;
+  return (
+    <ServiceWindow
+      repair={repair}
+      service={service}
+      onOpenReports={() => onOpenReports(service.reported)}
+      onClose={onClose}
+      editing={{
+        bleachers,
+        categories,
+        onSave: async (_initial: ServiceFormValues, values: ServiceFormValues) => {
+          const errors: ServiceFormErrors = validateServiceForm(values);
+          if (Object.keys(errors).length > 0) return errors;
+          setServices((draft) => updateDraftService(draft, service.id, values));
+          return null;
+        },
+        onDelete: async () => {
+          setServices((draft) => removeDraftService(draft, service.id));
+        },
+      }}
+    />
+  );
+}
 
 /**
  * The draft of the Edit and New repair modes (D128 to D139): the values, the errors under the fields,
  * whether a write runs, and Save. A change clears the errors of its own field; choosing a vendor in
  * New repair reads the vendor's country once and sets the currency while the person has not picked
- * one (D133). A failed write leaves the window as it is: the writer showed its red toast (D139).
+ * one (D133). The draft of services (09b1 D161) is part of it: it makes the window dirty and Save
+ * hands it to the writer with the fields. A failed write leaves the window as it is: the writer
+ * showed its red toast (D139).
  */
 function useRepairDraft(params: {
   mode: "edit" | "new";
   initial: RepairFormValues;
-  submit: (initial: RepairFormValues, values: RepairFormValues) => Promise<RepairFormErrors | null>;
+  initialServices: ServicesDraft;
+  submit: (
+    initial: RepairFormValues,
+    values: RepairFormValues,
+    services: ServicesDraft,
+  ) => Promise<RepairFormErrors | null>;
   onSaved: () => void;
 }) {
-  const { mode, initial, submit, onSaved } = params;
+  const { mode, initial, initialServices, submit, onSaved } = params;
   const [values, setValues] = useState<RepairFormValues>(initial);
+  const [services, setServices] = useState<ServicesDraft>(initialServices);
   const [errors, setErrors] = useState<RepairFormErrors>({});
   const [saving, setSaving] = useState(false);
   const currencyTouched = useRef(false);
@@ -412,7 +560,7 @@ function useRepairDraft(params: {
     if (saving) return;
     setSaving(true);
     try {
-      const refused = await submit(initial, values);
+      const refused = await submit(initial, values, services);
       if (refused) {
         setErrors(refused);
         const id = firstErrorFieldId(refused);
@@ -427,7 +575,16 @@ function useRepairDraft(params: {
     }
   };
 
-  return { values, errors, saving, dirty: isRepairFormDirty(initial, values), change, save };
+  return {
+    values,
+    services,
+    setServices,
+    errors,
+    saving,
+    dirty: isRepairFormDirty(initial, values) || isServicesDraftChanged(services),
+    change,
+    save,
+  };
 }
 
 /** "Discard changes?" (D129): asked by the cross, Esc and a click outside, when a field changed. */
@@ -510,42 +667,61 @@ export const REPAIR_WINDOW_CLASS =
 function RepairEditBody({
   repair,
   initial,
-  vendors,
+  initialServices,
+  editing,
   timezone,
   files,
-  onOpenService,
   onOpenReports,
-  onSave,
   onLeave,
   onDirtyChange,
 }: {
   repair: RepairListRow;
   initial: RepairFormValues;
-  vendors: readonly FilterOption[];
+  initialServices: ServicesDraft;
+  editing: RepairEditing;
   timezone: string;
   files: ReactNode;
-  onOpenService: (serviceId: string) => void;
   onOpenReports: () => void;
-  onSave: RepairEditing["onSave"];
   onLeave: () => void;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const draft = useRepairDraft({ mode: "edit", initial, submit: onSave, onSaved: onLeave });
+  const draft = useRepairDraft({
+    mode: "edit",
+    initial,
+    initialServices,
+    submit: editing.onSave,
+    onSaved: onLeave,
+  });
   const { dirty } = draft;
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
   const vendorOptions = useMemo(
-    () => vendorSelectOptions(vendors, { uuid: initial.vendorUuid, name: repair.vendorName }),
-    [vendors, initial.vendorUuid, repair.vendorName],
+    () =>
+      vendorSelectOptions(editing.vendors, { uuid: initial.vendorUuid, name: repair.vendorName }),
+    [editing.vendors, initial.vendorUuid, repair.vendorName],
   );
+  // The window shows the repair with the services of the draft, and the draft's currency (D163).
+  const lookups = useMemo(
+    () => serviceLookups(editing.bleachers, editing.categories),
+    [editing.bleachers, editing.categories],
+  );
+  const shown = useMemo(
+    () => ({
+      ...repairWithServicesDraft(repair, draft.services, lookups),
+      currency: draft.values.currency,
+    }),
+    [repair, draft.services, draft.values.currency, lookups],
+  );
+  const [serviceWindow, setServiceWindow] = useState<DraftServiceWindowState>(null);
 
   return (
     <>
       <RepairWindowContent
-        repair={repair}
+        repair={shown}
         timezone={timezone}
         vendorAddress={null}
-        onOpenService={onOpenService}
+        onOpenService={(id) => setServiceWindow({ kind: "view", id })}
         onOpenReports={onOpenReports}
+        onAddService={() => setServiceWindow({ kind: "new" })}
         files={files}
         Title={DialogTitle}
         eyebrow="Edit repair"
@@ -571,6 +747,15 @@ function RepairEditBody({
         onRestore={() => {}}
         onCancel={onLeave}
         onSave={draft.save}
+      />
+      <DraftServiceWindows
+        state={serviceWindow}
+        repair={shown}
+        bleachers={editing.bleachers}
+        categories={editing.categories}
+        setServices={draft.setServices}
+        onOpenReports={editing.onOpenServiceReports}
+        onClose={() => setServiceWindow(null)}
       />
     </>
   );
@@ -604,8 +789,12 @@ export function RepairWindow({
   const { isAdmin, isAccountManager, isMaintainer } = useTeamPermissions();
   const canReadFiles = canReadRepairFiles({ isAdmin, isAccountManager, isMaintainer });
 
-  // The values the draft opened with; null in view mode. The inputs are drawn only while it is set.
-  const [session, setSession] = useState<RepairFormValues | null>(null);
+  // What the draft opened with (the fields and the services); null in view mode. The inputs are drawn
+  // only while it is set.
+  const [session, setSession] = useState<{
+    initial: RepairFormValues;
+    services: ServicesDraft;
+  } | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const dirtyRef = useRef(false);
@@ -645,13 +834,12 @@ export function RepairWindow({
           {session && editing ? (
             <RepairEditBody
               repair={repair}
-              initial={session}
-              vendors={editing.vendors}
+              initial={session.initial}
+              initialServices={session.services}
+              editing={editing}
               timezone={timezone}
               files={files}
-              onOpenService={onOpenService}
               onOpenReports={onOpenReports}
-              onSave={editing.onSave}
               onLeave={leaveEdit}
               onDirtyChange={onDirtyChange}
             />
@@ -663,6 +851,7 @@ export function RepairWindow({
                 vendorAddress={address}
                 onOpenService={onOpenService}
                 onOpenReports={onOpenReports}
+                onAddService={editing && !repair.deleted ? editing.onAddService : undefined}
                 files={files}
                 Title={DialogTitle}
                 onChangeStatus={onChangeStatus}
@@ -672,7 +861,12 @@ export function RepairWindow({
                   mode="view"
                   deleted={repair.deleted}
                   saving={false}
-                  onEdit={() => setSession(repairFormFromRow(repair))}
+                  onEdit={() =>
+                    setSession({
+                      initial: repairFormFromRow(repair),
+                      services: servicesDraftFromRepair(repair),
+                    })
+                  }
                   onDelete={() => setConfirmDelete(true)}
                   onRestore={() => void editing.onRestore().catch(() => {})}
                   onCancel={() => {}}
@@ -702,23 +896,44 @@ export function RepairWindow({
 
 export type NewRepairWindowProps = {
   vendors: readonly FilterOption[];
-  onCreate: (values: RepairFormValues) => Promise<RepairFormErrors | null>;
+  /** The lists of the service selects (09b1 D153). */
+  bleachers: readonly FilterOption[];
+  categories: readonly FilterOption[];
+  onCreate: (values: RepairFormValues, services: ServicesDraft) => Promise<RepairFormErrors | null>;
   onClose: () => void;
 };
 
-/** The window of New repair: the fields only, Cancel and Add repair (D128, D129). */
-export function NewRepairWindow({ vendors, onCreate, onClose }: NewRepairWindowProps) {
+/**
+ * The window of New repair: the fields and the draft of services (spec 09b1 D149), Cancel and Add
+ * repair (D128, D129). The files join the draft in spec 09b3.
+ */
+export function NewRepairWindow({
+  vendors,
+  bleachers,
+  categories,
+  onCreate,
+  onClose,
+}: NewRepairWindowProps) {
   const [initial] = useState(emptyRepairForm);
   const draft = useRepairDraft({
     mode: "new",
     initial,
-    submit: (_initial, values) => onCreate(values),
+    initialServices: [],
+    submit: (_initial, values, services) => onCreate(values, services),
     onSaved: onClose,
   });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [serviceWindow, setServiceWindow] = useState<DraftServiceWindowState>(null);
   const vendorOptions = useMemo(
     () => vendorSelectOptions(vendors, { uuid: null, name: null }),
     [vendors],
+  );
+  const lookups = useMemo(() => serviceLookups(bleachers, categories), [bleachers, categories]);
+  const vendorName =
+    vendors.find((vendor) => vendor.value === draft.values.vendorUuid)?.label ?? null;
+  const shown = useMemo(
+    () => newRepairDisplayRow({ values: draft.values, vendorName, draft: draft.services, lookups }),
+    [draft.values, vendorName, draft.services, lookups],
   );
   const requestClose = () => (draft.dirty ? setConfirmDiscard(true) : onClose());
 
@@ -751,6 +966,11 @@ export function NewRepairWindow({ vendors, onCreate, onClose }: NewRepairWindowP
                 onChange={draft.change}
               />
             </div>
+            <RepairServicesSection
+              repair={shown}
+              onOpenService={(id) => setServiceWindow({ kind: "view", id })}
+              onAddService={() => setServiceWindow({ kind: "new" })}
+            />
           </div>
           <RepairWindowFooter
             mode="new"
@@ -768,6 +988,15 @@ export function NewRepairWindow({ vendors, onCreate, onClose }: NewRepairWindowP
         open={confirmDiscard}
         onKeep={() => setConfirmDiscard(false)}
         onDiscard={onClose}
+      />
+      <DraftServiceWindows
+        state={serviceWindow}
+        repair={shown}
+        bleachers={bleachers}
+        categories={categories}
+        setServices={draft.setServices}
+        onOpenReports={() => {}}
+        onClose={() => setServiceWindow(null)}
       />
     </>
   );

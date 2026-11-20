@@ -16,7 +16,9 @@ import {
   type RepairFormValues,
 } from "../utils/repairForm";
 import type { ReportedReport } from "../utils/repairRows";
+import { isServicesDraftChanged, type ServicesDraft } from "../utils/serviceForm";
 import { buildStatusStatements } from "./repairStatusWrite";
+import { buildServicesDraftStatements } from "./serviceWrite";
 import { buildVendorAddressQuery, type RawVendorAddressRow } from "./repairWindowQueries";
 
 /**
@@ -24,7 +26,9 @@ import { buildVendorAddressQuery, type RawVendorAddressRow } from "./repairWindo
  * through the app's Kysely and one local transaction per action (docs/POWERSYNC_ARCHITECTURE.md).
  * The statements are built apart from the run so that they are tested on SQLite, and the writers
  * validate before they write. docs/specs/repairs-09a-repair-writes.md §2.4 to §2.6 and §3 (D125 to
- * D145; the signatures here are locked by that spec).
+ * D145; the signatures here are locked by that spec). The services draft of New repair and Edit rides
+ * in the same batch, after the repair's own statements: docs/specs/repairs-09b1-services.md §2.6 and §3
+ * (D149, D161).
  */
 
 export type CreateRepairInput = {
@@ -32,6 +36,8 @@ export type CreateRepairInput = {
   values: RepairFormValues;
   createdByUserUuid: string | null;
   now: string; // an ISO timestamp: created_at, and completed_at for a Completed repair
+  /** The services of the New repair window (09b1 D149); absent is an empty draft. */
+  services?: ServicesDraft;
 };
 
 /**
@@ -67,12 +73,14 @@ export type UpdateRepairInput = {
   liveStatus: string; // the status the list shows at Save (the `from` of spec 08)
   reported: readonly ReportedReport[];
   now: string;
+  /** The services draft of the Edit window (09b1 D161); absent is an empty draft. */
+  services?: ServicesDraft;
 };
 
 /**
  * The statements of §2.5 for an Edit, in order: one update of the changed columns (never `status`),
- * then the statements of spec 08 when the person picked another status. Empty when nothing is to be
- * written.
+ * then the statements of spec 08 when the person picked another status, then the statements of the
+ * services draft (09b1). Empty when nothing is to be written.
  */
 export function buildUpdateRepairStatements(input: UpdateRepairInput): CompiledQuery[] {
   const { repairId, initial, values } = input;
@@ -121,6 +129,14 @@ export function buildUpdateRepairStatements(input: UpdateRepairInput): CompiledQ
       }),
     );
   }
+
+  statements.push(
+    ...buildServicesDraftStatements({
+      repairId,
+      draft: input.services ?? [],
+      now: input.now,
+    }),
+  );
   return statements;
 }
 
@@ -217,21 +233,30 @@ export async function createRepair(
   if (duplicate) errors.invoiceNumber = REPAIR_FORM_MESSAGES.invoiceDuplicate;
   if (Object.keys(errors).length > 0) return errors;
 
+  const id = crypto.randomUUID();
   await writeBatch(
-    [buildCreateRepairStatement({ ...input, id: crypto.randomUUID() })],
+    [
+      buildCreateRepairStatement({ ...input, id }),
+      ...buildServicesDraftStatements({
+        repairId: id,
+        draft: input.services ?? [],
+        now: input.now,
+      }),
+    ],
     REPAIR_FORM_MESSAGES.saveFailed,
   );
   return null;
 }
 
 /**
- * The same for an Edit. Nothing changed: nothing is checked and nothing is written. The duplicate
+ * The same for an Edit. Nothing changed (no field and no service): nothing is checked and nothing is
+ * written. The duplicate
  * check runs only when the vendor or the number changed, so a record that was already a
  * near-duplicate does not block an unrelated edit (§2.4).
  */
 export async function updateRepair(input: UpdateRepairInput): Promise<RepairFormErrors | null> {
   const changed = changedRepairFields(input.initial, input.values);
-  if (changed.length === 0) return null;
+  if (changed.length === 0 && !isServicesDraftChanged(input.services ?? [])) return null;
 
   const errors = validateRepairForm(input.values);
   if (changed.includes("vendorUuid") || changed.includes("invoiceNumber")) {

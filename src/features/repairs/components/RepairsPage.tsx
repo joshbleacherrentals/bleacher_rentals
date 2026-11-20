@@ -10,6 +10,7 @@ import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canMa
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { changeRepairStatus } from "../db/repairStatusWrite";
 import { createRepair, deleteRepair, restoreRepair, updateRepair } from "../db/repairWrite";
+import { createService, deleteService, updateService } from "../db/serviceWrite";
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
 import { useRepairList } from "../hooks/useRepairList";
 import { closeFrom, openWindow, resolveWindows, type WindowEntry } from "../utils/repairDetails";
@@ -28,14 +29,14 @@ import {
   type RepairsUrlPatch,
   type RepairsUrlState,
 } from "../utils/repairPageState";
-import type { RepairListRow, RepairStatus } from "../utils/repairRows";
+import type { RepairListRow, RepairService, RepairStatus } from "../utils/repairRows";
 import { nextRepairSort, type RepairSortKey } from "../utils/repairSort";
 import { DamageReportWindow } from "./DamageReportWindow";
 import { NewRepairWindow, RepairWindow, type RepairEditing } from "./RepairWindow";
 import { RepairsTable } from "./RepairsTable";
 import { RepairsToolbar } from "./RepairsToolbar";
 import { RepairsTotalsStrip } from "./RepairsTotalsStrip";
-import { ServiceWindow } from "./ServiceWindow";
+import { NewServiceWindow, ServiceWindow, type ServiceEditing } from "./ServiceWindow";
 
 /**
  * The Repairs page: the totals strip, the Open and Completed tabs, the toolbar (search, four
@@ -44,10 +45,11 @@ import { ServiceWindow } from "./ServiceWindow";
  * window, the service window and the damage report window are one stack, each over the one that
  * opened it (spec 07 D95, D96). It writes, for an administrator or a maintainer: the status chosen in
  * the menu of a pill (spec 08 D110, D111), and the repair itself, from the New repair button and from
- * the repair window: Add, Edit, Delete and Restore (spec 09a D124 to D145). docs/specs/repairs-04-table.md,
+ * the repair window: Add, Edit, Delete and Restore (spec 09a D124 to D145), and the services of a repair:
+ * Add service, Edit and Delete (spec 09b1 D158 to D165). docs/specs/repairs-04-table.md,
  * docs/specs/repairs-05-toolbar.md, docs/specs/repairs-06-expanded-row.md,
  * docs/specs/repairs-07-repair-window.md §2.7, docs/specs/repairs-08-status.md §2.1 and
- * docs/specs/repairs-09a-repair-writes.md §2.1 and §2.8.
+ * docs/specs/repairs-09a-repair-writes.md §2.1 and §2.8 and docs/specs/repairs-09b1-services.md §2.8.
  */
 export default function RepairsPage() {
   const router = useRouter();
@@ -110,11 +112,14 @@ export default function RepairsPage() {
     canManage
       ? {
           vendors: options.vendor,
-          onSave: (initial, values) =>
+          bleachers: options.bleacher,
+          categories: options.category,
+          onSave: (initial, values, services) =>
             updateRepair({
               repairId: repair.id,
               initial,
               values,
+              services,
               liveStatus: repair.status,
               reported: repair.reported,
               now: new Date().toISOString(),
@@ -123,6 +128,23 @@ export default function RepairsPage() {
           onRestore: async () => {
             await restore(repair.id);
           },
+          onAddService: () => open({ kind: "newService", repairId: repair.id }),
+          onOpenServiceReports: (reported) => open({ kind: "reports", reported }),
+        }
+      : undefined;
+
+  // What the service window gets for an administrator or a maintainer: a service that is not deleted of
+  // a repair that is not deleted (spec 09b1 D157, D165). The writers show their own error toasts.
+  const serviceEditingFor = (
+    repair: RepairListRow,
+    service: RepairService,
+  ): ServiceEditing | undefined =>
+    canManage && !repair.deleted && !service.deleted
+      ? {
+          bleachers: options.bleacher,
+          categories: options.category,
+          onSave: (initial, values) => updateService({ serviceId: service.id, initial, values }),
+          onDelete: () => deleteService(service.id),
         }
       : undefined;
 
@@ -200,6 +222,9 @@ export default function RepairsPage() {
           onOpenService={(repairId, serviceId) => open({ kind: "service", repairId, serviceId })}
           onOpenReports={(reported) => open({ kind: "reports", reported })}
           onOpenRepair={(repairId) => open({ kind: "repair", repairId })}
+          onAddService={
+            canManage ? (repairId) => open({ kind: "newService", repairId }) : undefined
+          }
           onChangeStatus={canManage ? changeStatus : undefined}
         />
       </div>
@@ -210,9 +235,12 @@ export default function RepairsPage() {
             <NewRepairWindow
               key={w.index}
               vendors={options.vendor}
-              onCreate={(values) =>
+              bleachers={options.bleacher}
+              categories={options.category}
+              onCreate={(values, services) =>
                 createRepair({
                   values,
+                  services,
                   createdByUserUuid: userId,
                   now: new Date().toISOString(),
                 })
@@ -245,6 +273,25 @@ export default function RepairsPage() {
               onOpenReports={() => open({ kind: "reports", reported: w.service.reported })}
               onOpenRepair={
                 w.showOpenRepair ? () => open({ kind: "repair", repairId: w.repair.id }) : undefined
+              }
+              onClose={() => close(w.index)}
+              editing={serviceEditingFor(w.repair, w.service)}
+            />
+          );
+        }
+        if (w.kind === "newService") {
+          return (
+            <NewServiceWindow
+              key={w.index}
+              repair={w.repair}
+              bleachers={options.bleacher}
+              categories={options.category}
+              onCreate={(values) =>
+                createService({
+                  repairId: w.repair.id,
+                  values,
+                  now: new Date().toISOString(),
+                })
               }
               onClose={() => close(w.index)}
             />

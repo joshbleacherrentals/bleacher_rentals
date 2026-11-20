@@ -44,6 +44,11 @@ export type RepairsTableProps = {
   /** A click on the button at the end of a row: the repair window (spec 07 D94). */
   onOpenRepair: (repairId: string) => void;
   /**
+   * Add service under the services of an open repair (spec 09b1 D158). Given only to a role that may
+   * write; a deleted repair never gets the button.
+   */
+  onAddService?: (repairId: string) => void;
+  /**
    * A status chosen in the menu of a row's pill (spec 08 D110). Given only to a role that may change
    * the status; without it every pill is the plain one. A deleted row never gets the menu (D118).
    */
@@ -352,6 +357,7 @@ export function RepairsTable({
   onOpenService,
   onOpenReports,
   onOpenRepair,
+  onAddService,
   onChangeStatus,
 }: RepairsTableProps) {
   const grid = gridFor(showRestore);
@@ -501,6 +507,9 @@ export function RepairsTable({
                     repair={row}
                     id={blockId}
                     onOpenService={(serviceId) => onOpenService(row.id, serviceId)}
+                    onAddService={
+                      onAddService && !row.deleted ? () => onAddService(row.id) : undefined
+                    }
                   />
                 )}
               </div>

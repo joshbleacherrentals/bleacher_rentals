@@ -42,6 +42,14 @@ import {
   type UpdateRepairInput,
 } from "./repairWrite";
 import { REPAIR_FORM_MESSAGES, type RepairFormValues } from "../utils/repairForm";
+import { repairRow, repairService } from "../utils/repairRowFixture";
+import {
+  addDraftService,
+  removeDraftService,
+  servicesDraftFromRepair,
+  type ServiceFormValues,
+  type ServicesDraft,
+} from "../utils/serviceForm";
 
 const REPAIR = "r0000000-0000-4000-8000-000000000001";
 const OTHER_REPAIR = "r0000000-0000-4000-8000-000000000002";
@@ -678,5 +686,96 @@ describe("the writers", () => {
       await expect(restoreRepair(repair)).rejects.toThrow("disk is full");
       expect(toastLines()[0]).toBe("Failed to restore the repair.");
     });
+  });
+});
+
+// docs/specs/repairs-09b1-services.md §2.6 and §3 (D149, D161): the services draft rides in the same
+// batch as the repair, after the statements of the fields and the status.
+describe("the services draft (09b1)", () => {
+  const serviceValues = (over: Partial<ServiceFormValues> = {}): ServiceFormValues => ({
+    bleacherUuid: "b1",
+    categoryUuid: "c1",
+    severity: "minor",
+    description: "Weld",
+    laborText: "10.00",
+    partsText: "",
+    taxText: "",
+    freightText: "",
+    ...over,
+  });
+  const stored = repairRow({
+    id: REPAIR,
+    services: [repairService({ id: "s1", description: "Weld", laborCents: 1000 })],
+  });
+  const added = (): ServicesDraft =>
+    addDraftService(servicesDraftFromRepair(stored), "n1", serviceValues());
+  const removed = (): ServicesDraft => removeDraftService(servicesDraftFromRepair(stored), "s1");
+
+  beforeEach(() => {
+    typedExecuteBatch.mockReset();
+    typedGetAll.mockReset();
+    toastCustom.mockReset();
+    typedExecuteBatch.mockResolvedValue(undefined);
+    typedGetAll.mockResolvedValue([]);
+  });
+
+  it("createRepair writes the repair first and then the services, in one batch", async () => {
+    const { id: _id, ...rest } = createInput({ services: added() });
+    expect(await createRepair(rest)).toBeNull();
+    expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
+    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(statements.map((s) => s.sql.match(/"(\w+)"/)?.[1])).toEqual([
+      "MaintenanceEvents",
+      "MaintenanceLineItems",
+    ]);
+    expect(statements[0].sql).toMatch(/^insert into "MaintenanceEvents"/i);
+    // The service points at the new repair: the id the repair insert was given.
+    expect(statements[1].parameters).toContain(statements[0].parameters[0]);
+  });
+
+  it("createRepair without a draft sends the statements it always did", async () => {
+    const { id: _id, ...rest } = createInput();
+    await createRepair(rest);
+    expect((typedExecuteBatch.mock.calls[0][0] as CompiledQuery[]).length).toBe(1);
+  });
+
+  it("buildUpdateRepairStatements appends the services after the fields and the status", () => {
+    const statements = buildUpdateRepairStatements(
+      updateInput({
+        values: values({ notes: "x", status: "completed" }),
+        services: added(),
+      }),
+    );
+    expect(statements.map((s) => s.sql.match(/^(update "\w+"|insert into "\w+")/)?.[1])).toEqual([
+      'update "MaintenanceEvents"',
+      'update "MaintenanceEvents"',
+      'update "DamageReports"',
+      'insert into "MaintenanceLineItems"',
+    ]);
+  });
+
+  it("updateRepair with only a services change writes the services, runs no duplicate check and returns null", async () => {
+    expect(await updateRepair(updateInput({ services: removed() }))).toBeNull();
+    expect(typedGetAll).not.toHaveBeenCalled();
+    expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
+    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(statements).toHaveLength(1);
+    expect(statements[0].sql).toMatch(/^update "MaintenanceLineItems"/i);
+    expect(statements[0].parameters).toEqual([1, "s1"]);
+  });
+
+  it("updateRepair writes nothing when neither a field nor the services changed", async () => {
+    expect(
+      await updateRepair(updateInput({ services: servicesDraftFromRepair(stored) })),
+    ).toBeNull();
+    expect(typedExecuteBatch).not.toHaveBeenCalled();
+  });
+
+  it("updateRepair with both writes the repair's statement first and the services after it", async () => {
+    await updateRepair(updateInput({ values: values({ notes: "x" }), services: added() }));
+    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(statements).toHaveLength(2);
+    expect(statements[0].sql).toMatch(/^update "MaintenanceEvents"/i);
+    expect(statements[1].sql).toMatch(/^insert into "MaintenanceLineItems"/i);
   });
 });

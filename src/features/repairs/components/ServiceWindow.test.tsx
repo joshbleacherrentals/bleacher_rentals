@@ -1,9 +1,15 @@
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { repairRow, repairService } from "../utils/repairRowFixture";
 import type { RepairListRow, RepairService } from "../utils/repairRows";
 import type { RawServiceBleacherRow } from "../db/serviceWindowQueries";
-import { ServiceWindowContent } from "./ServiceWindow";
+import {
+  ServiceWindowContent,
+  ServiceWindowFooter,
+  serviceIsEditable,
+  type ServiceWindowFooterProps,
+} from "./ServiceWindow";
 
 // docs/specs/repairs-06-expanded-row.md §2.3 and §7 (D4, D84, D86, D88, D89), and
 // docs/specs/repairs-07-repair-window.md §2.6 (Open repair). The window's content
@@ -263,5 +269,97 @@ describe("ServiceWindowContent is read-only (D84)", () => {
     expect(words).not.toContain("Delete ");
     expect(words).not.toContain("Add service");
     expect(markup).not.toContain("<footer");
+  });
+});
+
+// docs/specs/repairs-09b1-services.md §2.1, §2.3 and §7 (D155 to D157, D162, D165). The footer is a
+// plain component so that a test can render it; the window around it is a Radix dialog.
+describe("ServiceWindowContent in Edit and Add (the eyebrow and the form)", () => {
+  const renderForm = (over: { eyebrow?: string; form?: ReactNode } = {}) =>
+    renderToStaticMarkup(
+      <ServiceWindowContent
+        repair={repair}
+        service={service}
+        bleacher={bleacher}
+        onOpenReports={() => {}}
+        eyebrow={over.eyebrow}
+        form={over.form}
+      />,
+    );
+
+  it("draws the eyebrow it is given, and Service otherwise", () => {
+    expect(text(renderForm({ eyebrow: "Edit service" }))).toContain("Edit service");
+    expect(text(renderForm())).toContain("Service");
+    expect(text(renderForm())).not.toContain("Edit service");
+  });
+
+  it("draws the form in place of the fields and the amounts, and keeps the strip and the card", () => {
+    const markup = renderForm({ form: <div data-testid="the-form">the form</div> });
+    expect(markup).toContain('data-testid="the-form"');
+    expect(markup).not.toContain('data-field="bleacher"');
+    expect(markup).not.toContain('data-amount="labor"');
+    expect(markup).toContain('data-testid="service-window-repair"');
+    expect(markup).toContain('data-testid="service-window-bleacher"');
+  });
+});
+
+describe("ServiceWindowFooter (D155, D156)", () => {
+  const footer = (over: Partial<ServiceWindowFooterProps> = {}) =>
+    renderToStaticMarkup(
+      <ServiceWindowFooter
+        mode="view"
+        saving={false}
+        onEdit={() => {}}
+        onDelete={() => {}}
+        onCancel={() => {}}
+        onSave={() => {}}
+        {...over}
+      />,
+    );
+
+  it("view mode draws Delete at the left and Edit at the right", () => {
+    const markup = footer();
+    expect(markup).toContain('data-testid="service-delete"');
+    expect(markup).toContain('data-testid="service-edit"');
+    expect(markup.indexOf("service-delete")).toBeLessThan(markup.indexOf("service-edit"));
+    expect(text(markup)).toBe("Delete Edit");
+    expect(markup).not.toContain('data-testid="service-save"');
+    expect(markup).not.toContain('data-testid="service-cancel"');
+  });
+
+  it("Edit draws Cancel and Save", () => {
+    const markup = footer({ mode: "edit" });
+    expect(text(markup)).toBe("Cancel Save");
+    expect(markup).not.toContain('data-testid="service-delete"');
+    expect(markup).not.toContain('data-testid="service-edit"');
+  });
+
+  it("Add draws Cancel and Add service", () => {
+    expect(text(footer({ mode: "new" }))).toBe("Cancel Add service");
+  });
+
+  it("reads Saving... and disables Cancel and Save while a write runs", () => {
+    const markup = footer({ mode: "edit", saving: true });
+    expect(text(markup)).toContain("Saving...");
+    const buttons = markup.match(/<button\b[^>]*>/g) ?? [];
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) expect(button).toContain("disabled");
+  });
+});
+
+describe("serviceIsEditable (D157, D165)", () => {
+  it("is true only with the handlers, for a live service of a live repair", () => {
+    expect(serviceIsEditable({ editing: true, serviceDeleted: false, repairDeleted: false })).toBe(
+      true,
+    );
+    expect(serviceIsEditable({ editing: false, serviceDeleted: false, repairDeleted: false })).toBe(
+      false,
+    );
+    expect(serviceIsEditable({ editing: true, serviceDeleted: true, repairDeleted: false })).toBe(
+      false,
+    );
+    expect(serviceIsEditable({ editing: true, serviceDeleted: false, repairDeleted: true })).toBe(
+      false,
+    );
   });
 });

@@ -6,6 +6,7 @@ import type { RepairListRow } from "../utils/repairRows";
 import {
   REPAIR_WINDOW_CLASS,
   REPAIR_WINDOW_WIDTH,
+  RepairServicesSection,
   RepairWindowContent,
   RepairWindowFooter,
   type RepairWindowFooterProps,
@@ -441,5 +442,59 @@ describe("the repair window has no side scroll", () => {
   it("sets that width on the dialog and hides a sideways overflow of the dialog itself", () => {
     expect(REPAIR_WINDOW_CLASS).toContain(`sm:max-w-[${REPAIR_WINDOW_WIDTH}px]`);
     expect(REPAIR_WINDOW_CLASS).toContain("overflow-x-hidden");
+  });
+});
+
+// docs/specs/repairs-09b1-services.md §2.1, §2.6 and §7 (D149, D158): the Services block of the window,
+// with Add service, in the view mode, in Edit and in New repair (where it is a draft and there are no
+// Files). The dialog around the window needs a portal, so the block is a plain component.
+describe("the Services block of the repair window (09b1)", () => {
+  const section = (repair: RepairListRow, onAddService?: () => void) =>
+    renderToStaticMarkup(
+      <RepairServicesSection
+        repair={repair}
+        onOpenService={() => {}}
+        onAddService={onAddService}
+      />,
+    );
+  const content = (onAddService?: () => void) =>
+    renderToStaticMarkup(
+      <RepairWindowContent
+        repair={full}
+        timezone="America/Toronto"
+        vendorAddress={null}
+        onOpenService={() => {}}
+        onOpenReports={() => {}}
+        files={null}
+        onAddService={onAddService}
+      />,
+    );
+
+  it("RepairWindowContent draws the Services heading and the button under its table when given the handler", () => {
+    const markup = content(() => {});
+    expect(text(markup)).toContain("Services");
+    expect(markup.match(/data-testid="add-service"/g)).toHaveLength(1);
+    expect(markup.indexOf('data-testid="repair-window-total"')).toBeLessThan(
+      markup.indexOf('data-testid="add-service"'),
+    );
+  });
+
+  it("RepairWindowContent draws no button without the handler (spec 07's window)", () => {
+    expect(content()).not.toContain('data-testid="add-service"');
+  });
+
+  it("an empty draft says No services on this repair. and still has the button, and no Files", () => {
+    const empty = repairRow({ id: "new-repair", status: "inbound", services: [] });
+    const markup = section(empty, () => {});
+    expect(text(markup)).toContain("No services on this repair.");
+    expect(markup).toContain('data-testid="add-service"');
+    expect(text(markup)).not.toContain("Files");
+    expect(markup).not.toContain('data-testid="repair-files"');
+  });
+
+  it("the table of the draft shows its services and a Total row", () => {
+    const markup = section(full, () => {});
+    expect(markup).toContain('data-testid="repair-service-row"');
+    expect(markup).toContain('data-testid="repair-window-total"');
   });
 });

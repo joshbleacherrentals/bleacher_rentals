@@ -410,3 +410,64 @@ describe("RepairWindowServices", () => {
     expect(markup).toContain("grid-template-columns:84px 148px 96px 124px");
   });
 });
+
+// docs/specs/repairs-09b1-services.md §2.1, §3 and §7 (D158): the Add service button under the table of
+// an open row and under the table of the repair window, drawn only when the page gives the handler.
+describe("Add service button (09b1 D158)", () => {
+  const block = (services = [tires], onAddService?: () => void) =>
+    renderToStaticMarkup(
+      <RepairServicesBlock
+        repair={repairRow({ id: "r1", invoiceNumber: "DTR-2377", services })}
+        id="repair-services-r1"
+        onOpenService={() => {}}
+        onAddService={onAddService}
+      />,
+    );
+  const windowTable = (services = [tires], onAddService?: () => void) =>
+    renderToStaticMarkup(
+      <RepairWindowServices
+        repair={repairRow({ id: "r1", invoiceNumber: "DTR-2377", services })}
+        onOpenService={() => {}}
+        onAddService={onAddService}
+      />,
+    );
+  const button = (markup: string) => {
+    const at = markup.indexOf('data-testid="add-service"');
+    expect(at, "no Add service button").toBeGreaterThan(-1);
+    return markup.slice(markup.lastIndexOf("<button", at), markup.indexOf("</button>", at) + 9);
+  };
+
+  it("is drawn under the open block when it is given the handler", () => {
+    const markup = block([tires], () => {});
+    expect(text(button(markup))).toBe("Add service");
+    expect(button(markup)).toContain('type="button"');
+    // Under the table: after the last service row.
+    expect(markup.lastIndexOf('data-testid="repair-service-row"')).toBeLessThan(
+      markup.indexOf('data-testid="add-service"'),
+    );
+  });
+
+  it("is drawn under the table of the repair window, below the Total row", () => {
+    const markup = windowTable([tires], () => {});
+    expect(text(button(markup))).toBe("Add service");
+    expect(markup.indexOf('data-testid="repair-window-total"')).toBeLessThan(
+      markup.indexOf('data-testid="add-service"'),
+    );
+  });
+
+  it("is drawn for a repair with no services too, under its text", () => {
+    const emptyBlock = block([], () => {});
+    expect(text(emptyBlock)).toContain("No services on this repair.");
+    expect(text(button(emptyBlock))).toBe("Add service");
+    const emptyWindow = windowTable([], () => {});
+    expect(text(emptyWindow)).toContain("No services on this repair.");
+    expect(text(button(emptyWindow))).toBe("Add service");
+  });
+
+  it("is not drawn without the handler", () => {
+    for (const markup of [block(), windowTable(), block([]), windowTable([])]) {
+      expect(markup).not.toContain('data-testid="add-service"');
+      expect(text(markup)).not.toContain("Add service");
+    }
+  });
+});
