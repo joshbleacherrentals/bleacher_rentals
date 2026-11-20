@@ -1,59 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Pencil, Undo2, UserMinus, X } from "lucide-react";
+import { Undo2, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
-import { DRIVER_REQUIREMENTS, type DriverData, type RequirementResult } from "../utils/driverData";
-import { useCanFixDriverData } from "../hooks/useCanFixDriverData";
-import { DriverAddressModal } from "./DriverAddressModal";
+import { DRIVER_REQUIREMENTS, type DriverData } from "../utils/driverData";
+import { Mark, RequirementCell } from "./RequirementCell";
+import { useCanFixZoneData } from "../hooks/useCanFixZoneData";
+import { AddressFixModal } from "./AddressFixModal";
 import { setDriverExcluded } from "../db/setDriverExcluded";
 import { GRID_LINES as LINES } from "./DriverWeekGrid";
-
-function Mark({ ok, label }: { ok: boolean; label: string }) {
-  return ok ? (
-    <Check className="h-4 w-4 shrink-0 text-green-600" aria-label={label} />
-  ) : (
-    <X className="h-4 w-4 shrink-0 text-red-600" aria-label={label} />
-  );
-}
-
-function RequirementCell({
-  result,
-  onFix,
-}: {
-  result: RequirementResult;
-  /** Opens the fix for this requirement; absent when it has none or the user may not fix it. */
-  onFix?: () => void;
-}) {
-  const className = `flex min-h-12 w-full items-center gap-2 px-2 text-left text-sm ${LINES} ${
-    result.ok ? "" : "bg-red-50 text-red-700"
-  }`;
-  const content = (
-    <>
-      <Mark ok={result.ok} label={result.ok ? "Complete" : "Incomplete"} />
-      {result.problem && <span>{result.problem}</span>}
-      {onFix && <Pencil className="ml-auto h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />}
-    </>
-  );
-  return onFix ? (
-    <button
-      type="button"
-      className={`${className} cursor-pointer ${result.ok ? "hover:bg-gray-50" : "hover:bg-red-100"}`}
-      onClick={onFix}
-      data-testid="driver-data-cell"
-      data-ok={result.ok}
-    >
-      {content}
-    </button>
-  ) : (
-    <div className={className} data-testid="driver-data-cell" data-ok={result.ok}>
-      {content}
-    </div>
-  );
-}
 
 /** The requirements with a fix on this page, by key. */
 const FIXABLE = new Set(["address"]);
@@ -112,7 +70,7 @@ function ExcludedDrivers({ drivers, canFix }: { drivers: DriverData[]; canFix: b
 export function DriverDataTab() {
   const { zoneId } = useZoneWeekParams();
   const { drivers, isLoading } = useChecks().driverData;
-  const canFix = useCanFixDriverData(zoneId);
+  const canFix = useCanFixZoneData(zoneId);
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
   const editing: DriverData | null = drivers.find((d) => d.driverUuid === editingUuid) ?? null;
 
@@ -167,6 +125,7 @@ export function DriverDataTab() {
                 <RequirementCell
                   key={r.key}
                   result={driver.results[r.key]}
+                  testId="driver-data-cell"
                   onFix={
                     canFix && FIXABLE.has(r.key)
                       ? () => setEditingUuid(driver.driverUuid)
@@ -195,7 +154,18 @@ export function DriverDataTab() {
 
       <ExcludedDrivers drivers={excluded} canFix={canFix} />
 
-      <DriverAddressModal driver={editing} onClose={() => setEditingUuid(null)} />
+      <AddressFixModal
+        target={
+          editing && {
+            owner: { table: "Drivers", id: editing.driverUuid },
+            title: `${editing.driverName}: home address`,
+            addressUuid: editing.addressUuid,
+            address: editing.address,
+            problem: editing.results.address?.problem ?? null,
+          }
+        }
+        onClose={() => setEditingUuid(null)}
+      />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import type {
 import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWorkload";
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
 import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
+import type { EventData } from "@/features/scheduleValidator/utils/eventData";
 
 /**
  * How a check came out for the week: how many of the things it checks passed, out of how many. Each
@@ -61,6 +62,11 @@ export function summarizeDriverData(drivers: DriverData[]): CheckSummary {
     drivers.filter((d) => !d.excluded),
     (d) => d.ok,
   );
+}
+
+/** The week's events and their pickup events, passing when they have every piece of data. */
+export function summarizeEventData(events: EventData[]): CheckSummary {
+  return count(events, (e) => e.ok);
 }
 
 /** Green when everything passed (nothing to check counts as passing), red otherwise. */

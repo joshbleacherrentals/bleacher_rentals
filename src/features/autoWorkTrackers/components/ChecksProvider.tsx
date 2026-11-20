@@ -10,6 +10,8 @@ import { useBleacherBookings } from "@/features/scheduleValidator/hooks/useBleac
 import { useDriverWorkload } from "@/features/scheduleValidator/hooks/useDriverWorkload";
 import { useDriverAvailability } from "@/features/scheduleValidator/hooks/useDriverAvailability";
 import { useDriverData } from "@/features/scheduleValidator/hooks/useDriverData";
+import { useEventData } from "@/features/scheduleValidator/hooks/useEventData";
+import { eventDataRoles, type EventData } from "@/features/scheduleValidator/utils/eventData";
 import {
   findOverbookedBleachers,
   type OverbookedBleacher,
@@ -23,6 +25,7 @@ import { zoneWeekEvents } from "../utils/zoneEvents";
 import {
   summarizeDriverAvailability,
   summarizeDriverData,
+  summarizeEventData,
   summarizeDriverWorkload,
   summarizeEventBleacherRequirements,
   summarizeEventFulfilment,
@@ -44,6 +47,7 @@ type Checks = {
   driverWorkload: { drivers: DriverWorkload[]; isLoading: boolean };
   driverAvailability: { drivers: DriverAvailability[]; isLoading: boolean };
   driverData: { drivers: DriverData[]; isLoading: boolean };
+  eventData: { events: EventData[]; isLoading: boolean };
   /** Keyed by page slug; a page with no entry (the Dashboard) is a view, not a check. */
   statuses: Record<string, CheckStatus>;
 };
@@ -76,6 +80,13 @@ export function ChecksProvider({
   const eventIds = useMemo(() => requirementEvents.map((e) => e.id), [requirementEvents]);
   const eventsBleachers = useEventsBleachers(eventIds);
 
+  // Event Data: the same events, plus the ones their bleachers are picked up from.
+  const eventRoles = useMemo(
+    () => (zoneId ? eventDataRoles(logistics.events) : new Map()),
+    [zoneId, logistics.events],
+  );
+  const eventData = useEventData(eventRoles);
+
   const bookings = useBleacherBookings(zoneId, weekStart);
   const overbooked = useMemo(
     () => findOverbookedBleachers(bookings.bookings, weekStart),
@@ -88,6 +99,7 @@ export function ChecksProvider({
 
   const value = useMemo<Checks>(() => {
     const requirementsLoading = !!zoneId && (logistics.isLoading || eventsBleachers.isLoading);
+    const eventDataLoading = !!zoneId && (logistics.isLoading || eventData.isLoading);
     return {
       eventFulfilment: { deliveries, isLoading: logistics.isLoading },
       eventBleacherRequirements: {
@@ -99,6 +111,7 @@ export function ChecksProvider({
       driverWorkload: { drivers: workload.drivers, isLoading: workload.isLoading },
       driverAvailability: { drivers: availability.drivers, isLoading: availability.isLoading },
       driverData: { drivers: driverData.drivers, isLoading: driverData.isLoading },
+      eventData: { events: eventData.events, isLoading: eventDataLoading },
       statuses: {
         "event-fulfilment": {
           isLoading: !!zoneId && logistics.isLoading,
@@ -109,6 +122,10 @@ export function ChecksProvider({
           summary: zoneId
             ? summarizeEventBleacherRequirements(eventIds, eventsBleachers.byEvent)
             : null,
+        },
+        "event-data": {
+          isLoading: eventDataLoading,
+          summary: zoneId ? summarizeEventData(eventData.events) : null,
         },
         "overbooked-bleachers": {
           isLoading: !!zoneId && bookings.isLoading,
@@ -145,6 +162,8 @@ export function ChecksProvider({
     availability.isLoading,
     driverData.drivers,
     driverData.isLoading,
+    eventData.events,
+    eventData.isLoading,
   ]);
 
   return <ChecksContext.Provider value={value}>{children}</ChecksContext.Provider>;

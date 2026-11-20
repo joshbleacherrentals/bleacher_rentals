@@ -6,7 +6,9 @@ vi.mock("@/components/providers/SystemProvider", async () => {
   return { db: new Kysely<any>({ dialect: new SqliteDialect({ database: {} as any }) }) };
 });
 
-import { driverAddressWrites, type PickedAddress } from "./saveDriverAddress";
+import { ownedAddressWrites, type PickedAddress } from "./saveOwnedAddress";
+
+const DRIVER = { table: "Drivers" as const, id: "d1" };
 
 const PICKED: PickedAddress = {
   address: "1663 Windham Road 12",
@@ -19,9 +21,9 @@ const PICKED: PickedAddress = {
   placeId: "ChIJ123",
 };
 
-describe("driverAddressWrites", () => {
+describe("ownedAddressWrites", () => {
   it("overwrites the driver's existing address row, every column", () => {
-    const writes = driverAddressWrites("d1", "a1", PICKED, "new");
+    const writes = ownedAddressWrites(DRIVER, "a1", PICKED, "new");
     expect(writes).toHaveLength(1);
     expect(writes[0].sql).toMatch(/^update "Addresses" set/);
     expect(writes[0].sql).toContain('where "id" = ?');
@@ -39,7 +41,7 @@ describe("driverAddressWrites", () => {
   });
 
   it("creates a row and links it to a driver with no address", () => {
-    const writes = driverAddressWrites("d1", null, PICKED, "new");
+    const writes = ownedAddressWrites(DRIVER, null, PICKED, "new");
     expect(writes.map((w) => w.sql.split(" ").slice(0, 3).join(" "))).toEqual([
       'insert into "Addresses"',
       'update "Drivers" set',
@@ -49,7 +51,13 @@ describe("driverAddressWrites", () => {
   });
 
   it("stores a part Google did not give as null, not an empty string", () => {
-    const [write] = driverAddressWrites("d1", "a1", { ...PICKED, postalCode: "" }, "new");
+    const [write] = ownedAddressWrites(DRIVER, "a1", { ...PICKED, postalCode: "" }, "new");
     expect(write.parameters[3]).toBeNull();
+  });
+
+  it("links a new row from the event when the owner is an event", () => {
+    const writes = ownedAddressWrites({ table: "Events", id: "e1" }, null, PICKED, "new");
+    expect(writes[1].sql).toMatch(/^update "Events" set "address_uuid" = \? where "id" = \?$/);
+    expect(writes[1].parameters).toEqual(["new", "e1"]);
   });
 });

@@ -14,6 +14,7 @@ export const AUTO_WORK_TRACKERS_SECTIONS: AutoWorkTrackersSection[] = [
     pages: [
       { slug: "event-fulfilment", label: "Event Fulfilment" },
       { slug: "event-bleacher-requirements", label: "Event Bleacher Requirements" },
+      { slug: "event-data", label: "Event Data" },
     ],
   },
   {

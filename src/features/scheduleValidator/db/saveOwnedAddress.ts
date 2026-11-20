@@ -26,13 +26,16 @@ function addressColumns(picked: PickedAddress) {
   };
 }
 
+/** What an address belongs to: a driver's home, or an event's place. */
+export type AddressOwner = { table: "Drivers" | "Events"; id: string };
+
 /**
- * The local writes that save a driver's home address: the driver's own Addresses row is overwritten
- * in place; a driver with none gets a new row, linked from Drivers.address_uuid. `newId` is the id a
- * new row would take (passed in so the writes can be checked).
+ * The local writes that save an owner's address: the Addresses row it points at is overwritten in
+ * place; one with none gets a new row, linked from its `address_uuid`. `newId` is the id a new row
+ * would take (passed in so the writes can be checked).
  */
-export function driverAddressWrites(
-  driverUuid: string,
+export function ownedAddressWrites(
+  owner: AddressOwner,
   addressUuid: string | null,
   picked: PickedAddress,
   newId: string,
@@ -41,22 +44,24 @@ export function driverAddressWrites(
   if (addressUuid) {
     return [db.updateTable("Addresses").set(columns).where("id", "=", addressUuid).compile()];
   }
-  return [
-    db
-      .insertInto("Addresses")
-      .values({ id: newId, ...columns })
-      .compile(),
-    db.updateTable("Drivers").set({ address_uuid: newId }).where("id", "=", driverUuid).compile(),
-  ];
+  const insert = db
+    .insertInto("Addresses")
+    .values({ id: newId, ...columns })
+    .compile();
+  const link =
+    owner.table === "Drivers"
+      ? db.updateTable("Drivers").set({ address_uuid: newId }).where("id", "=", owner.id).compile()
+      : db.updateTable("Events").set({ address_uuid: newId }).where("id", "=", owner.id).compile();
+  return [insert, link];
 }
 
-/** Saves a driver's home address to the local database; PowerSync uploads it. */
-export async function saveDriverAddress(
-  driverUuid: string,
+/** Saves an owner's address to the local database; PowerSync uploads it. */
+export async function saveOwnedAddress(
+  owner: AddressOwner,
   addressUuid: string | null,
   picked: PickedAddress,
 ): Promise<void> {
-  for (const write of driverAddressWrites(driverUuid, addressUuid, picked, crypto.randomUUID())) {
+  for (const write of ownedAddressWrites(owner, addressUuid, picked, crypto.randomUUID())) {
     await typedExecute(write);
   }
 }

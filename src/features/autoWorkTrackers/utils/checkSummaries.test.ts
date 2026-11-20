@@ -8,9 +8,11 @@ import type {
 import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWorkload";
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
 import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
+import type { EventData } from "@/features/scheduleValidator/utils/eventData";
 import {
   summarizeDriverAvailability,
   summarizeDriverData,
+  summarizeEventData,
   summarizeDriverWorkload,
   summarizeEventBleacherRequirements,
   summarizeEventFulfilment,
@@ -91,5 +93,12 @@ describe("summarizeDriverData", () => {
       { ok: false, excluded: true },
     ] as DriverData[];
     expect(summarizeDriverData(drivers)).toEqual({ passed: 1, total: 1 });
+  });
+});
+
+describe("summarizeEventData", () => {
+  it("counts the events with every piece of data", () => {
+    const events = [{ ok: true }, { ok: false }, { ok: false }] as EventData[];
+    expect(summarizeEventData(events)).toEqual({ passed: 1, total: 3 });
   });
 });

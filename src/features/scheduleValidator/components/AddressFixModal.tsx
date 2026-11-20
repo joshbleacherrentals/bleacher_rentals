@@ -7,8 +7,8 @@ import { placeMapEmbedUrl } from "@/components/maps/placeMapEmbedUrl";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
-import { saveDriverAddress, type PickedAddress } from "../db/saveDriverAddress";
-import type { DriverData } from "../utils/driverData";
+import { saveOwnedAddress, type AddressOwner, type PickedAddress } from "../db/saveOwnedAddress";
+import type { StoredAddress } from "../utils/addressCheck";
 
 function PinMap({ lat, lng }: { lat: number; lng: number }) {
   return (
@@ -22,24 +22,36 @@ function PinMap({ lat, lng }: { lat: number; lng: number }) {
   );
 }
 
+/** What the fix window is editing: a driver's home or an event's place. */
+export type AddressFixTarget = {
+  owner: AddressOwner;
+  /** e.g. "Justin Kowalsky: home address". */
+  title: string;
+  addressUuid: string | null;
+  address: StoredAddress | null;
+  /** What is missing, from the address check. */
+  problem: string | null;
+};
+
 /**
- * Fixes a driver's home address from Driver Data: the address on file opens already searched, so
+ * Fixes an address from Driver Data or Event Data: the address on file opens already searched, so
  * picking the right suggestion and pressing Save fills every part, coordinates included. The map
  * shows the pin: the one on file, then the one picked.
  */
-export function DriverAddressModal({
-  driver,
+export function AddressFixModal({
+  target,
   onClose,
 }: {
-  driver: DriverData | null;
+  target: AddressFixTarget | null;
   onClose: () => void;
 }) {
   const [picked, setPicked] = useState<PickedAddress | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => setPicked(null), [driver?.driverUuid]);
+  const targetKey = target ? `${target.owner.table}:${target.owner.id}` : null;
+  useEffect(() => setPicked(null), [targetKey]);
 
-  const stored = driver?.address ?? null;
+  const stored = target?.address ?? null;
   const storedLine = stored
     ? formatAddressLine({
         street: stored.street,
@@ -54,13 +66,13 @@ export function DriverAddressModal({
       : stored?.latitude != null && stored.longitude != null
         ? { lat: stored.latitude, lng: stored.longitude }
         : null;
-  const problem = driver?.results.address?.problem ?? null;
+  const problem = target?.problem ?? null;
 
   const handleSave = async () => {
-    if (!driver || !picked) return;
+    if (!target || !picked) return;
     setSaving(true);
     try {
-      await saveDriverAddress(driver.driverUuid, driver.addressUuid, picked);
+      await saveOwnedAddress(target.owner, target.addressUuid, picked);
       onClose();
     } catch (e) {
       createErrorToastNoThrow(["Could not save the address.", e instanceof Error ? e.message : ""]);
@@ -70,10 +82,10 @@ export function DriverAddressModal({
   };
 
   return (
-    <Dialog open={!!driver} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl" data-testid="driver-address-modal">
+    <Dialog open={!!target} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl" data-testid="address-fix-modal">
         <DialogHeader>
-          <DialogTitle>{driver?.driverName}: home address</DialogTitle>
+          <DialogTitle>{target?.title}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 text-sm">
@@ -87,9 +99,9 @@ export function DriverAddressModal({
             <div className="mb-1 text-gray-500">
               Pick the address from the list to fill in every part
             </div>
-            {driver && (
+            {target && (
               <AddressAutocomplete
-                key={driver.driverUuid}
+                key={targetKey}
                 initialSearchQuery={storedLine || undefined}
                 onAddressSelect={(data) => setPicked(data)}
               />
