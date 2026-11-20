@@ -3,6 +3,7 @@ import {
   AUTO_WORK_TRACKERS_PAGES,
   AUTO_WORK_TRACKERS_SECTIONS,
   DEFAULT_PAGE,
+  HOME_PAGE,
   pageFromPathname,
   pageHref,
 } from "./pages";
@@ -10,14 +11,17 @@ import {
 describe("auto work trackers pages", () => {
   it("groups the pages under Events, Bleachers and Drivers", () => {
     expect(AUTO_WORK_TRACKERS_SECTIONS.map((s) => [s.label, s.pages.map((p) => p.slug)])).toEqual([
-      ["Events", ["event-dashboard", "event-fulfilment", "event-bleacher-requirements"]],
+      ["Events", ["event-fulfilment", "event-bleacher-requirements"]],
       ["Bleachers", ["overbooked-bleachers"]],
       ["Drivers", ["driver-workload", "driver-availability"]],
     ]);
   });
 
-  it("opens on the Event Dashboard", () => {
-    expect(DEFAULT_PAGE.slug).toBe("event-dashboard");
+  it("opens on the Dashboard, which sits on its own above the headings", () => {
+    expect(DEFAULT_PAGE).toBe(HOME_PAGE);
+    expect(HOME_PAGE).toEqual({ slug: "dashboard", label: "Dashboard" });
+    expect(AUTO_WORK_TRACKERS_SECTIONS.flatMap((s) => s.pages)).not.toContainEqual(HOME_PAGE);
+    expect(AUTO_WORK_TRACKERS_PAGES[0]).toBe(HOME_PAGE);
   });
 
   it("has no Schedule page and no two pages share a slug", () => {
@@ -39,7 +43,7 @@ describe("auto work trackers pages", () => {
   });
 
   it("puts the zone and week in the page's address, leaving the zone out when none is chosen", () => {
-    const page = AUTO_WORK_TRACKERS_PAGES[1];
+    const page = AUTO_WORK_TRACKERS_SECTIONS[0].pages[0];
     expect(pageHref(page, "z1", "2026-11-09")).toBe(
       "/auto-work-trackers/event-fulfilment?zone=z1&week=2026-11-09",
     );

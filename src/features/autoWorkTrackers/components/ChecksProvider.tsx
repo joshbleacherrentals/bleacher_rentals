@@ -40,7 +40,7 @@ type Checks = {
   overbookedBleachers: { overbooked: OverbookedBleacher[]; isLoading: boolean };
   driverWorkload: { drivers: DriverWorkload[]; isLoading: boolean };
   driverAvailability: { drivers: DriverAvailability[]; isLoading: boolean };
-  /** Keyed by page slug; a page with no entry (the Event Dashboard) is a view, not a check. */
+  /** Keyed by page slug; a page with no entry (the Dashboard) is a view, not a check. */
   statuses: Record<string, CheckStatus>;
 };
 

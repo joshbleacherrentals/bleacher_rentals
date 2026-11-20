@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronsLeft, CalendarClock, Check, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronsLeft, CalendarClock, Check, House, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AUTO_WORK_TRACKERS_SECTIONS, pageHref } from "../utils/pages";
+import { AUTO_WORK_TRACKERS_SECTIONS, HOME_PAGE, pageHref } from "../utils/pages";
 import { summaryTone } from "../utils/checkSummaries";
 import { useChecks, type CheckStatus } from "./ChecksProvider";
 import { GenerateWorkTrackersButton } from "./GenerateWorkTrackersButton";
@@ -120,6 +120,21 @@ export function AutoWorkTrackersSidebar({
           <GenerateWorkTrackersButton zoneId={zoneId} weekStart={weekStart} fullWidth />
 
           <nav aria-label="Auto Work Trackers pages" className="border-t border-gray-200 pt-3">
+            {/* The home page stands on its own above the headings, like a home link. */}
+            <Link
+              href={pageHref(HOME_PAGE, zoneId, weekStart)}
+              aria-current={activeSlug === HOME_PAGE.slug ? "page" : undefined}
+              className={cn(
+                "mb-3 flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold",
+                activeSlug === HOME_PAGE.slug
+                  ? "bg-darkBlue text-white"
+                  : "text-gray-800 hover:bg-gray-200",
+              )}
+            >
+              <House className="h-4 w-4 shrink-0" />
+              {HOME_PAGE.label}
+            </Link>
+
             {AUTO_WORK_TRACKERS_SECTIONS.map((section) => {
               const holdsActive = section.pages.some((p) => p.slug === activeSlug);
               const open = holdsActive || !folded.has(section.label);

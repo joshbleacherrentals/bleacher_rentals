@@ -1,15 +1,17 @@
 export type AutoWorkTrackersPage = { slug: string; label: string };
 export type AutoWorkTrackersSection = { label: string; pages: AutoWorkTrackersPage[] };
 
+/** The home page: the week at a glance, above the checks and not under any heading. */
+export const HOME_PAGE: AutoWorkTrackersPage = { slug: "dashboard", label: "Dashboard" };
+
 /**
- * The side panel's navigation, in order: a heading per kind of check, each with its pages. A page's
+ * The side panel's checks, in order: a heading per kind of check, each with its pages. A page's
  * slug is its URL segment: /auto-work-trackers/<slug>. New checks go under the heading they check.
  */
 export const AUTO_WORK_TRACKERS_SECTIONS: AutoWorkTrackersSection[] = [
   {
     label: "Events",
     pages: [
-      { slug: "event-dashboard", label: "Event Dashboard" },
       { slug: "event-fulfilment", label: "Event Fulfilment" },
       { slug: "event-bleacher-requirements", label: "Event Bleacher Requirements" },
     ],
@@ -27,11 +29,12 @@ export const AUTO_WORK_TRACKERS_SECTIONS: AutoWorkTrackersSection[] = [
   },
 ];
 
-export const AUTO_WORK_TRACKERS_PAGES: AutoWorkTrackersPage[] = AUTO_WORK_TRACKERS_SECTIONS.flatMap(
-  (s) => s.pages,
-);
+export const AUTO_WORK_TRACKERS_PAGES: AutoWorkTrackersPage[] = [
+  HOME_PAGE,
+  ...AUTO_WORK_TRACKERS_SECTIONS.flatMap((s) => s.pages),
+];
 
-export const DEFAULT_PAGE = AUTO_WORK_TRACKERS_PAGES[0];
+export const DEFAULT_PAGE = HOME_PAGE;
 
 /** The page a pathname is on, or null when it is on none (e.g. /auto-work-trackers itself). */
 export function pageFromPathname(pathname: string): AutoWorkTrackersPage | null {
