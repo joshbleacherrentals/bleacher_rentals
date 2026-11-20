@@ -9,6 +9,7 @@ import {
 import { useBleacherBookings } from "@/features/scheduleValidator/hooks/useBleacherBookings";
 import { useDriverWorkload } from "@/features/scheduleValidator/hooks/useDriverWorkload";
 import { useDriverAvailability } from "@/features/scheduleValidator/hooks/useDriverAvailability";
+import { useDriverData } from "@/features/scheduleValidator/hooks/useDriverData";
 import {
   findOverbookedBleachers,
   type OverbookedBleacher,
@@ -16,10 +17,12 @@ import {
 import type { WeekEvent } from "@/features/scheduleValidator/utils/eventsStartingInWeek";
 import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWorkload";
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
+import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
 import { buildDeliveryList, type EventDeliveries } from "../utils/deliveryList";
 import { zoneWeekEvents } from "../utils/zoneEvents";
 import {
   summarizeDriverAvailability,
+  summarizeDriverData,
   summarizeDriverWorkload,
   summarizeEventBleacherRequirements,
   summarizeEventFulfilment,
@@ -40,6 +43,7 @@ type Checks = {
   overbookedBleachers: { overbooked: OverbookedBleacher[]; isLoading: boolean };
   driverWorkload: { drivers: DriverWorkload[]; isLoading: boolean };
   driverAvailability: { drivers: DriverAvailability[]; isLoading: boolean };
+  driverData: { drivers: DriverData[]; isLoading: boolean };
   /** Keyed by page slug; a page with no entry (the Dashboard) is a view, not a check. */
   statuses: Record<string, CheckStatus>;
 };
@@ -80,6 +84,7 @@ export function ChecksProvider({
 
   const workload = useDriverWorkload(zoneId, weekStart);
   const availability = useDriverAvailability(zoneId, weekStart);
+  const driverData = useDriverData(zoneId);
 
   const value = useMemo<Checks>(() => {
     const requirementsLoading = !!zoneId && (logistics.isLoading || eventsBleachers.isLoading);
@@ -93,6 +98,7 @@ export function ChecksProvider({
       overbookedBleachers: { overbooked, isLoading: bookings.isLoading },
       driverWorkload: { drivers: workload.drivers, isLoading: workload.isLoading },
       driverAvailability: { drivers: availability.drivers, isLoading: availability.isLoading },
+      driverData: { drivers: driverData.drivers, isLoading: driverData.isLoading },
       statuses: {
         "event-fulfilment": {
           isLoading: !!zoneId && logistics.isLoading,
@@ -116,6 +122,10 @@ export function ChecksProvider({
           isLoading: !!zoneId && availability.isLoading,
           summary: zoneId ? summarizeDriverAvailability(availability.drivers) : null,
         },
+        "driver-data": {
+          isLoading: !!zoneId && driverData.isLoading,
+          summary: zoneId ? summarizeDriverData(driverData.drivers) : null,
+        },
       },
     };
   }, [
@@ -133,6 +143,8 @@ export function ChecksProvider({
     workload.isLoading,
     availability.drivers,
     availability.isLoading,
+    driverData.drivers,
+    driverData.isLoading,
   ]);
 
   return <ChecksContext.Provider value={value}>{children}</ChecksContext.Provider>;

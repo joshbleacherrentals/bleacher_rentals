@@ -8,6 +8,7 @@ vi.mock("@/components/providers/SystemProvider", async () => {
 
 import {
   driverAvailabilityTripsQuery,
+  driverDataQuery,
   driverUnavailabilityQuery,
   driverWorkloadQuery,
 } from "./driverQueries";
@@ -31,5 +32,20 @@ describe.each([
   it("stays inside the week", () => {
     expect(compiled.parameters).toContain("2026-09-14");
     expect(compiled.parameters).toContain("2026-09-20");
+  });
+});
+
+describe("driverDataQuery", () => {
+  const compiled = driverDataQuery("zone-1");
+
+  it("keeps only active drivers linked to the zone", () => {
+    expect(compiled.sql).toContain('"d"."id" in (select');
+    expect(compiled.sql).toMatch(ZONE_FILTER);
+    expect(compiled.sql).toContain('"d"."is_active" = ?');
+    expect(compiled.parameters).toEqual([1, "zone-1"]);
+  });
+
+  it("keeps drivers with no address (left join)", () => {
+    expect(compiled.sql).toContain('left join "Addresses" as "a"');
   });
 });

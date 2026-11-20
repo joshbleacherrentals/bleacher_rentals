@@ -76,3 +76,28 @@ export function driverUnavailabilityQuery(zoneId: string, weekStart: string, wee
     .where("du.driver_uuid", "in", driverUuidsInZone(zoneId))
     .compile();
 }
+
+/** Driver Data: every active driver in the zone with their home address, for the data checks. */
+export function driverDataQuery(zoneId: string) {
+  return db
+    .selectFrom("Drivers as d")
+    .innerJoin("Users as u", "u.id", "d.user_uuid")
+    .leftJoin("Addresses as a", "a.id", "d.address_uuid")
+    .select([
+      "d.id as driver_uuid",
+      "u.first_name as first_name",
+      "u.last_name as last_name",
+      "d.address_uuid as address_uuid",
+      "a.street as street",
+      "a.city as city",
+      "a.state_province as state_province",
+      "a.zip_postal as zip_postal",
+      "a.country as country",
+      "a.latitude as latitude",
+      "a.longitude as longitude",
+      "a.place_id as place_id",
+    ])
+    .where("d.is_active", "=", 1)
+    .where("d.id", "in", driverUuidsInZone(zoneId))
+    .compile();
+}

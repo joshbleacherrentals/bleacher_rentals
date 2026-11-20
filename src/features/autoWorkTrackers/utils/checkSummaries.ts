@@ -6,6 +6,7 @@ import type {
 } from "@/features/scheduleValidator/utils/overbooked";
 import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWorkload";
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
+import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
 
 /**
  * How a check came out for the week: how many of the things it checks passed, out of how many. Each
@@ -48,6 +49,11 @@ export function summarizeDriverWorkload(drivers: DriverWorkload[]): CheckSummary
 
 /** Drivers with a trip or a day off this week, passing when no trip lands on a day off. */
 export function summarizeDriverAvailability(drivers: DriverAvailability[]): CheckSummary {
+  return count(drivers, (d) => d.ok);
+}
+
+/** Active drivers in the zone, passing when they have every piece of data the model needs. */
+export function summarizeDriverData(drivers: DriverData[]): CheckSummary {
   return count(drivers, (d) => d.ok);
 }
 

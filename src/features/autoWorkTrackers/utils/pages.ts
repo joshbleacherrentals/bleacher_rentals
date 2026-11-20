@@ -25,6 +25,7 @@ export const AUTO_WORK_TRACKERS_SECTIONS: AutoWorkTrackersSection[] = [
     pages: [
       { slug: "driver-workload", label: "Driver Workload" },
       { slug: "driver-availability", label: "Driver Availability" },
+      { slug: "driver-data", label: "Driver Data" },
     ],
   },
 ];

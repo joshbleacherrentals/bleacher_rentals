@@ -7,8 +7,10 @@ import type {
 } from "@/features/scheduleValidator/utils/overbooked";
 import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWorkload";
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
+import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
 import {
   summarizeDriverAvailability,
+  summarizeDriverData,
   summarizeDriverWorkload,
   summarizeEventBleacherRequirements,
   summarizeEventFulfilment,
@@ -74,5 +76,12 @@ describe("summaryTone", () => {
 
   it("is bad when anything fails", () => {
     expect(summaryTone({ passed: 19, total: 20 })).toBe("bad");
+  });
+});
+
+describe("summarizeDriverData", () => {
+  it("counts the drivers with every piece of data", () => {
+    const drivers = [{ ok: true }, { ok: false }] as DriverData[];
+    expect(summarizeDriverData(drivers)).toEqual({ passed: 1, total: 2 });
   });
 });
