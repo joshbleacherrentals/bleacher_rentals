@@ -7,9 +7,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { useEventsBleachers } from "../hooks/useEventsBleachers";
-import { useEventsStartingInWeek } from "../hooks/useEventsStartingInWeek";
-import { useSelectedWeek } from "../hooks/useSelectedWeek";
+import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { EventDetails } from "./EventDetails";
 
 /**
@@ -17,9 +15,7 @@ import { EventDetails } from "./EventDetails";
  * exactly what the event requires, by type; click an event to see both.
  */
 export function EventBleacherRequirementsTab() {
-  const [weekStart] = useSelectedWeek();
-  const { events, isLoading } = useEventsStartingInWeek(weekStart);
-  const { byEvent } = useEventsBleachers(events.map((e) => e.id));
+  const { events, byEvent, isLoading } = useChecks().eventBleacherRequirements;
 
   return (
     <>

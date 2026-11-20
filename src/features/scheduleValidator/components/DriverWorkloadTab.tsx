@@ -1,6 +1,6 @@
 "use client";
 
-import { useDriverWorkload } from "../hooks/useDriverWorkload";
+import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import { MAX_DRIVING_HOURS, formatHours, type WorkloadDay } from "../utils/driverWorkload";
 import { DriverWeekGrid, GRID_LINES as LINES } from "./DriverWeekGrid";
@@ -35,7 +35,7 @@ function WorkloadCell({ day }: { day: WorkloadDay }) {
  */
 export function DriverWorkloadTab() {
   const [weekStart] = useSelectedWeek();
-  const { drivers, isLoading } = useDriverWorkload(weekStart);
+  const { drivers, isLoading } = useChecks().driverWorkload;
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
   if (drivers.length === 0) {

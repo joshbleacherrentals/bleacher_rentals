@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { Check, X } from "lucide-react";
 import {
   Accordion,
@@ -8,9 +7,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { useBleacherBookings } from "../hooks/useBleacherBookings";
-import { useSelectedWeek } from "../hooks/useSelectedWeek";
-import { findOverbookedBleachers } from "../utils/overbooked";
+import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { OverbookedBleacherDetails } from "./OverbookedBleacherDetails";
 
 /**
@@ -18,12 +15,7 @@ import { OverbookedBleacherDetails } from "./OverbookedBleacherDetails";
  * events clash and on which days. When there are none, says so.
  */
 export function OverbookedBleachersTab() {
-  const [weekStart] = useSelectedWeek();
-  const { bookings, isLoading } = useBleacherBookings(weekStart);
-  const overbooked = useMemo(
-    () => findOverbookedBleachers(bookings, weekStart),
-    [bookings, weekStart],
-  );
+  const { overbooked, isLoading } = useChecks().overbookedBleachers;
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, X } from "lucide-react";
-import { useDriverAvailability } from "../hooks/useDriverAvailability";
+import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import type { AvailabilityDay } from "../utils/driverAvailability";
 import { DriverWeekGrid, GRID_LINES } from "./DriverWeekGrid";
@@ -45,7 +45,7 @@ function AvailabilityCell({ day }: { day: AvailabilityDay }) {
  */
 export function DriverAvailabilityTab() {
   const [weekStart] = useSelectedWeek();
-  const { drivers, isLoading } = useDriverAvailability(weekStart);
+  const { drivers, isLoading } = useChecks().driverAvailability;
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
   if (drivers.length === 0) {

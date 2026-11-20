@@ -2,13 +2,47 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronsLeft, CalendarClock } from "lucide-react";
+import { ChevronDown, ChevronsLeft, CalendarClock, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AUTO_WORK_TRACKERS_SECTIONS, pageHref } from "../utils/pages";
+import { summaryTone } from "../utils/checkSummaries";
+import { useChecks, type CheckStatus } from "./ChecksProvider";
 import { GenerateWorkTrackersButton } from "./GenerateWorkTrackersButton";
 import { ZoneWeekPicker } from "./ZoneWeekPicker";
 
 export const SIDEBAR_WIDTH = 288; // px — Tailwind's w-72
+
+/**
+ * How a page's check came out: a spinner while it runs, a check when there was nothing to check, or
+ * passed/total, green when all passed and red when any failed.
+ */
+function CheckBadge({ status }: { status: CheckStatus }) {
+  if (status.isLoading) {
+    return (
+      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin opacity-60" aria-label="Checking" />
+    );
+  }
+  const { summary } = status;
+  if (!summary) return null;
+  const good = summaryTone(summary) === "good";
+  const color = good ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
+  const label = `${summary.passed} of ${summary.total} passed`;
+  return (
+    <span
+      className={`shrink-0 rounded-full px-1.5 text-[11px] leading-5 font-semibold tabular-nums ${color}`}
+      title={label}
+      aria-label={label}
+      data-testid="check-badge"
+      data-tone={good ? "good" : "bad"}
+    >
+      {summary.total === 0 ? (
+        <Check className="my-0.5 h-3.5 w-3.5" />
+      ) : (
+        `${summary.passed}/${summary.total}`
+      )}
+    </span>
+  );
+}
 
 /**
  * The pinned left-hand panel of Auto Work Trackers, styled like the Quotes & Bookings filters: the
@@ -33,6 +67,7 @@ export function AutoWorkTrackersSidebar({
   onWeekChange: (weekStart: string) => void;
 }) {
   const [folded, setFolded] = useState<Set<string>>(new Set());
+  const { statuses } = useChecks();
 
   const toggleSection = (label: string) =>
     setFolded((prev) => {
@@ -106,19 +141,21 @@ export function AutoWorkTrackersSidebar({
                     <ul className="mt-1 flex flex-col gap-0.5">
                       {section.pages.map((page) => {
                         const active = page.slug === activeSlug;
+                        const status = statuses[page.slug];
                         return (
                           <li key={page.slug}>
                             <Link
                               href={pageHref(page, zoneId, weekStart)}
                               aria-current={active ? "page" : undefined}
                               className={cn(
-                                "block rounded px-2 py-1.5 text-sm",
+                                "flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm",
                                 active
                                   ? "bg-darkBlue font-medium text-white"
                                   : "text-gray-700 hover:bg-gray-200",
                               )}
                             >
-                              {page.label}
+                              <span className="truncate">{page.label}</span>
+                              {status && <CheckBadge status={status} />}
                             </Link>
                           </li>
                         );

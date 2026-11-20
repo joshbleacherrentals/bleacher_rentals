@@ -1,15 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Check } from "lucide-react";
-import { useLogisticsPlans } from "@/features/scheduleValidator/hooks/useLogisticsPlans";
 import { formatDateRange } from "@/features/scheduleValidator/utils/formatDateRange";
 import { useZoneWeekParams } from "../hooks/useZoneWeekParams";
-import {
-  buildDeliveryList,
-  type DeliveryBleacher,
-  type EventDeliveries,
-} from "../utils/deliveryList";
+import { useChecks } from "./ChecksProvider";
+import { type DeliveryBleacher, type EventDeliveries } from "../utils/deliveryList";
 import { kmToMiles } from "../utils/distance";
 
 const KIND_LABEL = { work_tracker: "Work tracker", event: "Event", maintenance: "Maintenance" };
@@ -116,9 +112,8 @@ function EventSection({ event, hideReady }: { event: EventDeliveries; hideReady:
  * ticked and folded. "Hide ready" narrows the list to what still needs doing.
  */
 export function EventFulfilmentTab() {
-  const { zoneId, weekStart } = useZoneWeekParams();
-  const { events, isLoading } = useLogisticsPlans(weekStart, zoneId || undefined);
-  const deliveries = useMemo(() => buildDeliveryList(events), [events]);
+  const { zoneId } = useZoneWeekParams();
+  const { deliveries, isLoading } = useChecks().eventFulfilment;
   const [hideReady, setHideReady] = useState(false);
 
   if (!zoneId) return <p className="text-sm text-gray-500">Select a zone to see its deliveries.</p>;
