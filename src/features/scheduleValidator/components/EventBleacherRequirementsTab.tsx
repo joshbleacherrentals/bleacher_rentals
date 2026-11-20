@@ -8,14 +8,20 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
+import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
 import { EventDetails } from "./EventDetails";
 
 /**
- * Every booked event that starts in the selected week. A check means the bleachers selected are
+ * Every booked event that starts in the selected week with a bleacher from the selected zone. A check means the bleachers selected are
  * exactly what the event requires, by type; click an event to see both.
  */
 export function EventBleacherRequirementsTab() {
+  const { zoneId } = useZoneWeekParams();
   const { events, byEvent, isLoading } = useChecks().eventBleacherRequirements;
+
+  if (!zoneId) {
+    return <p className="text-sm text-gray-500">Select a zone to see its events.</p>;
+  }
 
   return (
     <>
@@ -39,7 +45,9 @@ export function EventBleacherRequirementsTab() {
         ))}
       </Accordion>
       {!isLoading && events.length === 0 && (
-        <p className="text-sm text-gray-500">No events start this week.</p>
+        <p className="text-sm text-gray-500">
+          No events with this zone's bleachers start this week.
+        </p>
       )}
     </>
   );

@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useLogisticsPlans } from "@/features/scheduleValidator/hooks/useLogisticsPlans";
-import { useEventsStartingInWeek } from "@/features/scheduleValidator/hooks/useEventsStartingInWeek";
 import {
   useEventsBleachers,
   type EventBleachers,
@@ -18,6 +17,7 @@ import type { WeekEvent } from "@/features/scheduleValidator/utils/eventsStartin
 import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWorkload";
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
 import { buildDeliveryList, type EventDeliveries } from "../utils/deliveryList";
+import { zoneWeekEvents } from "../utils/zoneEvents";
 import {
   summarizeDriverAvailability,
   summarizeDriverWorkload,
@@ -63,8 +63,13 @@ export function ChecksProvider({
   const logistics = useLogisticsPlans(weekStart, zoneId || undefined);
   const deliveries = useMemo(() => buildDeliveryList(logistics.events), [logistics.events]);
 
-  const weekEvents = useEventsStartingInWeek(weekStart);
-  const eventIds = useMemo(() => weekEvents.events.map((e) => e.id), [weekEvents.events]);
+  // The zone's events are the ones with a bleacher from it, as on the Dashboard. Their match is then
+  // checked against every bleacher selected on them, so one shared with another zone is not short.
+  const requirementEvents = useMemo(
+    () => (zoneId ? zoneWeekEvents(logistics.events) : []),
+    [zoneId, logistics.events],
+  );
+  const eventIds = useMemo(() => requirementEvents.map((e) => e.id), [requirementEvents]);
   const eventsBleachers = useEventsBleachers(eventIds);
 
   const bookings = useBleacherBookings(zoneId, weekStart);
@@ -77,11 +82,11 @@ export function ChecksProvider({
   const availability = useDriverAvailability(zoneId, weekStart);
 
   const value = useMemo<Checks>(() => {
-    const requirementsLoading = weekEvents.isLoading || eventsBleachers.isLoading;
+    const requirementsLoading = !!zoneId && (logistics.isLoading || eventsBleachers.isLoading);
     return {
       eventFulfilment: { deliveries, isLoading: logistics.isLoading },
       eventBleacherRequirements: {
-        events: weekEvents.events,
+        events: requirementEvents,
         byEvent: eventsBleachers.byEvent,
         isLoading: requirementsLoading,
       },
@@ -95,7 +100,9 @@ export function ChecksProvider({
         },
         "event-bleacher-requirements": {
           isLoading: requirementsLoading,
-          summary: summarizeEventBleacherRequirements(eventIds, eventsBleachers.byEvent),
+          summary: zoneId
+            ? summarizeEventBleacherRequirements(eventIds, eventsBleachers.byEvent)
+            : null,
         },
         "overbooked-bleachers": {
           isLoading: !!zoneId && bookings.isLoading,
@@ -115,8 +122,7 @@ export function ChecksProvider({
     zoneId,
     deliveries,
     logistics.isLoading,
-    weekEvents.events,
-    weekEvents.isLoading,
+    requirementEvents,
     eventIds,
     eventsBleachers.byEvent,
     eventsBleachers.isLoading,
