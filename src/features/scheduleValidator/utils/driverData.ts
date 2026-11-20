@@ -20,6 +20,8 @@ export type DriverAddress = {
 export type DriverDataInput = {
   driverUuid: string;
   driverName: string;
+  /** The Addresses row the driver points at, null when none. */
+  addressUuid: string | null;
   address: DriverAddress | null;
 };
 
@@ -37,6 +39,8 @@ export type DriverRequirement = {
 export type DriverData = {
   driverUuid: string;
   driverName: string;
+  addressUuid: string | null;
+  address: DriverAddress | null;
   results: Record<string, RequirementResult>;
   /** Every requirement passed. */
   ok: boolean;
@@ -86,6 +90,8 @@ export function buildDriverData(
       return {
         driverUuid: driver.driverUuid,
         driverName: driver.driverName,
+        addressUuid: driver.addressUuid,
+        address: driver.address,
         results,
         ok: Object.values(results).every((r) => r.ok),
       };

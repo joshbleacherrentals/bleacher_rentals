@@ -101,3 +101,14 @@ export function driverDataQuery(zoneId: string) {
     .where("d.id", "in", driverUuidsInZone(zoneId))
     .compile();
 }
+
+/** Whether the account manager manages the zone (a row, or none). */
+export function managesZoneQuery(accountManagerUuid: string, zoneId: string) {
+  return db
+    .selectFrom("AccountManagerZones as amz")
+    .select("amz.id")
+    .where("amz.account_manager_uuid", "=", accountManagerUuid)
+    .where("amz.zone_uuid", "=", zoneId)
+    .limit(1)
+    .compile();
+}

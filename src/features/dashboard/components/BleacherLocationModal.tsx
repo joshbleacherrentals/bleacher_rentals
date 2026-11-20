@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { placeMapEmbedUrl } from "@/components/maps/placeMapEmbedUrl";
 
 type DeviceLocation = {
   deviceId: string;
@@ -109,7 +110,7 @@ export default function BleacherLocationModal({
                   frameBorder="0"
                   style={{ border: 0 }}
                   referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${device.lat},${device.lng}&zoom=15`}
+                  src={placeMapEmbedUrl(device.lat, device.lng)}
                   allowFullScreen
                 />
               </div>

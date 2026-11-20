@@ -37,6 +37,7 @@ export function useDriverData(zoneId: string): { drivers: DriverData[]; isLoadin
             {
               driverUuid: r.driver_uuid,
               driverName: [r.first_name, r.last_name].filter(Boolean).join(" ") || "Unnamed driver",
+              addressUuid: r.address_uuid,
               address: r.address_uuid
                 ? {
                     street: r.street,

@@ -21,6 +21,7 @@ const FULL_ADDRESS: DriverAddress = {
 const driver = (over: Partial<DriverDataInput> = {}): DriverDataInput => ({
   driverUuid: "d1",
   driverName: "Justin Kowalsky",
+  addressUuid: "a1",
   address: FULL_ADDRESS,
   ...over,
 });

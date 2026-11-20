@@ -9,6 +9,7 @@ vi.mock("@/components/providers/SystemProvider", async () => {
 import {
   driverAvailabilityTripsQuery,
   driverDataQuery,
+  managesZoneQuery,
   driverUnavailabilityQuery,
   driverWorkloadQuery,
 } from "./driverQueries";
@@ -47,5 +48,13 @@ describe("driverDataQuery", () => {
 
   it("keeps drivers with no address (left join)", () => {
     expect(compiled.sql).toContain('left join "Addresses" as "a"');
+  });
+});
+
+describe("managesZoneQuery", () => {
+  it("looks for the account manager's link to the zone", () => {
+    const compiled = managesZoneQuery("am-1", "zone-1");
+    expect(compiled.sql).toContain('from "AccountManagerZones" as "amz"');
+    expect(compiled.parameters).toEqual(["am-1", "zone-1", 1]);
   });
 });
