@@ -67,7 +67,7 @@ export function ChecksProvider({
   const eventIds = useMemo(() => weekEvents.events.map((e) => e.id), [weekEvents.events]);
   const eventsBleachers = useEventsBleachers(eventIds);
 
-  const bookings = useBleacherBookings(weekStart);
+  const bookings = useBleacherBookings(zoneId, weekStart);
   const overbooked = useMemo(
     () => findOverbookedBleachers(bookings.bookings, weekStart),
     [bookings.bookings, weekStart],
@@ -98,8 +98,8 @@ export function ChecksProvider({
           summary: summarizeEventBleacherRequirements(eventIds, eventsBleachers.byEvent),
         },
         "overbooked-bleachers": {
-          isLoading: bookings.isLoading,
-          summary: summarizeOverbookedBleachers(bookings.bookings, overbooked),
+          isLoading: !!zoneId && bookings.isLoading,
+          summary: zoneId ? summarizeOverbookedBleachers(bookings.bookings, overbooked) : null,
         },
         "driver-workload": {
           isLoading: !!zoneId && workload.isLoading,

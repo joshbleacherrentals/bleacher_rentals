@@ -8,14 +8,20 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
+import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
 import { OverbookedBleacherDetails } from "./OverbookedBleacherDetails";
 
 /**
- * The bleachers booked on two events that overlap in the selected week, each opening to show which
+ * The selected zone's bleachers booked on two events that overlap in the selected week, each opening to show which
  * events clash and on which days. When there are none, says so.
  */
 export function OverbookedBleachersTab() {
+  const { zoneId } = useZoneWeekParams();
   const { overbooked, isLoading } = useChecks().overbookedBleachers;
+
+  if (!zoneId) {
+    return <p className="text-sm text-gray-500">Select a zone to see its bleachers.</p>;
+  }
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
 
@@ -26,7 +32,7 @@ export function OverbookedBleachersTab() {
         data-testid="no-overbooked-bleachers"
       >
         <Check className="h-5 w-5" />
-        No overbooked bleachers this week.
+        No overbooked bleachers in this zone this week.
       </div>
     );
   }
