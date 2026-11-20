@@ -10,6 +10,7 @@ import {
   driverAvailabilityTripsQuery,
   driverDataQuery,
   managesZoneQuery,
+  driverUserUuidsQuery,
   driverUnavailabilityQuery,
   driverWorkloadQuery,
 } from "./driverQueries";
@@ -62,5 +63,13 @@ describe("managesZoneQuery", () => {
 describe("driverDataQuery exclusion", () => {
   it("reads whether each driver is excluded from the model", () => {
     expect(driverDataQuery("zone-1").sql).toContain('"d"."exclude_from_auto_work_trackers"');
+  });
+});
+
+describe("driverUserUuidsQuery", () => {
+  it("maps the zone's drivers to their users", () => {
+    const compiled = driverUserUuidsQuery("zone-1");
+    expect(compiled.sql).toContain('"d"."user_uuid"');
+    expect(compiled.sql).toMatch(ZONE_FILTER);
   });
 });

@@ -116,3 +116,12 @@ export function managesZoneQuery(accountManagerUuid: string, zoneId: string) {
     .limit(1)
     .compile();
 }
+
+/** Each driver in the zone's user (the Users row their other pages are keyed by). */
+export function driverUserUuidsQuery(zoneId: string) {
+  return db
+    .selectFrom("Drivers as d")
+    .select(["d.id as driver_uuid", "d.user_uuid as user_uuid"])
+    .where("d.id", "in", driverUuidsInZone(zoneId))
+    .compile();
+}

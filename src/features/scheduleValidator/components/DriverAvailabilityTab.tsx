@@ -4,6 +4,8 @@ import { Check, X } from "lucide-react";
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
+import { useDriverUserUuids } from "../hooks/useDriverUserUuids";
+import { DriverLinksMenu } from "./DriverLinksMenu";
 import type { AvailabilityDay } from "../utils/driverAvailability";
 import { DriverWeekGrid, GRID_LINES } from "./DriverWeekGrid";
 
@@ -47,6 +49,7 @@ function AvailabilityCell({ day }: { day: AvailabilityDay }) {
 export function DriverAvailabilityTab() {
   const [weekStart] = useSelectedWeek();
   const { zoneId } = useZoneWeekParams();
+  const userUuids = useDriverUserUuids(zoneId);
   const { drivers, isLoading } = useChecks().driverAvailability;
 
   if (!zoneId) {
@@ -64,6 +67,13 @@ export function DriverAvailabilityTab() {
   return (
     <DriverWeekGrid
       weekStart={weekStart}
+      renderDriverActions={(driver) => (
+        <DriverLinksMenu
+          userUuid={userUuids.get(driver.driverUuid)}
+          weekStart={weekStart}
+          driverName={driver.driverName}
+        />
+      )}
       drivers={drivers}
       renderDay={(day) => <AvailabilityCell day={day} />}
       renderDriverStatus={(driver) =>

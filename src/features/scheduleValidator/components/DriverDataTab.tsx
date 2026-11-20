@@ -10,6 +10,8 @@ import { DRIVER_REQUIREMENTS, type DriverData } from "../utils/driverData";
 import { Mark, RequirementCell } from "./RequirementCell";
 import { useCanFixZoneData } from "../hooks/useCanFixZoneData";
 import { AddressFixModal } from "./AddressFixModal";
+import { DriverLinksMenu } from "./DriverLinksMenu";
+import { useDriverUserUuids } from "../hooks/useDriverUserUuids";
 import { setDriverExcluded } from "../db/setDriverExcluded";
 import { GRID_LINES as LINES } from "./DriverWeekGrid";
 
@@ -29,7 +31,17 @@ async function toggleExcluded(driver: DriverData, excluded: boolean) {
 }
 
 /** The drivers the office left out of the model, each with a way back in. */
-function ExcludedDrivers({ drivers, canFix }: { drivers: DriverData[]; canFix: boolean }) {
+function ExcludedDrivers({
+  drivers,
+  canFix,
+  userUuids,
+  weekStart,
+}: {
+  drivers: DriverData[];
+  canFix: boolean;
+  userUuids: Map<string, string>;
+  weekStart: string;
+}) {
   return (
     <section className="mt-6" data-testid="driver-data-excluded">
       <h3 className="mb-1 text-sm font-semibold">Removed from the model ({drivers.length})</h3>
@@ -47,7 +59,14 @@ function ExcludedDrivers({ drivers, canFix }: { drivers: DriverData[]; canFix: b
               className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
               data-testid="driver-data-excluded-row"
             >
-              <span className="font-medium text-gray-700">{driver.driverName}</span>
+              <span className="flex flex-1 items-center gap-2 font-medium text-gray-700">
+                {driver.driverName}
+                <DriverLinksMenu
+                  userUuid={userUuids.get(driver.driverUuid)}
+                  weekStart={weekStart}
+                  driverName={driver.driverName}
+                />
+              </span>
               {canFix && (
                 <Button size="sm" variant="outline" onClick={() => toggleExcluded(driver, false)}>
                   <Undo2 className="mr-1 h-3.5 w-3.5" />
@@ -68,8 +87,9 @@ function ExcludedDrivers({ drivers, canFix }: { drivers: DriverData[]; canFix: b
  * missing, and a way to remove the driver from the model. Below it, the drivers already removed.
  */
 export function DriverDataTab() {
-  const { zoneId } = useZoneWeekParams();
+  const { zoneId, weekStart } = useZoneWeekParams();
   const { drivers, isLoading } = useChecks().driverData;
+  const userUuids = useDriverUserUuids(zoneId);
   const canFix = useCanFixZoneData(zoneId);
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
   const editing: DriverData | null = drivers.find((d) => d.driverUuid === editingUuid) ?? null;
@@ -120,6 +140,11 @@ export function DriverDataTab() {
               <div className={`flex min-h-12 items-center gap-2 px-2 text-sm font-medium ${LINES}`}>
                 <Mark ok={driver.ok} label={driver.ok ? "Ready" : "Missing data"} />
                 {driver.driverName}
+                <DriverLinksMenu
+                  userUuid={userUuids.get(driver.driverUuid)}
+                  weekStart={weekStart}
+                  driverName={driver.driverName}
+                />
               </div>
               {DRIVER_REQUIREMENTS.map((r) => (
                 <RequirementCell
@@ -152,7 +177,12 @@ export function DriverDataTab() {
         </div>
       )}
 
-      <ExcludedDrivers drivers={excluded} canFix={canFix} />
+      <ExcludedDrivers
+        drivers={excluded}
+        canFix={canFix}
+        userUuids={userUuids}
+        weekStart={weekStart}
+      />
 
       <AddressFixModal
         target={

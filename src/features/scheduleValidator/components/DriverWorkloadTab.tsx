@@ -3,6 +3,8 @@
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
+import { useDriverUserUuids } from "../hooks/useDriverUserUuids";
+import { DriverLinksMenu } from "./DriverLinksMenu";
 import { MAX_DRIVING_HOURS, formatHours, type WorkloadDay } from "../utils/driverWorkload";
 import { DriverWeekGrid, GRID_LINES as LINES } from "./DriverWeekGrid";
 
@@ -37,6 +39,7 @@ function WorkloadCell({ day }: { day: WorkloadDay }) {
 export function DriverWorkloadTab() {
   const [weekStart] = useSelectedWeek();
   const { zoneId } = useZoneWeekParams();
+  const userUuids = useDriverUserUuids(zoneId);
   const { drivers, isLoading } = useChecks().driverWorkload;
 
   if (!zoneId) {
@@ -52,6 +55,13 @@ export function DriverWorkloadTab() {
   return (
     <DriverWeekGrid
       weekStart={weekStart}
+      renderDriverActions={(driver) => (
+        <DriverLinksMenu
+          userUuid={userUuids.get(driver.driverUuid)}
+          weekStart={weekStart}
+          driverName={driver.driverName}
+        />
+      )}
       drivers={drivers}
       renderDay={(day) => <WorkloadCell day={day} />}
       testId="driver-workload"
