@@ -97,6 +97,19 @@ def test_zone_drivers_are_the_active_ones_assigned_to_the_zone():
     assert requests[0].url.params["zone_uuid"] == "eq.zone-1"
 
 
+def test_zone_drivers_leave_out_the_ones_excluded_from_the_model():
+    tables = {
+        "DriverZones": [{"driver_uuid": "d1"}, {"driver_uuid": "d2"}],
+        "Drivers": [
+            {"id": "d1", "is_active": True, "address_uuid": "home1", "exclude_from_auto_work_trackers": False},
+            {"id": "d2", "is_active": True, "address_uuid": "home2", "exclude_from_auto_work_trackers": True},
+        ],
+    }
+    requests = []
+    assert repo_with(requests, tables).load_zone_drivers("zone-1") == [Driver("d1", "home1")]
+    assert "exclude_from_auto_work_trackers" in requests[1].url.params["select"]
+
+
 def test_blocked_days_are_unavailable_days_and_active_work_trackers_inside_the_week():
     tables = {
         "DriverUnavailability": [

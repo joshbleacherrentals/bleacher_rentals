@@ -23,6 +23,8 @@ export type DriverDataInput = {
   /** The Addresses row the driver points at, null when none. */
   addressUuid: string | null;
   address: DriverAddress | null;
+  /** Left out of the Auto Work Trackers model by the office: never given a trip. */
+  excluded: boolean;
 };
 
 /** How one driver did on one requirement: ok, or what is missing. */
@@ -41,6 +43,7 @@ export type DriverData = {
   driverName: string;
   addressUuid: string | null;
   address: DriverAddress | null;
+  excluded: boolean;
   results: Record<string, RequirementResult>;
   /** Every requirement passed. */
   ok: boolean;
@@ -92,6 +95,7 @@ export function buildDriverData(
         driverName: driver.driverName,
         addressUuid: driver.addressUuid,
         address: driver.address,
+        excluded: driver.excluded,
         results,
         ok: Object.values(results).every((r) => r.ok),
       };

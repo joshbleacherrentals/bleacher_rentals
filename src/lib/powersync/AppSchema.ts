@@ -319,6 +319,8 @@ const DriversCols = {
   insurance_expires_on: column.text,
   license_expires_on: column.text,
   medical_card_expires_on: column.text,
+  /** 1 when the Auto Work Trackers model must never give this driver a trip (Driver Data). */
+  exclude_from_auto_work_trackers: column.integer,
   bucket_count: column.integer,
   sync_version: column.integer,
   bucket_count_reported_at: column.text,

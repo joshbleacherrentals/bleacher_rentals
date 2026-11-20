@@ -77,7 +77,10 @@ export function driverUnavailabilityQuery(zoneId: string, weekStart: string, wee
     .compile();
 }
 
-/** Driver Data: every active driver in the zone with their home address, for the data checks. */
+/**
+ * Driver Data: every active driver in the zone with their home address, for the data checks, and
+ * whether the office excluded them from the model.
+ */
 export function driverDataQuery(zoneId: string) {
   return db
     .selectFrom("Drivers as d")
@@ -88,6 +91,7 @@ export function driverDataQuery(zoneId: string) {
       "u.first_name as first_name",
       "u.last_name as last_name",
       "d.address_uuid as address_uuid",
+      "d.exclude_from_auto_work_trackers as exclude_from_auto_work_trackers",
       "a.street as street",
       "a.city as city",
       "a.state_province as state_province",

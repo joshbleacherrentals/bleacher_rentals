@@ -52,9 +52,15 @@ export function summarizeDriverAvailability(drivers: DriverAvailability[]): Chec
   return count(drivers, (d) => d.ok);
 }
 
-/** Active drivers in the zone, passing when they have every piece of data the model needs. */
+/**
+ * Active drivers in the zone the model uses (not excluded), passing when they have every piece of
+ * data it needs.
+ */
 export function summarizeDriverData(drivers: DriverData[]): CheckSummary {
-  return count(drivers, (d) => d.ok);
+  return count(
+    drivers.filter((d) => !d.excluded),
+    (d) => d.ok,
+  );
 }
 
 /** Green when everything passed (nothing to check counts as passing), red otherwise. */

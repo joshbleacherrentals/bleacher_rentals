@@ -10,6 +10,7 @@ type Row = {
   first_name: string | null;
   last_name: string | null;
   address_uuid: string | null;
+  exclude_from_auto_work_trackers: number | null;
   street: string | null;
   city: string | null;
   state_province: string | null;
@@ -38,6 +39,7 @@ export function useDriverData(zoneId: string): { drivers: DriverData[]; isLoadin
               driverUuid: r.driver_uuid,
               driverName: [r.first_name, r.last_name].filter(Boolean).join(" ") || "Unnamed driver",
               addressUuid: r.address_uuid,
+              excluded: r.exclude_from_auto_work_trackers === 1,
               address: r.address_uuid
                 ? {
                     street: r.street,

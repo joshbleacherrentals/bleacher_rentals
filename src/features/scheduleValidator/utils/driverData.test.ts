@@ -23,6 +23,7 @@ const driver = (over: Partial<DriverDataInput> = {}): DriverDataInput => ({
   driverName: "Justin Kowalsky",
   addressUuid: "a1",
   address: FULL_ADDRESS,
+  excluded: false,
   ...over,
 });
 

@@ -58,3 +58,9 @@ describe("managesZoneQuery", () => {
     expect(compiled.parameters).toEqual(["am-1", "zone-1", 1]);
   });
 });
+
+describe("driverDataQuery exclusion", () => {
+  it("reads whether each driver is excluded from the model", () => {
+    expect(driverDataQuery("zone-1").sql).toContain('"d"."exclude_from_auto_work_trackers"');
+  });
+});

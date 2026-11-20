@@ -84,4 +84,12 @@ describe("summarizeDriverData", () => {
     const drivers = [{ ok: true }, { ok: false }] as DriverData[];
     expect(summarizeDriverData(drivers)).toEqual({ passed: 1, total: 2 });
   });
+
+  it("leaves out the drivers excluded from the model", () => {
+    const drivers = [
+      { ok: true, excluded: false },
+      { ok: false, excluded: true },
+    ] as DriverData[];
+    expect(summarizeDriverData(drivers)).toEqual({ passed: 1, total: 1 });
+  });
 });

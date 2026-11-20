@@ -344,7 +344,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-02-08 14:02:03.30076+00', '1311 Music Hall Rd, Hiawassee, GA 30546, USA', 'Hiawassee', 'Georgia', '30546', 'd9ccdcce-d734-445f-ba23-cb7c4f0390ce', NULL, NULL, NULL, NULL),
 	('2026-02-09 14:35:50.660983+00', '2454 Nixon Road, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K6', 'e4ca8a57-1b1f-4311-b5c6-a573d9b76386', NULL, NULL, NULL, NULL),
 	('2026-02-09 17:35:31.85663+00', 'Tonopah, AZ, USA', 'Tonopah', 'Arizona', '85354', 'cf16fea5-8794-44a4-85cd-b59dd92b0a4c', NULL, NULL, NULL, NULL),
-	('2026-02-11 20:41:34.912+00', '5430 LINE 75, North Perth, ON, Canada', 'North Perth', 'Ontario', 'N0G 1B0', 'fcca265d-40b3-43a1-90b1-00fec5da749b', NULL, NULL, NULL, NULL),
+	('2026-02-11 20:41:34.912+00', '5430 LINE 75', 'North Perth', 'Ontario', 'N0G 1B0', 'fcca265d-40b3-43a1-90b1-00fec5da749b', 43.6567158, -80.963311, 'CA', 'ChIJh2WlPmdbKYgRK1ovrUEz6x0'),
 	('2026-02-27 14:03:44.875115+00', 'Phoenix, AZ, USA', 'Phoenix', 'Arizona', '', 'eabad93a-cc48-4d06-a4ad-3795006fdcef', NULL, NULL, NULL, NULL),
 	('2026-02-28 17:17:16.932671+00', '1358 Cathcart Blvd, Sarnia, ON, Canada', 'Sarnia', 'Ontario', 'N7S 2J2', '37589ce7-6536-4181-b6c2-b01b8048c05d', NULL, NULL, NULL, NULL),
 	('2026-02-18 17:47:28.256212+00', '1087 Queen St W, Toronto, Toronto, ON M6J 1H3, Canada', 'Toronto', 'Ontario', 'M6J 1H3', '2696797a-22a7-4f87-9f2c-ec74f1814d37', NULL, NULL, NULL, NULL),
@@ -663,7 +663,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-01-30 14:34:44.487247+00', '1279 Colonial Rd, Ottawa, Ottawa, ON K4B 1N1, Canada', 'Ottawa', 'Ontario', 'K4B 1N1', 'e2484c55-a83b-412e-9e7d-dbbdcb01ea10', NULL, NULL, NULL, NULL),
 	('2026-04-08 13:17:48.245253+00', '', '', '', '', '85d914b7-2a5f-4cea-9e80-bc24457e22dd', NULL, NULL, NULL, NULL),
 	('2026-04-09 13:20:09.165114+00', '', '', '', '', 'e0e9deb9-56d7-460c-bcfc-31647c02ec39', NULL, NULL, NULL, NULL),
-	('2026-03-18 14:21:45.729+00', '30 Lindbergh Drive, Fort Erie, ON, Canada', 'Fort Erie', 'Ontario', 'L2A 2Z4', 'd56bce18-15a9-4adc-8d15-5e7e3baa821f', NULL, NULL, NULL, NULL),
+	('2026-03-18 14:21:45.729+00', '30 Lindbergh Drive', 'Fort Erie', 'Ontario', 'L2A 2Z4', 'd56bce18-15a9-4adc-8d15-5e7e3baa821f', 42.9361268, -78.9230935, 'CA', 'ChIJl1kDAloT04kR81mCesWFYUc'),
 	('2026-03-03 21:15:41.106552+00', 'Lampasas, TX, USA', 'Lampasas', 'Texas', '76550', '4d769d53-d10c-4801-852a-13c0d57f76d0', NULL, NULL, NULL, NULL),
 	('2026-03-23 17:00:55.370316+00', 'Henderson, NV, USA', 'Henderson', 'Nevada', '', 'c3478639-f56b-47bc-a4ae-6f4b1977cf64', NULL, NULL, NULL, NULL),
 	('2026-02-27 06:59:15.442665+00', '10693 Mendota, Canadian, TX 79014, USA', 'Canadian', 'Texas', '79014', '424a9391-9457-49a8-b76c-efd85b99c981', NULL, NULL, NULL, NULL),
@@ -1129,7 +1129,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-05-19 19:00:16.8956+00', '2454 Nixon Road, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K6', '36ed6676-f53f-40be-bc87-ca1063045fd4', NULL, NULL, NULL, NULL),
 	('2026-07-15 18:25:39.832367+00', '1723 Hollis Street, Halifax, NS, Canada', 'Halifax', 'Nova Scotia', 'B3J 1V9', '490fb855-c863-4fb0-a3aa-1795618dd163', NULL, NULL, NULL, NULL),
 	('2026-01-30 20:23:27.295738+00', 'Greater Hillsborough County Fair, 215 Sydney Washer Rd, Dover, FL 33527, USA', 'Dover', 'Florida', '33527', '4b9b9bef-841c-4aee-9ba8-11b44a98cb94', NULL, NULL, NULL, NULL),
-	('2026-02-03 17:33:51.774+00', '12 Winding Way, McHenry, MD, USA', 'McHenry', 'Maryland', '21541', '0a2e2686-276d-494d-a632-6b76cc34e8e9', NULL, NULL, NULL, NULL),
+	('2026-02-03 17:33:51.774+00', '12 Winding Way Crescent', 'London', 'Ontario', 'N6G 3G1', '0a2e2686-276d-494d-a632-6b76cc34e8e9', 43.0115026, -81.3189095, 'CA', 'ChIJOTwIOujvLogRRNqJewY2538'),
 	('2026-02-06 03:49:30.514549+00', '8601 Bluff Springs Rd, Austin, TX 78744, USA', 'Austin', 'Texas', '78744', '18b2754d-cb76-4611-863f-238eba349b78', NULL, NULL, NULL, NULL),
 	('2026-02-06 15:32:01.612748+00', 'Farmington, AR, USA', 'Farmington', 'Arkansas', '72730', '039a07d5-e2a6-404b-9ddb-bddb06e9fde4', NULL, NULL, NULL, NULL),
 	('2026-02-08 14:19:01.643732+00', '1400 Martin Luther King Jr Blvd, Rome, GA 30161, USA', 'Rome', 'Georgia', '30161', '4db4e301-9edb-4ce9-80b7-cede781b7688', NULL, NULL, NULL, NULL),
@@ -2335,7 +2335,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-06-08 20:14:59.025156+00', '', '', '', '', 'a9280f76-5036-4a07-b08a-2fcf4aa40630', NULL, NULL, NULL, NULL),
 	('2026-05-27 17:47:44.565619+00', '2454 Nixon Road, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K6', 'eb6929c7-c814-43af-bdad-6f8de7bc8731', NULL, NULL, NULL, NULL),
 	('2026-05-27 17:47:44.749009+00', 'BMO Training Ground (TFC), Carl Hall Road, North York, ON, Canada', 'Toronto', 'Ontario', 'M2K 2B9', '7c1bbfb9-387a-429d-8a18-dab8d5bddba4', NULL, NULL, NULL, NULL),
-	('2026-05-20 13:19:49.612+00', '1417 Hazen Road, Langton, ON, Canada', 'Langton', 'Ontario', 'N0E 1G0', '775bcf56-6e90-4759-9c7f-f304ca266707', NULL, NULL, NULL, NULL),
+	('2026-05-20 13:19:49.612+00', '1417 Hazen Road', 'Norfolk', 'Ontario', 'N0E 1G0', '775bcf56-6e90-4759-9c7f-f304ca266707', 42.6995942, -80.571068, 'CA', 'ChIJVeGs8ZnOLYgR1YavCbLptio'),
 	('2026-06-11 11:44:34.147581+00', '', '', '', '', '478218d9-37fb-468b-9362-1476adeca8ca', NULL, NULL, NULL, NULL),
 	('2026-05-30 14:33:56.287795+00', '2960 Riverside Dr., Ottawa, Ottawa, ON K1V 8N4, Canada', 'Ottawa', 'Ontario', 'K1V 8N4', 'ba13b9b8-2d2b-4e27-abec-16a9f1a762dd', NULL, NULL, NULL, NULL),
 	('2026-05-30 14:28:50.181211+00', 'Navan Fair, Colonial Road, Navan, ON, Canada', 'Ottawa', 'Ontario', 'K4B 1N1', 'cc61deca-860d-4206-aea6-2892c078dd48', NULL, NULL, NULL, NULL),
@@ -2455,7 +2455,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-06-03 20:13:45.430831+00', 'Brooke-Alvinston, ON, Canada', '', 'Ontario', '', 'c466ee4b-b32c-4ad9-a936-90cc18a2be20', NULL, NULL, NULL, NULL),
 	('2026-06-04 13:15:01.96512+00', '2454 Nixon Road, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K6', '4fd1c15a-2284-4449-855d-67d7533bccfa', NULL, NULL, NULL, NULL),
 	('2026-06-04 13:15:02.079906+00', '557 Walter St, Lucknow, Bruce County, ON N0G 2H0, Canada', 'Lucknow', 'Ontario', 'N0G 2H0', 'b3928957-955c-4bdf-b0ff-4f9d3fd8e52c', NULL, NULL, NULL, NULL),
-	('2026-03-18 13:31:26.476+00', '30 Lindbergh Drive, Fort Erie, ON, Canada', 'Fort Erie', 'Ontario', 'L2A 2Z4', '06fb74ea-6007-494a-a88b-42d49fc6d801', NULL, NULL, NULL, NULL),
+	('2026-03-18 13:31:26.476+00', '30 Lindbergh Drive', 'Fort Erie', 'Ontario', 'L2A 2Z4', '06fb74ea-6007-494a-a88b-42d49fc6d801', 42.9361268, -78.9230935, 'CA', 'ChIJl1kDAloT04kR81mCesWFYUc'),
 	('2026-06-04 13:16:26.203766+00', '2454 Nixon Road, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K6', '2ceef08c-4f01-4d7a-ad08-21b4186270d1', NULL, NULL, NULL, NULL),
 	('2026-06-04 13:16:26.317517+00', '557 Walter St, Lucknow, Bruce County, ON N0G 2H0, Canada', 'Lucknow', 'Ontario', 'N0G 2H0', '932ec75a-205c-45ae-8aa8-e1cdcfd57d0d', NULL, NULL, NULL, NULL),
 	('2026-06-04 13:03:53.528452+00', '3100 Hurontario St, Mississauga, Regional Municipality of Peel, ON L5B 1N8, Canada', 'Mississauga', 'Ontario', 'L5A 4E4', 'a44cd71f-682b-4a8b-b898-bdba429165f1', NULL, NULL, NULL, NULL),
@@ -2526,7 +2526,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-06-04 14:23:59.767777+00', '1258 Turkey Point Road, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K1', 'c9abca90-2e77-444a-8530-ae09792c2bfc', NULL, NULL, NULL, NULL),
 	('2026-06-04 17:26:07.163785+00', '46100 Grand River Ave, Novi, MI 48374, United States', 'Novi', 'Michigan', '48374', 'c7966b60-5a88-447e-8d0b-003b31baf1cc', NULL, NULL, NULL, NULL),
 	('2026-06-04 17:37:06.633449+00', 'Teen Ranch, Hurontario St, Caledon, ON, Canada', '', 'Ontario', 'L7K 1X1', 'a06f01cf-870f-4a6a-9b65-50c6eeca002d', NULL, NULL, NULL, NULL),
-	('2026-06-02 14:25:58.661+00', '4424 Prairie Rd, Rockford, Illinois, USA', 'Rockford', 'Illinois', '61102', '2aebf81e-dc18-4d3c-855e-0590bb24244b', NULL, NULL, NULL, NULL),
+	('2026-06-02 14:25:58.661+00', '4424 Prairie Road', 'Rockford', 'Illinois', '61102', '2aebf81e-dc18-4d3c-855e-0590bb24244b', 42.2163087, -89.130834, 'US', 'ChIJcTrYD9_qCIgRSDoAxuowM5c'),
 	('2026-07-29 13:20:00.579592+00', 'San Antonio, TX, USA', 'San Antonio', 'Texas', '', 'bfc27130-5ce6-4607-ac58-0d2bf781d077', NULL, NULL, NULL, NULL),
 	('2026-06-05 17:53:12.567895+00', '411 Opie Lane, Cibolo, TX, USA', 'Cibolo', 'Texas', '78108', 'fe4b6e29-a703-4e78-9626-00411d3efdf2', NULL, NULL, NULL, NULL),
 	('2026-06-05 17:53:12.722577+00', 'Shady Park Dr, Central, Greenwell Springs, LA, USA', 'Central', 'Louisiana', '70739', 'e5b3d48d-380d-4dc5-950b-d62f63d0068f', NULL, NULL, NULL, NULL),
@@ -2961,7 +2961,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-06-23 20:02:30.406646+00', '', '', '', '', '923bbb69-58ea-4397-89e2-286ba87b9cfd', NULL, NULL, NULL, NULL),
 	('2026-06-13 20:30:57.946045+00', '8686 OK-91, Colbert, OK 74733, USA', 'Colbert', 'Oklahoma', '74733', '9a81991f-8bdd-4473-b31a-38ed80c9f03a', NULL, NULL, NULL, NULL),
 	('2026-06-15 14:27:52.6707+00', '39475 Woodward Ave, Bloomfield Hills, Oakland County, MI 48304, USA', 'Bloomfield Hills', 'Michigan', '48304', '6cc3fc64-1bec-4e62-b63a-fd7e58e9d786', NULL, NULL, NULL, NULL),
-	('2026-06-15 14:54:04.079738+00', '1417 Hazen Rd, Norfolk, ON, Canada', 'Norfolk', 'Ontario', 'N0E 1G0', '0ec0aba6-3043-45f3-aead-12b6134c5153', NULL, NULL, NULL, NULL),
+	('2026-06-15 14:54:04.079738+00', '1417 Hazen Road', 'Norfolk', 'Ontario', 'N0E 1G0', '0ec0aba6-3043-45f3-aead-12b6134c5153', 42.6995942, -80.571068, 'CA', 'ChIJVeGs8ZnOLYgR1YavCbLptio'),
 	('2026-06-15 14:59:38.518229+00', '13325 Florida Blvd, Walker, LA 70785, USA', 'Walker', 'Louisiana', '70785', '0b2152ba-7695-4244-9d53-bc047cb1b657', NULL, NULL, NULL, NULL),
 	('2026-06-15 16:25:49.005084+00', '45 Freeman Dr, Lebanon, Lebanon County, PA 17042, USA', 'Lebanon', 'Pennsylvania', '17042', 'd3827cc0-8026-4df3-93fe-0e5f2cbec1d0', NULL, NULL, NULL, NULL),
 	('2026-06-15 17:48:00.137129+00', '1000 Fort Duquesne Blvd, Pittsburgh, Allegheny County, PA 15222, USA', 'Pittsburgh', 'Pennsylvania', '15222', '3fcdd941-6fa5-4bd8-b88b-0e8ea4c0b114', NULL, NULL, NULL, NULL),
@@ -3962,7 +3962,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-07-29 13:20:42.438022+00', 'Encanto Park, Phoenix, AZ, USA', 'Phoenix', 'Arizona', '85007', '6ea29f73-8e31-4c1b-b061-f2aa2514ee32', NULL, NULL, NULL, NULL),
 	('2026-07-27 19:49:30.994728+00', '5430 75th Line, Atwood, ON N0G 1B0, Canada', 'North Perth', 'Ontario', 'N0G 1B0', 'cabcabc9-3d72-4e36-8026-836a838abf9f', NULL, NULL, NULL, NULL),
 	('2026-07-27 19:49:52.935104+00', '5430 75th Line, Atwood, ON N0G 1B0, Canada', 'North Perth', 'Ontario', 'N0G 1B0', '3a28d522-31bb-4149-99c7-00d8e7f9be27', NULL, NULL, NULL, NULL),
-	('2026-05-13 17:28:14.645+00', '410 Chemin de Val-des-Lacs, Val-des-Lacs, QC, Canada', 'Val-des-Lacs', 'Québec', 'J0T 2P0', '0ef95e00-1620-4dd6-a064-856fbc394a2d', NULL, NULL, NULL, NULL),
+	('2026-05-13 17:28:14.645+00', '410 Chemin de Val-des-Lacs', 'Val-des-Lacs', 'Québec', 'J0T 2P0', '0ef95e00-1620-4dd6-a064-856fbc394a2d', 46.1875197, -74.3473699, 'CA', 'ChIJnZsH96Nvz0wRx9IXQe5Dvnw'),
 	('2026-07-29 13:20:42.603369+00', 'Crismon junior high and High school, 21942 E Riggs Rd, Queen Creek, AZ 85142, USA', 'Queen Creek', 'Arizona', '85142', 'dd43f7b6-c99a-4502-be7d-b66f17799ad5', NULL, NULL, NULL, NULL),
 	('2026-07-29 13:20:59.597685+00', 'Encanto Park, Phoenix, AZ, USA', 'Phoenix', 'Arizona', '85007', '37931a88-11af-41d9-bb71-1457782d366c', NULL, NULL, NULL, NULL),
 	('2026-07-29 13:20:59.842408+00', 'Crismon junior high and High school, 21942 E Riggs Rd, Queen Creek, AZ 85142, USA', 'Queen Creek', 'Arizona', '85142', 'b066a5c3-4eaf-4e13-95b6-29f6a64fecce', NULL, NULL, NULL, NULL),
@@ -3988,7 +3988,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-07-29 15:33:43.246354+00', '19477 Fairground Road, Robertsdale, AL, USA', 'Robertsdale', 'Alabama', '36567', '8bfbbaa8-b795-4545-af52-2ee97538b3db', NULL, NULL, NULL, NULL),
 	('2026-07-29 15:38:48.000494+00', '5150 Lindle Rd, Harrisburg, Dauphin County, PA 17111, USA', 'Harrisburg', 'Pennsylvania', '17111', 'e63b2412-01e9-4374-8a56-5c2167d21631', NULL, NULL, NULL, NULL),
 	('2026-07-29 15:33:45.307507+00', 'Greater Hillsborough County Fair, 215 Sydney Washer Rd, Dover, FL 33527, USA', 'Dover', 'Florida', '33527', 'edc0d3e0-286b-407b-a58a-ec4baaa5123f', NULL, NULL, NULL, NULL),
-	('2026-02-27 00:39:16.411+00', '1663 Windham Road 12, Norfolk County, ON, Canada', 'Norfolk County', 'Ontario', 'N3Y 4K3', '7eb9110e-10ff-4526-952d-7337598c2131', NULL, NULL, NULL, NULL),
+	('2026-02-27 00:39:16.411+00', '1663 Windham Road 12', 'Norfolk', 'Ontario', 'N3Y 4K3', '7eb9110e-10ff-4526-952d-7337598c2131', 42.8799974, -80.3221211, 'CA', 'ChIJrUoR7f9OLIgRT0cfLPmLcYE'),
 	('2026-07-29 16:09:05.841622+00', 'Boston, MA, USA', 'Boston', 'Massachusetts', '', 'b6cea23c-b831-4b5c-998a-6f0eeb722080', NULL, NULL, NULL, NULL),
 	('2026-07-29 17:21:20.198483+00', '37286 U.S. 59 Scenic, Jay, OK, USA', 'Jay', 'Oklahoma', '74346', '86192d41-c6b0-4bc9-b3cd-5416bd3d25a0', NULL, NULL, NULL, NULL),
 	('2026-07-29 17:23:28.67054+00', 'Erie, MI, USA', 'Erie', 'Michigan', '48133', '1814eb7b-6d0d-452e-9be2-dcde3a5169c5', NULL, NULL, NULL, NULL),
@@ -4328,7 +4328,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-08-13 18:48:18.72249+00', '1799 Av. Pierre-Péladeau, Laval, Laval, QC H7T 2Y5, Canada', 'Laval', 'Québec', 'H7T 2Y5', '3b86fe6e-12da-4b89-afb3-a9840c47323e', NULL, NULL, NULL, NULL),
 	('2026-08-13 18:48:20.532081+00', 'Carp Agricultural Society (Carp Fair), Carp Road, Carp, ON, Canada', 'Ottawa', 'Ontario', 'K0A 1L0', '4d819ac7-ba0b-4139-8095-99c154e85ecb', NULL, NULL, NULL, NULL),
 	('2026-08-13 22:07:29.974123+00', '15720 Hillcrest Rd, Dallas, TX 75248, USA', 'Dallas', 'Texas', '75248', '4bacf622-0b69-4eaa-9c02-e68f631fbeea', NULL, NULL, NULL, NULL),
-	('2026-08-14 12:32:09.092998+00', '433 Rue des Pruches, Otterburn Park, QC, Canada', 'Otterburn Park', 'Québec', 'J3H 6H3', '39fc67ae-e0c4-4d1c-b04c-8f07edb80ea2', NULL, NULL, NULL, NULL),
+	('2026-08-14 12:32:09.092998+00', 'Rue des Pruches', 'Otterburn Park', 'Québec', 'J3H 6H3', '39fc67ae-e0c4-4d1c-b04c-8f07edb80ea2', 45.5329568, -73.2084119, 'CA', 'EjNSdWUgZGVzIFBydWNoZXMsIE90dGVyYnVybiBQYXJrLCBRQyBKM0ggNkgzLCBDYW5hZGEiLiosChQKEgnFRVhYrKvJTBFMaAapnCzsihIUChIJ6ej-UKyryUwRzIsG_cPR62E'),
 	('2026-08-14 13:09:21.210045+00', '1799 Av. Pierre-Péladeau, Laval, QC, Canada', 'Laval', 'Québec', 'H7T 2Y5', '7f879f67-9f64-4838-b620-93b84077d25b', NULL, NULL, NULL, NULL),
 	('2026-08-14 13:09:22.865837+00', 'Carp Agricultural Society (Carp Fair), Carp Road, Carp, ON, Canada', 'Ottawa', 'Ontario', 'K0A 1L0', '532001cb-fbe8-4f9a-94a6-297667a89dac', NULL, NULL, NULL, NULL),
 	('2026-08-14 13:09:30.444333+00', '1799 Av. Pierre-Péladeau, Laval, QC, Canada', 'Laval', 'Québec', 'H7T 2Y5', 'cb16c2a2-6856-4c57-87b1-fe8e40088fb3', NULL, NULL, NULL, NULL),
@@ -4444,7 +4444,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-08-19 14:57:46.285496+00', 'Thorndale Fairgrounds, Fairview Road, Thorndale, ON, Canada', 'Thames Centre', 'Ontario', 'N0M 2P0', 'fe524953-a202-4665-8be4-45b08c2f7926', NULL, NULL, NULL, NULL),
 	('2026-08-19 14:58:46.51658+00', 'Timmermans'' Ranch and horse stables, Nixon Road, Simcoe, ON, Canada', 'Norfolk', 'Ontario', 'N3Y 4K6', '82dc2590-2056-4ab1-ad8b-e31d4c62e96b', NULL, NULL, NULL, NULL),
 	('2026-08-19 14:58:47.378858+00', 'Thorndale Fairgrounds, Fairview Road, Thorndale, ON, Canada', 'Thames Centre', 'Ontario', 'N0M 2P0', '94c2e280-4c4c-437f-a904-65dc49346c11', NULL, NULL, NULL, NULL),
-	('2026-08-19 15:27:08.646569+00', '584 Beech Street, Delhi, Ontario, Canada', 'Norfolk', 'Ontario', 'N4B 3A4', '0f6a3b9d-3b21-4f0e-a26d-e3def19ab02b', NULL, NULL, NULL, NULL),
+	('2026-08-19 15:27:08.646569+00', 'Beech Street', 'Delhi', 'Ontario', 'N4B 3A4', '0f6a3b9d-3b21-4f0e-a26d-e3def19ab02b', 42.8445555, -80.4969452, 'CA', 'EjVCZWVjaCBTdHJlZXQsIERlbGhpLCBOb3Jmb2xrLCBPbnRhcmlvIE40QiAzQTQsIENhbmFkYSIuKiwKFAoSCSe3F_bMNSyIEViS8hHQXrU3EhQKEgnHUYL3zDUsiBHJWwpcFL5XxA'),
 	('2026-08-19 16:19:28.228661+00', 'Timmermans'' Ranch and horse stables, Nixon Road, Simcoe, ON, Canada', 'Norfolk', 'Ontario', 'N3Y 4K6', '7f32c8ec-7f82-47b7-b7af-264f2485d3bd', NULL, NULL, NULL, NULL),
 	('2026-08-19 16:19:29.222844+00', '2017 Ball Park Road, Southwold, ON, Canada', 'Middlesex Centre', 'Ontario', 'N0L 1W0', '02786717-559e-4103-8312-eeac08b323d1', NULL, NULL, NULL, NULL),
 	('2026-08-19 16:20:48.695637+00', '212 Liberty Hill Rd, Hartwell, GA, USA', 'Hartwell', 'Georgia', '30643', 'e633d7bf-0003-4e37-8d09-52f4da14bb18', NULL, NULL, NULL, NULL),
@@ -4557,7 +4557,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-08-24 21:26:38.198475+00', '503 W Broadway Ave, McLoud, OK 74851, USA', 'McLoud', 'Oklahoma', '74851', '0c04bb08-b620-48cb-b7ee-9c6f56a68d31', NULL, NULL, NULL, NULL),
 	('2026-08-25 12:59:16.283069+00', '53666 N Ironwood Rd, South Bend, Clay Township, IN 46635, USA', 'South Bend', 'Indiana', '46635', 'b43888c9-09cf-4cb8-9fb9-0d6741e79f28', NULL, NULL, NULL, NULL),
 	('2026-08-25 13:01:18.558189+00', '42771 Alabama 77, Ashland, AL, USA', 'Ashland', 'Alabama', '36251', '41491568-9bc0-4c61-92b2-8f9b72f9e3e9', NULL, NULL, NULL, NULL),
-	('2026-03-04 11:49:37.361+00', '2454 Nixon Rd, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K6', '24a4dd62-8669-403c-94d8-c0410e23e48b', NULL, NULL, NULL, NULL),
+	('2026-03-04 11:49:37.361+00', '2454 Nixon Road', 'Simcoe', 'Ontario', 'N3Y 4K6', '24a4dd62-8669-403c-94d8-c0410e23e48b', 42.8606941, -80.4036247, 'CA', 'ChIJS2Kqw3BJLIgRXD3LANq3Sc4'),
 	('2026-08-25 13:47:24.127063+00', '12 Winding Way Crescent, London, ON, Canada', 'London', 'Ontario', 'N6G 3G1', '2d3e6534-0fbf-4ad9-82bc-51ccbec9748d', NULL, NULL, NULL, NULL),
 	('2026-08-25 13:47:24.64084+00', 'Buffalo, NY, USA', 'Buffalo', 'New York', '', 'de44dcd3-057f-42ac-8f1f-7abddb58c32c', NULL, NULL, NULL, NULL),
 	('2026-08-25 13:59:50.273364+00', '5430 75th Line, Atwood, ON N0G 1B0, Canada', 'North Perth', 'Ontario', 'N0G 1B0', '440f551e-c1b7-4eb1-8458-cad87712cfa4', NULL, NULL, NULL, NULL),
@@ -4695,7 +4695,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-08-31 13:00:13.217147+00', 'Paris Fairground, Silver Street, Paris, ON, Canada', 'Brant', 'Ontario', 'N3L 1V5', 'eef60829-82d0-403e-9099-129a587900c0', NULL, NULL, NULL, NULL),
 	('2026-08-31 14:35:33.965682+00', 'Broward County Convention Center, Eisenhower Boulevard, Fort Lauderdale, FL, USA', 'Fort Lauderdale', 'Florida', '33316', '6ab080d1-d9a0-494f-9e61-b1b4ae155dfc', NULL, NULL, NULL, NULL),
 	('2026-08-31 15:21:04.560144+00', '1 Green Wave Dr, Newark, Licking County, OH 43055, USA', 'Newark', 'Ohio', '43055', 'ce0bb285-a48d-4e32-b652-4dc5704373a9', NULL, NULL, NULL, NULL),
-	('2026-08-11 13:59:57.658794+00', '500 Trueloves Road, Perth, ON, Canada', 'Perth', 'Ontario', 'K7H 3C6', 'aa5c8f61-3a8b-49d5-9e39-dbeeb067ecdf', NULL, NULL, NULL, NULL),
+	('2026-08-11 13:59:57.658794+00', '500 Trueloves Road', 'Perth', 'Ontario', 'K7H 3C6', 'aa5c8f61-3a8b-49d5-9e39-dbeeb067ecdf', 44.875182, -76.4079634, 'CA', 'ChIJW1364hBk0kwR8uvgeBCx__c'),
 	('2026-05-05 19:15:11.54779+00', '9181 95th St N, Seminole, FL, USA', 'Seminole', 'Florida', '33777', '79f61c6f-0554-43fc-a0bc-4d10f0a80bd7', NULL, NULL, NULL, NULL),
 	('2026-08-31 16:42:41.400283+00', '', '', '', '', '957fca36-e98d-4524-b508-2ea8111ae81f', NULL, NULL, NULL, NULL),
 	('2026-08-31 16:42:41.715236+00', '', '', '', '', '8ca36576-8d51-4779-b91d-5471b6d18564', NULL, NULL, NULL, NULL),
@@ -4726,9 +4726,9 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-09-01 18:15:48.166526+00', '7402 Mud St W, Grassie, Regional Municipality of Niagara, ON L0R 1M0, Canada', 'Grassie', 'Ontario', 'L0R 1M0', '54c73597-be4d-4a7e-940b-981bef894e75', NULL, NULL, NULL, NULL),
 	('2026-08-31 17:35:34.700637+00', '9313 Fourth Line, Halton Hills, Georgetown, Regional Municipality of Halton, ON L7G 4S6, Canada', 'Halton Hills', 'Ontario', 'L7G 4S6', '3a764dd4-72af-4fff-b3a2-52a80dcf7ec0', NULL, NULL, NULL, NULL),
 	('2026-09-01 18:37:34.821027+00', '46100 Grand River Ave, Novi, Oakland County, MI 48374, USA', 'Novi', 'Michigan', '48374', '6600bc01-f5b1-4aa4-98f2-99897fae9614', NULL, NULL, NULL, NULL),
-	('2026-06-11 18:07:49.118126+00', '2434 Nixon Rd, Simcoe, ON, Canada', 'Simcoe', 'Ontario', 'N3Y 4K6', '9e6aeafb-be32-45df-b088-ed3ea3abe110', NULL, NULL, NULL, NULL),
-	('2026-02-09 14:36:17.116+00', '1663 Windham Rd 12, Norfolk County, ON, Canada', 'Norfolk County', 'Ontario', 'N3Y 4K3', 'a2057455-e4c5-4fc4-81d1-e48efbb30b7e', NULL, NULL, NULL, NULL),
-	('2026-02-28 17:16:43.127+00', '148 Davis St, Wardsville, ON, Canada', 'Wardsville', 'Ontario', 'N0L 2N0', 'fa3fe2f0-db0a-4c4b-bfc9-b311266561f4', NULL, NULL, NULL, NULL),
+	('2026-06-11 18:07:49.118126+00', '2434 Nixon Road', 'Simcoe', 'Ontario', 'N3Y 4K6', '9e6aeafb-be32-45df-b088-ed3ea3abe110', 42.85991, -80.40391, 'CA', 'ChIJNQcfunBJLIgRCvIWYOIQOZA'),
+	('2026-02-09 14:36:17.116+00', '1663 Windham Road 12', 'Norfolk', 'Ontario', 'N3Y 4K3', 'a2057455-e4c5-4fc4-81d1-e48efbb30b7e', 42.8799974, -80.3221211, 'CA', 'ChIJrUoR7f9OLIgRT0cfLPmLcYE'),
+	('2026-02-28 17:16:43.127+00', '148 Davis Street', 'Wardsville', 'Ontario', 'N0L 2N0', 'fa3fe2f0-db0a-4c4b-bfc9-b311266561f4', 42.6536846, -81.7565391, 'CA', 'EiwxNDggRGF2aXMgU3QsIFdhcmRzdmlsbGUsIE9OIE4wTCAyTjAsIENhbmFkYSIxEi8KFAoSCcMnrFnduy-IEWWn8ksggA0dEJQBKhQKEglB7vBp3bsviBGkPhtfd_IZOg'),
 	('2026-09-01 19:15:47.625804+00', 'Georgetown Fairgrounds, Park Ave, Halton Hills, ON, Canada', 'Halton Hills', 'Ontario', 'L7G 3H9', 'ccda3d18-b34e-4ed4-9b72-de4b1c62b9f0', NULL, NULL, NULL, NULL),
 	('2026-09-01 19:20:47.083508+00', '60 Neault Rd, Papineau-Cameron, Nipissing District, ON P0H 1V0, Canada', '', 'Ontario', 'P0H 1V0', 'f16b833d-ef3e-4df3-b7f6-bed6ad46c02a', NULL, NULL, NULL, NULL),
 	('2026-09-01 19:20:47.280894+00', 'Meridian Place, Simcoe Street, Barrie, ON, Canada', 'Barrie', 'Ontario', 'L4M 1A7', 'eb97412a-89f6-42f9-bb92-e933df908349', NULL, NULL, NULL, NULL),
@@ -5005,7 +5005,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-09-07 15:35:27.240857+00', '250 Jacob St, New Hamburg, Waterloo Regional Municipality, ON N3A 1B9, Canada', 'New Hamburg', 'Ontario', 'N3A 1B9', '616b912d-d020-45ad-ab37-0ae67bb615fc', NULL, NULL, NULL, NULL),
 	('2026-07-10 23:46:07.026429+00', '6727 Stanley Avenue, Niagara Falls, ON, Canada', 'Niagara Falls', 'Ontario', 'L2G 3Y9', 'f0904fab-b281-4e48-9410-2e8c5b9dadf1', NULL, NULL, NULL, NULL),
 	('2026-09-07 15:15:22.987939+00', '6727 Stanley Avenue, Niagara Falls, ON, Canada', 'Niagara Falls', 'Ontario', 'L2G 3Y9', '45dbc9ed-0ee6-4696-ab86-06243e9c023f', NULL, NULL, NULL, NULL),
-	('2026-06-02 01:04:19.162+00', '13 Rue du Lynx, Gatineau, QC, Canada', 'Gatineau', 'Québec', 'J9J 4C5', 'ef449b4f-539f-48db-affa-004dd44a12ab', NULL, NULL, NULL, NULL),
+	('2026-06-02 01:04:19.162+00', '13 Rue du Lynx', 'Gatineau', 'Québec', 'J9J 4C5', 'ef449b4f-539f-48db-affa-004dd44a12ab', 45.4135722, -75.8518858, 'CA', 'ChIJx-pfdwgCzkwR-vY_llEaVWE'),
 	('2026-09-08 00:12:00.741859+00', '250 Jacob St, New Hamburg, Waterloo Regional Municipality, ON N3A 1B9, Canada', 'New Hamburg', 'Ontario', 'N3A 1B9', '0bdac16d-964e-4521-832e-afa0463cf696', NULL, NULL, NULL, NULL),
 	('2026-09-08 00:12:01.011213+00', '45 Jefferson St W, Forest, Lambton Shores, Lambton County, ON N0N 1J0, Canada', 'Forest', 'Ontario', 'N0N 1J0', '952893d7-6ef5-4e1a-a973-32b12fa18da7', NULL, NULL, NULL, NULL),
 	('2026-09-08 00:13:12.494166+00', 'Fergus Fall Fair, Belsyde Avenue East, Fergus, ON, Canada', 'Fergus', 'Ontario', 'N1M 3S1', 'c060eeb8-5702-42cf-9418-f2829971da39', NULL, NULL, NULL, NULL),
@@ -5162,7 +5162,7 @@ INSERT INTO "public"."Addresses" ("created_at", "street", "city", "state_provinc
 	('2026-09-12 19:34:44.232805+00', '45 Jefferson St W, Forest, Lambton Shores, Lambton County, ON N0N 1J0, Canada', 'Forest', 'Ontario', 'N0N 1J0', '6198503a-003a-452d-9499-00382eb2c9c8', NULL, NULL, NULL, NULL),
 	('2026-09-12 16:53:36.013389+00', '70 South Fruit Street', 'Concord', 'New Hampshire', '03301', '7c5b3b42-5a08-4f35-9f6f-ff6fff00d223', 43.194545, -71.551203, 'US', 'ChIJ-7SbhKFq4okRduwMvvXtb7w'),
 	('2026-09-13 00:39:51.094222+00', '70 South Fruit Street', 'Concord', 'New Hampshire', '03301', 'cab37132-83d4-4910-a5e1-f79343e8c88f', NULL, NULL, NULL, NULL),
-	('2026-09-13 14:24:36.596231+00', 'Bracebridge, ON, Canada', 'Bracebridge', 'Ontario', NULL, '9c31de20-4e9f-4850-a1c3-d0dca4f6245b', 45.0402409, -79.3085748, 'CA', 'ChIJr6VpFVmGKk0R9GOR9TJgnns'),
+	('2026-09-13 14:24:36.596231+00', 'Highway 11', 'Bracebridge', 'Ontario', NULL, '9c31de20-4e9f-4850-a1c3-d0dca4f6245b', 45.0699806, -79.297187, 'CA', 'EihIaWdod2F5IDExLCBCcmFjZWJyaWRnZSwgT250YXJpbywgQ2FuYWRhIi4qLAoUChIJ6fngT-ZKL00RoBgxejlcMqsSFAoSCa-laRVZhipNEfRjkfUyYJ57'),
 	('2026-09-14 12:23:47.260275+00', '354 Angeline Street South', 'Lindsay', 'Ontario', 'K9V 4R2', 'a3c887d9-bcb7-4a2d-8233-dad7f45d422f', 44.3282166, -78.7406514, 'CA', 'ChIJ55loxoN51YkRZOX0AtJOUJ0'),
 	('2026-09-14 13:04:16.716989+00', '758 Marrett Road', 'Lexington', 'Massachusetts', '02421', '1b96990d-043f-45c6-8c9e-e8ceeaaced0e', 42.4454637, -71.2685911, 'US', 'ChIJg51iphSc44kR-fwelPd0BTg'),
 	('2026-09-14 13:06:15.912464+00', '758 Marrett Road', 'Lexington', 'Massachusetts', '02421', '4054cf90-7e18-43f5-805d-3c6f0787bcb1', NULL, NULL, NULL, NULL),
@@ -45346,6 +45346,19 @@ INSERT INTO "public"."Drivers" ("created_at", "tax", "pay_rate_cents", "pay_curr
 	('2025-10-10 13:18:26.345782+00', 13, 450, 'CAD', 'KM', true, '6ae8269d-c07b-4bc0-8488-94f10a7100fd', 'eaeee623-f203-4680-b8a9-3bc6c3d258c0', '6dfb01a5-eba2-4b21-93f9-6481cd64d08b', '5192917116', 'fcca265d-40b3-43a1-90b1-00fec5da749b', 'eaeee623-f203-4680-b8a9-3bc6c3d258c0/license_1785518361703.jpg', 'eaeee623-f203-4680-b8a9-3bc6c3d258c0/insurance_1785518361703.pdf', NULL, 'a222e5ef-4ace-44aa-b033-20b263a7dfc4', 'b62a00b9-4679-4c8b-b601-e3784f3be774', '1.9.0', 'ios', '2026-09-14 00:51:46.697+00', '2027-07-14', '2081-08-03', NULL, 0, 6000, 6000, 13.000),
 	('2026-05-05 19:15:11.753164+00', 0, 300, 'USD', 'MI', true, '3cb97f64-5c9c-4d7f-992d-f708b0c34568', '7ba2125c-882c-4ee7-9dc0-0c43bc795565', 'e1bb3518-88e6-4667-a62f-e64a951e6a2d', '727-858-6103', '79f61c6f-0554-43fc-a0bc-4d10f0a80bd7', '7ba2125c-882c-4ee7-9dc0-0c43bc795565/license_1787158160012.pdf', '7ba2125c-882c-4ee7-9dc0-0c43bc795565/insurance_1787158160013.pdf', '7ba2125c-882c-4ee7-9dc0-0c43bc795565/medical_card_1787170973989.jpg', 'c06a64dd-33d3-4405-a0e2-3bb91dedb7c3', '42ce869b-d785-437e-b462-07b6e5c55209', '1.7.0', 'ios', '2026-08-25 14:51:19.722+00', '2026-10-03', '2027-04-22', '2027-11-19', 0, 5000, 5000, 0.000),
 	('2026-06-08 12:10:06.66945+00', 13, 0, 'CAD', 'KM', true, '6ae8269d-c07b-4bc0-8488-94f10a7100fd', 'db51f3ec-13dc-4196-b13b-cbb5579bbc5b', 'ac0b2e68-0d4c-4021-a313-f73302823181', NULL, NULL, NULL, NULL, NULL, NULL, 'b1fdc084-44ef-4b4b-b40e-a36c4ad050f6', NULL, NULL, NULL, NULL, NULL, NULL, 0, 5000, 5000, 13.000);
+
+-- Drivers left out of the Auto Work Trackers model (Driver Data page).
+UPDATE "public"."Drivers" SET "exclude_from_auto_work_trackers" = true WHERE "id" IN (
+	'51aa3aa5-0d6e-41b0-a7f1-ebf6bbbfee45', -- Gavin Crabb
+	'41d341db-7155-4cd5-b1ff-113827ac3b5c', -- Jake Loewen
+	'723cbd59-9e05-4751-9168-402b29c4dbb9', -- Jason Rowe
+	'2cd7f0d1-bcf5-489c-8b1a-1a0b79b06fd4', -- luke vandenouweland
+	'997db6ea-3fc6-40d4-99fc-b38b6dca3c41', -- Michael McManus
+	'db51f3ec-13dc-4196-b13b-cbb5579bbc5b', -- Ottawa Heavy Haul
+	'd08f7880-9c83-46f4-882c-23fad708cfc3', -- Tim -Timberfell
+	'2416dcd0-7fd7-4280-b164-66ee1b55233a', -- Tim Timberfell
+	'6bc42de2-b90b-4fc8-a5b1-fe01683dd78e' -- Vanessa Hill Farms
+);
 
 
 --

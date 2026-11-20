@@ -47,12 +47,21 @@ class WorkTrackerRepository:
         return [row["id"] for row in self._db.insert("WorkTrackers", rows)]
 
     def load_zone_drivers(self, zone_id: str) -> list[Driver]:
-        """The active drivers assigned to the zone, with the address each starts from. Ordered by id."""
+        """The active drivers assigned to the zone, with the address each starts from. Ordered by id.
+
+        Leaves out the drivers the office excluded from the model on the Driver Data page.
+        """
         links = self._db.select("DriverZones", "driver_uuid", {"zone_uuid": f"eq.{zone_id}"})
         driver_ids = sorted({link["driver_uuid"] for link in links})
-        drivers = self._db.select_in("Drivers", "id,is_active,address_uuid", "id", driver_ids)
+        drivers = self._db.select_in(
+            "Drivers", "id,is_active,address_uuid,exclude_from_auto_work_trackers", "id", driver_ids
+        )
         return sorted(
-            (Driver(d["id"], d["address_uuid"]) for d in drivers if d["is_active"]),
+            (
+                Driver(d["id"], d["address_uuid"])
+                for d in drivers
+                if d["is_active"] and not d.get("exclude_from_auto_work_trackers")
+            ),
             key=lambda d: d.driver_uuid,
         )
 
