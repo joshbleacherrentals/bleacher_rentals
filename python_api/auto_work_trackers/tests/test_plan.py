@@ -10,6 +10,15 @@ from python_api.core.supabase import SupabaseRest
 WEEK = "2026-11-09"
 
 
+def plan_assignments_fast(repo, zone_id, week_start, tz):
+    return plan_assignments(repo, zone_id, week_start, tz, search_seconds=0)
+
+
+def generate_fast(repo):
+    ids = iter(f"id{i}" for i in range(100))
+    return generate_assigned_work_trackers(repo, "z", WEEK, "UTC", search_seconds=0, new_id=lambda: next(ids))
+
+
 class FakeRepo:
     def __init__(self, bleachers, drivers, blocked=(), points=None, homes=None):
         self.bleachers, self.blocked = bleachers, set(blocked)
@@ -21,6 +30,10 @@ class FakeRepo:
     def create_accepted_work_trackers(self, trips):
         self.created = trips
         return [f"wt{i}" for i in range(len(trips))]
+
+    def create_planned_work_trackers(self, rows):
+        self.created = rows
+        return [row["id"] for row in rows]
 
     def load_bleachers(self, zone_id, tz):
         return self.bleachers
@@ -48,7 +61,7 @@ def moving(number):
 
 
 def test_plan_gives_each_trip_a_driver_and_a_day_in_its_window():
-    result = plan_assignments(FakeRepo([moving(1), moving(2)], ["d1", "d2"]), "z", WEEK, "UTC")
+    result = plan_assignments_fast(FakeRepo([moving(1), moving(2)], ["d1", "d2"]), "z", WEEK, "UTC")
     assert result.drivers_in_zone == 2
     assert len(result.plan.assigned) == 2
     for a in result.plan.assigned:
@@ -57,18 +70,18 @@ def test_plan_gives_each_trip_a_driver_and_a_day_in_its_window():
 
 def test_plan_respects_days_drivers_cannot_work():
     blocked = {("d1", "2026-11-09"), ("d1", "2026-11-10")}
-    result = plan_assignments(FakeRepo([moving(1)], ["d1"], blocked), "z", WEEK, "UTC")
+    result = plan_assignments_fast(FakeRepo([moving(1)], ["d1"], blocked), "z", WEEK, "UTC")
     assert [(a.driver_uuid, a.date) for a in result.plan.assigned] == [("d1", "2026-11-11")]
 
 
 def test_plan_reports_trips_when_the_zone_has_no_drivers():
-    result = plan_assignments(FakeRepo([moving(1)], []), "z", WEEK, "UTC")
+    result = plan_assignments_fast(FakeRepo([moving(1)], []), "z", WEEK, "UTC")
     assert [u.reason for u in result.plan.unassigned] == ["no_free_driver_day"]
 
 
 def test_plan_does_not_look_up_blocked_days_when_there_is_nothing_to_place():
     repo = FakeRepo([BleacherInput("b9", 9, [])], ["d1"])
-    plan_assignments(repo, "z", WEEK, "UTC")
+    plan_assignments_fast(repo, "z", WEEK, "UTC")
     assert repo.blocked_asked_for is None
 
 
@@ -137,19 +150,36 @@ def test_an_accepted_trip_without_a_driver_has_no_driver_field():
     assert "driver_uuid" not in json.loads(requests[0].content)[0]
 
 
-def test_generate_creates_only_the_trips_that_got_a_driver_and_day_with_the_driver_set():
+def test_generate_chains_several_trips_a_day_and_creates_them_with_their_plan():
+    # One driver and four trips over three days. With no coordinates each leg counts as 2 hours, so
+    # a day holds two trips (2 + 2 + 2 + 2 + 2 = 10 hours): all four fit, two days with two each.
     repo = FakeRepo([moving(1), moving(2), moving(3), moving(4)], ["d1"])
-    # one driver, a three-day window: three trips fit, the fourth does not
-    result = generate_assigned_work_trackers(repo, "z", WEEK, "UTC")
-    assert len(repo.created) == 3 and len(result.work_tracker_ids) == 3
-    assert {t.driver_uuid for t in repo.created} == {"d1"}
-    assert len({t.date for t in repo.created}) == 3  # one trip per driver per day
+    result = generate_fast(repo)
+    assert len(repo.created) == 4 and result.work_tracker_ids == [row["id"] for row in repo.created]
+    assert {row["driver_uuid"] for row in repo.created} == {"d1"}
+    assert not result.plan.unassigned
+    by_id = {row["id"]: row for row in repo.created}
+    followers = [row for row in repo.created if row["previous_work_tracker_uuid"]]
+    assert len(followers) == 2
+    for row in followers:
+        before = by_id[row["previous_work_tracker_uuid"]]
+        assert before["date"] == row["date"] and before["planned_dropoff_at"] <= row["planned_pickup_at"]
+        assert before["return_home_distance_meters"] is None
+    # every row has every key, as one bulk insert needs
+    assert len({frozenset(row) for row in repo.created}) == 1
+
+
+def test_generate_leaves_out_what_does_not_fit_twelve_hours():
+    # Seven trips, one driver, three days, two trips a day at most: one is left out.
+    repo = FakeRepo([moving(n) for n in range(1, 8)], ["d1"])
+    result = generate_fast(repo)
+    assert len(repo.created) == 6
     assert [u.reason for u in result.plan.unassigned] == ["no_free_driver_day"]
 
 
 def test_generate_creates_nothing_when_no_trip_fits():
     repo = FakeRepo([moving(1)], [])
-    assert generate_assigned_work_trackers(repo, "z", WEEK, "UTC").work_tracker_ids == []
+    assert generate_fast(repo).work_tracker_ids == []
     assert repo.created is None
 
 
@@ -164,14 +194,14 @@ def test_plan_picks_the_driver_whose_home_is_nearest_the_pickup():
         points={"a1": POINTS["yard"], "home-near": POINTS["near"], "home-far": POINTS["far"]},
         homes={"d1": "home-far", "d2": "home-near"},
     )
-    (assigned,) = plan_assignments(repo, "z", WEEK, "UTC").plan.assigned
+    (assigned,) = plan_assignments_fast(repo, "z", WEEK, "UTC").plan.assigned
     assert assigned.driver_uuid == "d2"
     assert 0 < assigned.distance_m < 5_000
 
 
-def test_plan_gives_each_trip_its_nearest_free_driver_when_they_compete():
-    # Both trips pick up in Calgary. d1 is nearest, but can only do one trip a day, and both trips
-    # are only possible on one day, so the other goes to the next nearest driver.
+def test_two_trips_from_the_same_yard_go_to_the_nearest_driver_in_one_day():
+    # Both trips pick up in Calgary on the same day. The nearest driver chains them rather than a
+    # second, farther driver taking one.
     def one_day(number):
         return BleacherInput(
             f"b{number}",
@@ -185,11 +215,11 @@ def test_plan_gives_each_trip_its_nearest_free_driver_when_they_compete():
     repo = FakeRepo(
         [one_day(1), one_day(2)],
         ["d1", "d2", "d3"],
-        points={"a1": POINTS["yard"], "h1": POINTS["near"], "h2": (51.2, -114.2), "h3": POINTS["far"]},
+        points={"a1": POINTS["yard"], "a2": POINTS["near"], "h1": POINTS["near"], "h2": (51.2, -114.2), "h3": POINTS["far"]},
         homes={"d1": "h1", "d2": "h2", "d3": "h3"},
     )
-    assigned = plan_assignments(repo, "z", WEEK, "UTC").plan.assigned
-    assert sorted(a.driver_uuid for a in assigned) == ["d1", "d2"]
+    assigned = plan_assignments_fast(repo, "z", WEEK, "UTC").plan.assigned
+    assert [(a.driver_uuid, a.sequence) for a in assigned] == [("d1", 1), ("d1", 2)]
 
 
 def test_a_driver_with_no_home_on_file_is_chosen_last():
@@ -199,5 +229,5 @@ def test_a_driver_with_no_home_on_file_is_chosen_last():
         points={"a1": POINTS["yard"], "home-far": POINTS["far"]},
         homes={"d2": "home-far"},  # d1 has no home address
     )
-    (assigned,) = plan_assignments(repo, "z", WEEK, "UTC").plan.assigned
+    (assigned,) = plan_assignments_fast(repo, "z", WEEK, "UTC").plan.assigned
     assert assigned.driver_uuid == "d2"

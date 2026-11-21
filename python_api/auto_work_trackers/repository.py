@@ -111,6 +111,11 @@ class WorkTrackerRepository:
             if row["status"] not in OFF_STATUSES
         }
 
+    def create_planned_work_trackers(self, rows: list[dict[str, Any]]) -> list[str]:
+        """Insert the planned work trackers in one request (rows carry their own ids, and a trip's
+        previous trip comes before it). Returns the ids, in order."""
+        return [row["id"] for row in self._db.insert("WorkTrackers", rows)]
+
     def create_accepted_work_trackers(self, trips: list[Any]) -> list[str]:
         """One draft work tracker per accepted trip, in order. Returns the new work trackers' ids."""
         rows = [

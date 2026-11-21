@@ -53,7 +53,8 @@ def _unassigned_json(u) -> UnassignedTrip:
 
 @router.post("/generate", response_model=GenerateResponse)
 def generate(body: GenerateRequest) -> GenerateResponse:
-    """Plan the week and create a draft work tracker, with its driver and day, for each trip that fits."""
+    """Plan the week as driver routes and create a draft work tracker for each trip that fits: its
+    driver and day, the trip it follows that day, suggested times and estimated legs."""
     _check_timezone(body.timezone)
 
     repo = WorkTrackerRepository(SupabaseRest.from_env())
@@ -76,6 +77,12 @@ def generate(body: GenerateRequest) -> GenerateResponse:
                 to_street=a.trip.to_street,
                 date=a.date,
                 driver_uuid=a.driver_uuid,
+                sequence=a.sequence,
+                previous_work_tracker_id=(
+                    result.work_tracker_ids[a.previous_index] if a.previous_index is not None else None
+                ),
+                planned_pickup_at=a.planned_pickup_at,
+                planned_dropoff_at=a.planned_dropoff_at,
             )
             for a, wt_id in zip(assigned, result.work_tracker_ids, strict=True)
         ],
@@ -136,7 +143,8 @@ def accept(body: AcceptRequest) -> AcceptResponse:
 
 @router.post("/plan", response_model=PlanResponse)
 def plan(body: SuggestRequest) -> PlanResponse:
-    """Choose a driver and day for each trip the zone needs (one trip per driver per day). Creates nothing."""
+    """Plan the zone's trips as driver routes (several a day, one bleacher at a time, 12 hours at
+    most). Creates nothing."""
     _check_timezone(body.timezone)
     repo = WorkTrackerRepository(SupabaseRest.from_env())
     try:
@@ -157,7 +165,13 @@ def plan(body: SuggestRequest) -> PlanResponse:
                 to_street=a.trip.to_street,
                 driver_uuid=a.driver_uuid,
                 date=a.date,
+                sequence=a.sequence,
+                previous_index=a.previous_index,
+                planned_pickup_at=a.planned_pickup_at,
+                planned_dropoff_at=a.planned_dropoff_at,
                 distance_m=a.distance_m,
+                haul_m=a.haul.meters if a.haul else None,
+                return_home_m=a.return_home.meters if a.return_home else None,
             )
             for a in result.plan.assigned
         ],

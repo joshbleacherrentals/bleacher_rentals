@@ -1,6 +1,8 @@
 /**
- * The Dashboard's map: each driver's work trackers for the week drawn as loops, home → pickup
- * (deadhead) → drop-off (hauling) → home (deadhead), in straight lines. One colour per driver. Pure.
+ * The Dashboard's map: each driver's work trackers for the week drawn as their day's route, in
+ * straight lines, one colour per driver. A trip starts from home, or straight from the drop-off of the
+ * trip it follows (previous work tracker); a trip no other trip follows ends with the drive home.
+ * Pickup → drop-off is hauling; the rest is deadhead. Pure.
  */
 
 import { straightLineKm } from "./distance";
@@ -12,6 +14,8 @@ export type MapTracker = {
   workTrackerUuid: string;
   date: string;
   driverUuid: string | null;
+  /** The work tracker it drives on from (same driver and day); null: it starts from home. */
+  previousUuid?: string | null;
   driverName: string | null;
   bleacherNumber: number | null;
   home: MapPoint | null;
@@ -97,18 +101,30 @@ export function buildDriverLoops(
     const stops: MapPoint[] = [];
     let incomplete = 0;
 
+    const byId = new Map(list.map((t) => [t.workTrackerUuid, t]));
+    // A chain only counts within the driver's own trackers; anything else starts from home.
+    const previousOf = (t: MapTracker) => (t.previousUuid ? byId.get(t.previousUuid) : undefined);
+    const followed = new Set(
+      list
+        .map(previousOf)
+        .filter(Boolean)
+        .map((t) => t!.workTrackerUuid),
+    );
+
     for (const t of [...list].sort((a, b) => a.date.localeCompare(b.date))) {
       const trip = tripLabel(t);
       const { pickup, dropoff } = t;
-      if (!pickup || !dropoff || (!isNone && !home)) incomplete++;
+      const previous = previousOf(t);
+      const startsAt = previous ? previous.dropoff : home;
+      if (!pickup || !dropoff || (!isNone && !startsAt)) incomplete++;
       if (pickup) stops.push(pickup);
       if (dropoff) stops.push(dropoff);
       const leg = (kind: LegKind, from: MapPoint | null, to: MapPoint | null) => {
         if (from && to) legs.push({ kind, from, to, km: km(from, to), trip });
       };
-      if (!isNone) leg("deadhead", home, pickup);
+      if (!isNone) leg("deadhead", startsAt, pickup);
       leg("hauling", pickup, dropoff);
-      if (!isNone) leg("deadhead", dropoff, home);
+      if (!isNone && !followed.has(t.workTrackerUuid)) leg("deadhead", dropoff, home);
     }
 
     const total = (kind: LegKind) =>

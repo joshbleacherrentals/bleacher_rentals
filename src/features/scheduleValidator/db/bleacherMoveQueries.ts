@@ -77,6 +77,7 @@ export function workTrackerMapQuery(zoneId: string, weekStart: string, weekEnd: 
       "w.id as id",
       "w.date as date",
       "w.driver_uuid as driver_uuid",
+      "w.previous_work_tracker_uuid as previous_work_tracker_uuid",
       "u.first_name as first_name",
       "u.last_name as last_name",
       "b.bleacher_number as bleacher_number",

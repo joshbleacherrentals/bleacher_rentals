@@ -17,6 +17,7 @@ type Row = {
   id: string;
   date: string | null;
   driver_uuid: string | null;
+  previous_work_tracker_uuid: string | null;
   first_name: string | null;
   last_name: string | null;
   bleacher_number: number | null;
@@ -55,6 +56,7 @@ export function useTripMap(
           workTrackerUuid: r.id,
           date,
           driverUuid: r.driver_uuid,
+          previousUuid: r.previous_work_tracker_uuid,
           driverName: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
           bleacherNumber: r.bleacher_number,
           home: point(r.home_lat, r.home_lng, r.home_street),

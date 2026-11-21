@@ -56,4 +56,28 @@ describe("buildDriverLoops", () => {
     expect(loop.legs.map((l) => l.kind)).toEqual(["deadhead"]);
     expect(loop.incomplete).toBe(1);
   });
+
+  it("follows a chain: the next trip starts at the previous drop-off, and only the last drives home", () => {
+    const C = p(43.3, -80, "C");
+    const D = p(43.4, -80, "D");
+    const [loop] = buildDriverLoops(
+      [
+        tracker({ workTrackerUuid: "w1", pickup: A, dropoff: B }),
+        tracker({ workTrackerUuid: "w2", previousUuid: "w1", pickup: C, dropoff: D }),
+      ],
+      label,
+    );
+    expect(loop.legs.map((l) => [l.kind, l.from.label, l.to.label])).toEqual([
+      ["deadhead", "home", "A"],
+      ["hauling", "A", "B"],
+      ["deadhead", "B", "C"],
+      ["hauling", "C", "D"],
+      ["deadhead", "D", "home"],
+    ]);
+  });
+
+  it("starts from home when the previous tracker is not this driver's", () => {
+    const [loop] = buildDriverLoops([tracker({ previousUuid: "someone-else" })], label);
+    expect(loop.legs[0]).toMatchObject({ kind: "deadhead", from: HOME });
+  });
 });

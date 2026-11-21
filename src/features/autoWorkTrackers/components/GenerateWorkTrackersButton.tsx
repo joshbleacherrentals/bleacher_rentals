@@ -51,7 +51,8 @@ export function GenerateWorkTrackersButton({
             Created {result.created.length} draft work tracker
             {result.created.length === 1 ? "" : "s"} with a driver and day for{" "}
             {new Set(result.created.map((t) => t.bleacher_uuid)).size} of {result.bleachers_in_zone}{" "}
-            bleachers.
+            bleachers, on {new Set(result.created.map((t) => `${t.driver_uuid}|${t.date}`)).size}{" "}
+            driver-days.
           </p>
           {result.unassigned.length > 0 && (
             <p className="text-amber-700" data-testid="generate-work-trackers-unassigned">

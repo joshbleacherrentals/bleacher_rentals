@@ -12,8 +12,9 @@ const FALLBACK_CENTER = { lat: 43.6, lng: -80.0 };
 const formatKm = (km: number) => `${Math.round(km).toLocaleString()} km`;
 
 /**
- * Draws each driver's loops on a Google map: a solid line with an arrow for hauling (pickup to
- * drop-off), a dashed line for deadhead (home to pickup, drop-off to home), a large dot at each
+ * Draws each driver's routes on a Google map: a solid line with an arrow for hauling (pickup to
+ * drop-off), a dashed line for deadhead (from home or the previous drop-off to a pickup, and the
+ * last drop-off home), a large dot at each
  * driver's home and small dark dots at the pickups and drop-offs. Lines are straight, not roads.
  */
 function MapCanvas({ loops, showDeadhead }: { loops: DriverLoops[]; showDeadhead: boolean }) {
@@ -217,7 +218,7 @@ export function TripMap({ loops, trackers }: { loops: DriverLoops[]; trackers: n
                 strokeDasharray="4 4"
               />
             </svg>
-            Deadhead (home ↔ trip)
+            Deadhead (from home, between trips, back home)
           </div>
           <label className="flex items-center gap-2 pt-1">
             <input

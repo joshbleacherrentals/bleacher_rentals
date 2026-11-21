@@ -5,12 +5,13 @@ type Unassigned = GenerateWorkTrackersResult["unassigned"][number];
 const REASON_TEXT: Record<Unassigned["reason"], string> = {
   no_window: "events are back to back",
   outside_week: "no free day in this week",
-  no_free_driver_day: "no driver free on those days",
+  no_free_driver_day: "no driver had room on those days",
+  too_long_for_a_day: "over 12 hours with the drive there and back",
 };
 
 /**
  * One line saying which trips got no driver and day (so no work tracker was made), grouped by why:
- * "3 trips not created: no driver free on those days (2), events are back to back (1)."
+ * "3 trips not created: no driver had room on those days (2), events are back to back (1)."
  */
 export function summarizeUnassigned(unassigned: Unassigned[]): string {
   const counts = new Map<Unassigned["reason"], number>();

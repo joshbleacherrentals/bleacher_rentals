@@ -18,7 +18,7 @@ class UnassignedTrip(BaseModel):
     to_street: str
     earliest_day: str | None
     latest_day: str | None
-    reason: str  # "no_window" | "outside_week" | "no_free_driver_day"
+    reason: str  # "no_window" | "outside_week" | "no_free_driver_day" | "too_long_for_a_day"
 
 
 class CreatedTrip(BaseModel):
@@ -29,6 +29,10 @@ class CreatedTrip(BaseModel):
     to_street: str
     date: str
     driver_uuid: str | None = None
+    sequence: int = 1  # the trip's place in the driver's day
+    previous_work_tracker_id: str | None = None  # the trip it drives on from; None: from home
+    planned_pickup_at: str | None = None
+    planned_dropoff_at: str | None = None
 
 
 class GenerateResponse(BaseModel):
@@ -97,7 +101,13 @@ class PlannedTrip(BaseModel):
     to_street: str
     driver_uuid: str
     date: str
-    distance_m: int | None = None  # driver's home to the pickup, straight line; None when unknown
+    sequence: int = 1  # the trip's place in the driver's day
+    previous_index: int | None = None  # index in `assigned` of the trip it drives on from
+    planned_pickup_at: str | None = None
+    planned_dropoff_at: str | None = None
+    distance_m: int | None = None  # estimated deadhead to the pickup; None when unknown
+    haul_m: int | None = None  # estimated pickup to drop-off
+    return_home_m: int | None = None  # estimated drive home; only on the day's last trip
 
 
 class PlanResponse(BaseModel):

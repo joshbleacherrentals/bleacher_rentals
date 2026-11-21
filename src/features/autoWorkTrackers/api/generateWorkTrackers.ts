@@ -10,6 +10,13 @@ export type GenerateWorkTrackersResult = {
     to_street: string;
     date: string;
     driver_uuid: string | null;
+    /** The trip's place in the driver's day: 1 for the first. */
+    sequence: number;
+    /** The work tracker it drives on from, straight from its drop-off; null: from home. */
+    previous_work_tracker_id: string | null;
+    /** Suggested times, ISO with the zone's offset. */
+    planned_pickup_at: string | null;
+    planned_dropoff_at: string | null;
   }[];
   /** Trips that got no driver and day, so no work tracker was created for them. */
   unassigned: {
@@ -19,15 +26,16 @@ export type GenerateWorkTrackersResult = {
     to_street: string;
     earliest_day: string | null;
     latest_day: string | null;
-    reason: "no_window" | "outside_week" | "no_free_driver_day";
+    reason: "no_window" | "outside_week" | "no_free_driver_day" | "too_long_for_a_day";
   }[];
 };
 
 /**
  * Asks the Python service to find the trips the zone's bleachers need in the week starting
- * `weekStart` (a Monday), give each a driver and a day (one trip per driver per day) and create a
- * draft work tracker for each that fits. The service reads and writes
- * Supabase itself.
+ * `weekStart` (a Monday) and plan them as driver routes: several trips a day, one bleacher at a
+ * time, at most 12 hours from leaving home to getting back. It creates a draft work tracker for each
+ * trip that fits, with its driver, day, the trip it follows and suggested times. The service reads
+ * and writes Supabase itself.
  */
 export async function generateWorkTrackers(params: {
   zoneId: string;
