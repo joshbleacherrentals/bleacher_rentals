@@ -7,6 +7,7 @@ import {
   clock,
   duration,
   layoutSchedule,
+  scheduleDayOf,
   type ScheduleTracker,
 } from "./scheduleLayout";
 
@@ -105,5 +106,14 @@ describe("clock / duration", () => {
     expect(duration(155)).toBe("2 h 35 min");
     expect(duration(45)).toBe("45 min");
     expect(duration(120)).toBe("2 h");
+  });
+});
+
+describe("scheduleDayOf", () => {
+  it("is the planned pickup's day, else the tracker's date", () => {
+    expect(scheduleDayOf({ date: WEEK, plannedPickupAt: at("2026-09-16", "09:00") })).toBe(
+      "2026-09-16",
+    );
+    expect(scheduleDayOf({ date: WEEK, plannedPickupAt: null })).toBe(WEEK);
   });
 });

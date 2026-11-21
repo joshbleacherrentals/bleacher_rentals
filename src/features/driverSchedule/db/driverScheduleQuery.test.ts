@@ -19,6 +19,12 @@ describe("driverScheduleQuery", () => {
     );
   });
 
+  it("joins the driver's home for the route map", () => {
+    expect(compiled.sql).toContain(
+      'left join "Addresses" as "ha" on "ha"."id" = "d"."address_uuid"',
+    );
+  });
+
   it("reads the planned times and every leg's minutes", () => {
     for (const column of [
       "planned_pickup_at",

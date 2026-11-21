@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { DateTime } from "luxon";
 import { weekEndOf } from "@/features/autoWorkTrackers/utils/week";
+import { MapCanvas } from "@/features/autoWorkTrackers/components/TripMap";
+import type { DriverLoops } from "@/features/autoWorkTrackers/utils/tripMap";
 import { useDriverSchedule } from "../hooks/useDriverSchedule";
 import { DAY_MINUTES, duration, type ScheduleSpan } from "../utils/scheduleLayout";
 
@@ -37,11 +40,57 @@ function Span({ span }: { span: ScheduleSpan }) {
   );
 }
 
+const km = (n: number) => `${Math.round(n).toLocaleString()} km`;
+
+/** The selected day's route on the map: from home, through each trip, and home. */
+function DayRoute({ date, loops }: { date: string | undefined; loops: DriverLoops[] }) {
+  const trips = loops.reduce((sum, l) => sum + l.trips, 0);
+  const hauling = loops.reduce((sum, l) => sum + l.haulingKm, 0);
+  const deadhead = loops.reduce((sum, l) => sum + l.deadheadKm, 0);
+  const incomplete = loops.reduce((sum, l) => sum + l.incomplete, 0);
+  return (
+    <aside
+      className="sticky top-0 flex w-[40%] min-w-[320px] shrink-0 flex-col gap-2"
+      data-testid="driver-schedule-map"
+    >
+      <div className="text-sm">
+        <span className="font-semibold">
+          {date ? DateTime.fromISO(date).toFormat("EEEE, MMM d") : "No day"}
+        </span>
+        {trips > 0 ? (
+          <span className="text-gray-600">
+            {" "}
+            · {trips} trip{trips === 1 ? "" : "s"} · hauling {km(hauling)} · deadhead {km(deadhead)}{" "}
+            (straight line)
+          </span>
+        ) : (
+          <span className="text-gray-500"> · no trips</span>
+        )}
+      </div>
+      {incomplete > 0 && (
+        <p className="text-xs text-amber-700">
+          {incomplete} trip{incomplete === 1 ? " is" : "s are"} missing coordinates, so some lines
+          are not drawn.
+        </p>
+      )}
+      <div className="h-[460px]">
+        <MapCanvas loops={loops} showDeadhead />
+      </div>
+      <p className="text-xs text-gray-500">
+        Solid: hauling, with an arrow. Dashed: deadhead. Click a day in the schedule to see its
+        route.
+      </p>
+    </aside>
+  );
+}
+
 /**
  * A driver's week as a grid: a row per day (always seven) and the 24 hours across, each work tracker
  * painted where it happens, with the deadhead in, the haul and the drive home as wide as their drive
  * times (layoutSchedule). Striped spans are estimates, placed as early as they can be because the
- * tracker has no planned times. Used inside Auto Work Trackers and on the driver's work tracker week.
+ * tracker has no planned times. Clicking a day shows its route on the map beside the grid (the
+ * Dashboard map's drawing, for this driver alone). Used inside Auto Work Trackers and on the driver's
+ * work tracker week.
  */
 export function DriverSchedule({
   userUuid,
@@ -54,7 +103,13 @@ export function DriverSchedule({
   backHref: string;
   backLabel: string;
 }) {
-  const { days, driverName, isLoading } = useDriverSchedule(userUuid, weekStart);
+  const { days, routesByDay, driverName, isLoading } = useDriverSchedule(userUuid, weekStart);
+  const [picked, setPicked] = useState<string | null>(null);
+  // The day shown on the map: the one clicked, else the first day with trips, else Monday.
+  const selected =
+    (picked && days.some((d) => d.date === picked) ? picked : null) ??
+    days.find((d) => d.trips > 0)?.date ??
+    days[0]?.date;
   const range = `${DateTime.fromISO(weekStart).toFormat("EEE, MMM d")} – ${DateTime.fromISO(
     weekEndOf(weekStart),
   ).toFormat("EEE, MMM d")}`;
@@ -101,48 +156,65 @@ export function DriverSchedule({
           {trips === 0 && (
             <p className="text-sm text-gray-500">No work trackers for this driver this week.</p>
           )}
-          <div className="min-w-[900px] border-t border-l border-black/15">
-            <div className="flex">
-              <div className="w-36 shrink-0 border-r border-b border-black/15 bg-gray-200" />
-              <div className="relative h-7 flex-1 border-r border-b border-black/15 bg-gray-200">
-                {HOURS.map((h) => (
-                  <span
-                    key={h}
-                    className="absolute top-1 -translate-x-1/2 text-[10px] text-gray-600"
-                    style={{ left: pct(h * 60) }}
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1 overflow-x-auto">
+              <div className="min-w-[640px] border-t border-l border-black/15">
+                <div className="flex">
+                  <div className="w-36 shrink-0 border-r border-b border-black/15 bg-gray-200" />
+                  <div className="relative h-7 flex-1 border-r border-b border-black/15 bg-gray-200">
+                    {HOURS.map((h) => (
+                      <span
+                        key={h}
+                        className="absolute top-1 -translate-x-1/2 text-[10px] text-gray-600"
+                        style={{ left: pct(h * 60) }}
+                      >
+                        {h === 0 ? "" : hourLabel(h)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {days.map((day) => (
+                  <button
+                    type="button"
+                    key={day.date}
+                    onClick={() => setPicked(day.date)}
+                    aria-pressed={day.date === selected}
+                    className={`flex w-full cursor-pointer text-left ${
+                      day.date === selected
+                        ? "bg-blue-50 ring-2 ring-inset ring-blue-500"
+                        : "hover:bg-gray-50"
+                    }`}
+                    data-testid="driver-schedule-day"
                   >
-                    {h === 0 ? "" : hourLabel(h)}
-                  </span>
+                    <div className="flex w-36 shrink-0 flex-col justify-center border-r border-b border-black/15 px-2 py-1 text-sm">
+                      <span className="font-medium">
+                        {DateTime.fromISO(day.date).toFormat("EEE, MMM d")}
+                      </span>
+                      {day.trips > 0 && (
+                        <span className="text-xs text-gray-500">
+                          {day.trips} trip{day.trips === 1 ? "" : "s"} ·{" "}
+                          {duration(day.driveMinutes)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative h-14 flex-1 border-r border-b border-black/15">
+                      {HOURS.slice(1).map((h) => (
+                        <div
+                          key={h}
+                          className={`absolute top-0 bottom-0 w-px ${h % 6 === 0 ? "bg-black/20" : "bg-black/5"}`}
+                          style={{ left: pct(h * 60) }}
+                        />
+                      ))}
+                      {day.spans.map((span, i) => (
+                        <Span key={`${span.trackerId}-${i}`} span={span} />
+                      ))}
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
-
-            {days.map((day) => (
-              <div key={day.date} className="flex" data-testid="driver-schedule-day">
-                <div className="flex w-36 shrink-0 flex-col justify-center border-r border-b border-black/15 px-2 py-1 text-sm">
-                  <span className="font-medium">
-                    {DateTime.fromISO(day.date).toFormat("EEE, MMM d")}
-                  </span>
-                  {day.trips > 0 && (
-                    <span className="text-xs text-gray-500">
-                      {day.trips} trip{day.trips === 1 ? "" : "s"} · {duration(day.driveMinutes)}
-                    </span>
-                  )}
-                </div>
-                <div className="relative h-14 flex-1 border-r border-b border-black/15">
-                  {HOURS.slice(1).map((h) => (
-                    <div
-                      key={h}
-                      className={`absolute top-0 bottom-0 w-px ${h % 6 === 0 ? "bg-black/20" : "bg-black/5"}`}
-                      style={{ left: pct(h * 60) }}
-                    />
-                  ))}
-                  {day.spans.map((span, i) => (
-                    <Span key={`${span.trackerId}-${i}`} span={span} />
-                  ))}
-                </div>
-              </div>
-            ))}
+            <DayRoute date={selected} loops={selected ? (routesByDay.get(selected) ?? []) : []} />
           </div>
         </>
       )}

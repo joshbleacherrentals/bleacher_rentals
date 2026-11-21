@@ -77,6 +77,11 @@ function localTime(value: string | null): { date: string; minutes: number } | nu
 
 const clamp = (m: number) => Math.min(Math.max(m, 0), DAY_MINUTES);
 
+/** The day a tracker is drawn on: its planned pickup's local day, else its own date. */
+export function scheduleDayOf(t: Pick<ScheduleTracker, "date" | "plannedPickupAt">): string {
+  return localTime(t.plannedPickupAt)?.date ?? t.date;
+}
+
 /** The week's 7 days (Monday first), each with its spans. */
 export function layoutSchedule(trackers: ScheduleTracker[], weekStart: string): ScheduleDay[] {
   const days = Array.from(
@@ -85,8 +90,7 @@ export function layoutSchedule(trackers: ScheduleTracker[], weekStart: string): 
   );
   const byDay = new Map<string, ScheduleTracker[]>(days.map((d) => [d, []]));
   for (const t of trackers) {
-    const day = localTime(t.plannedPickupAt)?.date ?? t.date;
-    byDay.get(day)?.push(t);
+    byDay.get(scheduleDayOf(t))?.push(t);
   }
 
   return days.map((date) => {

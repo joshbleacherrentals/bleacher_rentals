@@ -483,7 +483,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     label: "Work Trackers",
 
     description:
-      "This applies to the Work Trackers Page and the Dashboard. A driver's week also has a Schedule button that shows that week as a grid, a row per day and the 24 hours across, with each trip's deadhead and haul drawn as long as their drive times; it only reads, and is open to everyone who can open the driver's week.",
+      "This applies to the Work Trackers Page and the Dashboard. A driver's week also has a Schedule button that shows that week as a grid, a row per day and the 24 hours across, with each trip's deadhead and haul drawn as long as their drive times, and beside it a map of the selected day's route (click a day to choose it); it only reads, and is open to everyone who can open the driver's week.",
     category: "Day to Day Operations",
     roles: {
       admin: full(

@@ -17,7 +17,13 @@ const formatKm = (km: number) => `${Math.round(km).toLocaleString()} km`;
  * last drop-off home), a large dot at each
  * driver's home and small dark dots at the pickups and drop-offs. Lines are straight, not roads.
  */
-function MapCanvas({ loops, showDeadhead }: { loops: DriverLoops[]; showDeadhead: boolean }) {
+export function MapCanvas({
+  loops,
+  showDeadhead,
+}: {
+  loops: DriverLoops[];
+  showDeadhead: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const mapsRef = useRef<GoogleMaps>(null);

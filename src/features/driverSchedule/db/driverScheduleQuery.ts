@@ -4,13 +4,15 @@ import { OFF_STATUSES } from "@/features/scheduleValidator/db/driverQueries";
 /**
  * A driver's work trackers dated in the week, unless off, with what the schedule paints: planned
  * times, the drive minutes of each leg and the trip it follows. The driver is found by their user
- * (the Users row the driver's pages are keyed by). Every zone: it is the driver's whole week.
+ * (the Users row the driver's pages are keyed by). Every zone: it is the driver's whole week. Also the
+ * coordinates of the driver's home, the pickup and the drop-off, for the day's route map.
  */
 export function driverScheduleQuery(userUuid: string, weekStart: string, weekEnd: string) {
   return db
     .selectFrom("WorkTrackers as w")
     .innerJoin("Drivers as d", "d.id", "w.driver_uuid")
     .leftJoin("Bleachers as b", "b.id", "w.bleacher_uuid")
+    .leftJoin("Addresses as ha", "ha.id", "d.address_uuid")
     .leftJoin("Addresses as pa", "pa.id", "w.pickup_address_uuid")
     .leftJoin("Addresses as da", "da.id", "w.dropoff_address_uuid")
     .select([
@@ -25,6 +27,15 @@ export function driverScheduleQuery(userUuid: string, weekStart: string, weekEnd
       "b.bleacher_number as bleacher_number",
       "pa.street as pickup_street",
       "da.street as dropoff_street",
+      // For the day's route map.
+      "w.driver_uuid as driver_uuid",
+      "ha.latitude as home_lat",
+      "ha.longitude as home_lng",
+      "ha.street as home_street",
+      "pa.latitude as pickup_lat",
+      "pa.longitude as pickup_lng",
+      "da.latitude as dropoff_lat",
+      "da.longitude as dropoff_lng",
     ])
     .where("d.user_uuid", "=", userUuid)
     .where("w.date", ">=", weekStart)
