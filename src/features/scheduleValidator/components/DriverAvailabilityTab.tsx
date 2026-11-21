@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, X } from "lucide-react";
+import { AppTooltip } from "@/components/AppTooltip";
 import { useChecks } from "@/features/autoWorkTrackers/components/ChecksProvider";
 import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
@@ -13,9 +14,17 @@ function AvailabilityCell({ day }: { day: AvailabilityDay }) {
   const tripCount = day.trips.length;
   if (!day.unavailable && tripCount === 0) return <div className={`min-h-12 ${GRID_LINES}`} />;
 
-  const routes = day.trips
-    .map((t) => `${t.fromStreet ?? "No pick-up address"} → ${t.toStreet ?? "No drop-off address"}`)
-    .join("\n");
+  const tip = (
+    <div className="space-y-0.5 text-xs">
+      {day.conflict && <div className="font-semibold">Scheduled on a day marked unavailable</div>}
+      {!day.conflict && day.unavailable && <div className="font-semibold">Marked unavailable</div>}
+      {day.trips.map((t, i) => (
+        <div key={i}>
+          {t.fromStreet ?? "No pick-up address"} → {t.toStreet ?? "No drop-off address"}
+        </div>
+      ))}
+    </div>
+  );
   const tone = day.conflict
     ? "bg-red-100 font-semibold text-red-700"
     : day.unavailable
@@ -23,21 +32,20 @@ function AvailabilityCell({ day }: { day: AvailabilityDay }) {
       : "";
 
   return (
-    <div
-      className={`flex min-h-12 flex-col items-center justify-center px-1 py-1 text-center text-sm ${GRID_LINES} ${tone}`}
-      title={
-        day.conflict ? `Scheduled on a day marked unavailable\n${routes}` : routes || undefined
-      }
-      data-testid="driver-availability-cell"
-      data-conflict={day.conflict}
-    >
-      {day.unavailable && <span>Unavailable</span>}
-      {tripCount > 0 && (
-        <span className={day.unavailable ? "text-xs" : undefined}>
-          {tripCount} trip{tripCount === 1 ? "" : "s"}
-        </span>
-      )}
-    </div>
+    <AppTooltip content={tip}>
+      <div
+        className={`flex min-h-12 flex-col items-center justify-center px-1 py-1 text-center text-sm ${GRID_LINES} ${tone}`}
+        data-testid="driver-availability-cell"
+        data-conflict={day.conflict}
+      >
+        {day.unavailable && <span>Unavailable</span>}
+        {tripCount > 0 && (
+          <span className={day.unavailable ? "text-xs" : undefined}>
+            {tripCount} trip{tripCount === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+    </AppTooltip>
   );
 }
 

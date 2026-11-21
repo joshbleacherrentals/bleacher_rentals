@@ -5,36 +5,81 @@ import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeek
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import { useDriverUserUuids } from "../hooks/useDriverUserUuids";
 import { DriverLinksMenu } from "./DriverLinksMenu";
-import { MAX_DRIVING_HOURS, formatHours, type WorkloadDay } from "../utils/driverWorkload";
+import { Truck } from "lucide-react";
+import { AppTooltip } from "@/components/AppTooltip";
+import {
+  MAX_DRIVING_HOURS,
+  formatHours,
+  formatKm,
+  type WorkloadDay,
+} from "../utils/driverWorkload";
 import { DriverWeekGrid, GRID_LINES as LINES } from "./DriverWeekGrid";
 
 function WorkloadCell({ day }: { day: WorkloadDay }) {
   if (day.trips === 0) return <div className={`min-h-12 ${LINES}`} />;
 
-  return (
-    <div
-      className={`flex min-h-12 flex-col items-center justify-center px-1 py-1 text-center text-sm ${LINES} ${
-        day.overLimit ? "bg-red-100 font-semibold text-red-700" : ""
-      }`}
-      title={day.overLimit ? `More than ${MAX_DRIVING_HOURS} hours of driving` : undefined}
-      data-testid="driver-workload-cell"
-      data-over-limit={day.overLimit}
-    >
-      <span>
-        {formatHours(day.minutes)} · {day.trips} trip{day.trips === 1 ? "" : "s"}
-      </span>
+  const tripsText = `${day.trips} trip${day.trips === 1 ? "" : "s"}`;
+  const tip = (
+    <div className="space-y-0.5 text-xs">
+      <div className="font-semibold">
+        {formatHours(day.minutes)} driving · {formatKm(day.meters)} · {tripsText}
+      </div>
+      <div>
+        Hauling: {formatHours(day.haulMinutes)} · {formatKm(day.haulMeters)}
+      </div>
+      <div>
+        Deadhead (to pickups and home): {formatHours(day.deadheadMinutes)} ·{" "}
+        {formatKm(day.deadheadMeters)}
+      </div>
       {day.missingDriveTime > 0 && (
-        <span className="text-xs font-normal text-gray-500">
-          {day.missingDriveTime} missing drive time
-        </span>
+        <div>
+          {day.missingDriveTime} trip{day.missingDriveTime === 1 ? "" : "s"} with no drive time
+        </div>
+      )}
+      {day.overLimit && (
+        <div className="font-semibold">Over {MAX_DRIVING_HOURS} hours of driving</div>
       )}
     </div>
+  );
+
+  return (
+    <AppTooltip content={tip}>
+      <div
+        className={`flex min-h-12 flex-col justify-center gap-0.5 overflow-hidden px-1.5 py-1 leading-tight whitespace-nowrap ${LINES} ${
+          day.overLimit ? "bg-red-100 text-red-700" : ""
+        }`}
+        data-testid="driver-workload-cell"
+        data-over-limit={day.overLimit}
+      >
+        <span className="truncate text-[13px] font-semibold">
+          {formatHours(day.minutes)} · {formatKm(day.meters)} ·{" "}
+          <Truck className="inline h-3 w-3 align-[-1px]" aria-label="trips" />
+          {day.trips}
+        </span>
+        <span
+          className={`truncate text-[11px] ${day.overLimit ? "text-red-600" : "text-gray-500"}`}
+        >
+          Haul {formatHours(day.haulMinutes)} · {formatKm(day.haulMeters)}
+        </span>
+        <span
+          className={`truncate text-[11px] ${day.overLimit ? "text-red-600" : "text-gray-500"}`}
+        >
+          DH {formatHours(day.deadheadMinutes)} · {formatKm(day.deadheadMeters)}
+        </span>
+        {day.missingDriveTime > 0 && (
+          <span className="truncate text-[11px] text-amber-700">
+            {day.missingDriveTime} no time
+          </span>
+        )}
+      </div>
+    </AppTooltip>
   );
 }
 
 /**
- * A grid of the selected week: a row per driver in the selected zone, a column per day, each cell the hours that driver
- * drives that day and how many trips that is. A day over 12 hours is shown as an error.
+ * A grid of the selected week: a row per driver in the selected zone, a column per day, each cell
+ * that driver's driving that day (the total, and its hauling and deadhead) and how many trips that
+ * is. A day over 12 hours in total is shown as an error.
  */
 export function DriverWorkloadTab() {
   const [weekStart] = useSelectedWeek();

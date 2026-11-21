@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { AppTooltip } from "@/components/AppTooltip";
 import { DateTime } from "luxon";
 import { weekEndOf } from "@/features/autoWorkTrackers/utils/week";
 import { MapCanvas } from "@/features/autoWorkTrackers/components/TripMap";
@@ -22,21 +23,22 @@ function Span({ span }: { span: ScheduleSpan }) {
   const haul = span.kind === "haul";
   const width = span.end - span.start;
   return (
-    <div
-      className={`absolute top-2 bottom-2 overflow-hidden rounded-sm text-[11px] leading-[1.6rem] whitespace-nowrap ${
-        haul ? "bg-blue-600 px-1 text-white" : "border border-gray-400 bg-gray-300"
-      }`}
-      style={{
-        left: pct(span.start),
-        width: pct(width),
-        backgroundImage: span.estimated ? STRIPES : undefined,
-      }}
-      title={span.title}
-      data-testid={`schedule-span-${span.kind}`}
-      data-estimated={span.estimated}
-    >
-      {haul && width >= 45 ? span.title.split(" · ")[0] : null}
-    </div>
+    <AppTooltip content={<span className="text-xs">{span.title}</span>}>
+      <div
+        className={`absolute top-2 bottom-2 overflow-hidden rounded-sm text-[11px] leading-[1.6rem] whitespace-nowrap ${
+          haul ? "bg-blue-600 px-1 text-white" : "border border-gray-400 bg-gray-300"
+        }`}
+        style={{
+          left: pct(span.start),
+          width: pct(width),
+          backgroundImage: span.estimated ? STRIPES : undefined,
+        }}
+        data-testid={`schedule-span-${span.kind}`}
+        data-estimated={span.estimated}
+      >
+        {haul && width >= 45 ? span.title.split(" · ")[0] : null}
+      </div>
+    </AppTooltip>
   );
 }
 

@@ -11,6 +11,11 @@ type Row = {
   driver_uuid: string | null;
   date: string | null;
   drive_minutes: number | null;
+  deadhead_in_drive_minutes: number | null;
+  return_home_drive_minutes: number | null;
+  distance_meters: number | null;
+  deadhead_in_distance_meters: number | null;
+  return_home_distance_meters: number | null;
   first_name: string | null;
   last_name: string | null;
 };
@@ -44,6 +49,10 @@ export function useDriverWorkload(
           driverName: [r.first_name, r.last_name].filter(Boolean).join(" ") || "Unnamed driver",
           date,
           driveMinutes: r.drive_minutes,
+          deadheadMinutes: (r.deadhead_in_drive_minutes ?? 0) + (r.return_home_drive_minutes ?? 0),
+          haulMeters: r.distance_meters,
+          deadheadMeters:
+            (r.deadhead_in_distance_meters ?? 0) + (r.return_home_distance_meters ?? 0),
         },
       ];
     });

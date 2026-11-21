@@ -3,6 +3,7 @@ import {
   MAX_DRIVING_HOURS,
   buildDriverWorkload,
   formatHours,
+  formatKm,
   type WorkloadTrip,
 } from "./driverWorkload";
 
@@ -43,6 +44,38 @@ describe("buildDriverWorkload", () => {
       trips: 2,
       overLimit: false,
     });
+  });
+
+  it("adds the deadhead to the hauling, and the 12-hour limit is on the total", () => {
+    const rows = buildDriverWorkload(
+      [
+        trip({ driveMinutes: 300, deadheadMinutes: 120 }),
+        trip({ driveMinutes: 240, deadheadMinutes: 90 }),
+      ],
+      WEEK,
+    );
+    expect(day(rows, "d1", "2026-11-10")).toMatchObject({
+      haulMinutes: 540,
+      deadheadMinutes: 210,
+      minutes: 750,
+      overLimit: true,
+    });
+  });
+
+  it("adds up the hauling and deadhead distances", () => {
+    const rows = buildDriverWorkload(
+      [
+        trip({ haulMeters: 100_000, deadheadMeters: 30_000 }),
+        trip({ haulMeters: 50_000, deadheadMeters: null }),
+      ],
+      WEEK,
+    );
+    expect(day(rows, "d1", "2026-11-10")).toMatchObject({
+      haulMeters: 150_000,
+      deadheadMeters: 30_000,
+      meters: 180_000,
+    });
+    expect(formatKm(180_400)).toBe("180km");
   });
 
   it("leaves a day with no trips empty", () => {

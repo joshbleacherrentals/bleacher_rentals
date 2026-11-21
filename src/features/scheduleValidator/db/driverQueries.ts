@@ -29,13 +29,18 @@ function zoneDriverTrips(zoneId: string, weekStart: string, weekEnd: string) {
     .where("w.driver_uuid", "in", driverUuidsInZone(zoneId));
 }
 
-/** Driver Workload: each trip's driver, date and drive time. */
+/** Driver Workload: each trip's driver, date, haul drive time and deadhead drive times. */
 export function driverWorkloadQuery(zoneId: string, weekStart: string, weekEnd: string) {
   return zoneDriverTrips(zoneId, weekStart, weekEnd)
     .select([
       "w.driver_uuid as driver_uuid",
       "w.date as date",
       "w.drive_minutes as drive_minutes",
+      "w.deadhead_in_drive_minutes as deadhead_in_drive_minutes",
+      "w.return_home_drive_minutes as return_home_drive_minutes",
+      "w.distance_meters as distance_meters",
+      "w.deadhead_in_distance_meters as deadhead_in_distance_meters",
+      "w.return_home_distance_meters as return_home_distance_meters",
       "u.first_name as first_name",
       "u.last_name as last_name",
     ])
