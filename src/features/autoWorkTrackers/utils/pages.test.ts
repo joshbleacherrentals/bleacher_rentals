@@ -4,8 +4,11 @@ import {
   AUTO_WORK_TRACKERS_SECTIONS,
   DEFAULT_PAGE,
   HOME_PAGE,
+  DRIVER_SCHEDULE_PAGE,
+  driverScheduleHref,
   pageFromPathname,
   pageHref,
+  scheduleBackHref,
 } from "./pages";
 
 describe("auto work trackers pages", () => {
@@ -49,6 +52,31 @@ describe("auto work trackers pages", () => {
     );
     expect(pageHref(page, "", "2026-11-09")).toBe(
       "/auto-work-trackers/event-fulfilment?week=2026-11-09",
+    );
+  });
+});
+
+describe("driver schedule page", () => {
+  it("is not in the panel's list but has its own title", () => {
+    expect(AUTO_WORK_TRACKERS_PAGES).not.toContain(DRIVER_SCHEDULE_PAGE);
+    expect(pageFromPathname("/auto-work-trackers/driver-schedule")?.label).toBe("Driver Schedule");
+  });
+
+  it("keeps the zone, week, driver and where it came from", () => {
+    expect(driverScheduleHref("u1", "z1", "2026-09-14", "driver-workload")).toBe(
+      "/auto-work-trackers/driver-schedule?zone=z1&week=2026-09-14&user=u1&from=driver-workload",
+    );
+  });
+
+  it("goes back to the page it came from, or the Dashboard", () => {
+    expect(scheduleBackHref("driver-availability", "z1", "2026-09-14")).toBe(
+      "/auto-work-trackers/driver-availability?zone=z1&week=2026-09-14",
+    );
+    expect(scheduleBackHref(null, "z1", "2026-09-14")).toBe(
+      "/auto-work-trackers/dashboard?zone=z1&week=2026-09-14",
+    );
+    expect(scheduleBackHref("driver-schedule", "z1", "2026-09-14")).toBe(
+      "/auto-work-trackers/dashboard?zone=z1&week=2026-09-14",
     );
   });
 });
