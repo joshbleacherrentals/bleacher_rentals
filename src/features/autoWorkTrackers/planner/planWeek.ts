@@ -120,7 +120,7 @@ export async function planWeek(input: {
       })),
       pay,
     );
-    await typedExecuteBatch(planStatements(keep, lines));
+    await typedExecuteBatch(planStatements(keep, lines, inputs.tripTypeUuid));
 
     return {
       created: keep.length,

@@ -5,6 +5,7 @@ import {
   driverWorkloadQuery,
 } from "@/features/scheduleValidator/db/driverQueries";
 import { addressesQuery } from "@/features/scheduleValidator/db/bleacherMoveQueries";
+import { db } from "@/components/providers/SystemProvider";
 import { loadTripsNeeded } from "../db/tripsNeeded";
 import { timestampToDate } from "../utils/discoverTrips";
 import { weekEndOf } from "../utils/week";
@@ -18,6 +19,8 @@ export type PlanningInputs = {
   /** "driverUuid|YYYY-MM-DD": marked unavailable, or already on a work tracker that day. */
   blocked: Set<string>;
   existing: ExistingTracker[];
+  /** The "Trip" work tracker type (code `trip`, as the modal picks it); null if missing. */
+  tripTypeUuid: string | null;
 };
 
 const point = (lat: number | null, lng: number | null): Point | null =>
@@ -33,7 +36,7 @@ export async function loadPlanningInputs(
   weekStart: string,
 ): Promise<PlanningInputs> {
   const weekEnd = weekEndOf(weekStart);
-  const [{ trips, trackers }, driverRows, unavailable, working] = await Promise.all([
+  const [{ trips, trackers }, driverRows, unavailable, working, tripTypes] = await Promise.all([
     loadTripsNeeded(zoneId, weekStart),
     typedGetAll(
       driverDataQuery(zoneId),
@@ -77,6 +80,17 @@ export async function loadPlanningInputs(
         last_name: string | null;
       }>(),
     ),
+    typedGetAll(
+      db
+        .selectFrom("WorkTrackerTypes")
+        .select("id")
+        .where("code", "=", "trip")
+        .where("is_deleted", "=", 0)
+        .orderBy("sort_order", "asc")
+        .limit(1)
+        .compile(),
+      expect<{ id: string }>(),
+    ),
   ]);
 
   const addressIds = [
@@ -118,6 +132,7 @@ export async function loadPlanningInputs(
       .filter((d) => d.exclude_from_auto_work_trackers !== 1)
       .map((d) => ({ driverUuid: d.driver_uuid, home: point(d.latitude, d.longitude) })),
     blocked,
+    tripTypeUuid: tripTypes[0]?.id ?? null,
     existing: trackers.flatMap((t) =>
       t.bleacher_uuid
         ? [

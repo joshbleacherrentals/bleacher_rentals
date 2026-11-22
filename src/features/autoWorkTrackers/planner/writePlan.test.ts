@@ -42,6 +42,7 @@ describe("planStatements", () => {
   const statements = planStatements(
     [planned("w1", null, false), planned("w2", "w1", true)],
     [{ workTrackerId: "w1", unitAmtCents: 3060, description: "15.0KM × $2.04/KM = $30.60" }],
+    "trip-type",
     () => "line-1",
     "2026-11-22T00:00:00.000Z",
   );
@@ -55,13 +56,21 @@ describe("planStatements", () => {
     expect(statements[1].parameters).toContain("w1"); // w2 follows w1
   });
 
+  const column = (i: number, name: string) => {
+    const cols = statements[i].sql.match(/\(([^)]*)\) values/)![1].split(", ");
+    return statements[i].parameters[cols.indexOf(`"${name}"`)];
+  };
+
   it("sets each tracker's pay to its Hauling line, and leaves it empty without one", () => {
-    const pay = (i: number) => {
-      const cols = statements[i].sql.match(/\(([^)]*)\) values/)![1].split(", ");
-      return statements[i].parameters[cols.indexOf('"pay_cents"')];
-    };
-    expect(pay(0)).toBe(3060);
-    expect(pay(1)).toBeNull();
+    expect(column(0, "pay_cents")).toBe(3060);
+    expect(column(1, "pay_cents")).toBeNull();
+  });
+
+  it("makes every tracker a Trip", () => {
+    expect([column(0, "work_tracker_type_uuid"), column(1, "work_tracker_type_uuid")]).toEqual([
+      "trip-type",
+      "trip-type",
+    ]);
   });
 
   it("writes the Hauling line as the modal would", () => {

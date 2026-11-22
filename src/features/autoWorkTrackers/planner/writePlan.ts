@@ -5,13 +5,14 @@ import type { PlannedHaulingLine } from "../utils/haulingLineItems";
 
 /**
  * The local writes for a plan, in order: each work tracker (a trip's previous one first, so the
- * chain points backwards), then its Hauling line item. A tracker's pay is its line items' total,
+ * chain points backwards) as a "Trip" type, then its Hauling line item. A tracker's pay is its line items' total,
  * so it is set to its Hauling line here, as the work tracker modal does on save. One batch, written
  * to the local database; PowerSync uploads it.
  */
 export function planStatements(
   planned: PlannedTracker[],
   lines: PlannedHaulingLine[],
+  tripTypeUuid: string | null,
   newId: () => string = () => crypto.randomUUID(),
   now: string = new Date().toISOString(),
 ): CompiledQuery[] {
@@ -24,6 +25,7 @@ export function planStatements(
         bleacher_uuid: p.trip.bleacherUuid,
         date: p.date,
         status: "draft",
+        work_tracker_type_uuid: tripTypeUuid,
         driver_uuid: p.driverUuid,
         pickup_address_uuid: p.trip.fromAddressUuid,
         dropoff_address_uuid: p.trip.toAddressUuid,
