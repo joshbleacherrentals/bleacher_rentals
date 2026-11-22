@@ -1,12 +1,12 @@
-import { normalizeStreet } from "@/features/autoWorkTrackers/utils/discoverTrips";
+import { samePlace } from "@/features/autoWorkTrackers/utils/samePlace";
 
 /**
  * The logistics-plan check. A bleacher assigned to an event that starts on `startDate` should
  * already be at that event's street by then. Where it was is the last thing that happened to it on
  * or before that day: a work tracker (it ended up at the drop-off), an event (it is at the event's
  * address, or its venue's) or a maintenance event (it is at the maintenance address). When that
- * place is the event's street, the bleacher has a plan. Pure: dates are "YYYY-MM-DD" strings, and
- * "the same street" is decided on the street text.
+ * place is the event's, the bleacher has a plan. Pure: dates are "YYYY-MM-DD" strings, and "the
+ * same place" is decided by coordinates when both have them, else by the street text (samePlace).
  */
 
 export type HistoryKind = "work_tracker" | "event" | "maintenance";
@@ -76,8 +76,12 @@ export function lastKnownLocation(
   return before[0] ?? null;
 }
 
-const sameStreet = (a: string | null, b: string | null) =>
-  normalizeStreet(a) !== "" && normalizeStreet(a) === normalizeStreet(b);
+// The same place by coordinates (within 200 m) when both have them, else by street text (samePlace),
+// so a re-picked event address still matches where the bleacher was left.
+const sameLocation = (
+  a: { street: string | null; latitude?: number | null; longitude?: number | null },
+  b: { street: string | null; latitude?: number | null; longitude?: number | null },
+) => samePlace(a, b);
 
 /** Each event with each of its bleachers checked, ordered by start date then name, then number. */
 export function checkLogisticsPlans(events: PlannedEvent[]): EventLogisticsCheck[] {
@@ -93,7 +97,7 @@ export function checkLogisticsPlans(events: PlannedEvent[]): EventLogisticsCheck
             bleacherNumber: bleacher.bleacherNumber,
             bleacherTypeName: bleacher.bleacherTypeName,
             last,
-            matches: last !== null && sameStreet(last.street, event.street),
+            matches: last !== null && sameLocation(last, event),
           };
         })
         .sort(

@@ -1,159 +1,114 @@
-"""Plans the week as driver routes: each driver-day is a route from home and back, carrying one
-bleacher at a time, so a day can be home -> pick A -> drop A -> pick B -> drop B -> home.
+"""The Auto Work Trackers solver: places trips on driver-days as routes. Pure: no database, no
+network, no business rules. The TypeScript planner prepares everything (which trips, which
+driver-days may take each one, the drive time and cost between every pair of places) and turns the
+answer into work trackers.
 
 Rules (constraints):
-- A trip happens on one of its allowed days (the bleacher is free), on a day the driver can work.
+- A trip goes on one of the vehicles it allows (its days, a driver free that day).
 - One bleacher at a time: a trip's pickup is followed by its own drop-off.
-- A driver's day, leaving home to getting back (deadhead included), is at most MAX_DAY_MINUTES.
+- A vehicle's day, leaving home to getting back, is at most `max_day_minutes`.
 
 Objective: place as many trips as possible (a trip left out costs far more than any route), then
-drive as few metres as possible. Haul length is fixed by the trips, so in effect the
-deadhead is what gets smaller: trips are chained when the next pickup is near the last drop-off.
+the least total cost. Haul cost is fixed by the trips, so in effect the deadhead gets smaller:
+trips are chained when the next pickup is near the last drop-off.
 
-Solved with the OR-Tools routing solver: every free driver-day is a vehicle starting and ending at
-the driver's home; each trip is a pickup and a delivery on the same vehicle; a load dimension of
-capacity 1 keeps one bleacher on the truck; a time dimension caps the day. Distances and times are
-road times from `travel`: Google's where known (road_times), else estimates (travel.estimate). The
-search runs for at most `search_seconds`.
+OR-Tools routing: every vehicle starts and ends at its home; each trip is a pickup and a delivery
+on the same vehicle; a load dimension of capacity 1; a time dimension capped at the day limit. The
+search runs for at most `search_seconds` (0: keep the first solution).
 """
-
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
-from datetime import datetime, time, timedelta
-from zoneinfo import ZoneInfo
 
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
-from python_api.auto_work_trackers.assignment import (
-    NO_FREE_DRIVER_DAY,
-    TOO_LONG_FOR_A_DAY,
-    Assignment,
-    AssignmentResult,
-    Unassigned,
-    allowed_days,
+from python_api.auto_work_trackers.schemas import (
+    SolveRequest,
+    SolveResponse,
+    SolveRoute,
+    SolveStop,
+    SolveUnplaced,
 )
-from python_api.auto_work_trackers.models import NeededTrip
-from python_api.auto_work_trackers.travel import NO_DRIVE, Leg, Point, estimate
 
-Travel = Callable[[Point | None, Point | None], Leg]
-"""Distance and drive time from one point to another (road_times.RoadTimes, or travel.estimate)."""
-
-MAX_DAY_MINUTES = 12 * 60
-DAY_START = time(7, 0)  # suggested times count from here, in the zone's local time
-SEARCH_SECONDS = 3.0  # stays well inside the request time limit
 DROP_PENALTY = 1_000_000_000  # leaving a trip out; far above any route's cost
 
-
-@dataclass(frozen=True)
-class RouteDriver:
-    driver_uuid: str
-    home: Point | None  # None when the driver has no home coordinates
+NO_VEHICLE = "no_vehicle"  # no vehicle it may use
+TOO_LONG_FOR_A_DAY = "too_long_for_a_day"  # even alone, home -> pickup -> drop-off -> home is over the limit
+NO_ROOM = "no_room"  # the allowed vehicles had no room left for it
 
 
-PointOf = Callable[[str | None], Point | None]
-"""(latitude, longitude) of an address id, or None when it has no coordinates."""
+class InvalidSolveRequest(ValueError):
+    pass
 
 
-def _local(day: str, minutes: int, tz: str) -> str:
-    start = datetime.combine(datetime.fromisoformat(day).date(), DAY_START, ZoneInfo(tz))
-    return (start + timedelta(minutes=minutes)).isoformat()
+def _check(req: SolveRequest) -> None:
+    n = len(req.minutes)
+    if len(req.costs) != n or any(len(row) != n for row in req.minutes + req.costs):
+        raise InvalidSolveRequest("minutes and costs must be square matrices of the same size.")
+    places = [v.home for v in req.vehicles] + [p for t in req.trips for p in (t.pickup, t.dropoff)]
+    if any(not 0 <= p < n for p in places):
+        raise InvalidSolveRequest("a place index is outside the matrices.")
+    ids = {v.id for v in req.vehicles}
+    if len(ids) != len(req.vehicles):
+        raise InvalidSolveRequest("vehicle ids must be unique.")
 
 
-def plan_routes(
-    trips: list[NeededTrip],
-    drivers: Iterable[RouteDriver],
-    blocked: set[tuple[str, str]],
-    week_start: str,
-    point_of: PointOf,
-    tz: str = "UTC",
-    search_seconds: float = SEARCH_SECONDS,
-    travel: Travel = estimate,
-) -> AssignmentResult:
-    """Place the trips on driver-days (see the module doc). `blocked` holds (driver, day) pairs the
-    driver cannot work. `search_seconds` <= 0 keeps the first solution found (no improvement)."""
-    drivers = sorted(drivers, key=lambda d: d.driver_uuid)
-    days_of: dict[int, list[str]] = {}
-    reasons: dict[int, str] = {}
-    for k, trip in enumerate(trips):
-        days, why = allowed_days(trip, week_start)
-        if why:
-            reasons[k] = why
-        else:
-            days_of[k] = days
+def solve(req: SolveRequest) -> SolveResponse:
+    _check(req)
+    minutes, costs, limit = req.minutes, req.costs, req.max_day_minutes
+    vehicle_index = {v.id: i for i, v in enumerate(req.vehicles)}
+    unplaced: list[SolveUnplaced] = []
 
-    # Every free driver-day some trip could use is a vehicle.
-    wanted_days = sorted({d for days in days_of.values() for d in days})
-    vehicles = [(drv, day) for drv in drivers for day in wanted_days if (drv.driver_uuid, day) not in blocked]
-
-    pickup = {k: point_of(trips[k].from_address_uuid) for k in days_of}
-    dropoff = {k: point_of(trips[k].to_address_uuid) for k in days_of}
-    haul = {k: travel(pickup[k], dropoff[k]) for k in days_of}
-
-    # The vehicles each trip may use: one of its days, and the trip fits a day on its own.
+    # The vehicles each trip may use, and fits on alone within the day.
     allowed: dict[int, list[int]] = {}
-    for k, days in days_of.items():
-        on_days = [v for v, (_, day) in enumerate(vehicles) if day in days]
+    for k, trip in enumerate(req.trips):
+        on = [vehicle_index[v] for v in trip.vehicles if v in vehicle_index]
         fits = [
             v
-            for v in on_days
-            if travel(vehicles[v][0].home, pickup[k]).clock_minutes
-            + haul[k].clock_minutes
-            + travel(dropoff[k], vehicles[v][0].home).clock_minutes
-            <= MAX_DAY_MINUTES
+            for v in on
+            if minutes[req.vehicles[v].home][trip.pickup]
+            + minutes[trip.pickup][trip.dropoff]
+            + minutes[trip.dropoff][req.vehicles[v].home]
+            <= limit
         ]
-        if not on_days:
-            reasons[k] = NO_FREE_DRIVER_DAY
+        if not on:
+            unplaced.append(SolveUnplaced(trip=trip.id, reason=NO_VEHICLE))
         elif not fits:
-            reasons[k] = TOO_LONG_FOR_A_DAY
+            unplaced.append(SolveUnplaced(trip=trip.id, reason=TOO_LONG_FOR_A_DAY))
         else:
             allowed[k] = fits
-
-    placeable = sorted(allowed)
-    if not placeable:
-        return AssignmentResult(unassigned=[Unassigned(trips[k], reasons[k]) for k in sorted(reasons)])
+    if not allowed:
+        return SolveResponse(routes=[], unplaced=unplaced)
 
     # Nodes: a start and an end (both home) per vehicle, then a pickup and a delivery per trip.
-    n_vehicles = len(vehicles)
-    node_point: list[Point | None] = []
-    for drv, _ in vehicles:
-        node_point += [drv.home, drv.home]
+    n_vehicles = len(req.vehicles)
+    place_of: list[int] = []
+    for v in req.vehicles:
+        place_of += [v.home, v.home]
     trip_of_node: dict[int, int] = {}
     pickup_node: dict[int, int] = {}
     delivery_node: dict[int, int] = {}
-    for k in placeable:
-        pickup_node[k], delivery_node[k] = len(node_point), len(node_point) + 1
+    for k in sorted(allowed):
+        pickup_node[k], delivery_node[k] = len(place_of), len(place_of) + 1
         trip_of_node[pickup_node[k]] = trip_of_node[delivery_node[k]] = k
-        node_point += [pickup[k], dropoff[k]]
+        place_of += [req.trips[k].pickup, req.trips[k].dropoff]
+    n_nodes = len(place_of)
+    depot = 2 * n_vehicles
 
-    n_nodes = len(node_point)
-    is_depot = [i < 2 * n_vehicles for i in range(n_nodes)]
+    def between(matrix: list[list[int]], i: int, j: int) -> int:
+        if i < depot and j < depot:  # an unused vehicle: home to home
+            return 0
+        return matrix[place_of[i]][place_of[j]]
 
-    def leg(i: int, j: int) -> Leg:
-        if i == j or (is_depot[i] and is_depot[j]):
-            return NO_DRIVE
-        k = trip_of_node.get(i)
-        if k is not None and i == pickup_node[k] and j == delivery_node[k]:
-            return haul[k]
-        return travel(node_point[i], node_point[j])
-
-    legs = [[leg(i, j) for j in range(n_nodes)] for i in range(n_nodes)]
-    minutes = [[legs[i][j].clock_minutes for j in range(n_nodes)] for i in range(n_nodes)]
-    cost = [[legs[i][j].cost_m for j in range(n_nodes)] for i in range(n_nodes)]
-
-    starts = [2 * v for v in range(n_vehicles)]
-    ends = [2 * v + 1 for v in range(n_vehicles)]
-    manager = pywrapcp.RoutingIndexManager(n_nodes, n_vehicles, starts, ends)
+    manager = pywrapcp.RoutingIndexManager(
+        n_nodes, n_vehicles, [2 * v for v in range(n_vehicles)], [2 * v + 1 for v in range(n_vehicles)]
+    )
     routing = pywrapcp.RoutingModel(manager)
-
     cost_cb = routing.RegisterTransitCallback(
-        lambda a, b: cost[manager.IndexToNode(a)][manager.IndexToNode(b)]
+        lambda a, b: between(costs, manager.IndexToNode(a), manager.IndexToNode(b))
     )
     routing.SetArcCostEvaluatorOfAllVehicles(cost_cb)
-
     time_cb = routing.RegisterTransitCallback(
-        lambda a, b: minutes[manager.IndexToNode(a)][manager.IndexToNode(b)]
+        lambda a, b: between(minutes, manager.IndexToNode(a), manager.IndexToNode(b))
     )
-    routing.AddDimension(time_cb, 0, MAX_DAY_MINUTES, True, "Time")
+    routing.AddDimension(time_cb, 0, limit, True, "Time")
     clock = routing.GetDimensionOrDie("Time")
 
     def demand(index: int) -> int:
@@ -167,7 +122,7 @@ def plan_routes(
     routing.AddDimensionWithVehicleCapacity(load_cb, 0, [1] * n_vehicles, True, "Load")
 
     solver = routing.solver()
-    for k in placeable:
+    for k in allowed:
         p, d = manager.NodeToIndex(pickup_node[k]), manager.NodeToIndex(delivery_node[k])
         routing.AddPickupAndDelivery(p, d)
         solver.Add(routing.VehicleVar(p) == routing.VehicleVar(d))
@@ -179,60 +134,33 @@ def plan_routes(
 
     params = pywrapcp.DefaultRoutingSearchParameters()
     params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
-    if search_seconds > 0:
+    if req.search_seconds > 0:
         params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-        params.time_limit.FromMilliseconds(int(search_seconds * 1000))
+        params.time_limit.FromMilliseconds(int(req.search_seconds * 1000))
     solution = routing.SolveWithParameters(params)
 
-    placed: dict[int, tuple[int, int, int | None, int, int]] = {}  # trip -> (vehicle, seq, prev trip, at p, at d)
-    route_last: dict[int, int] = {}
+    routes: list[SolveRoute] = []
+    placed: set[int] = set()
     if solution:
-        for v in range(n_vehicles):
-            index, seq, prev = routing.Start(v), 0, None
+        for v, vehicle in enumerate(req.vehicles):
+            stops: list[SolveStop] = []
+            index = routing.Start(v)
             while not routing.IsEnd(index):
                 node = manager.IndexToNode(index)
                 k = trip_of_node.get(node)
                 if k is not None and node == pickup_node[k]:
-                    seq += 1
                     d_index = manager.NodeToIndex(delivery_node[k])
-                    placed[k] = (
-                        v,
-                        seq,
-                        prev,
-                        solution.Value(clock.CumulVar(index)),
-                        solution.Value(clock.CumulVar(d_index)),
+                    stops.append(
+                        SolveStop(
+                            trip=req.trips[k].id,
+                            pickup_minute=solution.Value(clock.CumulVar(index)),
+                            dropoff_minute=solution.Value(clock.CumulVar(d_index)),
+                        )
                     )
-                    prev = k
+                    placed.add(k)
                 index = solution.Value(routing.NextVar(index))
-            if prev is not None:
-                route_last[v] = prev
+            if stops:
+                routes.append(SolveRoute(vehicle=vehicle.id, stops=stops))
 
-    order = sorted(placed, key=lambda k: (vehicles[placed[k][0]][0].driver_uuid, vehicles[placed[k][0]][1], placed[k][1]))
-    position = {k: i for i, k in enumerate(order)}
-    assigned: list[Assignment] = []
-    for k in order:
-        v, seq, prev, at_pickup, at_dropoff = placed[k]
-        drv, day = vehicles[v]
-        came_from = dropoff[prev] if prev is not None else drv.home
-        assigned.append(
-            Assignment(
-                trip=trips[k],
-                driver_uuid=drv.driver_uuid,
-                date=day,
-                sequence=seq,
-                previous_index=position[prev] if prev is not None else None,
-                planned_pickup_at=_local(day, at_pickup, tz),
-                planned_dropoff_at=_local(day, at_dropoff, tz),
-                deadhead_in=travel(came_from, pickup[k]),
-                haul=haul[k],
-                return_home=travel(dropoff[k], drv.home) if route_last.get(v) == k else None,
-            )
-        )
-
-    for k in placeable:
-        if k not in placed:
-            reasons[k] = NO_FREE_DRIVER_DAY
-    return AssignmentResult(
-        assigned=assigned,
-        unassigned=[Unassigned(trips[k], reasons[k]) for k in sorted(reasons)],
-    )
+    unplaced += [SolveUnplaced(trip=req.trips[k].id, reason=NO_ROOM) for k in sorted(allowed) if k not in placed]
+    return SolveResponse(routes=routes, unplaced=unplaced)

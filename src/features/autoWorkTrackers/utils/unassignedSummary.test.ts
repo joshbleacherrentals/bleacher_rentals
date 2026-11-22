@@ -1,15 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { summarizeUnassigned } from "./unassignedSummary";
+import type { UnplacedReason } from "../planner/buildSolve";
 
-const u = (reason: "no_window" | "outside_week" | "no_free_driver_day" | "too_long_for_a_day") => ({
-  bleacher_uuid: "b",
-  bleacher_number: 1,
-  from_street: "a",
-  to_street: "b",
-  earliest_day: null,
-  latest_day: null,
-  reason,
-});
+const u = (reason: UnplacedReason) => ({ reason });
 
 describe("summarizeUnassigned", () => {
   it("groups the trips by reason, most common first", () => {

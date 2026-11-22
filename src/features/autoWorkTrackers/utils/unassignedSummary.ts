@@ -1,8 +1,8 @@
-import type { GenerateWorkTrackersResult } from "../api/generateWorkTrackers";
+import type { UnplacedReason } from "../planner/buildSolve";
 
-type Unassigned = GenerateWorkTrackersResult["unassigned"][number];
+type Unassigned = { reason: UnplacedReason };
 
-const REASON_TEXT: Record<Unassigned["reason"], string> = {
+const REASON_TEXT: Record<UnplacedReason, string> = {
   no_window: "events are back to back",
   outside_week: "no free day in this week",
   no_free_driver_day: "no driver had room on those days",

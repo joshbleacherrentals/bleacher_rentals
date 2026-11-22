@@ -3,10 +3,14 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { generateWorkTrackers, type GenerateWorkTrackersResult } from "../api/generateWorkTrackers";
+import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
+import { planWeek, type PlanWeekResult } from "../planner/planWeek";
 import { summarizeUnassigned } from "../utils/unassignedSummary";
 
-/** Creates a draft work tracker for every trip the chosen zone needs in the chosen week. */
+/**
+ * Creates the work trackers the chosen zone needs in the chosen week (planWeek): each with its
+ * driver, day, order in the day, suggested times, road distances and its Hauling line item.
+ */
 export function GenerateWorkTrackersButton({
   zoneId,
   weekStart,
@@ -17,15 +21,24 @@ export function GenerateWorkTrackersButton({
   fullWidth?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<GenerateWorkTrackersResult | null>(null);
+  const [result, setResult] = useState<PlanWeekResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const supabase = useClerkSupabaseClient();
 
   const handleClick = async () => {
+    if (!supabase) return;
     setLoading(true);
     setResult(null);
     setError(null);
     try {
-      setResult(await generateWorkTrackers({ zoneId, weekStart }));
+      setResult(
+        await planWeek({
+          zoneId,
+          weekStart,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          supabase,
+        }),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
     } finally {
@@ -37,7 +50,7 @@ export function GenerateWorkTrackersButton({
     <div className="flex flex-col gap-1">
       <Button
         onClick={handleClick}
-        disabled={!zoneId || loading}
+        disabled={!zoneId || loading || !supabase}
         size={fullWidth ? "lg" : "default"}
         className={fullWidth ? "w-full" : undefined}
       >
@@ -48,22 +61,24 @@ export function GenerateWorkTrackersButton({
       {result && (
         <div className="text-sm text-gray-600" data-testid="generate-work-trackers-result">
           <p>
-            Created {result.created.length} draft work tracker
-            {result.created.length === 1 ? "" : "s"} with a driver and day for{" "}
-            {new Set(result.created.map((t) => t.bleacher_uuid)).size} of {result.bleachers_in_zone}{" "}
-            bleachers, on {new Set(result.created.map((t) => `${t.driver_uuid}|${t.date}`)).size}{" "}
-            driver-days.
+            Created {result.created} draft work tracker{result.created === 1 ? "" : "s"} for{" "}
+            {result.bleachers} bleacher{result.bleachers === 1 ? "" : "s"}, on {result.driverDays}{" "}
+            driver-day{result.driverDays === 1 ? "" : "s"}.
           </p>
-          {result.travel && (
-            <p className="text-xs text-gray-500" data-testid="generate-work-trackers-travel">
-              Road times: {result.travel.google + result.travel.cached} from Google (
-              {result.travel.cached} cached)
-              {result.travel.estimated > 0 && `, ${result.travel.estimated} estimated`}.
+          {result.alreadyPlanned > 0 && (
+            <p className="text-xs text-gray-500" data-testid="generate-work-trackers-already">
+              {result.alreadyPlanned} trip{result.alreadyPlanned === 1 ? " was" : "s were"} left
+              out: a work tracker already makes {result.alreadyPlanned === 1 ? "it" : "them"}.
             </p>
           )}
-          {result.unassigned.length > 0 && (
+          <p className="text-xs text-gray-500" data-testid="generate-work-trackers-travel">
+            Road times: {result.road.google + result.road.cached} from Google ({result.road.cached}{" "}
+            cached){result.road.estimated > 0 && `, ${result.road.estimated} estimated`}. Hauling
+            pay added to {result.withHauling} of {result.created}.
+          </p>
+          {result.unplaced.length > 0 && (
             <p className="text-amber-700" data-testid="generate-work-trackers-unassigned">
-              {summarizeUnassigned(result.unassigned)}
+              {summarizeUnassigned(result.unplaced)}
             </p>
           )}
         </div>

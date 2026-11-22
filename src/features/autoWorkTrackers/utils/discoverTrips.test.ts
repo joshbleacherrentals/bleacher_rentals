@@ -114,6 +114,8 @@ describe("discoverTrips: a move between two events", () => {
         toEventUuid: "b",
         availableFrom: "2026-11-10",
         mustArriveBy: "2026-11-15",
+        earliestDay: "2026-11-10",
+        latestDay: "2026-11-14",
       },
     ]);
   });
@@ -356,5 +358,41 @@ describe("discoverTrips: several bleachers", () => {
       fromAddressUuid: "addr-depot",
       toAddressUuid: "addr-b",
     });
+  });
+
+  it("sees a finished move whose addresses were re-picked (matching by coordinates, the #111 case)", () => {
+    const at = (s: BleacherStop, latitude: number, longitude: number, addressUuid: string) => ({
+      ...s,
+      latitude,
+      longitude,
+      addressUuid,
+    });
+    const lakeGeorge = at(
+      stop("a", "578 Aviation Road", "2026-11-06", "2026-11-09"),
+      43.32678,
+      -73.67844,
+      "ev-a",
+    );
+    const merrittville = at(
+      stop("b", "2371 Merrittville Highway", "2026-11-15", "2026-11-16"),
+      43.07778,
+      -79.25207,
+      "ev-b",
+    );
+    const done = {
+      ...trip(
+        "w1",
+        "2026-11-10",
+        "578 Aviation Road, Queensbury, NY 12804, USA",
+        "2371 Merrittville Highway, Fonthill, ON, Canada",
+      ),
+      pickupAddressUuid: "wt-p",
+      dropoffAddressUuid: "wt-d",
+      pickupLatitude: 43.3268,
+      pickupLongitude: -73.6785,
+      dropoffLatitude: 43.0779,
+      dropoffLongitude: -79.2521,
+    };
+    expect(discoverTrips([bleacher([lakeGeorge, merrittville], [done])], WEEK)).toEqual([]);
   });
 });

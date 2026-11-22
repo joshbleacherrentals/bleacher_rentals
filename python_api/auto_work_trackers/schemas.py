@@ -1,127 +1,55 @@
-from pydantic import BaseModel
+"""The /solve contract. The TypeScript side (src/features/autoWorkTrackers/planner/solveContract.ts)
+mirrors these shapes; keep the two in step.
+
+Everything the solver needs comes in the request: no database, no network. Places are indices into
+the two square matrices.
+"""
+
+from pydantic import BaseModel, Field
 
 
-class GenerateRequest(BaseModel):
-    zone_id: str
-    week_start: str  # a Monday, "YYYY-MM-DD"
-    timezone: str = "America/Edmonton"  # the viewer's, so event days match what they see
+class SolveVehicle(BaseModel):
+    """One driver-day: a route that starts and ends at `home` (a place index)."""
+
+    id: str
+    home: int
 
 
-class SuggestRequest(GenerateRequest):
-    """The same question as `generate`, answered without creating anything."""
+class SolveTrip(BaseModel):
+    """One bleacher move: pick up at `pickup`, drop off at `dropoff` (place indices), on one of
+    `vehicles` (vehicle ids allowed to take it)."""
+
+    id: str
+    pickup: int
+    dropoff: int
+    vehicles: list[str]
 
 
-class UnassignedTrip(BaseModel):
-    bleacher_uuid: str
-    bleacher_number: int | None
-    from_street: str
-    to_street: str
-    earliest_day: str | None
-    latest_day: str | None
-    reason: str  # "no_window" | "outside_week" | "no_free_driver_day" | "too_long_for_a_day"
+class SolveRequest(BaseModel):
+    minutes: list[list[int]] = Field(description="Drive minutes from place i to place j.")
+    costs: list[list[int]] = Field(description="What to minimise from place i to place j (metres).")
+    vehicles: list[SolveVehicle]
+    trips: list[SolveTrip]
+    max_day_minutes: int = 12 * 60
+    search_seconds: float = 3.0
 
 
-class CreatedTrip(BaseModel):
-    work_tracker_id: str
-    bleacher_uuid: str
-    bleacher_number: int | None
-    from_street: str
-    to_street: str
-    date: str
-    driver_uuid: str | None = None
-    sequence: int = 1  # the trip's place in the driver's day
-    previous_work_tracker_id: str | None = None  # the trip it drives on from; None: from home
-    planned_pickup_at: str | None = None
-    planned_dropoff_at: str | None = None
+class SolveStop(BaseModel):
+    trip: str
+    pickup_minute: int  # minutes after the vehicle leaves home
+    dropoff_minute: int
 
 
-class TravelSources(BaseModel):
-    """Where a run's road legs came from: Google just now, the cache, or a straight-line estimate."""
-
-    google: int = 0
-    cached: int = 0
-    estimated: int = 0
+class SolveRoute(BaseModel):
+    vehicle: str
+    stops: list[SolveStop]  # in driving order
 
 
-class GenerateResponse(BaseModel):
-    bleachers_in_zone: int
-    bleachers_needing_trips: int
-    created: list[CreatedTrip]
-    unassigned: list[UnassignedTrip] = []
-    travel: TravelSources = TravelSources()
+class SolveUnplaced(BaseModel):
+    trip: str
+    reason: str  # "no_vehicle" | "too_long_for_a_day" | "no_room"
 
 
-class SuggestedTrip(BaseModel):
-    bleacher_uuid: str
-    bleacher_number: int | None
-    from_address_uuid: str | None
-    to_address_uuid: str | None
-    from_street: str
-    to_street: str
-    from_event_uuid: str
-    to_event_uuid: str
-    date: str  # where the draft would be dated, inside the week
-    available_from: str
-    must_arrive_by: str
-
-
-class SuggestResponse(BaseModel):
-    bleachers_in_zone: int
-    trips: list[SuggestedTrip]
-
-
-class AcceptedTripIn(BaseModel):
-    bleacher_uuid: str
-    date: str
-    from_address_uuid: str | None = None
-    to_address_uuid: str | None = None
-    driver_uuid: str | None = None
-
-
-class AcceptRequest(BaseModel):
-    week_start: str  # a Monday, "YYYY-MM-DD"; trips outside this week are skipped
-    trips: list[AcceptedTripIn]
-    timezone: str = "America/Edmonton"
-
-
-class AcceptedCreated(BaseModel):
-    work_tracker_id: str
-    bleacher_uuid: str
-    date: str
-
-
-class AcceptedSkipped(BaseModel):
-    bleacher_uuid: str
-    date: str
-    reason: str
-
-
-class AcceptResponse(BaseModel):
-    created: list[AcceptedCreated]
-    skipped: list[AcceptedSkipped]
-
-
-class PlannedTrip(BaseModel):
-    bleacher_uuid: str
-    bleacher_number: int | None
-    from_address_uuid: str | None
-    to_address_uuid: str | None
-    from_street: str
-    to_street: str
-    driver_uuid: str
-    date: str
-    sequence: int = 1  # the trip's place in the driver's day
-    previous_index: int | None = None  # index in `assigned` of the trip it drives on from
-    planned_pickup_at: str | None = None
-    planned_dropoff_at: str | None = None
-    distance_m: int | None = None  # estimated deadhead to the pickup; None when unknown
-    haul_m: int | None = None  # estimated pickup to drop-off
-    return_home_m: int | None = None  # estimated drive home; only on the day's last trip
-
-
-class PlanResponse(BaseModel):
-    bleachers_in_zone: int
-    drivers_in_zone: int
-    assigned: list[PlannedTrip]
-    unassigned: list[UnassignedTrip]
-    travel: TravelSources = TravelSources()
+class SolveResponse(BaseModel):
+    routes: list[SolveRoute]
+    unplaced: list[SolveUnplaced]

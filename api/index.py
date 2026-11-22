@@ -6,7 +6,8 @@ so it never collides with the Next.js routes in src/app/api. The browser calls /
 - Locally, next.config.ts proxies it to this app (npm run dev:py, port 8000).
 - On Vercel, next.config.ts rewrites it to this function.
 
-Auth is enforced by the Clerk proxy (src/proxy.ts), not here.
+Auth is enforced by the Clerk proxy (src/proxy.ts), not here. Endpoints are pure (see CLAUDE.md,
+"Python — pure solvers only"): JSON in, JSON out, no database or network.
 """
 
 from fastapi import FastAPI

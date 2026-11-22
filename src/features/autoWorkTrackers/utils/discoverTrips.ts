@@ -1,4 +1,5 @@
 import { DateTime } from "luxon";
+import { isKnownPlace, samePlace, type Place } from "./samePlace";
 
 /**
  * Finds the trips a zone's bleachers need, from where their events put them.
@@ -23,6 +24,9 @@ export type BleacherStop = {
   street: string | null;
   /** The Addresses row that street comes from. */
   addressUuid?: string | null;
+  /** That address's coordinates, when it has them. */
+  latitude?: number | null;
+  longitude?: number | null;
   /** First day the bleacher has to be there: setup start, else event start. */
   startDate: string;
   /** Last day it has to be there: teardown end, else event end. */
@@ -35,8 +39,13 @@ export type ExistingTrip = {
   date: string | null;
   pickupStreet: string | null;
   dropoffStreet: string | null;
-  /** The Addresses row of the drop-off. */
+  /** The Addresses rows of the pickup and drop-off, and their coordinates when known. */
+  pickupAddressUuid?: string | null;
   dropoffAddressUuid?: string | null;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+  dropoffLatitude?: number | null;
+  dropoffLongitude?: number | null;
 };
 
 export type BleacherInput = {
@@ -63,6 +72,12 @@ export type NeededTrip = {
   availableFrom: string;
   /** Latest day it can happen: the day the next event starts. */
   mustArriveBy: string;
+  /**
+   * The days the bleacher is actually free: the day after the first event ends through the day
+   * before the next one starts. Empty (earliestDay > latestDay) when the events are back to back.
+   */
+  earliestDay: string;
+  latestDay: string;
 };
 
 /** Lowercase, punctuation dropped, whitespace collapsed. Empty for a missing street. */
@@ -88,13 +103,23 @@ function weekEndOf(weekStart: string): string {
   return DateTime.fromISO(weekStart, { zone: "utc" }).plus({ days: 6 }).toISODate()!;
 }
 
+const stopPlace = (s: BleacherStop): Place => ({
+  addressUuid: s.addressUuid,
+  street: s.street,
+  latitude: s.latitude,
+  longitude: s.longitude,
+});
+
+const day = (iso: string, plus: number) =>
+  DateTime.fromISO(iso, { zone: "utc" }).plus({ days: plus }).toISODate()!;
+
 function tripsForBleacher(
   bleacher: BleacherInput,
   weekStart: string,
   weekEnd: string,
 ): NeededTrip[] {
   const stops = bleacher.stops
-    .filter((s) => normalizeStreet(s.street) !== "")
+    .filter((s) => isKnownPlace(stopPlace(s)))
     .sort((x, y) => x.startDate.localeCompare(y.startDate) || x.endDate.localeCompare(y.endDate));
 
   const needed: NeededTrip[] = [];
@@ -102,47 +127,56 @@ function tripsForBleacher(
   for (let i = 0; i < stops.length - 1; i++) {
     const from = stops[i];
     const to = stops[i + 1];
-    const targetKey = normalizeStreet(to.street);
-    if (normalizeStreet(from.street) === targetKey) continue;
+    const target = stopPlace(to);
+    if (samePlace(stopPlace(from), target)) continue;
 
     // The bleacher is collected the day after its event ends, never on the last day itself. If the
     // next event starts before that, the move is already due, so it opens on that day.
     const mustArriveBy = to.startDate;
-    const dayAfterEnd = DateTime.fromISO(from.endDate, { zone: "utc" })
-      .plus({ days: 1 })
-      .toISODate()!;
+    const dayAfterEnd = day(from.endDate, 1);
     const availableFrom = dayAfterEnd < mustArriveBy ? dayAfterEnd : mustArriveBy;
     // The window has to touch the selected week, but may start long before it or end long after.
     if (availableFrom > weekEnd || mustArriveBy < weekStart) continue;
 
-    // Follow the work trackers already in the window: each one that picks the bleacher up where
-    // it currently is moves it on to its drop-off.
-    let position = from.street!;
-    let positionAddressUuid = from.addressUuid ?? null;
+    // Follow the work trackers already in the window: each one that picks the bleacher up where it
+    // currently is moves it on to its drop-off. Places match by address row, coordinates or, last,
+    // street text (samePlace), so a re-picked address still matches its older copies.
+    let position: Place = stopPlace(from);
     const inWindow = bleacher.trips
       .filter((t) => t.date !== null && t.date >= availableFrom && t.date <= mustArriveBy)
       .sort((x, y) => x.date!.localeCompare(y.date!));
     for (const trip of inWindow) {
-      if (normalizeStreet(trip.dropoffStreet) === "") continue;
-      if (normalizeStreet(trip.pickupStreet) === normalizeStreet(position)) {
-        position = trip.dropoffStreet!;
-        positionAddressUuid = trip.dropoffAddressUuid ?? null;
-      }
+      const dropoff: Place = {
+        addressUuid: trip.dropoffAddressUuid,
+        street: trip.dropoffStreet,
+        latitude: trip.dropoffLatitude,
+        longitude: trip.dropoffLongitude,
+      };
+      if (!isKnownPlace(dropoff)) continue;
+      const pickup: Place = {
+        addressUuid: trip.pickupAddressUuid,
+        street: trip.pickupStreet,
+        latitude: trip.pickupLatitude,
+        longitude: trip.pickupLongitude,
+      };
+      if (samePlace(pickup, position)) position = dropoff;
     }
 
-    if (normalizeStreet(position) === targetKey) continue;
+    if (samePlace(position, target)) continue;
 
     needed.push({
       bleacherUuid: bleacher.bleacherUuid,
       bleacherNumber: bleacher.bleacherNumber,
-      fromStreet: position,
-      toStreet: to.street!,
-      fromAddressUuid: positionAddressUuid,
+      fromStreet: position.street ?? "",
+      toStreet: to.street ?? "",
+      fromAddressUuid: position.addressUuid ?? null,
       toAddressUuid: to.addressUuid ?? null,
       fromEventUuid: from.eventUuid,
       toEventUuid: to.eventUuid,
       availableFrom,
       mustArriveBy,
+      earliestDay: dayAfterEnd,
+      latestDay: day(to.startDate, -1),
     });
   }
 

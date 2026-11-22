@@ -25,6 +25,8 @@ const needed: NeededTrip = {
   toEventUuid: "e2",
   availableFrom: "2026-09-15",
   mustArriveBy: "2026-09-18",
+  earliestDay: "2026-09-15",
+  latestDay: "2026-09-17",
 };
 
 const tracker: WeekWorkTracker = {
