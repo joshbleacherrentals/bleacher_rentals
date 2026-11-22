@@ -4,7 +4,10 @@ from typing import Any
 
 from python_api.auto_work_trackers.dates import day_after, day_before, to_local_date, week_end_of
 from python_api.auto_work_trackers.models import BleacherInput, Driver, ExistingTrip, NeededTrip, Stop
-from python_api.core.supabase import SupabaseRest
+from python_api.auto_work_trackers.google_routes import RoadLeg
+from python_api.core.supabase import SupabaseRest, in_filter
+
+ROUTE_CACHE_CHUNK = 100  # pair keys per request; keeps the URL short
 
 # Work trackers that are off: nobody is going to make the trip, so they do not cover it.
 OFF_STATUSES = {"cancelled", "declined", "abandoned"}
@@ -110,6 +113,24 @@ class WorkTrackerRepository:
             for row in rows
             if row["status"] not in OFF_STATUSES
         }
+
+    def load_route_cache(self, keys: list[str], since: str) -> dict[str, RoadLeg]:
+        """Cached road legs fetched since `since` (ISO), by pair key."""
+        rows: list[dict[str, Any]] = []
+        for i in range(0, len(keys), ROUTE_CACHE_CHUNK):
+            rows += self._db.select(
+                "RouteCache",
+                "pair_key,found,distance_meters,duration_seconds",
+                {"pair_key": in_filter(keys[i : i + ROUTE_CACHE_CHUNK]), "fetched_at": f"gte.{since}"},
+            )
+        return {
+            r["pair_key"]: RoadLeg(bool(r["found"]), r.get("distance_meters"), r.get("duration_seconds"))
+            for r in rows
+        }
+
+    def save_route_cache(self, rows: list[dict[str, Any]]) -> None:
+        for i in range(0, len(rows), 500):
+            self._db.upsert("RouteCache", rows[i : i + 500], on_conflict="pair_key")
 
     def create_planned_work_trackers(self, rows: list[dict[str, Any]]) -> list[str]:
         """Insert the planned work trackers in one request (rows carry their own ids, and a trip's

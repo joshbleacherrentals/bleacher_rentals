@@ -231,3 +231,29 @@ def test_a_driver_with_no_home_on_file_is_chosen_last():
     )
     (assigned,) = plan_assignments_fast(repo, "z", WEEK, "UTC").plan.assigned
     assert assigned.driver_uuid == "d2"
+
+
+def test_plan_looks_up_every_leg_and_plans_with_the_road_times_it_gets():
+    from python_api.auto_work_trackers.road_times import TravelStats
+    from python_api.auto_work_trackers.travel import Leg
+
+    asked = []
+
+    def load_travel(pairs):
+        asked.append(pairs)
+        # every leg is 30 minutes and 40 km by road
+        return (lambda a, b: Leg(40_000, 30) if a and b and a != b else Leg(0, 0)), TravelStats(google=len(pairs))
+
+    repo = FakeRepo(
+        [moving(1)],
+        ["d1"],
+        points={"a1": POINTS["yard"], "a2": POINTS["near"], "h1": POINTS["far"]},
+        homes={"d1": "h1"},
+    )
+    result = plan_assignments(repo, "z", WEEK, "UTC", search_seconds=0, load_travel=load_travel)
+    (pairs,) = asked
+    yard, near, home = POINTS["yard"], POINTS["near"], POINTS["far"]
+    assert {(home, yard), (yard, near), (near, home)} <= set(pairs)
+    (a,) = result.plan.assigned
+    assert (a.deadhead_in.meters, a.haul.minutes, a.return_home.minutes) == (40_000, 30, 30)
+    assert result.travel.google == len(pairs)

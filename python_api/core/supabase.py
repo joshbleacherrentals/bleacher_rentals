@@ -1,7 +1,7 @@
 """A small client for Supabase's REST API (PostgREST), using the service role key.
 
 Only what the Python features need: read rows (paged, with `in` lists chunked so URLs stay short)
-and insert rows. The service role bypasses row-level security, so callers must check who is asking.
+insert rows and upsert them. The service role bypasses row-level security, so callers must check who is asking.
 """
 
 from collections.abc import Iterable, Iterator, Sequence
@@ -72,6 +72,18 @@ class SupabaseRest:
         )
         self._raise_for_error(response, f"insert into {table}")
         return response.json()
+
+    def upsert(self, table: str, rows: list[dict[str, Any]], on_conflict: str) -> None:
+        """Insert rows, replacing any that share `on_conflict` (a unique column)."""
+        if not rows:
+            return
+        response = self._client.post(
+            f"{self._base}/{table}",
+            params={"on_conflict": on_conflict},
+            json=rows,
+            headers={**self._headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+        )
+        self._raise_for_error(response, f"upsert into {table}")
 
     @staticmethod
     def _raise_for_error(response: httpx.Response, what: str) -> None:

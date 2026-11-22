@@ -28,6 +28,11 @@ export type GenerateWorkTrackersResult = {
     latest_day: string | null;
     reason: "no_window" | "outside_week" | "no_free_driver_day" | "too_long_for_a_day";
   }[];
+  /**
+   * Where the run's road legs came from: Google just now, the route cache, or a straight-line
+   * estimate (no coordinates, no route found, or Google unreachable).
+   */
+  travel?: { google: number; cached: number; estimated: number };
 };
 
 /**

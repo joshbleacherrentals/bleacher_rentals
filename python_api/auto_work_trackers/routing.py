@@ -7,13 +7,14 @@ Rules (constraints):
 - A driver's day, leaving home to getting back (deadhead included), is at most MAX_DAY_MINUTES.
 
 Objective: place as many trips as possible (a trip left out costs far more than any route), then
-drive as few (estimated) metres as possible. Haul length is fixed by the trips, so in effect the
+drive as few metres as possible. Haul length is fixed by the trips, so in effect the
 deadhead is what gets smaller: trips are chained when the next pickup is near the last drop-off.
 
 Solved with the OR-Tools routing solver: every free driver-day is a vehicle starting and ending at
 the driver's home; each trip is a pickup and a delivery on the same vehicle; a load dimension of
 capacity 1 keeps one bleacher on the truck; a time dimension caps the day. Distances and times are
-estimates (travel.estimate). The search runs for at most `search_seconds`.
+road times from `travel`: Google's where known (road_times), else estimates (travel.estimate). The
+search runs for at most `search_seconds`.
 """
 
 from collections.abc import Callable, Iterable
@@ -33,6 +34,9 @@ from python_api.auto_work_trackers.assignment import (
 )
 from python_api.auto_work_trackers.models import NeededTrip
 from python_api.auto_work_trackers.travel import NO_DRIVE, Leg, Point, estimate
+
+Travel = Callable[[Point | None, Point | None], Leg]
+"""Distance and drive time from one point to another (road_times.RoadTimes, or travel.estimate)."""
 
 MAX_DAY_MINUTES = 12 * 60
 DAY_START = time(7, 0)  # suggested times count from here, in the zone's local time
@@ -63,6 +67,7 @@ def plan_routes(
     point_of: PointOf,
     tz: str = "UTC",
     search_seconds: float = SEARCH_SECONDS,
+    travel: Travel = estimate,
 ) -> AssignmentResult:
     """Place the trips on driver-days (see the module doc). `blocked` holds (driver, day) pairs the
     driver cannot work. `search_seconds` <= 0 keeps the first solution found (no improvement)."""
@@ -82,7 +87,7 @@ def plan_routes(
 
     pickup = {k: point_of(trips[k].from_address_uuid) for k in days_of}
     dropoff = {k: point_of(trips[k].to_address_uuid) for k in days_of}
-    haul = {k: estimate(pickup[k], dropoff[k]) for k in days_of}
+    haul = {k: travel(pickup[k], dropoff[k]) for k in days_of}
 
     # The vehicles each trip may use: one of its days, and the trip fits a day on its own.
     allowed: dict[int, list[int]] = {}
@@ -91,9 +96,9 @@ def plan_routes(
         fits = [
             v
             for v in on_days
-            if estimate(vehicles[v][0].home, pickup[k]).clock_minutes
+            if travel(vehicles[v][0].home, pickup[k]).clock_minutes
             + haul[k].clock_minutes
-            + estimate(dropoff[k], vehicles[v][0].home).clock_minutes
+            + travel(dropoff[k], vehicles[v][0].home).clock_minutes
             <= MAX_DAY_MINUTES
         ]
         if not on_days:
@@ -129,7 +134,7 @@ def plan_routes(
         k = trip_of_node.get(i)
         if k is not None and i == pickup_node[k] and j == delivery_node[k]:
             return haul[k]
-        return estimate(node_point[i], node_point[j])
+        return travel(node_point[i], node_point[j])
 
     legs = [[leg(i, j) for j in range(n_nodes)] for i in range(n_nodes)]
     minutes = [[legs[i][j].clock_minutes for j in range(n_nodes)] for i in range(n_nodes)]
@@ -218,9 +223,9 @@ def plan_routes(
                 previous_index=position[prev] if prev is not None else None,
                 planned_pickup_at=_local(day, at_pickup, tz),
                 planned_dropoff_at=_local(day, at_dropoff, tz),
-                deadhead_in=estimate(came_from, pickup[k]),
+                deadhead_in=travel(came_from, pickup[k]),
                 haul=haul[k],
-                return_home=estimate(dropoff[k], drv.home) if route_last.get(v) == k else None,
+                return_home=travel(dropoff[k], drv.home) if route_last.get(v) == k else None,
             )
         )
 

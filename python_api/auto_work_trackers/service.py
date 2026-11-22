@@ -12,7 +12,13 @@ from python_api.auto_work_trackers.dates import is_monday, week_end_of
 from python_api.auto_work_trackers.assignment import AssignmentResult
 from python_api.auto_work_trackers.discovery import discover_trips
 from python_api.auto_work_trackers.models import BleacherInput, Driver, NeededTrip
-from python_api.auto_work_trackers.routing import SEARCH_SECONDS, RouteDriver, plan_routes
+from python_api.auto_work_trackers.road_times import TravelStats
+from python_api.auto_work_trackers.routing import SEARCH_SECONDS, RouteDriver, Travel, plan_routes
+from python_api.auto_work_trackers.travel import Point, estimate
+
+LoadTravel = Callable[[list[tuple[Point, Point]]], tuple[Travel, TravelStats]]
+"""Looks up road times for the pairs a run may drive (road_times.load_road_times, bound to the cache
+and Google). Without one, the planner uses straight-line estimates."""
 
 
 class Repository(Protocol):
@@ -144,13 +150,34 @@ class PlanResult:
     bleachers_in_zone: int
     drivers_in_zone: int
     plan: AssignmentResult
+    travel: TravelStats = TravelStats()
+
+
+def travel_pairs(homes: list[Point], trips: list[tuple[Point | None, Point | None]]) -> list[tuple[Point, Point]]:
+    """Every leg the solver may drive: home -> pickup, drop-off -> another pickup, drop-off -> home,
+    and each trip's own haul (pickup -> drop-off)."""
+    pickups = {p for p, _ in trips if p}
+    dropoffs = {d for _, d in trips if d}
+    pairs = {(h, p) for h in homes for p in pickups}
+    pairs |= {(d, p) for d in dropoffs for p in pickups if d != p}
+    pairs |= {(d, h) for d in dropoffs for h in homes}
+    pairs |= {(p, d) for p, d in trips if p and d}
+    return sorted(pairs)
 
 
 def plan_assignments(
-    repo: Repository, zone_id: str, week_start: str, tz: str, search_seconds: float = SEARCH_SECONDS
+    repo: Repository,
+    zone_id: str,
+    week_start: str,
+    tz: str,
+    search_seconds: float = SEARCH_SECONDS,
+    load_travel: LoadTravel | None = None,
 ) -> PlanResult:
     """Find the zone's trips for the week and plan them as driver routes (see routing.plan_routes):
     several trips a day, one bleacher at a time, at most 12 hours a day. Creates nothing.
+
+    With `load_travel`, every leg the solver may drive is looked up first (real road times from the
+    cache or Google); without it, legs are straight-line estimates.
 
     A trip that cannot be placed comes back with the reason.
     """
@@ -170,10 +197,17 @@ def plan_assignments(
     ]
     points = repo.load_address_points(wanted)
     route_drivers = [RouteDriver(d.driver_uuid, points.get(d.home_address_uuid or "")) for d in drivers]
-    plan = plan_routes(
-        trips, route_drivers, blocked, week_start, lambda a: points.get(a or ""), tz, search_seconds
-    )
-    return PlanResult(len(bleachers), len(drivers), plan)
+    point_of = lambda a: points.get(a or "")  # noqa: E731
+
+    travel: Travel = estimate
+    stats = TravelStats()
+    if load_travel:
+        homes = [d.home for d in route_drivers if d.home]
+        legs = [(point_of(t.from_address_uuid), point_of(t.to_address_uuid)) for t in trips]
+        travel, stats = load_travel(travel_pairs(homes, legs))
+
+    plan = plan_routes(trips, route_drivers, blocked, week_start, point_of, tz, search_seconds, travel)
+    return PlanResult(len(bleachers), len(drivers), plan, stats)
 
 
 @dataclass(frozen=True)
@@ -181,13 +215,14 @@ class GenerateAssignedResult:
     bleachers_in_zone: int
     plan: AssignmentResult
     work_tracker_ids: list[str]  # one per assigned trip, same order as `plan.assigned`
+    travel: TravelStats = TravelStats()
 
 
 def planned_work_tracker_rows(plan: AssignmentResult, new_id: Callable[[], str]) -> list[dict[str, Any]]:
     """One draft work tracker row per assigned trip, in plan order (a trip's previous comes first).
 
     Ids are made here so each trip can point at the one it drives on from. Distances and minutes are
-    the planner's estimates. Every row has every key, as one bulk insert needs.
+    the planner's: Google road times where known, else estimates. Every row has every key, as one bulk insert needs.
     """
     ids = [new_id() for _ in plan.assigned]
     rows = []
@@ -222,6 +257,7 @@ def generate_assigned_work_trackers(
     tz: str,
     search_seconds: float = SEARCH_SECONDS,
     new_id: Callable[[], str] = lambda: str(uuid4()),
+    load_travel: LoadTravel | None = None,
 ) -> GenerateAssignedResult:
     """Plan the week as driver routes and create a draft work tracker for each trip that got a place.
 
@@ -229,7 +265,7 @@ def generate_assigned_work_trackers(
     suggested pickup and drop-off times and the estimated legs. The rest are returned unassigned;
     nothing is created for them.
     """
-    planned = plan_assignments(repo, zone_id, week_start, tz, search_seconds)
+    planned = plan_assignments(repo, zone_id, week_start, tz, search_seconds, load_travel)
     rows = planned_work_tracker_rows(planned.plan, new_id)
     ids = repo.create_planned_work_trackers(rows) if rows else []
-    return GenerateAssignedResult(planned.bleachers_in_zone, planned.plan, ids)
+    return GenerateAssignedResult(planned.bleachers_in_zone, planned.plan, ids, planned.travel)

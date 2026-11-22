@@ -54,6 +54,13 @@ export function GenerateWorkTrackersButton({
             bleachers, on {new Set(result.created.map((t) => `${t.driver_uuid}|${t.date}`)).size}{" "}
             driver-days.
           </p>
+          {result.travel && (
+            <p className="text-xs text-gray-500" data-testid="generate-work-trackers-travel">
+              Road times: {result.travel.google + result.travel.cached} from Google (
+              {result.travel.cached} cached)
+              {result.travel.estimated > 0 && `, ${result.travel.estimated} estimated`}.
+            </p>
+          )}
           {result.unassigned.length > 0 && (
             <p className="text-amber-700" data-testid="generate-work-trackers-unassigned">
               {summarizeUnassigned(result.unassigned)}

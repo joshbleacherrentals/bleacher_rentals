@@ -35,11 +35,20 @@ class CreatedTrip(BaseModel):
     planned_dropoff_at: str | None = None
 
 
+class TravelSources(BaseModel):
+    """Where a run's road legs came from: Google just now, the cache, or a straight-line estimate."""
+
+    google: int = 0
+    cached: int = 0
+    estimated: int = 0
+
+
 class GenerateResponse(BaseModel):
     bleachers_in_zone: int
     bleachers_needing_trips: int
     created: list[CreatedTrip]
     unassigned: list[UnassignedTrip] = []
+    travel: TravelSources = TravelSources()
 
 
 class SuggestedTrip(BaseModel):
@@ -115,3 +124,4 @@ class PlanResponse(BaseModel):
     drivers_in_zone: int
     assigned: list[PlannedTrip]
     unassigned: list[UnassignedTrip]
+    travel: TravelSources = TravelSources()

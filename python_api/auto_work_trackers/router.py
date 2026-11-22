@@ -1,8 +1,11 @@
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException
 
+from python_api.auto_work_trackers.google_routes import fetch_road_legs
 from python_api.auto_work_trackers.repository import WorkTrackerRepository
+from python_api.auto_work_trackers.road_times import load_road_times
 from python_api.auto_work_trackers.schemas import (
     AcceptedCreated,
     AcceptedSkipped,
@@ -16,6 +19,7 @@ from python_api.auto_work_trackers.schemas import (
     SuggestedTrip,
     SuggestRequest,
     SuggestResponse,
+    TravelSources,
     UnassignedTrip,
 )
 from python_api.auto_work_trackers.service import (
@@ -27,6 +31,7 @@ from python_api.auto_work_trackers.service import (
     suggest_trips,
     work_tracker_date,
 )
+from python_api.core import settings
 from python_api.core.supabase import SupabaseRest
 
 router = APIRouter(prefix="/api/py/auto-work-trackers")
@@ -37,6 +42,17 @@ def _check_timezone(tz: str) -> None:
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError):
         raise HTTPException(422, f"Unknown timezone {tz!r}.")
+
+
+def _road_times(repo: WorkTrackerRepository):
+    """Road times for a run: the RouteCache, then Google for the rest (when a key is set)."""
+    key = settings.google_maps_key()
+    fetch = (lambda pairs: fetch_road_legs(pairs, key)) if key else None
+    return lambda pairs: load_road_times(pairs, repo, fetch, datetime.now(timezone.utc))
+
+
+def _travel_json(stats) -> TravelSources:
+    return TravelSources(google=stats.google, cached=stats.cached, estimated=stats.estimated)
 
 
 def _unassigned_json(u) -> UnassignedTrip:
@@ -59,7 +75,9 @@ def generate(body: GenerateRequest) -> GenerateResponse:
 
     repo = WorkTrackerRepository(SupabaseRest.from_env())
     try:
-        result = generate_assigned_work_trackers(repo, body.zone_id, body.week_start, body.timezone)
+        result = generate_assigned_work_trackers(
+            repo, body.zone_id, body.week_start, body.timezone, load_travel=_road_times(repo)
+        )
     except InvalidWeekError as e:
         raise HTTPException(422, str(e))
 
@@ -87,6 +105,7 @@ def generate(body: GenerateRequest) -> GenerateResponse:
             for a, wt_id in zip(assigned, result.work_tracker_ids, strict=True)
         ],
         unassigned=[_unassigned_json(u) for u in result.plan.unassigned],
+        travel=_travel_json(result.travel),
     )
 
 
@@ -148,7 +167,9 @@ def plan(body: SuggestRequest) -> PlanResponse:
     _check_timezone(body.timezone)
     repo = WorkTrackerRepository(SupabaseRest.from_env())
     try:
-        result = plan_assignments(repo, body.zone_id, body.week_start, body.timezone)
+        result = plan_assignments(
+            repo, body.zone_id, body.week_start, body.timezone, load_travel=_road_times(repo)
+        )
     except InvalidWeekError as e:
         raise HTTPException(422, str(e))
 
@@ -176,4 +197,5 @@ def plan(body: SuggestRequest) -> PlanResponse:
             for a in result.plan.assigned
         ],
         unassigned=[_unassigned_json(u) for u in result.plan.unassigned],
+        travel=_travel_json(result.travel),
     )

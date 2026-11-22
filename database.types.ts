@@ -2011,6 +2011,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"RouteCache": {
+                  Row: {
+                    "distance_meters": number | null,"duration_seconds": number | null,"fetched_at": string,"found": boolean,"from_lat": number,"from_lng": number,"pair_key": string,"to_lat": number,"to_lng": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "distance_meters"?: number | null,"duration_seconds"?: number | null,"fetched_at"?: string,"found": boolean,"from_lat": number,"from_lng": number,"pair_key": string,"to_lat": number,"to_lng": number
+                  }
+                  Update: {
+                    "distance_meters"?: number | null,"duration_seconds"?: number | null,"fetched_at"?: string,"found"?: boolean,"from_lat"?: number,"from_lng"?: number,"pair_key"?: string,"to_lat"?: number,"to_lng"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"SalesOffices": {
                   Row: {
                     "address_uuid": string | null,"created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"id": string,"name": string,"payment_info": string | null,"phone": string | null,"quickbook_uuid": string,"stripe_connection_uuid": string | null

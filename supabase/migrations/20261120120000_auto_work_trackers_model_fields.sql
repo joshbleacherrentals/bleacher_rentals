@@ -1,4 +1,4 @@
--- The Auto Work Trackers model's fields.
+-- The Auto Work Trackers model's fields, and its route cache.
 --
 -- 1. Drivers.exclude_from_auto_work_trackers: lets the office leave a driver out of the model. An
 --    excluded driver is never given a trip when work trackers are created, and is listed apart on
@@ -50,3 +50,27 @@ comment on column public."WorkTrackers".return_home_distance_meters is
   'This drop-off to the driver''s home; only on the last trip of the day.';
 comment on column public."WorkTrackers".return_home_drive_minutes is
   'This drop-off to the driver''s home; only on the last trip of the day.';
+
+-- 3. RouteCache: real road distances and drive times from Google (Routes API, Compute Route Matrix,
+--    traffic-unaware, avoiding tolls), kept so planning runs only ask Google for pairs they have
+--    not seen in the last 30 days. Keyed by the two points rounded to 5 decimals (about a metre).
+--    Server-only: read and written by the Python planner with the service role. Row-level security
+--    is on with no policies, so the app's users (and PowerSync) never see it.
+
+create table if not exists public."RouteCache" (
+  pair_key text primary key,
+  from_lat double precision not null,
+  from_lng double precision not null,
+  to_lat double precision not null,
+  to_lng double precision not null,
+  found boolean not null,
+  distance_meters integer,
+  duration_seconds integer,
+  fetched_at timestamptz not null default now()
+);
+
+alter table public."RouteCache" enable row level security;
+
+comment on table public."RouteCache" is
+  'Google road distance/time between two points (traffic-unaware, no tolls), cached for the Auto Work Trackers planner. Server-only.';
+comment on column public."RouteCache".found is 'False when Google found no route between the points.';
