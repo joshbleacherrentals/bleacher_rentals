@@ -31,10 +31,13 @@ export async function GET(req: NextRequest) {
     origin: buildRoutesWaypoint(origin),
     destination: buildRoutesWaypoint(dest),
     travelMode: "DRIVE",
-    routingPreference: "TRAFFIC_AWARE",
+    // No live traffic: the same trip gets the same distance and time whenever it is asked (and it is
+    // the cheapest tier). Departure time does not matter in this mode.
+    routingPreference: "TRAFFIC_UNAWARE",
     computeAlternativeRoutes: false,
     routeModifiers: {
-      avoidTolls: false,
+      // Drivers avoid toll roads, so the route and its pay are worked out the same way.
+      avoidTolls: true,
       avoidHighways: false,
       avoidFerries: false,
     },
@@ -97,7 +100,8 @@ export async function GET(req: NextRequest) {
     kilometers: kilometers ? parseFloat(kilometers.toFixed(1)) : null,
     durationSeconds,
     durationText,
-    durationInTrafficSeconds: durationSeconds, // Routes API uses traffic by default with TRAFFIC_AWARE
+    // Kept for callers that read it; with TRAFFIC_UNAWARE this is the same drive time, no traffic.
+    durationInTrafficSeconds: durationSeconds,
     durationInTrafficText: durationText,
   };
 
