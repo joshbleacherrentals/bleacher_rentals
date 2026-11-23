@@ -1,9 +1,11 @@
 # Repairs page: plan
 
 Status: **APPROVED 2026-11-18** together with spec 01 (0 open decisions in the plan; every page
-spec asks its own decisions before it is written). Eleven specs: 01 is the design, 02 to 10 are
-the page by layers, 11 moves the Dashboard to the new window. Page: `/repairs`. Design:
-`docs/design/repairs/`. Branch: `q4-sprint4-maintenance`.
+spec asks its own decisions before it is written). **Changed 2026-11-23 (D207 to D213, §4):**
+spec 09 was cut into 09a, 09b1, 09b2 and 09b3, and spec 10 (permissions) is merged into spec 11,
+so the series ends with spec 11 and has no spec 10. Specs: 01 is the design, 02 to 09b3 are the
+page by layers, 11 moves the Dashboard to the new window and carries what was left of 10. Page:
+`/repairs`. Design: `docs/design/repairs/`. Branch: `q4-sprint4-maintenance`.
 
 ## 0. The feature in brief (the same in the plan and in every spec)
 
@@ -120,9 +122,9 @@ the spreadsheet, and the page itself is refactored, not added.
   are written and **not run** (the user's rule); the report marks that step SKIPPED. The seeded
   E2E admin user has no `Users` row locally, so admin specs cannot run there.
 
-## 1. The eleven specs
+## 1. The specs
 
-Each spec is its own logic, its own "Approved" and its own commit. A page spec is written only
+Eleven were planned; 09 became four parts and 10 is merged into 11 (§4). Each spec is its own logic, its own "Approved" and its own commit. A page spec is written only
 after the design is approved, and only after its questions are answered. Under each spec is what
 it must settle; these are questions, not decisions.
 
@@ -150,27 +152,73 @@ it must settle; these are questions, not decisions.
 - **08, status:** the pill menu, the write, `completed_at`, the move between the tabs.
   - What `completed_at` does when a completed repair is reopened.
   - Updates its row in the permissions matrix in the same commit (see §2).
-- **09, writes:** Edit and New repair, services (Edit, Add, Delete), files, Delete and Restore.
-  - The fixed event name, the Vendor select, the currency pre-fill, the zone of the repair, the
-    one-zone rule, the duplicate invoice number check, the first status.
-  - Updates its rows in the permissions matrix in the same commit (see §2).
-- **10, permissions:** who sees which buttons, the Playwright specs per role, and a final check
-  of the matrix.
+- **09, writes:** cut into four specs (D123, D148, D168, D189), each APPROVED, IMPLEMENTED and
+  committed, each with its own rows in the permissions matrix in the same commit (see §2).
+  - **09a, the repair itself:** [repairs-09a-repair-writes.md](repairs-09a-repair-writes.md). Edit
+    and New repair, Delete and Restore.
+  - **09b1, the services:** [repairs-09b1-services.md](repairs-09b1-services.md). Add, Edit and
+    Delete of a service.
+  - **09b2, what a service does to its repair:**
+    [repairs-09b2-bleachers-zone-reports.md](repairs-09b2-bleachers-zone-reports.md). The bleachers
+    of the repair, its zone and the links to the damage reports.
+  - **09b3, the files:** [repairs-09b3-files.md](repairs-09b3-files.md). Add and delete the files
+    of a repair.
+- **10, permissions (merged into 11, D207):** there is no spec 10. What it was to hold is settled
+  by the audit of 2026-11-23, in §4.
+  - The button gates were built by the page specs themselves: one gate for the writers,
+    `canManageDamageAndMaintenance` (an administrator and a maintainer), and `canReadRepairFiles`
+    for the Files section.
+  - No Playwright scenarios and no unit tests are added for the roles that cannot open the page
+    (D211).
+  - The last check of the matrix is made in spec 11 (D208).
 - **11, the Dashboard:** the maintenance flow of a Dashboard cell uses the New repair window and
   the old form is deleted.
+  - **Carried from the old spec 10:** the text of the account manager's row in "Repairs &
+    Maintenance" is corrected (D208), and a maintainer gets "+ Create" with the one item
+    "Maintenance Event" on the Dashboard (D210).
 
 ## 2. Order and one rule to keep
 
-- **Order:** 01, then 02 to 10 in order, then 11. A later spec needs the earlier ones.
+- **Order:** 01, 02 to 08, 09a, 09b1, 09b2, 09b3, then 11. A later spec needs the earlier ones.
+  Everything up to 09b3 is built and committed.
 - **The permissions matrix.** CLAUDE.md says the matrix `permissionPageData.ts` is updated in
   the same commit as the change that alters what a role can do, and no spec may leave that for
   later. So a spec that puts data on a screen or changes what a role can do carries its rows
-  itself: 04 (the first screen that shows vendors and Reported), 08 and 09. A spec that only moves
-  data that no screen shows yet (02, 03) carries none, as in maintenance-01 §3 (user, 2026-11-18).
-  Spec 10 holds the button gates, the role specs and the last check.
+  itself: 04 (the first screen that shows vendors and Reported), 08 and the four parts of 09. A
+  spec that only moves data that no screen shows yet (02, 03) carries none, as in maintenance-01 §3
+  (user, 2026-11-18). There is no spec 10 (D207): the button gates came with the page specs, and
+  the last check of the matrix is made in spec 11 (D208).
 
 ## 3. Out of the series
 
 The Vendors page, the Dashboard & Analytics page, the Assets additions, the sidebar changes for
 them, the damage category settings (adding and switching categories off), the budget form, the
 driver's hourly maintenance rate, the driver app, the Driver Parts Tracker and the GPS Trackers.
+
+The Storage policies of the bucket `maintenance-photos` (D209): they check only the bucket, so any
+signed-in user can add, change and delete an object in it through the API, whatever the role. The
+page shows no such button to the other roles. The policies are left as they are.
+
+## 4. Decisions after 09b3 (user, 2026-11-23)
+
+The audit before spec 10 found that the page specs 04 to 09b3 had already built what spec 10 was
+to hold: the gates of the buttons, the roles' rows of the matrix and the role scenarios of the
+page. D21 to D206 are in the specs 02 to 09b3. Two batches of questions settled the rest.
+
+- **D207:** spec 10 is merged into spec 11. There is no spec 10 file.
+- **D208:** spec 11 corrects the text of the account manager's row in "Repairs & Maintenance". The
+  row says they can edit or delete only the repairs they created, but the database and the
+  Dashboard form let them change any event, and on the Repairs page they only read. The level
+  stays `custom`, and no right changes.
+- **D209:** the Storage policies of `maintenance-photos` stay as they are (§3).
+- **D210:** in spec 11 a maintainer gets "+ Create" on the Dashboard with one item, "Maintenance
+  Event". "Sub-Rental Request" stays hidden for them, because the database gives them only a read
+  of `SubrentalEvents`. Today `CreateEventButton` counts a maintainer as a viewer and draws nothing
+  for them.
+- **D211:** no new tests that a developer, a driver and an accountant cannot open `/repairs`:
+  neither Vitest nor Playwright.
+- **D212:** the browser check of the specs 04 to 09b3 is not made again by Claude: the user checked
+  the pages in their own browser and says that everything is good (their word, 2026-11-23;
+  Claude has seen none of them).
+- **D213:** only this plan is corrected. The "uncommitted" status lines in the headers of the
+  specs 04 to 09b3 stay as they are.
