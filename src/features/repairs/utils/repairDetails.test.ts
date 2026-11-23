@@ -522,6 +522,26 @@ describe("the new entry of the stack (spec 09a)", () => {
   it("is drawn even when the rows are empty", () => {
     expect(resolveWindows([], [newEntry]).map((w) => w.kind)).toEqual(["new"]);
   });
+
+  // docs/specs/repairs-11-dashboard.md §3 and §7: the entry may carry a preset, and it reaches the
+  // window that is drawn.
+  it("hands the preset of a new entry on to the window that is drawn", () => {
+    const preset = { eventStart: "2026-12-02", bleacherUuid: "b-52", requireService: true };
+    const [window] = resolveWindows([], [{ kind: "new", preset }]);
+    expect(window.kind).toBe("new");
+    expect(window.kind === "new" && window.preset).toEqual(preset);
+  });
+
+  it("has no preset when the entry has none", () => {
+    const [window] = resolveWindows([], [newEntry]);
+    expect(window.kind === "new" && window.preset).toBeUndefined();
+  });
+
+  it("treats two new entries with different presets as the same window on the top", () => {
+    const first: WindowEntry = { kind: "new", preset: { bleacherUuid: "b-1" } };
+    const second: WindowEntry = { kind: "new", preset: { bleacherUuid: "b-2" } };
+    expect(openWindow([first], second)).toEqual([first]);
+  });
 });
 
 // docs/specs/repairs-09b1-services.md §2.4, §3 and §7 (D158): the stack gets a `newService` entry for

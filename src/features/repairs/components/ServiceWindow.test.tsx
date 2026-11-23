@@ -4,9 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { repairRow, repairService } from "../utils/repairRowFixture";
 import type { RepairListRow, RepairService } from "../utils/repairRows";
 import type { RawServiceBleacherRow } from "../db/serviceWindowQueries";
+import { emptyServiceForm } from "../utils/serviceForm";
 import {
   ServiceWindowContent,
   ServiceWindowFooter,
+  newServiceStart,
   serviceIsEditable,
   type ServiceWindowFooterProps,
 } from "./ServiceWindow";
@@ -361,5 +363,21 @@ describe("serviceIsEditable (D157, D165)", () => {
     expect(serviceIsEditable({ editing: true, serviceDeleted: false, repairDeleted: true })).toBe(
       false,
     );
+  });
+});
+
+// docs/specs/repairs-11-dashboard.md §2.6, §3 and §7 (D229): the New service window opens with the
+// bleacher chosen when a repair is started from a cell or from a damage report. The dialog needs a
+// portal, so the start of its form is a pure function.
+describe("newServiceStart (D229)", () => {
+  it("is the empty form with no bleacher", () => {
+    expect(newServiceStart(undefined)).toEqual(emptyServiceForm());
+  });
+
+  it("has the bleacher chosen and everything else empty, Severity included", () => {
+    const values = newServiceStart("b-40");
+    expect(values).toEqual({ ...emptyServiceForm(), bleacherUuid: "b-40" });
+    expect(values.severity).toBeNull();
+    expect(values.categoryUuid).toBeNull();
   });
 });

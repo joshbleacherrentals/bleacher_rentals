@@ -8,6 +8,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { REPAIR_POPOVER_CLASS } from "../utils/repairLayer";
 import { statusPill } from "../utils/repairFormat";
 import type { RepairStatus } from "../utils/repairRows";
 import { REPAIR_STATUSES, statusMenuEntries } from "../utils/repairStatus";
@@ -51,7 +52,7 @@ export function RepairStatusMenu({ status, repairLabel, onChange }: RepairStatus
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="min-w-[11rem]"
+        className={`min-w-[11rem] ${REPAIR_POPOVER_CLASS}`}
         onClick={(event) => event.stopPropagation()}
       >
         <DropdownMenuRadioGroup

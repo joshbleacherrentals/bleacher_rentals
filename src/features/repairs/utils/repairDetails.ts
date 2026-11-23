@@ -2,6 +2,7 @@ import type { AcknowledgementSummary } from "@/app/damage-reports/_lib/acknowled
 import { effectiveColumnDamage } from "@/lib/damageReportSeverity";
 import type { RawReportDetailRow, RawReportPhotoRow } from "../db/serviceWindowQueries";
 import { dayInZone } from "./dayInZone";
+import type { NewRepairPreset } from "./newRepairPreset";
 import type { RepairListRow, RepairService, ReportedReport } from "./repairRows";
 
 /**
@@ -154,8 +155,11 @@ export type WindowEntry =
   | { kind: "repair"; repairId: string }
   | { kind: "service"; repairId: string; serviceId: string }
   | { kind: "reports"; reported: ReportedReport[] }
-  /** The New repair window: it has no repair behind it (spec 09a D126). */
-  | { kind: "new" }
+  /**
+   * The New repair window: it has no repair behind it (spec 09a D126). A preset says what it starts
+   * with, when it is opened from the Dashboard or from a damage report (spec 11 D216, D223).
+   */
+  | { kind: "new"; preset?: NewRepairPreset }
   /** The New service window of a live repair (spec 09b1 D158). */
   | { kind: "newService"; repairId: string };
 
@@ -171,7 +175,7 @@ export type ResolvedWindow =
       showOpenRepair: boolean;
     }
   | { kind: "reports"; index: number; reported: ReportedReport[] }
-  | { kind: "new"; index: number }
+  | { kind: "new"; index: number; preset?: NewRepairPreset }
   | { kind: "newService"; index: number; repair: RepairListRow };
 
 function sameWindow(a: WindowEntry, b: WindowEntry): boolean {
@@ -217,7 +221,7 @@ export function resolveWindows(
   const windows: ResolvedWindow[] = [];
   stack.forEach((entry, index) => {
     if (entry.kind === "new") {
-      windows.push({ kind: "new", index });
+      windows.push({ kind: "new", index, preset: entry.preset });
     } else if (entry.kind === "reports") {
       windows.push({ kind: "reports", index, reported: entry.reported });
     } else if (entry.kind === "repair") {

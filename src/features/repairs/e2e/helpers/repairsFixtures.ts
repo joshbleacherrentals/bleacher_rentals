@@ -12,7 +12,9 @@ import { randomUUID } from "node:crypto";
  * reports.md §6 (`links`: bleachers, open damage reports, a sub-rental and three repairs for what a
  * service does to the repair around it), and docs/specs/repairs-09b3-files.md §6 (`files`: a fresh
  * bleacher with one repair for each files scenario, whose stored files have real objects in the
- * bucket, and the payloads the scenarios pick).
+ * bucket, and the payloads the scenarios pick), and docs/specs/repairs-11-dashboard.md §6
+ * (`dashboard`: a fresh bleacher with an open damage report that no repair has, and another with an
+ * open report linked to a repair, for the "Create Maintenance to Resolve" button).
  *
  * It writes `MaintenanceLineItems` and `Vendors`, which reach a user's device only where the sync
  * rules of docs/specs/repairs-02-sync-rules.md are deployed.
@@ -165,6 +167,19 @@ export type SeededLinks = {
   };
 };
 
+/**
+ * What the spec 11 scenarios (S52, S53, S55) need: two fresh bleachers with no zone, each with one open
+ * damage report that has an uploaded photo (the Damage Reports page hides a report whose photos are
+ * not all uploaded, and one with none). Each report has its own note, so its card can be found.
+ * docs/specs/repairs-11-dashboard.md §6.
+ */
+export type SeededDashboard = {
+  /** An open report that no repair has, on a bleacher with no repair (S52, S55). */
+  unlinked: { bleacher: BleacherRef; reportId: string; note: string };
+  /** An open report linked to an open repair that sits on the same bleacher (S53). */
+  linked: { bleacher: BleacherRef; reportId: string; note: string; repairId: string };
+};
+
 export type SeededRepairs = {
   /**
    * Holds the completed USD repair and the in-repair CAD repair. It has a model number and, when
@@ -209,6 +224,8 @@ export type SeededRepairs = {
   links: SeededLinks | null;
   /** The fixtures of spec 09b3 (the files of a repair). */
   files: SeededFiles;
+  /** The fixtures of spec 11 (the button of a damage report). */
+  dashboard: SeededDashboard;
   cleanup: () => Promise<void>;
 };
 
@@ -754,6 +771,90 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     }),
   };
 
+  // ── Spec 11: the button "Create Maintenance to Resolve" of a damage report ───────────────────
+  // Two fresh bleachers (smallint numbers, clear of the ones above) with no zone. One holds an open
+  // report that no repair has, the other an open report linked to an open repair. Each report has one
+  // uploaded photo, so the Damage Reports page does not hide it; the cleanup removes the photos with
+  // the reports, and the repair that S52 makes on the first bleacher with the others.
+  const dashboardBleacherRes = await supabase
+    .from("Bleachers")
+    .insert(
+      [0, 1].map((i) => ({
+        bleacher_number: base + 120 + i,
+        bleacher_rows: 5,
+        bleacher_seats: 50,
+      })),
+    )
+    .select("id, bleacher_number");
+  const dashboardBleachers = check(
+    dashboardBleacherRes.data,
+    dashboardBleacherRes.error,
+    "dashboard bleachers",
+  );
+  extraBleacherIds.push(...dashboardBleachers.map((b) => b.id as string));
+  const dashboardBleacher = (offset: number): BleacherRef => {
+    const found = dashboardBleachers.find((b) => b.bleacher_number === base + 120 + offset);
+    if (!found) throw new Error(`fixture dashboard bleacher ${offset} missing`);
+    return { uuid: found.id as string, number: base + 120 + offset };
+  };
+  const insertDashboardReport = async (
+    bleacherUuid: string,
+    note: string,
+    repairId: string | null,
+  ) => {
+    const res = await supabase
+      .from("DamageReports")
+      .insert({
+        bleacher_uuid: bleacherUuid,
+        seat_damage: "minor",
+        haul_damage: "none",
+        is_safe_to_sit: false,
+        is_safe_to_haul: true,
+        note,
+        maintenance_event_uuid: repairId,
+      })
+      .select("id")
+      .single();
+    const id = check(res.data, res.error, "dashboard report").id as string;
+    reportIds.push(id);
+    const photo = await supabase.from("DamageReportPhotos").insert({
+      damage_report_uuid: id,
+      photo_path: `e2e/${suffix}/dashboard-${id}.jpg`,
+      upload_status: "uploaded",
+    });
+    if (photo.error) throw new Error(`fixture dashboard photo failed: ${photo.error.message}`);
+    return id;
+  };
+  const unlinkedBleacher = dashboardBleacher(0);
+  const unlinkedNote = `e2e-dash-open-${suffix}`;
+  const unlinkedReportId = await insertDashboardReport(unlinkedBleacher.uuid, unlinkedNote, null);
+  const linkedBleacher = dashboardBleacher(1);
+  const linkedNote = `e2e-dash-linked-${suffix}`;
+  const linkedRepairId = await insertEvent(
+    {
+      event_start: "2026-10-20",
+      event_end: "2026-10-25",
+      status: "inbound",
+      currency: "USD",
+      invoice_number: `E2E-DASH-${suffix}`,
+    },
+    linkedBleacher.uuid,
+  );
+  const linkedReportId = await insertDashboardReport(
+    linkedBleacher.uuid,
+    linkedNote,
+    linkedRepairId,
+  );
+  const dashboard: SeededDashboard = {
+    unlinked: { bleacher: unlinkedBleacher, reportId: unlinkedReportId, note: unlinkedNote },
+    linked: {
+      bleacher: linkedBleacher,
+      reportId: linkedReportId,
+      note: linkedNote,
+      repairId: linkedRepairId,
+    },
+  };
+
   const completedTotal = await costOf(completedId);
   const cadTotal = await costOf(cadId);
 
@@ -778,6 +879,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     repairFiles,
     links,
     files,
+    dashboard,
     cleanup: async () => {
       const bleacherIds = [...bleachers.map((b) => b.id as string), ...extraBleacherIds];
 

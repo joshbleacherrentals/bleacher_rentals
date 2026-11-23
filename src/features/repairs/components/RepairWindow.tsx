@@ -29,7 +29,6 @@ import { useVendorAddress } from "../hooks/useRepairDetails";
 import { repairLabel, reportsButtonLabel } from "../utils/repairDetails";
 import {
   clearedRepairFormErrors,
-  emptyRepairForm,
   isRepairFormDirty,
   nextCurrencyForVendor,
   repairFormFromRow,
@@ -41,6 +40,12 @@ import {
 import type { FilterOption } from "../utils/repairFilters";
 import { reportedCell } from "../utils/repairFormat";
 import { liveBleachersOfDraft, type ServiceZoneCheck } from "../utils/repairLinks";
+import { REPAIR_LAYER_CLASS } from "../utils/repairLayer";
+import {
+  presetRepairForm,
+  requiredServiceError,
+  type NewRepairPreset,
+} from "../utils/newRepairPreset";
 import type { RepairListRow, RepairStatus, ReportedReport } from "../utils/repairRows";
 import { canChangeRepairStatus } from "../utils/repairStatus";
 import {
@@ -459,8 +464,29 @@ export type RepairEditing = {
   checkServiceZone: ServiceZoneCheck;
 };
 
-/** The service window a draft has open (spec 09b1 D162): one service of the draft, or Add service. */
-type DraftServiceWindowState = { kind: "view"; id: string } | { kind: "new" } | null;
+/**
+ * The service window a draft has open (spec 09b1 D162): one service of the draft, or Add service. Add
+ * service may start with a bleacher chosen (spec 11 D229).
+ */
+export type DraftServiceWindowState =
+  | { kind: "view"; id: string }
+  | { kind: "new"; bleacherUuid?: string }
+  | null;
+
+/**
+ * What the New repair window starts with (spec 11 §2.6): the form, with the days of the preset, and
+ * the service window, open at once with the bleacher of the preset chosen. Pure, so it is tested
+ * without the dialog.
+ */
+export function newRepairStart(preset: NewRepairPreset | undefined): {
+  initial: RepairFormValues;
+  serviceWindow: DraftServiceWindowState;
+} {
+  return {
+    initial: presetRepairForm(preset),
+    serviceWindow: preset?.bleacherUuid ? { kind: "new", bleacherUuid: preset.bleacherUuid } : null,
+  };
+}
 
 /**
  * The service windows of a draft, drawn by the repair window itself over it: the stack of the page
@@ -500,6 +526,7 @@ function DraftServiceWindows({
         repair={repair}
         bleachers={bleachers}
         categories={categories}
+        initialBleacherUuid={state.bleacherUuid}
         onCreate={async (values) => {
           const errors = validateServiceForm(values);
           if (Object.keys(errors).length > 0) return errors;
@@ -661,7 +688,11 @@ function DiscardChangesDialog({
 }) {
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onKeep()}>
-      <AlertDialogContent data-testid="repair-discard-dialog">
+      <AlertDialogContent
+        data-testid="repair-discard-dialog"
+        className={REPAIR_LAYER_CLASS}
+        overlayClassName={REPAIR_LAYER_CLASS}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Discard changes?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -694,7 +725,11 @@ function DeleteRepairDialog({
 }) {
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
-      <AlertDialogContent data-testid="repair-delete-dialog">
+      <AlertDialogContent
+        data-testid="repair-delete-dialog"
+        className={REPAIR_LAYER_CLASS}
+        overlayClassName={REPAIR_LAYER_CLASS}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -722,8 +757,7 @@ function DeleteRepairDialog({
  * window is 1152 px. The window itself never scrolls sideways.
  */
 export const REPAIR_WINDOW_WIDTH = 1152;
-export const REPAIR_WINDOW_CLASS =
-  "max-h-[90vh] gap-0 overflow-x-hidden overflow-y-auto rounded-xl p-0 sm:max-w-[1152px]";
+export const REPAIR_WINDOW_CLASS = `${REPAIR_LAYER_CLASS} max-h-[90vh] gap-0 overflow-x-hidden overflow-y-auto rounded-xl p-0 sm:max-w-[1152px]`;
 
 /** The Edit mode of an existing repair: the content with the inputs, and Cancel and Save. */
 function RepairEditBody({
@@ -900,7 +934,11 @@ export function RepairWindow({
           if (!open) requestClose();
         }}
       >
-        <DialogContent data-testid="repair-window" className={REPAIR_WINDOW_CLASS}>
+        <DialogContent
+          data-testid="repair-window"
+          className={REPAIR_WINDOW_CLASS}
+          overlayClassName={REPAIR_LAYER_CLASS}
+        >
           <DialogDescription className="sr-only">
             A repair with its services and files.
           </DialogDescription>
@@ -978,6 +1016,8 @@ export type NewRepairWindowProps = {
   ) => Promise<RepairFormErrors | null>;
   /** Called before a service goes into the draft: the refusal text of a zone conflict, or null (09b2 D176). */
   checkServiceZone: ServiceZoneCheck;
+  /** What the window starts with, when it is opened from the Dashboard or a damage report (spec 11). */
+  preset?: NewRepairPreset;
   onClose: () => void;
 };
 
@@ -991,18 +1031,27 @@ export function NewRepairWindow({
   categories,
   onCreate,
   checkServiceZone,
+  preset,
   onClose,
 }: NewRepairWindowProps) {
-  const [initial] = useState(emptyRepairForm);
+  const [start] = useState(() => newRepairStart(preset));
   const draft = useRepairDraft({
     mode: "new",
-    initial,
+    initial: start.initial,
     initialServices: [],
-    submit: (_initial, values, services, files) => onCreate(values, services, files),
+    // A window opened from a damage report refuses a save with no service (D222); a repair that is
+    // added tells the preset, so the card of the report can close (D234).
+    submit: async (_initial, values, services, files) => {
+      const refusal = requiredServiceError(preset, services);
+      if (refusal) return { services: refusal };
+      const errors = await onCreate(values, services, files);
+      if (!errors) preset?.onCreated?.();
+      return errors;
+    },
     onSaved: onClose,
   });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [serviceWindow, setServiceWindow] = useState<DraftServiceWindowState>(null);
+  const [serviceWindow, setServiceWindow] = useState<DraftServiceWindowState>(start.serviceWindow);
   const vendorOptions = useMemo(
     () => vendorSelectOptions(vendors, { uuid: null, name: null }),
     [vendors],
@@ -1024,7 +1073,11 @@ export function NewRepairWindow({
           if (!open) requestClose();
         }}
       >
-        <DialogContent data-testid="new-repair-window" className={REPAIR_WINDOW_CLASS}>
+        <DialogContent
+          data-testid="new-repair-window"
+          className={REPAIR_WINDOW_CLASS}
+          overlayClassName={REPAIR_LAYER_CLASS}
+        >
           <DialogDescription className="sr-only">Add a new repair.</DialogDescription>
           <div className="px-6 pt-5 pr-12 pb-4">
             <div className={EYEBROW}>New repair</div>

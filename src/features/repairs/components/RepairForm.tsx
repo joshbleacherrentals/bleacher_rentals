@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Dropdown } from "@/components/DropDown";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { REPAIR_POPOVER_CLASS } from "../utils/repairLayer";
 import { statusPill } from "../utils/repairFormat";
 import type {
   RepairFormErrors,
@@ -111,6 +112,7 @@ export function RepairFormFields({
     <div className="grid grid-cols-2 gap-x-6 gap-y-[18px] sm:grid-cols-4">
       <Field label="Vendor" className="col-span-2">
         <SearchableSelect
+          popoverClassName={REPAIR_POPOVER_CLASS}
           options={vendorOptions}
           selected={values.vendorUuid}
           onSelect={(value) => onChange("vendorUuid", value === NO_VENDOR ? null : value)}

@@ -38,11 +38,15 @@ function AlertDialogOverlay({
 
 function AlertDialogContent({
   className,
+  overlayClassName,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+}: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
+  /** Classes for the overlay behind the content, e.g. a higher layer than the default z-50. */
+  overlayClassName?: string;
+}) {
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
+      <AlertDialogOverlay className={overlayClassName} />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(

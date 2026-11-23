@@ -35,6 +35,8 @@ type SearchableSelectProps = {
   emptyMessage?: string;
   disabled?: boolean;
   className?: string;
+  /** Classes for the open list, e.g. a layer above the dialog the select sits in. */
+  popoverClassName?: string;
   /**
    * Pinned action rendered as the last row of the list — e.g. "+ Add new contact".
    * Deliberately outside the filtered group so it stays reachable when the search
@@ -62,6 +64,7 @@ export function SearchableSelect({
   emptyMessage = "No results found.",
   disabled = false,
   className,
+  popoverClassName,
   footerItem,
   fallbackLabel = null,
   onSearchChange,
@@ -116,7 +119,10 @@ export function SearchableSelect({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent
+        className={cn("w-[--radix-popover-trigger-width] p-0", popoverClassName)}
+        align="start"
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} onValueChange={onSearchChange} />
           <CommandList>

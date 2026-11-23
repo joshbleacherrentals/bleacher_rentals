@@ -33,6 +33,7 @@ import {
   type DraftFile,
   type FilesDraft,
 } from "../utils/repairFiles";
+import { REPAIR_LAYER_CLASS } from "../utils/repairLayer";
 import { buildRepairFileRows, type RepairFileRow } from "../utils/repairWindow";
 
 /**
@@ -221,7 +222,11 @@ export function DeleteFileDialog({
   const text = deleteFileDialogText(row?.name ?? "", mode);
   return (
     <AlertDialog open={row !== null} onOpenChange={(next) => !next && !busy && onCancel()}>
-      <AlertDialogContent data-testid="repair-file-delete-dialog">
+      <AlertDialogContent
+        data-testid="repair-file-delete-dialog"
+        className={REPAIR_LAYER_CLASS}
+        overlayClassName={REPAIR_LAYER_CLASS}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{text.title}</AlertDialogTitle>
           <AlertDialogDescription>{text.description}</AlertDialogDescription>

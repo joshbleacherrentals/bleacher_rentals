@@ -24,7 +24,6 @@ import {
   withoutSubrentalRows,
 } from "./util/subrentalRowVisibility";
 import { useCurrentEventStore } from "../eventConfiguration/state/useCurrentEventStore";
-import { useMaintenanceEventStore } from "../maintenanceEvents/state/useMaintenanceEventStore";
 import { useSubrentalEventStore } from "../subrentals/state/useSubrentalEventStore";
 import { WorkTrackerDragManager } from "./util/WorkTrackerDragManager";
 import { useTooltipStore } from "./state/useTooltipStore";
@@ -62,7 +61,6 @@ export class Dashboard {
   private unsubBleachers?: () => void;
   private unsubEvents?: () => void;
   private unsubCurrentEvent?: () => void;
-  private unsubMaintenance?: () => void;
   private unsubSubrental?: () => void;
   private unsubAlertCounts?: () => void;
   private bleachers: Bleacher[] = [];
@@ -205,7 +203,6 @@ export class Dashboard {
 
     // Subscribe once and coalesce recomputes
     this.unsubCurrentEvent = useCurrentEventStore.subscribe(() => scheduleRecompute());
-    this.unsubMaintenance = useMaintenanceEventStore.subscribe(() => scheduleRecompute());
     this.unsubSubrental = useSubrentalEventStore.subscribe(() => scheduleRecompute());
     this.unsubEvents = useDashboardEventsStore.subscribe(() => scheduleRecompute());
     this.unsubBleachers = useDashboardBleachersStore.subscribe(() => scheduleRecompute());
@@ -331,13 +328,11 @@ export class Dashboard {
     const allBleachers = useDashboardBleachersStore.getState().data;
     const allEvents = useDashboardEventsStore.getState().data;
     const currentEvent = useCurrentEventStore.getState();
-    const maintenanceEvent = useMaintenanceEventStore.getState();
     const subrentalEvent = useSubrentalEventStore.getState();
 
-    // Combine bleacher UUIDs from event, maintenance, and subrental forms so they stay visible
+    // Combine bleacher UUIDs from the event and sub-rental forms so they stay visible
     const alwaysInclude = [
       ...(currentEvent.bleacherUuids ?? []),
-      ...(maintenanceEvent.isFormExpanded ? maintenanceEvent.bleacherUuids : []),
       ...(subrentalEvent.isFormExpanded && subrentalEvent.bleacherUuid
         ? [subrentalEvent.bleacherUuid]
         : []),
@@ -348,10 +343,7 @@ export class Dashboard {
       zoneUuids: filters.zoneUuids,
       showUnassignedZone: filters.showUnassignedZone,
       alwaysIncludeBleacherUuids: alwaysInclude,
-      isFormExpanded:
-        currentEvent.isFormExpanded ||
-        maintenanceEvent.isFormExpanded ||
-        subrentalEvent.isFormExpanded,
+      isFormExpanded: currentEvent.isFormExpanded || subrentalEvent.isFormExpanded,
       optimizationMode: filters.optimizationMode,
     });
 
@@ -360,10 +352,7 @@ export class Dashboard {
         ? filterEvents(allEvents, filters.stateProvinces)
         : allEvents;
 
-    const anyFormExpanded =
-      currentEvent.isFormExpanded ||
-      maintenanceEvent.isFormExpanded ||
-      subrentalEvent.isFormExpanded;
+    const anyFormExpanded = currentEvent.isFormExpanded || subrentalEvent.isFormExpanded;
     this.pinnedBleacherUuids = new Set(anyFormExpanded ? alwaysInclude : []);
 
     // Update snapshots
@@ -809,9 +798,6 @@ export class Dashboard {
     } catch {}
     try {
       this.unsubCurrentEvent?.();
-    } catch {}
-    try {
-      this.unsubMaintenance?.();
     } catch {}
     try {
       this.unsubSubrental?.();

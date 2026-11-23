@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import CentsInput from "@/components/CentsInput";
 import { Dropdown } from "@/components/DropDown";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { REPAIR_POPOVER_CLASS } from "../utils/repairLayer";
 import { formatRepairMoney, severityPill } from "../utils/repairFormat";
 import type { RepairCurrency, RepairSeverity } from "../utils/repairRows";
 import {
@@ -154,6 +155,7 @@ export function ServiceFormFields({
         <Field label="Bleacher">
           <div id="service-bleacher">
             <SearchableSelect
+              popoverClassName={REPAIR_POPOVER_CLASS}
               options={[...bleachers]}
               selected={values.bleacherUuid}
               onSelect={(value) => onChange("bleacherUuid", value)}
@@ -169,6 +171,7 @@ export function ServiceFormFields({
           <Field label="Category">
             <div id="service-category">
               <SearchableSelect
+                popoverClassName={REPAIR_POPOVER_CLASS}
                 options={categoryOptions}
                 selected={values.categoryUuid}
                 onSelect={(value) =>

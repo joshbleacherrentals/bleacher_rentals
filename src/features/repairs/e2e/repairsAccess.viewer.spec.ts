@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import { createButton, openDashboard } from "./helpers/dashboardFlow";
 import { readRepairMadeByServices } from "./helpers/linksFlow";
 import { readRepairWindow } from "./helpers/repairWindowFlow";
 import { readServicesAndReport } from "./helpers/serviceFlow";
@@ -16,10 +17,12 @@ import {
 
 /**
  * The Repairs page as a viewer sees it: the whole table, vendors and money included, no Restore
- * and a click on a row that opens its block of services. Written, not run (project rule).
+ * and a click on a row that opens its block of services. It also covers the Dashboard, which has no
+ * "+ Create" button for a viewer (S56). Written, not run (project rule).
  * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
  * docs/specs/repairs-06-expanded-row.md §6 (S27), docs/specs/repairs-07-repair-window.md §6 (S33)
- * and docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S41).
+ * docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S41)
+ * and docs/specs/repairs-11-dashboard.md §6 (S56).
  */
 test.describe("Repairs page (viewer)", () => {
   let seeded: SeededRepairs;
@@ -98,5 +101,12 @@ test.describe("Repairs page (viewer)", () => {
   }) => {
     test.skip(!seeded.links || !seeded.zones, "the database has fewer than two zones");
     await readRepairMadeByServices(page, seeded);
+  });
+
+  test("S56: the Dashboard has no + Create button", async ({ page }) => {
+    test.setTimeout(300_000);
+    // Waits for the toolbar, which every role gets; the button is drawn only for a role that creates.
+    await openDashboard(page);
+    await expect(createButton(page)).toHaveCount(0);
   });
 });

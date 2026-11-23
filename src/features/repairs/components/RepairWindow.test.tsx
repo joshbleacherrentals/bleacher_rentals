@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { repairRow, repairService } from "../utils/repairRowFixture";
 import type { RepairListRow } from "../utils/repairRows";
+import { emptyRepairForm } from "../utils/repairForm";
 import {
   REPAIR_WINDOW_CLASS,
   REPAIR_WINDOW_WIDTH,
   RepairServicesSection,
   RepairWindowContent,
   RepairWindowFooter,
+  newRepairStart,
   type RepairWindowFooterProps,
 } from "./RepairWindow";
 import { WINDOW_MIN_WIDTH } from "./RepairServices";
@@ -534,5 +536,44 @@ describe("the red line above the services (09b2)", () => {
   it("draws nothing without an error", () => {
     expect(section()).not.toContain("repair-services-error");
     expect(section("")).not.toContain("repair-services-error");
+  });
+});
+
+// docs/specs/repairs-11-dashboard.md §2.6, §3 and §7 (D216, D223, D229): what the New repair window
+// starts with. The dialog is drawn in a portal that a server render cannot reach, so the start is a
+// pure function and it is the one under test.
+describe("newRepairStart (D216, D223, D229)", () => {
+  it("is the empty form and no service window with no preset", () => {
+    expect(newRepairStart(undefined)).toEqual({
+      initial: emptyRepairForm(),
+      serviceWindow: null,
+    });
+  });
+
+  it("takes the two days of a preset and opens no service window when it has no bleacher", () => {
+    const start = newRepairStart({ eventStart: "2026-12-02", eventEnd: "2026-12-05" });
+    expect(start.initial).toEqual({
+      ...emptyRepairForm(),
+      eventStart: "2026-12-02",
+      eventEnd: "2026-12-05",
+    });
+    expect(start.serviceWindow).toBeNull();
+  });
+
+  it("opens the service window with the bleacher of the preset", () => {
+    const start = newRepairStart({ bleacherUuid: "b-40", requireService: true });
+    expect(start.serviceWindow).toEqual({ kind: "new", bleacherUuid: "b-40" });
+    expect(start.initial).toEqual(emptyRepairForm());
+  });
+
+  it("opens the service window and takes the days when the preset has both", () => {
+    const start = newRepairStart({
+      eventStart: "2026-12-02",
+      eventEnd: "2026-12-05",
+      bleacherUuid: "b-52",
+    });
+    expect(start.serviceWindow).toEqual({ kind: "new", bleacherUuid: "b-52" });
+    expect(start.initial.eventStart).toBe("2026-12-02");
+    expect(start.initial.eventEnd).toBe("2026-12-05");
   });
 });

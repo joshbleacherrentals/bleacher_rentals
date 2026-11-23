@@ -2,7 +2,6 @@ import { db } from "@/components/providers/SystemProvider";
 import { typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { useSubrentalEventStore } from "@/features/subrentals/state/useSubrentalEventStore";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
-import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import type { SubrentalStatus } from "@/features/subrentals/state/useSubrentalEventStore";
 
 type SubrentalRow = {
@@ -47,9 +46,8 @@ export async function loadSubrentalEventById(subrentalEventUuid: string): Promis
     return;
   }
 
-  // Close other forms if open
+  // Close the event form if it is open
   useCurrentEventStore.getState().resetForm();
-  useMaintenanceEventStore.getState().resetForm();
 
   const store = useSubrentalEventStore.getState();
   const { setField } = store;

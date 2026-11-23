@@ -15,6 +15,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { RawServiceBleacherRow } from "../db/serviceWindowQueries";
 import { useServiceBleacher } from "../hooks/useRepairDetails";
+import { REPAIR_LAYER_CLASS } from "../utils/repairLayer";
 import { reportsButtonLabel, serviceWindowTitle } from "../utils/repairDetails";
 import type { FilterOption } from "../utils/repairFilters";
 import { formatRepairMoney, reportedCell } from "../utils/repairFormat";
@@ -433,7 +434,11 @@ function DiscardServiceChangesDialog({
 }) {
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onKeep()}>
-      <AlertDialogContent data-testid="service-discard-dialog">
+      <AlertDialogContent
+        data-testid="service-discard-dialog"
+        className={REPAIR_LAYER_CLASS}
+        overlayClassName={REPAIR_LAYER_CLASS}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Discard changes?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -466,7 +471,11 @@ function DeleteServiceDialog({
 }) {
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
-      <AlertDialogContent data-testid="service-delete-dialog">
+      <AlertDialogContent
+        data-testid="service-delete-dialog"
+        className={REPAIR_LAYER_CLASS}
+        overlayClassName={REPAIR_LAYER_CLASS}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -487,7 +496,7 @@ function DeleteServiceDialog({
   );
 }
 
-const SERVICE_WINDOW_CLASS = "max-h-[90vh] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-[760px]";
+const SERVICE_WINDOW_CLASS = `${REPAIR_LAYER_CLASS} max-h-[90vh] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-[760px]`;
 
 /** The Edit mode of a stored service: the content with the inputs, and Cancel and Save. */
 function ServiceEditBody({
@@ -632,7 +641,11 @@ export function ServiceWindow({
           if (!open) requestClose();
         }}
       >
-        <DialogContent data-testid="service-window" className={SERVICE_WINDOW_CLASS}>
+        <DialogContent
+          data-testid="service-window"
+          className={SERVICE_WINDOW_CLASS}
+          overlayClassName={REPAIR_LAYER_CLASS}
+        >
           <DialogDescription className="sr-only">
             {writable ? "A service of a repair." : "A service of a repair. Read-only."}
           </DialogDescription>
@@ -693,8 +706,18 @@ export type NewServiceWindowProps = {
   bleachers: readonly FilterOption[];
   categories: readonly FilterOption[];
   onCreate: (values: ServiceFormValues) => Promise<ServiceFormErrors | null>;
+  /** The bleacher chosen when the form opens (spec 11 D229); absent, nothing is chosen. */
+  initialBleacherUuid?: string;
   onClose: () => void;
 };
+
+/**
+ * What the form of Add service starts with: empty (D151), with the bleacher chosen when the window is
+ * opened from a cell or from a damage report (spec 11 D229). Pure, so it is tested without the dialog.
+ */
+export function newServiceStart(bleacherUuid?: string): ServiceFormValues {
+  return { ...emptyServiceForm(), bleacherUuid: bleacherUuid ?? null };
+}
 
 /** The window of Add service: the fields only, Cancel and "Add service" (D155). */
 export function NewServiceWindow({
@@ -702,9 +725,10 @@ export function NewServiceWindow({
   bleachers,
   categories,
   onCreate,
+  initialBleacherUuid,
   onClose,
 }: NewServiceWindowProps) {
-  const [initial] = useState(emptyServiceForm);
+  const [initial] = useState(() => newServiceStart(initialBleacherUuid));
   const draft = useServiceDraft({
     initial,
     submit: (_initial, values) => onCreate(values),
@@ -729,7 +753,11 @@ export function NewServiceWindow({
           if (!open) requestClose();
         }}
       >
-        <DialogContent data-testid="new-service-window" className={SERVICE_WINDOW_CLASS}>
+        <DialogContent
+          data-testid="new-service-window"
+          className={SERVICE_WINDOW_CLASS}
+          overlayClassName={REPAIR_LAYER_CLASS}
+        >
           <DialogDescription className="sr-only">Add a service to a repair.</DialogDescription>
           <ServiceHeader
             eyebrow="New service"

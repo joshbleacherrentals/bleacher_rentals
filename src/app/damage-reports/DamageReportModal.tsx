@@ -27,11 +27,14 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { DamageReportResolveMaintenanceModal } from "./DamageReportResolveMaintenanceModal";
+import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
+import { useRepairWindowsStore } from "@/features/repairs/state/useRepairWindowsStore";
+import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
 import { useAcknowledgements } from "./_lib/acknowledgements";
 import {
   buildRemoveFixedMarkUpdate,
   buildResolveWithoutMaintenanceUpdate,
+  canCreateRepairForReport,
   canResolveWithoutMaintenance,
   describeFixedMark,
 } from "./_lib/fixedMark";
@@ -147,9 +150,16 @@ export function DamageReportModal({
   const [uploading, setUploading] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [comboboxOpen, setComboboxOpen] = useState(false);
-  const [resolveMaintenanceOpen, setResolveMaintenanceOpen] = useState(false);
 
   const isReportResolved = !!editReport?.resolved_at;
+
+  // "Create Maintenance to Resolve" opens the New repair window with the bleacher of the report
+  // (docs/specs/repairs-11-dashboard.md §2.5, D217). Only a manager makes a repair (D215), and a report
+  // already linked to one is taken by no new repair (D235).
+  const { isAdmin, isMaintainer } = useTeamPermissions();
+  const showCreateRepair =
+    !!editReport &&
+    canCreateRepairForReport(editReport, canManageDamageAndMaintenance({ isAdmin, isMaintainer }));
 
   // Who else has seen this damage. Drivers now confirm an open report instead
   // of filing a second one about it, so this is where those confirmations
@@ -269,7 +279,6 @@ export function DamageReportModal({
     setSeatDamage(null);
     setHaulDamage(null);
     setNote("");
-    setResolveMaintenanceOpen(false);
     setPhotoPaths([]);
     setExistingPhotos([]);
     setRemovedPhotoIds([]);
@@ -602,36 +611,57 @@ export function DamageReportModal({
               </div>
             )}
 
-            {/* Resolve via maintenance — edit mode, unresolved only */}
-            {isEditing && !isReportResolved && (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  To resolve this report, create a maintenance event for the repair.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setResolveMaintenanceOpen(true)}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer text-sm font-semibold"
-                  >
-                    Create Maintenance to Resolve
-                  </button>
-                  {/* Only when a driver has vouched for it: closing a report
+            {/* Resolve via a repair — edit mode, unresolved only (spec 11 D217, D235) */}
+            {isEditing &&
+              !isReportResolved &&
+              (showCreateRepair || (editReport && canResolveWithoutMaintenance(editReport))) && (
+                <div className="space-y-2">
+                  {showCreateRepair && (
+                    <p className="text-sm text-gray-600">
+                      To resolve this report, create a repair for it. The report closes when the
+                      repair is Completed.
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    {showCreateRepair && editReport && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          // The New repair window with the bleacher of the report and a service
+                          // required; when the repair is added the card closes (D222, D234).
+                          useRepairWindowsStore.getState().open({
+                            kind: "new",
+                            preset: {
+                              bleacherUuid: editReport.bleacher_uuid,
+                              requireService: true,
+                              onCreated: () => {
+                                resetForm();
+                                onSaved();
+                              },
+                            },
+                          })
+                        }
+                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer text-sm font-semibold"
+                      >
+                        Create Maintenance to Resolve
+                      </button>
+                    )}
+                    {/* Only when a driver has vouched for it: closing a report
                       with no repair behind it and nobody saying the damage is
                       gone would lose it silently. */}
-                  {editReport && canResolveWithoutMaintenance(editReport) && (
-                    <button
-                      type="button"
-                      onClick={handleResolveWithoutMaintenance}
-                      disabled={saving}
-                      className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition cursor-pointer text-sm font-semibold disabled:opacity-50"
-                    >
-                      Mark as Resolved
-                    </button>
-                  )}
+                    {editReport && canResolveWithoutMaintenance(editReport) && (
+                      <button
+                        type="button"
+                        onClick={handleResolveWithoutMaintenance}
+                        disabled={saving}
+                        className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition cursor-pointer text-sm font-semibold disabled:opacity-50"
+                      >
+                        Mark as Resolved
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {isEditing && isReportResolved && (
               <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
@@ -826,21 +856,6 @@ export function DamageReportModal({
           </DialogContent>
         </Dialog>
       </Dialog>
-
-      {isEditing && editReport && !isReportResolved && (
-        <DamageReportResolveMaintenanceModal
-          open={resolveMaintenanceOpen}
-          onOpenChange={setResolveMaintenanceOpen}
-          bleacherUuid={editReport.bleacher_uuid}
-          bleacherNumber={editReport.bleacher?.bleacher_number ?? 0}
-          damageReportUuid={editReport.id}
-          onResolved={() => {
-            setResolveMaintenanceOpen(false);
-            resetForm();
-            onSaved();
-          }}
-        />
-      )}
     </>
   );
 }

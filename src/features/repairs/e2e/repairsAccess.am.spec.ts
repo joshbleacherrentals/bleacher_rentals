@@ -1,5 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import {
+  CREATE_REPAIR_BUTTON,
+  CREATE_REPAIR_HINT,
+  findReportCard,
+  openCreateMenu,
+  openDashboard,
+  openReportCard,
+} from "./helpers/dashboardFlow";
 import { readFilesWithoutButtons } from "./helpers/filesFlow";
 import { readRepairMadeByServices } from "./helpers/linksFlow";
 import { readRepairWindow } from "./helpers/repairWindowFlow";
@@ -17,11 +25,14 @@ import {
 
 /**
  * The Repairs page as a account manager sees it: the whole table, vendors and money included, no Restore
- * and a click on a row that opens its block of services. Written, not run (project rule).
+ * and a click on a row that opens its block of services. It also covers the "+ Create" menu of the
+ * Dashboard, which holds only "Sub-Rental Request" for an account manager, and the card of a damage
+ * report, which has no "Create Maintenance to Resolve" (S55). Written, not run (project rule).
  * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
  * docs/specs/repairs-06-expanded-row.md §6 (S27), docs/specs/repairs-07-repair-window.md §6 (S33)
  * docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S40)
- * and docs/specs/repairs-09b3-files.md §6 (S49).
+ * docs/specs/repairs-09b3-files.md §6 (S49)
+ * and docs/specs/repairs-11-dashboard.md §6 (S55).
  */
 test.describe("Repairs page (account manager)", () => {
   let seeded: SeededRepairs;
@@ -106,5 +117,29 @@ test.describe("Repairs page (account manager)", () => {
     page,
   }) => {
     await readFilesWithoutButtons(page, seeded);
+  });
+
+  test("S55: the + Create menu of the Dashboard has only Sub-Rental Request", async ({ page }) => {
+    test.setTimeout(300_000);
+    await openDashboard(page);
+
+    const items = await openCreateMenu(page);
+    await expect(items).toHaveCount(1);
+    await expect(page.getByRole("menuitem", { name: "Sub-Rental Request" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Maintenance Event" })).toHaveCount(0);
+  });
+
+  test("S55: the card of an open report that no repair has shows no Create Maintenance to Resolve", async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    const card = await findReportCard(page, seeded.dashboard.unlinked.note);
+    // Open and not linked, so the missing button is the role's doing; an account manager has no delete icon.
+    await expect(card.getByText("Open", { exact: true })).toBeVisible();
+    await expect(card.getByTitle("Delete damage report")).toHaveCount(0);
+
+    const dialog = await openReportCard(page, card);
+    await expect(dialog.getByRole("button", { name: CREATE_REPAIR_BUTTON })).toHaveCount(0);
+    await expect(dialog.getByText(CREATE_REPAIR_HINT)).toHaveCount(0);
   });
 });

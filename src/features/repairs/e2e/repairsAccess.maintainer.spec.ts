@@ -9,6 +9,7 @@ import {
   pickFiles,
   storedFiles,
 } from "./helpers/filesFlow";
+import { expectEmptyNewRepairWindow, openCreateMenu, openDashboard } from "./helpers/dashboardFlow";
 import { createRepairWithService } from "./helpers/linksFlow";
 import { readRepairWindow } from "./helpers/repairWindowFlow";
 import { readServicesAndReport } from "./helpers/serviceFlow";
@@ -25,11 +26,14 @@ import {
 
 /**
  * The Repairs page as a maintainer sees it: the whole table, vendors and money included, no Restore
- * and a click on a row that opens its block of services. Written, not run (project rule).
+ * and a click on a row that opens its block of services. It also covers the "+ Create" menu of the
+ * Dashboard, which holds only "Maintenance Event" for a maintainer (S54). Written, not run (project
+ * rule).
  * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
  * docs/specs/repairs-06-expanded-row.md §6 (S27), docs/specs/repairs-07-repair-window.md §6 (S33)
  * docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S42)
- * and docs/specs/repairs-09b3-files.md §6 (S50).
+ * docs/specs/repairs-09b3-files.md §6 (S50)
+ * and docs/specs/repairs-11-dashboard.md §6 (S54).
  */
 test.describe("Repairs page (maintainer)", () => {
   let seeded: SeededRepairs;
@@ -131,5 +135,20 @@ test.describe("Repairs page (maintainer)", () => {
     await expect(storedFiles(win).first()).toContainText("Photo 1");
     await expect.poll(async () => (await fileRowsOf(repair.id)).length).toBe(1);
     await expect.poll(async () => (await objectNamesOf(repair.id)).length).toBe(1);
+  });
+
+  test("S54: the + Create menu of the Dashboard has one item, and it opens an empty New repair window", async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await openDashboard(page);
+
+    const items = await openCreateMenu(page);
+    await expect(items).toHaveCount(1);
+    await expect(page.getByRole("menuitem", { name: "Maintenance Event" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Sub-Rental Request" })).toHaveCount(0);
+
+    await page.getByRole("menuitem", { name: "Maintenance Event" }).click();
+    await expectEmptyNewRepairWindow(page);
   });
 });

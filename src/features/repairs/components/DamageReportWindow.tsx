@@ -9,6 +9,7 @@ import {
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { useDamageReportViews } from "../hooks/useRepairDetails";
+import { REPAIR_LAYER_CLASS } from "../utils/repairLayer";
 import {
   reportsWindowTitle,
   type DamageLevel,
@@ -191,7 +192,8 @@ export function DamageReportWindow({ reported, onClose }: DamageReportWindowProp
     >
       <DialogContent
         data-testid="damage-report-window"
-        className="max-h-[90vh] overflow-y-auto sm:max-w-[640px]"
+        className={`${REPAIR_LAYER_CLASS} max-h-[90vh] overflow-y-auto sm:max-w-[640px]`}
+        overlayClassName={REPAIR_LAYER_CLASS}
       >
         <DialogHeader>
           <DialogTitle>{reportsWindowTitle(reported.length)}</DialogTitle>
