@@ -1,6 +1,6 @@
 {
   "name": "bleacher_rentals",
-  "version": "1.25.0",
+  "version": "1.26.2",
   "private": true,
   "scripts": {
     "generate-types-staging": "supabase gen types typescript --project-id \"sycrvbdpdbaczyfdwcnc\" --schema public > database.types.ts",
@@ -27,7 +27,7 @@
     "test:db:fuzz": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/driver-scorecard.fuzz.sql",
     "test:db:damage": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/damage_reports_photos_uploaded.test.sql",
     "test:db:payments": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/manual_payment_entry.test.sql",
-    "test:db:all": "npm run test:db && npm run test:db:fuzz && npm run test:db:damage && npm run test:db:swap && npm run test:db:survey && npm run test:db:payments && npm run test:db:tax && npm run test:db:qty && npm run test:db:inspections && npm run test:db:maintainer && npm run test:db:accountant && npm run test:db:accountantworktrackers && npm run test:db:fixed && npm run test:db:acks && npm run test:db:worktrackertypes && npm run test:db:pickupdropofftime && npm run test:db:worktrackertypeswrites && npm run test:db:withdrawal && npm run test:db:withdrawalreset && npm run test:db:statuschanged && npm run test:db:eventlinks && npm run test:db:groupispaid && npm run test:db:accountantreceivables && npm run test:db:accountantquotecard && npm run test:db:accountantisqbo && npm run test:db:paymentedit && npm run test:db:accountantpayments && npm run test:db:accountantchat && npm run test:db:accountantaddressbook && npm run test:db:accountantteam && npm run test:db:devallowedemails && npm run test:db:perfevents && npm run test:db:perfdashboard && npm run test:db:taxoverride && npm run test:db:eventtypesaccountant && npm run test:db:qboinvoicehash && npm run test:db:contactqbocustomers && npm run test:db:provincetaxcodes && npm run test:db:eventtypeservices && npm run test:db:areventtasks && npm run test:db:aramountdue && npm run test:db:aramountdueparity && npm run test:db:artasksync && npm run test:db:artaskfinished && npm run test:db:artaskdeleted && npm run test:db:invoicenumber && npm run test:db:dashboardpanel",
+    "test:db:all": "npm run test:db && npm run test:db:fuzz && npm run test:db:damage && npm run test:db:swap && npm run test:db:survey && npm run test:db:payments && npm run test:db:tax && npm run test:db:qty && npm run test:db:inspections && npm run test:db:maintainer && npm run test:db:accountant && npm run test:db:accountantworktrackers && npm run test:db:fixed && npm run test:db:acks && npm run test:db:worktrackertypes && npm run test:db:pickupdropofftime && npm run test:db:worktrackertypeswrites && npm run test:db:withdrawal && npm run test:db:withdrawalreset && npm run test:db:statuschanged && npm run test:db:eventlinks && npm run test:db:groupispaid && npm run test:db:accountantreceivables && npm run test:db:accountantquotecard && npm run test:db:accountantisqbo && npm run test:db:paymentedit && npm run test:db:accountantpayments && npm run test:db:accountantchat && npm run test:db:accountantaddressbook && npm run test:db:accountantteam && npm run test:db:devallowedemails && npm run test:db:perfevents && npm run test:db:perfdashboard && npm run test:db:taxoverride && npm run test:db:eventtypesaccountant && npm run test:db:qboinvoicehash && npm run test:db:contactqbocustomers && npm run test:db:provincetaxcodes && npm run test:db:eventtypeservices && npm run test:db:areventtasks && npm run test:db:aramountdue && npm run test:db:aramountdueparity && npm run test:db:artasksync && npm run test:db:artaskfinished && npm run test:db:artaskdeleted && npm run test:db:invoicenumber && npm run test:db:dashboardpanel && npm run test:db:analyticsro",
     "test:e2e": "set -a && source .env.local && set +a && playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:auth": "playwright test src/features/manageTeam/e2e/auth.setup.ts --headed --project=chromium",
@@ -76,6 +76,7 @@
     "test:db:pickupdropofftime": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/work_tracker_pickup_dropoff_time.test.sql",
     "test:db:worktrackertypeswrites": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/work_tracker_types_admin_only_writes.test.sql",
     "test:db:groupispaid": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/work_tracker_group_is_paid.test.sql",
+    "test:db:analyticsro": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f supabase/tests/analytics_ro.test.sql",
     "preflight:sign": "tsx scripts/preflight/signPreflight.cli.ts"
   },
   "dependencies": {
@@ -86,6 +87,7 @@
     "@googleapis/gmail": "^22.0.2",
     "@internationalized/date": "^3.12.4",
     "@journeyapps/wa-sqlite": "^1.4.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@powersync/kysely-driver": "^1.3.1",
     "@powersync/react": "^1.8.2",
     "@powersync/web": "^1.38.3",
@@ -130,6 +132,7 @@
     "lucide-react": "^0.487.0",
     "luxon": "^3.6.1",
     "next": "^16.1.6",
+    "pg": "^8.23.1",
     "pixi.js": "^8.12.0",
     "postmark": "^4.0.7",
     "react": "^19.0.0",
@@ -149,6 +152,7 @@
     "tz-lookup": "^6.1.25",
     "use-places-autocomplete": "^4.0.1",
     "world-atlas": "^2.0.2",
+    "zod": "^4.6.7",
     "zustand": "^5.0.3"
   },
   "overrides": {
@@ -162,6 +166,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/luxon": "^3.6.0",
     "@types/node": "^22",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-virtualized": "^9.22.2",

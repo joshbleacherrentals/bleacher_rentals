@@ -14,6 +14,8 @@ const seen = vi.hoisted(() => ({
   viewTrack: [] as Array<(e: TrackEvent) => void>,
   payProps: [] as Array<{ embedded?: boolean; language: string }>,
   modalLanguages: [] as string[],
+  viewCtas: [] as Array<{ kind: string; onClick: () => void } | undefined>,
+  signProps: [] as Array<{ canContinueToPay: boolean; onContinueToPay?: () => void }>,
 }));
 
 vi.mock("./useQuoteActivityTracker", () => ({ useQuoteActivityTracker: () => seen.liveTrack }));
@@ -41,18 +43,29 @@ vi.mock("./QuoteLanguageToggle", () => ({
 vi.mock("./QuotePublicView", async () => {
   const { quoteText } = await import("./quoteStrings");
   return {
-    QuotePublicView: (p: { data: { language: QuoteLanguage }; track: (e: TrackEvent) => void }) => {
+    QuotePublicView: (p: {
+      data: { language: QuoteLanguage };
+      track: (e: TrackEvent) => void;
+      cta?: { kind: string; onClick: () => void };
+    }) => {
       seen.viewTrack.push(p.track);
+      seen.viewCtas.push(p.cta);
       return (
-        <section data-tab="quote" data-language={p.data.language}>
-          {quoteText(p.data.language).tabApprovedQuote}
+        <section data-tab="quote" data-language={p.data.language} data-cta={p.cta?.kind ?? "none"}>
+          {quoteText(p.data.language).tabReviewQuote}
         </section>
       );
     },
   };
 });
 vi.mock("./SignContractTab", () => ({
-  SignContractTab: () => <section data-tab="contract" />,
+  SignContractTab: (p: { onContinueToPay?: () => void }) => {
+    seen.signProps.push({
+      canContinueToPay: !!p.onContinueToPay,
+      onContinueToPay: p.onContinueToPay,
+    });
+    return <section data-tab="contract" />;
+  },
 }));
 vi.mock("./PayInvoiceTab", () => ({
   PayInvoiceTab: (p: { embedded?: boolean; data: { language: string } }) => {
@@ -84,14 +97,16 @@ beforeEach(() => {
   seen.viewTrack = [];
   seen.payProps = [];
   seen.modalLanguages = [];
+  seen.viewCtas = [];
+  seen.signProps = [];
 });
 
 describe("QuotePublicTabs: the tab bar", () => {
   it("shows its own sticky bar with the three tabs and the language switch when not embedded", () => {
     const html = render();
     expect(html).toContain("sticky top-0");
-    expect(html).toContain(">Approved Quote<");
-    expect(html).toContain(">Signed Contract<");
+    expect(html).toContain(">Review Quote<");
+    expect(html).toContain(">Approve &amp; Sign<");
     expect(html).toContain(">Pay Invoice<");
     expect(html).toContain('data-testid="language-toggle"');
   });
@@ -99,7 +114,7 @@ describe("QuotePublicTabs: the tab bar", () => {
   it("has no bar and no language switch when embedded and framed", () => {
     const html = render({ embedded: true });
     expect(html).not.toContain("sticky top-0");
-    expect(html).not.toContain(">Signed Contract<");
+    expect(html).not.toContain(">Approve &amp; Sign<");
     expect(html).not.toContain(">Pay Invoice<");
     expect(html).not.toContain("language-toggle");
   });
@@ -111,7 +126,7 @@ describe("QuotePublicTabs: the tab bar", () => {
 });
 
 describe("QuotePublicTabs: initialTab", () => {
-  it("opens on Approved Quote without one", () => {
+  it("opens on Review Quote without one", () => {
     const html = render({ embedded: true });
     expect(shownWrapper(html, "quote")).toBe(true);
     expect(hiddenWrapper(html, "contract")).toBe(true);
@@ -131,8 +146,8 @@ describe("QuotePublicTabs: the language", () => {
   it("is English everywhere when embedded and framed, for a French contact", () => {
     const html = render({ data: quote("fr"), embedded: true });
     expect(html).toContain('data-language="en"');
-    expect(html).toContain(">Approved Quote<");
-    expect(html).not.toContain("Devis approuvé");
+    expect(html).toContain(">Review Quote<");
+    expect(html).not.toContain("Consulter le devis");
     expect(seen.payProps).toEqual([{ embedded: true, language: "en" }]);
     expect(seen.modalLanguages).toEqual(["en", "en"]);
   });
@@ -140,7 +155,7 @@ describe("QuotePublicTabs: the language", () => {
   it("stays the contact's language when not embedded", () => {
     const html = render({ data: quote("fr") });
     expect(html).toContain('data-language="fr"');
-    expect(html).toContain("Devis approuvé");
+    expect(html).toContain("Consulter le devis");
     expect(seen.payProps).toEqual([{ embedded: false, language: "fr" }]);
     expect(seen.modalLanguages).toEqual(["fr", "fr"]);
   });
@@ -159,5 +174,117 @@ describe("QuotePublicTabs: the activity log", () => {
     render();
     for (const track of seen.viewTrack) track(event);
     expect(seen.liveTrack).toHaveBeenCalledExactlyOnceWith(event);
+  });
+});
+
+describe("QuotePublicTabs: the next-step button", () => {
+  const signature = { signerName: "Jane Client", signedAt: "2026-01-10T15:00:00.000Z" };
+  const installment = (status: "unpaid" | "partial" | "paid") => ({
+    id: `pi-${status}`,
+    dueDate: "2026-02-01",
+    amountCents: 10_000,
+    status,
+    allocatedCents: status === "paid" ? 10_000 : 0,
+  });
+  const withTerms = { termsAndConditionsUuid: "t-1", termsHtml: "<p>Terms</p>" };
+
+  const stickyBar = (html: string) => html.includes('data-testid="quote-cta-sticky"');
+  const viewCta = () => seen.viewCtas[0]?.kind;
+
+  it("asks an unsigned quote to be approved: the view gets the button and a phone gets the sticky bar", () => {
+    const html = render({ data: { ...quote(), ...withTerms, contractSignature: null } });
+    expect(viewCta()).toBe("approve");
+    expect(stickyBar(html)).toBe(true);
+    expect(html).toContain("Approve Quote");
+    // Room under the quote so the bar never covers its last lines.
+    expect(html).toContain("pb-24 sm:pb-0");
+  });
+
+  it("asks a signed quote with money owed to be paid", () => {
+    const html = render({
+      data: {
+        ...quote(),
+        ...withTerms,
+        contractSignature: signature,
+        paymentSchedule: [installment("paid"), installment("unpaid")],
+      },
+    });
+    expect(viewCta()).toBe("pay");
+    expect(stickyBar(html)).toBe(true);
+    expect(html).toContain("Pay Invoice");
+  });
+
+  it("offers Continue to Payment after signing only while something is owed", () => {
+    render({
+      data: {
+        ...quote(),
+        ...withTerms,
+        contractSignature: signature,
+        paymentSchedule: [installment("unpaid")],
+      },
+    });
+    expect(seen.signProps[0].canContinueToPay).toBe(true);
+
+    seen.signProps = [];
+    render({ data: { ...quote(), ...withTerms, contractSignature: null } });
+    expect(seen.signProps[0].canContinueToPay).toBe(false);
+
+    seen.signProps = [];
+    render({
+      data: {
+        ...quote(),
+        ...withTerms,
+        contractSignature: signature,
+        paymentSchedule: [installment("paid")],
+      },
+    });
+    expect(seen.signProps[0].canContinueToPay).toBe(false);
+  });
+
+  it("shows paid in full without a button when signed and fully paid", () => {
+    const html = render({
+      data: {
+        ...quote(),
+        ...withTerms,
+        contractSignature: signature,
+        paymentSchedule: [installment("paid")],
+      },
+    });
+    expect(viewCta()).toBe("paid");
+    expect(stickyBar(html)).toBe(false);
+  });
+
+  it("shows nothing for an unsigned quote that has no contract to sign", () => {
+    const html = render({
+      data: { ...quote(), termsAndConditionsUuid: null, termsHtml: null, contractSignature: null },
+    });
+    expect(viewCta()).toBeUndefined();
+    expect(stickyBar(html)).toBe(false);
+  });
+
+  it("shows no sticky bar on the other tabs", () => {
+    for (const initialTab of ["contract", "pay"] as const) {
+      const html = render({ data: { ...quote(), ...withTerms }, initialTab });
+      expect(stickyBar(html), initialTab).toBe(false);
+    }
+  });
+
+  it("shows nothing when the page is framed by the invoice page", () => {
+    const html = render({ data: { ...quote(), ...withTerms }, embedded: true });
+    expect(viewCta()).toBeUndefined();
+    expect(stickyBar(html)).toBe(false);
+    expect(seen.signProps[0].canContinueToPay).toBe(false);
+  });
+
+  it("speaks the customer's language", () => {
+    const html = render({ data: { ...quote("fr"), ...withTerms, contractSignature: null } });
+    expect(html).toContain("Approuver le devis");
+    expect(html).not.toContain("Approve Quote");
+  });
+
+  it("changes tab like the tab bar does, so staff see it in the activity log", () => {
+    render({ data: { ...quote(), ...withTerms, contractSignature: null } });
+    // Not clickable in a static render; the same handler is what the tab bar's buttons use.
+    expect(typeof seen.viewCtas[0]?.onClick).toBe("function");
   });
 });

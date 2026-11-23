@@ -27,6 +27,7 @@ function row(over: Partial<CollectionsRow> = {}): CollectionsRow {
     remainingCents: 173575,
     currency: "CAD",
     daysOverdue: 3,
+    eventStart: "2027-06-01",
     ...over,
   };
 }
@@ -50,17 +51,33 @@ function render(
 const unescape = (html: string) => html.replace(/&amp;/g, "&");
 
 describe("CollectionsTable", () => {
-  it("has the five columns of the list and a chevron column", () => {
+  it("has the six columns of the list and a chevron column", () => {
     const html = render({});
     for (const header of [
       "Name",
       "Next Follow Up",
+      "Start Date",
       "Payment Overdue",
       "Task Notes",
       "Amount Overdue",
     ]) {
       expect(html).toContain(header);
     }
+  });
+
+  it("puts Start Date between Next Follow Up and Payment Overdue", () => {
+    const html = render({});
+    const followUp = html.indexOf("Next Follow Up");
+    const startDate = html.indexOf("Start Date");
+    const overdue = html.indexOf("Payment Overdue");
+    expect(followUp).toBeGreaterThan(-1);
+    expect(startDate).toBeGreaterThan(followUp);
+    expect(overdue).toBeGreaterThan(startDate);
+  });
+
+  it("shows the event's start date as the AR Deposits tab words it, and N/A without one", () => {
+    expect(render({})).toContain("Jun 1, 2027");
+    expect(render({ rows: [row({ eventStart: null })] })).toContain("N/A");
   });
 
   it("draws a row: name, follow-up wording, overdue wording, note, amount", () => {
@@ -134,9 +151,19 @@ describe("CollectionsTable", () => {
       expect(desc).toContain("lucide-arrow-down ");
     });
 
-    it("makes the three sortable headers buttons, and Name and Task Notes plain text", () => {
+    it("marks Start Date, and follows its direction", () => {
+      expect(sortOf(render({}), "Start Date")).toBe("none");
+      const asc = render({ state: { ...DEFAULT, sort: "startDate", dir: "asc" } });
+      expect(sortOf(asc, "Start Date")).toBe("ascending");
+      expect(sortOf(asc, "Next Follow Up")).toBe("none");
+      const desc = render({ state: { ...DEFAULT, sort: "startDate", dir: "desc" } });
+      expect(sortOf(desc, "Start Date")).toBe("descending");
+    });
+
+    it("makes the four sortable headers buttons, and Name and Task Notes plain text", () => {
       const html = render({});
       expect(html).toMatch(/<button[^>]*>[^]*?Next Follow Up/);
+      expect(html).toMatch(/<button[^>]*>[^]*?Start Date/);
       expect(html).toMatch(/<button[^>]*>[^]*?Payment Overdue/);
       expect(html).toMatch(/<button[^>]*>[^]*?Amount Overdue/);
       expect(html).not.toMatch(/<button[^>]*>[^<]*(<[^b/][^>]*>)*Name</);

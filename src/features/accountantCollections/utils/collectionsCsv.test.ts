@@ -20,6 +20,7 @@ function row(overrides: Partial<CollectionsRow> = {}): CollectionsRow {
     remainingCents: 300000,
     currency: "USD",
     daysOverdue: 12,
+    eventStart: "2027-06-01",
     ...overrides,
   };
 }
@@ -31,6 +32,7 @@ describe("buildCollectionsCsv", () => {
     expect(COLLECTIONS_CSV_HEADERS).toEqual([
       "Name",
       "Next Follow Up",
+      "Start Date",
       "Payment Overdue",
       "Task Notes",
       "Amount Overdue",
@@ -40,7 +42,12 @@ describe("buildCollectionsCsv", () => {
 
   it("writes each cell as the table shows it", () => {
     const [, line] = lines(buildCollectionsCsv([row()], TODAY));
-    expect(line).toBe('Homecoming,Due Today,12 days,Call Sam,"$2,500.00"');
+    expect(line).toBe('Homecoming,Due Today,"Jun 1, 2027",12 days,Call Sam,"$2,500.00"');
+  });
+
+  it("writes N/A in Start Date when the event has no start date, as the table does", () => {
+    const [, line] = lines(buildCollectionsCsv([row({ eventStart: null })], TODAY));
+    expect(line).toBe('Homecoming,Due Today,N/A,12 days,Call Sam,"$2,500.00"');
   });
 
   it("words the follow-up against today, as the table does", () => {
@@ -55,7 +62,7 @@ describe("buildCollectionsCsv", () => {
 
   it("leaves Payment Overdue empty when nothing is overdue", () => {
     const [, line] = lines(buildCollectionsCsv([row({ daysOverdue: null })], TODAY));
-    expect(line).toBe('Homecoming,Due Today,,Call Sam,"$2,500.00"');
+    expect(line).toBe('Homecoming,Due Today,"Jun 1, 2027",,Call Sam,"$2,500.00"');
   });
 
   it("marks a Canadian quote's amount with C$", () => {

@@ -102,6 +102,7 @@ describe("buildCollectionsRows: an event with a payment schedule", () => {
         remainingCents: 100000,
         currency: "USD",
         daysOverdue: 10,
+        eventStart: "2027-06-01",
       },
     ]);
   });
@@ -291,6 +292,14 @@ describe("buildCollectionsRows: money and currency", () => {
     expect(row.amountDueCents).toBe(0);
     expect(row.daysOverdue).toBeNull();
     expect(row.taskId).toBe("task-a");
+  });
+
+  it("carries the event's start date, and null when the event has none", () => {
+    const [dated] = build([task("a", { event_start: "2027-06-01" })]);
+    const [undated] = build([task("b", { event_start: null })]);
+
+    expect(dated.eventStart).toBe("2027-06-01");
+    expect(undated.eventStart).toBeNull();
   });
 
   it("treats an event with no line items as a total of 0", () => {

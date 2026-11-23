@@ -68,6 +68,7 @@ const baseInput = (over: Partial<SalesOfficeInput> = {}): SalesOfficeInput => ({
   stripeConnectionUuid: null,
   address: null,
   paymentInfo: null,
+  phone: null,
   ...over,
 });
 
@@ -125,6 +126,32 @@ describe("payment info", () => {
 
     executed.length = 0;
     await updateSalesOffice("office-1", null, baseInput({ paymentInfo: "" }));
+    expect(executed[0].parameters).not.toContain("");
+  });
+});
+
+describe("phone", () => {
+  it("is saved trimmed when creating an office", async () => {
+    await createSalesOffice(baseInput({ phone: "  (519) 555-0142 " }));
+    expect(executed[0].sql).toContain('"phone"');
+    expect(executed[0].parameters).toContain("(519) 555-0142");
+  });
+
+  it("is saved as null, not an empty string, when left blank", async () => {
+    await createSalesOffice(baseInput({ phone: "   " }));
+    expect(executed[0].sql).toContain('"phone"');
+    expect(executed[0].parameters).not.toContain("   ");
+    expect(executed[0].parameters).not.toContain("");
+  });
+
+  it("is written when updating an office, and can be cleared", async () => {
+    await updateSalesOffice("office-1", null, baseInput({ phone: "(519) 555-0142" }));
+    expect(executed[0].sql).toContain('"phone" = ?');
+    expect(executed[0].parameters).toContain("(519) 555-0142");
+
+    executed.length = 0;
+    await updateSalesOffice("office-1", null, baseInput({ phone: "" }));
+    expect(executed[0].sql).toContain('"phone" = ?');
     expect(executed[0].parameters).not.toContain("");
   });
 });
@@ -190,5 +217,10 @@ describe("fetchAllSalesOffices", () => {
     expect(sql).toContain('where "so"."deleted" = ?');
     expect(sql).toContain('order by "so"."name"');
     expect(parameters).toContain(0);
+  });
+
+  it("reads the office's phone, so the edit form can show it", async () => {
+    await fetchAllSalesOffices();
+    expect(executed[0].sql).toContain('"so"."phone" as "phone"');
   });
 });

@@ -35,6 +35,7 @@ describe("permission matrix", () => {
       );
       expect(granted.sort()).toEqual([
         "Accounts Receivable",
+        "Ask Claude About Our Data", // docs/specs/analytics-mcp.md D2: open to every active account
         "Blocked Customer Emails",
         "Collections",
         "Companies & Contacts",

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from "lucide-react";
+import { formatListDate } from "@/features/quotesAndBookings/components/eventListCells";
 import { formatMoney } from "@/features/quotesAndBookings/utils/formatMoney";
 import type { CollectionsListState, CollectionsSortKey } from "../utils/collectionsListState";
 import type { CollectionsRow } from "../utils/collectionsRows";
@@ -12,7 +13,7 @@ import { followUpLabel, overdueLabel } from "../utils/relativeDays";
  * The table of the Collections tab. docs/specs/accountant-collections-09-design.md §3.
  *
  * A row is a link: the Name cell holds the link and stretches it over the whole row, so the row
- * stays a table row. The three sortable headers are buttons; `aria-sort` follows the list state.
+ * stays a table row. The four sortable headers are buttons; `aria-sort` follows the list state.
  */
 
 const GRID = "px-5 py-3";
@@ -93,6 +94,13 @@ export function CollectionsTable({
                 onSort={onSort}
               />
               <SortHeader
+                label="Start Date"
+                sortKey="startDate"
+                state={state}
+                align="left"
+                onSort={onSort}
+              />
+              <SortHeader
                 label="Payment Overdue"
                 sortKey="overdue"
                 state={state}
@@ -132,6 +140,9 @@ export function CollectionsTable({
                   <span className={followUpClasses(row.dueDate, today)}>
                     {followUpLabel(row.dueDate, today)}
                   </span>
+                </td>
+                <td className={`${GRID} whitespace-nowrap text-gray-600`}>
+                  {formatListDate(row.eventStart)}
                 </td>
                 <td className={`${GRID} text-gray-900`}>{overdueLabel(row.daysOverdue)}</td>
                 <td className={`${GRID} max-w-[320px] text-gray-700`}>

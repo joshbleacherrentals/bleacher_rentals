@@ -55,6 +55,7 @@ function row(id: string, amountDueCents: number, remainingCents = amountDueCents
     remainingCents,
     currency: "USD",
     daysOverdue: 10,
+    eventStart: "2027-06-01",
   };
 }
 
