@@ -230,7 +230,7 @@ async function writeBatch(statements: CompiledQuery[], message: string): Promise
  * `ErrorToast` (`saveFailed` and the error text) and is thrown again.
  */
 export async function createRepair(
-  input: Omit<CreateRepairInput, "id">,
+  input: Omit<CreateRepairInput, "id"> & { id?: string },
 ): Promise<RepairFormErrors | null> {
   const errors = validateRepairForm(input.values);
   const duplicate = await findInvoiceDuplicate({
@@ -241,7 +241,8 @@ export async function createRepair(
   if (duplicate) errors.invoiceNumber = REPAIR_FORM_MESSAGES.invoiceDuplicate;
   if (Object.keys(errors).length > 0) return errors;
 
-  const id = crypto.randomUUID();
+  // The page may make the id itself, so that the files can be written for it afterwards (09b3).
+  const id = input.id ?? crypto.randomUUID();
   const draft = input.services ?? [];
   const statements = [
     buildCreateRepairStatement({ ...input, id }),

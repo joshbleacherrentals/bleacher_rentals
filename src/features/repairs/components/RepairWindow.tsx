@@ -58,8 +58,9 @@ import {
   type ServicesDraft,
 } from "../utils/serviceForm";
 import { canReadRepairFiles, repairCreatedLine, repairWindowTitle } from "../utils/repairWindow";
+import { EMPTY_FILES_DRAFT, isFilesDraftChanged, type FilesDraft } from "../utils/repairFiles";
 import { BleacherChip, DeletedBadge, StatusPill } from "./RepairChips";
-import { RepairFiles } from "./RepairFiles";
+import { RepairFiles, RepairFilesEdit, RepairFilesNew } from "./RepairFiles";
 import { RepairFormFields, firstErrorFieldId } from "./RepairForm";
 import { RepairWindowServices } from "./RepairServices";
 import { RepairStatusMenu } from "./RepairStatusMenu";
@@ -439,13 +440,14 @@ export type RepairEditing = {
   bleachers: readonly FilterOption[];
   categories: readonly FilterOption[];
   /**
-   * Save of an Edit: the fields and the services draft (09b1 D161). Null when written, the errors when
-   * nothing was written (D138).
+   * Save of an Edit: the fields, the services draft (09b1 D161) and the files draft (09b3 D191). Null
+   * when written, the errors when nothing was written (D138).
    */
   onSave: (
     initial: RepairFormValues,
     values: RepairFormValues,
     services: ServicesDraft,
+    files: FilesDraft,
   ) => Promise<RepairFormErrors | null>;
   onDelete: () => Promise<void>;
   onRestore: () => Promise<void>;
@@ -564,12 +566,15 @@ function useRepairDraft(params: {
     initial: RepairFormValues,
     values: RepairFormValues,
     services: ServicesDraft,
+    files: FilesDraft,
   ) => Promise<RepairFormErrors | null>;
   onSaved: () => void;
 }) {
   const { mode, initial, initialServices, submit, onSaved } = params;
   const [values, setValues] = useState<RepairFormValues>(initial);
   const [services, setServicesState] = useState<ServicesDraft>(initialServices);
+  // The files of the draft (09b3 D191): picked files and stored files marked removed.
+  const [files, setFiles] = useState<FilesDraft>(EMPTY_FILES_DRAFT);
   const [errors, setErrors] = useState<RepairFormErrors>({});
   // A change of the services drops the red line above them (09b2 D186).
   const setServices: Dispatch<SetStateAction<ServicesDraft>> = (action) => {
@@ -612,7 +617,7 @@ function useRepairDraft(params: {
     if (saving) return;
     setSaving(true);
     try {
-      const refused = await submit(initial, values, services);
+      const refused = await submit(initial, values, services, files);
       if (refused) {
         setErrors(refused);
         const id = firstErrorFieldId(refused);
@@ -631,9 +636,14 @@ function useRepairDraft(params: {
     values,
     services,
     setServices,
+    files,
+    setFiles,
     errors,
     saving,
-    dirty: isRepairFormDirty(initial, values) || isServicesDraftChanged(services),
+    dirty:
+      isRepairFormDirty(initial, values) ||
+      isServicesDraftChanged(services) ||
+      isFilesDraftChanged(files),
     change,
     save,
   };
@@ -722,7 +732,6 @@ function RepairEditBody({
   initialServices,
   editing,
   timezone,
-  files,
   onOpenReports,
   onLeave,
   onDirtyChange,
@@ -732,7 +741,6 @@ function RepairEditBody({
   initialServices: ServicesDraft;
   editing: RepairEditing;
   timezone: string;
-  files: ReactNode;
   onOpenReports: () => void;
   onLeave: () => void;
   onDirtyChange: (dirty: boolean) => void;
@@ -775,7 +783,14 @@ function RepairEditBody({
         onOpenReports={onOpenReports}
         onAddService={() => setServiceWindow({ kind: "new" })}
         servicesError={draft.errors.services}
-        files={files}
+        files={
+          <RepairFilesEdit
+            repairId={repair.id}
+            draft={draft.files}
+            onChange={draft.setFiles}
+            disabled={draft.saving}
+          />
+        }
         Title={DialogTitle}
         eyebrow="Edit repair"
         fields={
@@ -873,7 +888,9 @@ export function RepairWindow({
     else leaveEdit();
   };
 
-  const files = canReadFiles ? <RepairFiles repairId={repair.id} /> : null;
+  const files = canReadFiles ? (
+    <RepairFiles repairId={repair.id} canWrite={!!editing && !repair.deleted} />
+  ) : null;
 
   return (
     <>
@@ -894,7 +911,6 @@ export function RepairWindow({
               initialServices={session.services}
               editing={editing}
               timezone={timezone}
-              files={files}
               onOpenReports={onOpenReports}
               onLeave={leaveEdit}
               onDirtyChange={onDirtyChange}
@@ -955,7 +971,11 @@ export type NewRepairWindowProps = {
   /** The lists of the service selects (09b1 D153). */
   bleachers: readonly FilterOption[];
   categories: readonly FilterOption[];
-  onCreate: (values: RepairFormValues, services: ServicesDraft) => Promise<RepairFormErrors | null>;
+  onCreate: (
+    values: RepairFormValues,
+    services: ServicesDraft,
+    files: FilesDraft,
+  ) => Promise<RepairFormErrors | null>;
   /** Called before a service goes into the draft: the refusal text of a zone conflict, or null (09b2 D176). */
   checkServiceZone: ServiceZoneCheck;
   onClose: () => void;
@@ -963,7 +983,7 @@ export type NewRepairWindowProps = {
 
 /**
  * The window of New repair: the fields and the draft of services (spec 09b1 D149), Cancel and Add
- * repair (D128, D129). The files join the draft in spec 09b3.
+ * repair (D128, D129), and the draft of files (spec 09b3 D149, D191).
  */
 export function NewRepairWindow({
   vendors,
@@ -978,7 +998,7 @@ export function NewRepairWindow({
     mode: "new",
     initial,
     initialServices: [],
-    submit: (_initial, values, services) => onCreate(values, services),
+    submit: (_initial, values, services, files) => onCreate(values, services, files),
     onSaved: onClose,
   });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -1031,6 +1051,7 @@ export function NewRepairWindow({
               onAddService={() => setServiceWindow({ kind: "new" })}
               error={draft.errors.services}
             />
+            <RepairFilesNew draft={draft.files} onChange={draft.setFiles} disabled={draft.saving} />
           </div>
           <RepairWindowFooter
             mode="new"

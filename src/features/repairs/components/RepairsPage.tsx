@@ -1,13 +1,17 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Pagination } from "@/components/Pagination";
+import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
+import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
+import { makeRepairFilesClient, saveRepairFiles } from "../db/repairFileWrite";
 import { changeRepairStatus } from "../db/repairStatusWrite";
 import { createRepair, deleteRepair, restoreRepair, updateRepair } from "../db/repairWrite";
 import { findServiceZoneConflict } from "../db/repairLinkWrite";
@@ -15,6 +19,7 @@ import { createService, deleteService, updateService } from "../db/serviceWrite"
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
 import { useRepairList } from "../hooks/useRepairList";
 import { closeFrom, openWindow, resolveWindows, type WindowEntry } from "../utils/repairDetails";
+import { filesFailureLines, isFilesDraftChanged, type FilesDraft } from "../utils/repairFiles";
 import {
   NO_EXPANSION,
   openRepairIds,
@@ -52,6 +57,7 @@ import { NewServiceWindow, ServiceWindow, type ServiceEditing } from "./ServiceW
  * docs/specs/repairs-05-toolbar.md, docs/specs/repairs-06-expanded-row.md,
  * docs/specs/repairs-07-repair-window.md §2.7, docs/specs/repairs-08-status.md §2.1 and
  * docs/specs/repairs-09a-repair-writes.md §2.1 and §2.8 and docs/specs/repairs-09b1-services.md §2.8.
+ * The files of a repair are written after the local write of a Save (docs/specs/repairs-09b3-files.md §2.8).
  */
 export default function RepairsPage() {
   const router = useRouter();
@@ -62,6 +68,11 @@ export default function RepairsPage() {
   // the other roles deleted repairs (D65).
   const { isAdmin, isMaintainer, userId } = useTeamPermissions();
   const canManage = canManageDamageAndMaintenance({ isAdmin, isMaintainer });
+
+  // The files of a repair go straight to Supabase, after the local write of a Save (spec 09b3).
+  const supabase = useClerkSupabaseClient();
+  const queryClient = useQueryClient();
+  const filesClient = useMemo(() => makeRepairFilesClient(supabase), [supabase]);
 
   const urlState = useMemo(() => readRepairsUrlState(searchParams), [searchParams]);
   const showDeleted = canManage && urlState.showDeleted;
@@ -108,6 +119,22 @@ export default function RepairsPage() {
     });
   };
 
+  // The network part of a Save (spec 09b3 §2.4 steps 3 to 6): the files of the draft, after the local
+  // write. Nothing to do for a draft with no change. It never throws; a failure is one red toast
+  // (D194, D195) and the window leaves as after any Save.
+  const saveFiles = async (repairId: string, files: FilesDraft) => {
+    if (!isFilesDraftChanged(files)) return;
+    const result = await saveRepairFiles({
+      client: filesClient,
+      repairId,
+      added: files.added,
+      removed: files.removed,
+    });
+    await queryClient.invalidateQueries({ queryKey: ["repair-files", repairId] });
+    const lines = filesFailureLines(result, "save");
+    if (lines) createErrorToastNoThrow(lines);
+  };
+
   // What the repair window gets for an administrator or a maintainer (D124). `repair` is the row as
   // the page holds it at this render, so `liveStatus` and `reported` are the newest (D135).
   const editingFor = (repair: RepairListRow): RepairEditing | undefined =>
@@ -116,8 +143,8 @@ export default function RepairsPage() {
           vendors: options.vendor,
           bleachers: options.bleacher,
           categories: options.category,
-          onSave: (initial, values, services) =>
-            updateRepair({
+          onSave: async (initial, values, services, files) => {
+            const errors = await updateRepair({
               repairId: repair.id,
               initial,
               values,
@@ -126,7 +153,11 @@ export default function RepairsPage() {
               reported: repair.reported,
               now: new Date().toISOString(),
               timezone,
-            }),
+            });
+            if (errors) return errors;
+            await saveFiles(repair.id, files);
+            return null;
+          },
           onDelete: () => deleteRepair(repair.id),
           onRestore: async () => {
             await restore(repair.id);
@@ -255,15 +286,20 @@ export default function RepairsPage() {
               vendors={options.vendor}
               bleachers={options.bleacher}
               categories={options.category}
-              onCreate={(values, services) =>
-                createRepair({
+              onCreate={async (values, services, files) => {
+                const id = crypto.randomUUID();
+                const errors = await createRepair({
+                  id,
                   values,
                   services,
                   createdByUserUuid: userId,
                   now: new Date().toISOString(),
                   timezone,
-                })
-              }
+                });
+                if (errors) return errors;
+                await saveFiles(id, files);
+                return null;
+              }}
               checkServiceZone={(input) => findServiceZoneConflict({ repairId: null, ...input })}
               onClose={() => close(w.index)}
             />

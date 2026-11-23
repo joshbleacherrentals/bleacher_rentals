@@ -10,7 +10,9 @@ import { randomUUID } from "node:crypto";
  * with a service that was deleted on its own), and docs/specs/repairs-07-repair-window.md §6 (the
  * vendor's address and two files of the completed repair), and docs/specs/repairs-09b2-bleachers-zone-
  * reports.md §6 (`links`: bleachers, open damage reports, a sub-rental and three repairs for what a
- * service does to the repair around it).
+ * service does to the repair around it), and docs/specs/repairs-09b3-files.md §6 (`files`: a fresh
+ * bleacher with one repair for each files scenario, whose stored files have real objects in the
+ * bucket, and the payloads the scenarios pick).
  *
  * It writes `MaintenanceLineItems` and `Vendors`, which reach a user's device only where the sync
  * rules of docs/specs/repairs-02-sync-rules.md are deployed.
@@ -44,6 +46,67 @@ export const PAGER_REPAIRS = 26;
 export const REPORT_DAYS = { first: "2026-09-17", second: "2026-09-19", cad: "2026-09-20" };
 
 type BleacherRef = { uuid: string; number: number };
+
+/** The public bucket of the files of a repair (spec 07 D99, spec 09b3 D192). */
+export const FILES_BUCKET = "maintenance-photos";
+
+/** A file as `setInputFiles` takes it. */
+export type FilePayload = { name: string; mimeType: string; buffer: Buffer };
+
+/** A real 1 x 1 PNG: a few dozen bytes, an allowed type, well under 10 MB. */
+export const TINY_PNG: Buffer = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);
+/** A small file the page accepts (09b3 D197). */
+export const pngFile = (name = "photo.png"): FilePayload => ({
+  name,
+  mimeType: "image/png",
+  buffer: TINY_PNG,
+});
+/** An allowed type that is one byte over the 10 MB limit, so the page refuses it as too large. */
+export const bigPdfFile = (name = "big.pdf"): FilePayload => ({
+  name,
+  mimeType: "application/pdf",
+  buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+});
+/** A type that is not allowed, so the page refuses it by its MIME type. */
+export const zipFile = (name = "notes.zip"): FilePayload => ({
+  name,
+  mimeType: "application/zip",
+  buffer: Buffer.from("PK\u0003\u0004e2e", "binary"),
+});
+
+/** A repair of the files fixtures: its invoice number, and its stored files in the order of Photo 1, 2. */
+export type FilesRepair = {
+  id: string;
+  invoice: string;
+  files: { id: string; path: string }[];
+};
+
+/**
+ * What the 09b3 scenarios (S43 to S50) need. Each scenario has its own repair, so that the files one
+ * adds or deletes do not disturb another. All sit on `bleacher` (no zone, the Open tab, found by
+ * `?bleachers=`); the stored files have a real object in the bucket, so a deletion can be read back.
+ * docs/specs/repairs-09b3-files.md §6.
+ */
+export type SeededFiles = {
+  bleacher: BleacherRef;
+  /** A bleacher with no repair, for the New repair of S47 (its service goes on it). */
+  newRepairBleacher: BleacherRef;
+  /** S43: one stored file. */
+  add: FilesRepair;
+  /** S44: two stored files. */
+  remove: FilesRepair;
+  /** S45: two stored files. */
+  edit: FilesRepair;
+  /** S46: one stored file. */
+  cancel: FilesRepair;
+  /** S48 and S50: no file. */
+  none: FilesRepair;
+  /** S44: Completed and deleted, with one stored file (shown by `?tab=completed&showDeleted=1`). */
+  deleted: FilesRepair;
+};
 
 /**
  * What the 09b2 scenarios (S34 to S42) need. Every bleacher here is new and has its own damage
@@ -144,6 +207,8 @@ export type SeededRepairs = {
   repairFiles: { photoPath: string; pdfPath: string };
   /** The fixtures of spec 09b2; null when the database has fewer than two zones. */
   links: SeededLinks | null;
+  /** The fixtures of spec 09b3 (the files of a repair). */
+  files: SeededFiles;
   cleanup: () => Promise<void>;
 };
 
@@ -614,6 +679,81 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     };
   }
 
+  // ── Spec 09b3: the files of a repair ────────────────────────────────────────────────────────
+  // Two fresh bleachers (smallint numbers, clear of the ones above): one holds a repair for each
+  // scenario, the other holds nothing, for the New repair of S47.
+  const filesBleacherRes = await supabase
+    .from("Bleachers")
+    .insert(
+      [0, 1].map((i) => ({
+        bleacher_number: base + 110 + i,
+        bleacher_rows: 5,
+        bleacher_seats: 50,
+      })),
+    )
+    .select("id, bleacher_number");
+  const filesBleachers = check(filesBleacherRes.data, filesBleacherRes.error, "files bleachers");
+  extraBleacherIds.push(...filesBleachers.map((b) => b.id as string));
+  const filesBleacherRef = (offset: number): BleacherRef => {
+    const found = filesBleachers.find((b) => b.bleacher_number === base + 110 + offset);
+    if (!found) throw new Error(`fixture files bleacher ${offset} missing`);
+    return { uuid: found.id as string, number: base + 110 + offset };
+  };
+  const filesBleacher = filesBleacherRef(0);
+  const newRepairFilesBleacher = filesBleacherRef(1);
+
+  const insertFilesRepair = async (
+    label: string,
+    fileCount: number,
+    fields: Record<string, unknown> = {},
+  ): Promise<FilesRepair> => {
+    const filesInvoice = `E2E-FILES-${label}-${suffix}`;
+    const id = await insertEvent(
+      {
+        event_start: "2026-10-20",
+        event_end: "2026-10-25",
+        status: "inbound",
+        currency: "USD",
+        invoice_number: filesInvoice,
+        ...fields,
+      },
+      filesBleacher.uuid,
+    );
+    const stored: FilesRepair["files"] = [];
+    for (let i = 0; i < fileCount; i += 1) {
+      const path = `${id}/${suffix}-${i}.png`;
+      const upload = await supabase.storage
+        .from(FILES_BUCKET)
+        .upload(path, TINY_PNG, { contentType: "image/png", upsert: false });
+      if (upload.error) throw new Error(`fixture file object failed: ${upload.error.message}`);
+      const row = await supabase
+        .from("MaintenancePhotos")
+        .insert({
+          maintenance_event_uuid: id,
+          photo_path: path,
+          created_at: `2026-10-20T16:0${i}:00Z`,
+        })
+        .select("id")
+        .single();
+      stored.push({ id: check(row.data, row.error, "file row").id as string, path });
+    }
+    return { id, invoice: filesInvoice, files: stored };
+  };
+  const files: SeededFiles = {
+    bleacher: filesBleacher,
+    newRepairBleacher: newRepairFilesBleacher,
+    add: await insertFilesRepair("ADD", 1),
+    remove: await insertFilesRepair("DEL", 2),
+    edit: await insertFilesRepair("EDIT", 2),
+    cancel: await insertFilesRepair("CANCEL", 1),
+    none: await insertFilesRepair("NONE", 0),
+    deleted: await insertFilesRepair("GONE", 1, {
+      status: "completed",
+      completed_at: "2026-10-25T16:00:00Z",
+      deleted: true,
+    }),
+  };
+
   const completedTotal = await costOf(completedId);
   const cadTotal = await costOf(cadId);
 
@@ -637,6 +777,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     vendorAddress: "E2E City, TX, US",
     repairFiles,
     links,
+    files,
     cleanup: async () => {
       const bleacherIds = [...bleachers.map((b) => b.id as string), ...extraBleacherIds];
 
@@ -668,6 +809,27 @@ export async function seedRepairs(): Promise<SeededRepairs> {
       await supabase.from("DamageReportPhotos").delete().in("damage_report_uuid", allReportIds);
       await supabase.from("DamageReports").delete().in("id", allReportIds);
       await supabase.from("SubrentalEvents").delete().in("id", subrentalIds);
+      // The objects of the files, from the rows and from the folders of the repairs of the files
+      // fixtures (a file that failed half-way leaves an object with no row). A path that does not
+      // exist is not an error for `remove`.
+      const fileRows = await supabase
+        .from("MaintenancePhotos")
+        .select("photo_path")
+        .in("maintenance_event_uuid", allEventIds);
+      const onFilesBleachers = await supabase
+        .from("BleacherMaintEvents")
+        .select("maintenance_event_uuid")
+        .in("bleacher_uuid", [filesBleacher.uuid, newRepairFilesBleacher.uuid]);
+      const objectPaths = new Set((fileRows.data ?? []).map((r) => r.photo_path as string));
+      for (const folder of new Set(
+        (onFilesBleachers.data ?? []).map((r) => r.maintenance_event_uuid as string),
+      )) {
+        const listed = await supabase.storage.from(FILES_BUCKET).list(folder);
+        for (const object of listed.data ?? []) objectPaths.add(`${folder}/${object.name}`);
+      }
+      if (objectPaths.size > 0) {
+        await supabase.storage.from(FILES_BUCKET).remove([...objectPaths]);
+      }
       await supabase.from("MaintenancePhotos").delete().in("maintenance_event_uuid", allEventIds);
       await supabase
         .from("MaintenanceLineItems")

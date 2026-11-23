@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import { readFilesWithoutButtons } from "./helpers/filesFlow";
 import { readRepairMadeByServices } from "./helpers/linksFlow";
 import { readRepairWindow } from "./helpers/repairWindowFlow";
 import { readServicesAndReport } from "./helpers/serviceFlow";
@@ -19,7 +20,8 @@ import {
  * and a click on a row that opens its block of services. Written, not run (project rule).
  * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
  * docs/specs/repairs-06-expanded-row.md §6 (S27), docs/specs/repairs-07-repair-window.md §6 (S33)
- * and docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S40).
+ * docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S40)
+ * and docs/specs/repairs-09b3-files.md §6 (S49).
  */
 test.describe("Repairs page (account manager)", () => {
   let seeded: SeededRepairs;
@@ -98,5 +100,11 @@ test.describe("Repairs page (account manager)", () => {
   }) => {
     test.skip(!seeded.links || !seeded.zones, "the database has fewer than two zones");
     await readRepairMadeByServices(page, seeded);
+  });
+
+  test("S49: reads the files of a repair and opens them, and has no Add file and no bin", async ({
+    page,
+  }) => {
+    await readFilesWithoutButtons(page, seeded);
   });
 });

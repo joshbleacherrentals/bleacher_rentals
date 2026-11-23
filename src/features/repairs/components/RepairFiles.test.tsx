@@ -115,3 +115,98 @@ describe("RepairFilesContent is read-only (spec 09 owns the writes)", () => {
     expect(words).not.toContain("choose files");
   });
 });
+
+// docs/specs/repairs-09b3-files.md §2.2, §3 and §7 (D191, D200, D201): the controls of a writer.
+describe("RepairFilesContent with controls (09b3)", () => {
+  const draftFile = (name: string, size: number, key = `k-${name}`) => {
+    const file = new File([], name, { type: "image/jpeg" });
+    Object.defineProperty(file, "size", { value: size });
+    return { key, file };
+  };
+  const controls = (over: Partial<NonNullable<RepairFilesContentProps["controls"]>> = {}) => ({
+    canAdd: true,
+    busy: false,
+    added: [],
+    onPick: () => {},
+    onRemoveDraft: () => {},
+    onRemoveStored: () => {},
+    ...over,
+  });
+
+  it("gives every stored row a bin labelled with its name, next to the open button", () => {
+    const rows = fileRows(render({ controls: controls() }));
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toContain('data-testid="repair-file-delete"');
+    expect(rows[0]).toContain('aria-label="Delete Photo 1"');
+    expect(rows[1]).toContain('aria-label="Delete PDF 1"');
+    expect(rows[0]).toContain('aria-label="Open Photo 1"');
+  });
+
+  it("draws Add file and a hidden input that takes several files, only when canAdd", () => {
+    const markup = render({ controls: controls() });
+    expect(markup).toContain('data-testid="repair-file-add"');
+    expect(text(markup)).toContain("Add file");
+    const input = markup.match(/<input[^>]*data-testid="repair-file-input"[^>]*>/)?.[0] ?? "";
+    expect(input).toContain('type="file"');
+    expect(input).toContain("multiple");
+    expect(input).toContain("application/pdf");
+    expect(input).toContain("image/jpeg");
+
+    const off = render({ controls: controls({ canAdd: false }) });
+    expect(off).not.toContain('data-testid="repair-file-add"');
+    expect(off).not.toContain('data-testid="repair-file-input"');
+  });
+
+  it("draws a draft row with the name on the disk and the size, no link, and its own bin", () => {
+    const markup = render({
+      controls: controls({ added: [draftFile("IMG_0412.jpg", 2_516_582)] }),
+    });
+    const draft = markup.split('data-testid="repair-file-draft"')[1] ?? "";
+    expect(text(draft)).toContain("IMG_0412.jpg");
+    expect(text(draft)).toContain("2.4 MB");
+    expect(draft).toContain('data-testid="repair-file-draft-remove"');
+    expect(draft).toContain('aria-label="Remove IMG_0412.jpg"');
+    expect(draft).not.toContain("<a ");
+    expect(draft).not.toContain("Added");
+  });
+
+  it("puts the draft rows after the stored rows, in the order picked", () => {
+    const markup = render({
+      controls: controls({ added: [draftFile("one.jpg", 10), draftFile("two.jpg", 10)] }),
+    });
+    expect(markup.indexOf("Word 1")).toBeLessThan(markup.indexOf("one.jpg"));
+    expect(markup.indexOf("one.jpg")).toBeLessThan(markup.indexOf("two.jpg"));
+  });
+
+  it("says No files. only when there is neither a stored row nor a draft row", () => {
+    expect(text(render({ files: [], controls: controls() }))).toContain("No files.");
+    const withDraft = render({
+      files: [],
+      controls: controls({ added: [draftFile("one.jpg", 10)] }),
+    });
+    expect(text(withDraft)).not.toContain("No files.");
+    expect(text(withDraft)).toContain("one.jpg");
+  });
+
+  it("says Uploading... and disables every button while busy", () => {
+    const markup = render({
+      controls: controls({ busy: true, added: [draftFile("one.jpg", 10)] }),
+    });
+    expect(text(markup)).toContain("Uploading...");
+    const buttons = [...markup.matchAll(/<button[^>]*>/g)].map((m) => m[0]);
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) expect(button).toContain("disabled");
+    expect(markup).toMatch(/<input[^>]*data-testid="repair-file-input"[^>]*disabled/);
+  });
+
+  it("draws no Add file while the list loads or failed, and keeps the draft rows", () => {
+    const loading = render({
+      state: "loading",
+      files: [],
+      controls: controls({ canAdd: false, added: [draftFile("one.jpg", 10)] }),
+    });
+    expect(text(loading)).toContain("Loading...");
+    expect(loading).not.toContain('data-testid="repair-file-add"');
+    expect(loading).toContain('data-testid="repair-file-draft"');
+  });
+});

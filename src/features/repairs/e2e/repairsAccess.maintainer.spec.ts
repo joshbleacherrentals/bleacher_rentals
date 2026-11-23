@@ -1,5 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import { pngFile, seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import {
+  FILES_TIMEOUT,
+  addFileButton,
+  fileRowsOf,
+  objectNamesOf,
+  openFilesRepair,
+  pickFiles,
+  storedFiles,
+} from "./helpers/filesFlow";
 import { createRepairWithService } from "./helpers/linksFlow";
 import { readRepairWindow } from "./helpers/repairWindowFlow";
 import { readServicesAndReport } from "./helpers/serviceFlow";
@@ -19,7 +28,8 @@ import {
  * and a click on a row that opens its block of services. Written, not run (project rule).
  * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
  * docs/specs/repairs-06-expanded-row.md §6 (S27), docs/specs/repairs-07-repair-window.md §6 (S33)
- * and docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S42).
+ * docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S42)
+ * and docs/specs/repairs-09b3-files.md §6 (S50).
  */
 test.describe("Repairs page (maintainer)", () => {
   let seeded: SeededRepairs;
@@ -106,5 +116,20 @@ test.describe("Repairs page (maintainer)", () => {
     const row = repairRows(page).first();
     await expect(cellOf(row, "bleachers")).toContainText(`#${bleacher.number}`);
     await expect(cellOf(row, "zone")).toContainText(seeded.zones!.a.name);
+  });
+
+  test("S50: Add file in the view mode of a repair with no files writes the file at once", async ({
+    page,
+  }) => {
+    const repair = seeded.files.none;
+    const win = await openFilesRepair(page, seeded, repair);
+    await expect(win.getByTestId("repair-files")).toContainText("No files.");
+    await expect(addFileButton(win)).toBeVisible();
+
+    await pickFiles(win, [pngFile("maintainer.png")]);
+    await expect(storedFiles(win)).toHaveCount(1, { timeout: FILES_TIMEOUT });
+    await expect(storedFiles(win).first()).toContainText("Photo 1");
+    await expect.poll(async () => (await fileRowsOf(repair.id)).length).toBe(1);
+    await expect.poll(async () => (await objectNamesOf(repair.id)).length).toBe(1);
   });
 });

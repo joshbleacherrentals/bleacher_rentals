@@ -97,7 +97,7 @@ const FILE_PHOTOS_TABLE = "MaintenancePhotos";
 export function useRepairFiles(
   repairId: string,
   timezone: string,
-): { state: "loading" | "error" | "ready"; files: RepairFileRow[] } {
+): { state: "loading" | "error" | "ready"; files: RepairFileRow[]; raw: RawRepairFileRow[] } {
   const supabase = useClerkSupabaseClient();
   const { isLoaded, session } = useSession();
   const query = useQuery({
@@ -114,10 +114,9 @@ export function useRepairFiles(
     },
   });
 
-  const files = useMemo(
-    () => buildRepairFileRows(query.data ?? [], timezone),
-    [query.data, timezone],
-  );
+  const raw = useMemo(() => query.data ?? [], [query.data]);
+  const files = useMemo(() => buildRepairFileRows(raw, timezone), [raw, timezone]);
   const state = query.isError ? "error" : query.isSuccess ? "ready" : "loading";
-  return { state, files };
+  // `raw` lets the Edit window name the rows that remain after a removal (09b3 D202).
+  return { state, files, raw };
 }

@@ -561,6 +561,19 @@ describe("the writers", () => {
       expect(toastCustom).not.toHaveBeenCalled();
     });
 
+    // docs/specs/repairs-09b3-files.md §3: the page makes the id of a New repair, so the files can be
+    // written for it after the repair is saved.
+    it("uses the id it is given for the repair row, and makes one when it is given none (09b3)", async () => {
+      await createRepair({ ...input(), id: "given-id" });
+      const given = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+      expect(given[0].parameters[0]).toBe("given-id");
+
+      await createRepair(input());
+      const made = typedExecuteBatch.mock.calls[1][0] as CompiledQuery[];
+      expect(made[0].parameters[0]).toMatch(/^[0-9a-f-]{36}$/);
+      expect(made[0].parameters[0]).not.toBe("given-id");
+    });
+
     it("does not look for a duplicate when there is no vendor or no number", async () => {
       await createRepair(input({ values: values({ vendorUuid: null }) }));
       await createRepair(input({ values: values({ invoiceNumber: "" }) }));
@@ -760,6 +773,14 @@ describe("the services draft (09b1, 09b2)", () => {
     expect(call.now).toBe(NOW);
     expect(call.timezone).toBe("America/Toronto");
     expect(call.failedMessage).toBe("Failed to save the repair.");
+  });
+
+  it("createRepair hands the id it was given to the runner and to the repair row (09b3)", async () => {
+    const { id: _id, ...rest } = createInput({ services: newDraft() });
+    await createRepair({ ...rest, id: "given-id" });
+    const call = writeRepairChanges.mock.calls[0][0];
+    expect(call.repairId).toBe("given-id");
+    expect((call.statements as CompiledQuery[])[0].parameters[0]).toBe("given-id");
   });
 
   it("createRepair returns { services } for a zone refusal and shows no toast", async () => {
