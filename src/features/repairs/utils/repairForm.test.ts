@@ -305,4 +305,32 @@ describe("clearedRepairFormErrors (D138)", () => {
     expect(clearedRepairFormErrors(none, "invoiceNumber")).toBe(none);
     expect(clearedRepairFormErrors(none, "eventStart")).toBe(none);
   });
+
+  // docs/specs/repairs-09b2-bleachers-zone-reports.md §3 (D186): the red line above the services.
+  it("clears the services error when Repair from changes", () => {
+    const withServices = {
+      ...all,
+      services: "Bleacher #60 is in Zone 2, but this repair is in Zone 1.",
+    };
+    expect(clearedRepairFormErrors(withServices, "eventStart")).toEqual({ invoiceNumber: "c" });
+    expect(clearedRepairFormErrors({ services: "x" }, "eventStart")).toEqual({});
+  });
+
+  it("keeps the services error when any other field changes", () => {
+    const withServices = { ...all, services: "x" };
+    expect(clearedRepairFormErrors(withServices, "eventEnd")).toEqual({
+      invoiceNumber: "c",
+      services: "x",
+    });
+    expect(clearedRepairFormErrors(withServices, "invoiceNumber")).toEqual({
+      eventStart: "a",
+      eventEnd: "b",
+      services: "x",
+    });
+    for (const field of ["status", "currency", "notes"] as const) {
+      expect(clearedRepairFormErrors(withServices, field)).toBe(withServices);
+    }
+    const onlyServices = { services: "x" };
+    expect(clearedRepairFormErrors(onlyServices, "invoiceNumber")).toBe(onlyServices);
+  });
 });

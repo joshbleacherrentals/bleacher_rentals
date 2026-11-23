@@ -48,11 +48,15 @@ export type RepairFormFieldsProps = {
   onChange: <K extends RepairFormField>(field: K, value: RepairFormValues[K]) => void;
 };
 
-/** The id of the first input that carries an error, in the order the fields are drawn (D138). */
+/**
+ * The id of the first input that carries an error, in the order the fields are drawn (D138); the red
+ * line above the services (09b2 D186) comes after the fields.
+ */
 export function firstErrorFieldId(errors: RepairFormErrors): string | null {
   if (errors.invoiceNumber) return "repair-invoice";
   if (errors.eventStart) return "repair-from";
   if (errors.eventEnd) return "repair-to";
+  if (errors.services) return "repair-services-error";
   return null;
 }
 

@@ -8,7 +8,9 @@ import { randomUUID } from "node:crypto";
  * uuid and the notes, which the toolbar specs look for) and docs/specs/repairs-06-expanded-row.md
  * §6 (a model number and a type on bleacher A, a photo on the first report, and a deleted repair
  * with a service that was deleted on its own), and docs/specs/repairs-07-repair-window.md §6 (the
- * vendor's address and two files of the completed repair).
+ * vendor's address and two files of the completed repair), and docs/specs/repairs-09b2-bleachers-zone-
+ * reports.md §6 (`links`: bleachers, open damage reports, a sub-rental and three repairs for what a
+ * service does to the repair around it).
  *
  * It writes `MaintenanceLineItems` and `Vendors`, which reach a user's device only where the sync
  * rules of docs/specs/repairs-02-sync-rules.md are deployed.
@@ -24,6 +26,11 @@ function adminClient() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+/** The service-role client of the fixtures, for the scenarios that read what the page wrote. */
+export function serviceRoleClient() {
+  return adminClient();
+}
+
 /** The two services of the first repair, in cents. */
 export const SERVICE_TIRES = { labor: 1500, parts: 11600, tax: 783, freight: 0 };
 export const SERVICE_WELDING = { labor: 41500, parts: 0, tax: 0, freight: 6500 };
@@ -35,6 +42,65 @@ export const PAGER_REPAIRS = 26;
 
 /** The days of the damage reports linked to the repairs (Toronto and UTC agree at 16:00Z). */
 export const REPORT_DAYS = { first: "2026-09-17", second: "2026-09-19", cad: "2026-09-20" };
+
+type BleacherRef = { uuid: string; number: number };
+
+/**
+ * What the 09b2 scenarios (S34 to S42) need. Every bleacher here is new and has its own damage
+ * reports and repairs, so that a scenario that links a report does not take it from another one.
+ * Null when the database has fewer than two zones (the scenarios skip themselves).
+ * docs/specs/repairs-09b2-bleachers-zone-reports.md §6.
+ */
+export type SeededLinks = {
+  /** In the zone of bleacher A, with no repair and two open reports that no repair has (S34, S42). */
+  newRepairBleacher: BleacherRef & { reportIds: string[] };
+  /** In no zone (S38). */
+  noZoneBleacher: BleacherRef;
+  /**
+   * In the zone of bleacher A, with an accepted sub-rental that borrows the other zone on `day`
+   * (S39). Its own zone is the zone of A, so the two agree until a day inside the sub-rental is typed.
+   */
+  subrentalBleacher: BleacherRef;
+  subrental: { from: string; to: string; day: string };
+  /**
+   * An open repair with a junction row on `bleacher` and no services (S35): one open report is free,
+   * the other is linked to the in-repair CAD repair.
+   */
+  oldRepair: {
+    id: string;
+    invoice: string;
+    bleacher: BleacherRef;
+    freeReportId: string;
+    elsewhereReportId: string;
+    elsewhereRepairId: string;
+  };
+  /**
+   * An open repair made as the page makes it: a service on `from`, its junction row, its zone (the
+   * zone of A), an open report of `from` linked to it, and a free open report of `to` (S36, S40, S41).
+   * `to` is in the same zone as `from`; bleacher B (`otherZoneBleacher`) is in the other one.
+   */
+  moveRepair: {
+    id: string;
+    invoice: string;
+    from: BleacherRef;
+    to: BleacherRef;
+    otherZoneBleacher: BleacherRef;
+    linkedReportId: string;
+    freeReportId: string;
+  };
+  /**
+   * A Completed repair that ended on `eventEnd`, with a junction row on `bleacher` and no services
+   * (S37): one open report was created before `eventEnd` and one after.
+   */
+  completedRepair: {
+    id: string;
+    invoice: string;
+    bleacher: BleacherRef;
+    eventEnd: string;
+    beforeReportId: string;
+    afterReportId: string;
+  };
+};
 
 export type SeededRepairs = {
   /**
@@ -76,6 +142,8 @@ export type SeededRepairs = {
    * names them "Photo 1" and "PDF 1". The objects do not exist in storage; the links are tested.
    */
   repairFiles: { photoPath: string; pdfPath: string };
+  /** The fixtures of spec 09b2; null when the database has fewer than two zones. */
+  links: SeededLinks | null;
   cleanup: () => Promise<void>;
 };
 
@@ -182,6 +250,10 @@ export async function seedRepairs(): Promise<SeededRepairs> {
   };
 
   const eventIds: string[] = [];
+  /** Every damage report the fixtures insert, removed in `cleanup`. */
+  const reportIds: string[] = [];
+  /** The bleachers the 09b2 fixtures add; they are removed with the others. */
+  const extraBleacherIds: string[] = [];
   const insertEvent = async (fields: Record<string, unknown>, bleacherUuid: string) => {
     const res = await supabase
       .from("MaintenanceEvents")
@@ -317,7 +389,6 @@ export async function seedRepairs(): Promise<SeededRepairs> {
   }
 
   // Damage reports linked to the repairs: two on the completed one, one on the CAD one.
-  const reportIds: string[] = [];
   const reportNote = `e2e-report-${suffix}`;
   const insertReport = async (repairId: string, createdDay: string) => {
     const res = await supabase
@@ -367,6 +438,182 @@ export async function seedRepairs(): Promise<SeededRepairs> {
   ]);
   if (filesRes.error) throw new Error(`fixture files failed: ${filesRes.error.message}`);
 
+  // ── Spec 09b2: what a service does to the repair around it ──────────────────────────────────
+  const subrentalIds: string[] = [];
+  let links: SeededLinks | null = null;
+  if (zones) {
+    const insertOpenReport = async (
+      bleacherUuid: string,
+      createdAt: string,
+      repairId: string | null,
+    ) => {
+      const res = await supabase
+        .from("DamageReports")
+        .insert({
+          bleacher_uuid: bleacherUuid,
+          seat_damage: "minor",
+          haul_damage: "none",
+          is_safe_to_sit: false,
+          is_safe_to_haul: true,
+          note: reportNote,
+          maintenance_event_uuid: repairId,
+          created_at: createdAt,
+        })
+        .select("id")
+        .single();
+      const id = check(res.data, res.error, "open report").id as string;
+      reportIds.push(id);
+      return id;
+    };
+
+    // Seven fresh bleachers; six in the zone of A, one with no zone.
+    const linkBleacherRes = await supabase
+      .from("Bleachers")
+      .insert(
+        [0, 1, 2, 3, 4, 5, 6].map((i) => ({
+          bleacher_number: base + 100 + i,
+          bleacher_rows: 5,
+          bleacher_seats: 50,
+          zone_uuid: i === 6 ? null : zones.a.uuid,
+        })),
+      )
+      .select("id, bleacher_number");
+    const linkBleachers = check(linkBleacherRes.data, linkBleacherRes.error, "link bleachers");
+    extraBleacherIds.push(...linkBleachers.map((b) => b.id as string));
+    const linkBleacher = (offset: number): BleacherRef => {
+      const found = linkBleachers.find((b) => b.bleacher_number === base + 100 + offset);
+      if (!found) throw new Error(`fixture link bleacher ${offset} missing`);
+      return { uuid: found.id as string, number: base + 100 + offset };
+    };
+    const newRepairBleacher = linkBleacher(0);
+    const oldBleacher = linkBleacher(1);
+    const moveFrom = linkBleacher(2);
+    const moveTo = linkBleacher(3);
+    const completedBleacher = linkBleacher(4);
+    const subrentalBleacher = linkBleacher(5);
+    const noZoneBleacher = linkBleacher(6);
+
+    // S34, S42: two open reports that no repair has, on a bleacher with no repair.
+    const newRepairReportIds = [
+      await insertOpenReport(newRepairBleacher.uuid, "2026-10-10T16:00:00Z", null),
+      await insertOpenReport(newRepairBleacher.uuid, "2026-11-10T16:00:00Z", null),
+    ];
+
+    // S35: an open repair with a row on its bleacher and no services; one free open report and one
+    // open report that belongs to the CAD repair.
+    const oldInvoice = `E2E-OLD-${suffix}`;
+    const oldRepairId = await insertEvent(
+      {
+        event_start: "2026-10-01",
+        event_end: "2026-10-05",
+        status: "inbound",
+        currency: "USD",
+        invoice_number: oldInvoice,
+      },
+      oldBleacher.uuid,
+    );
+    const oldFreeReportId = await insertOpenReport(oldBleacher.uuid, "2026-10-02T16:00:00Z", null);
+    const oldElsewhereReportId = await insertOpenReport(
+      oldBleacher.uuid,
+      "2026-10-03T16:00:00Z",
+      cadId,
+    );
+
+    // S36, S40, S41: an open repair made as the page makes it, on `moveFrom`.
+    const moveInvoice = `E2E-MOVE-${suffix}`;
+    const moveRepairId = await insertEvent(
+      {
+        event_start: "2026-10-12",
+        event_end: "2026-10-15",
+        status: "inbound",
+        currency: "USD",
+        invoice_number: moveInvoice,
+        zone_uuid: zones.a.uuid,
+      },
+      moveFrom.uuid,
+    );
+    await insertService(moveRepairId, moveFrom.uuid, "Tires", "minor", SERVICE_TIRES);
+    const moveLinkedReportId = await insertOpenReport(
+      moveFrom.uuid,
+      "2026-10-11T16:00:00Z",
+      moveRepairId,
+    );
+    const moveFreeReportId = await insertOpenReport(moveTo.uuid, "2026-10-11T17:00:00Z", null);
+
+    // S37: a Completed repair with a row on its bleacher and no services; one open report created
+    // before it ended and one after.
+    const completedLinksInvoice = `E2E-DONE-${suffix}`;
+    const completedLinksEnd = "2026-09-29";
+    const completedLinksId = await insertEvent(
+      {
+        event_start: "2026-09-20",
+        event_end: completedLinksEnd,
+        status: "completed",
+        currency: "USD",
+        invoice_number: completedLinksInvoice,
+        completed_at: "2026-09-29T16:00:00Z",
+      },
+      completedBleacher.uuid,
+    );
+    const beforeReportId = await insertOpenReport(
+      completedBleacher.uuid,
+      "2026-09-25T16:00:00Z",
+      null,
+    );
+    const afterReportId = await insertOpenReport(
+      completedBleacher.uuid,
+      "2026-10-10T16:00:00Z",
+      null,
+    );
+
+    // S39: an accepted sub-rental on `subrentalBleacher` that borrows the other zone for November.
+    const subrental = { from: "2026-11-01", to: "2026-11-30", day: "2026-11-02" };
+    const subrentalRes = await supabase
+      .from("SubrentalEvents")
+      .insert({
+        bleacher_uuid: subrentalBleacher.uuid,
+        status: "accepted",
+        requested_zone_uuid: zones.b.uuid,
+        event_start: subrental.from,
+        event_end: subrental.to,
+      })
+      .select("id")
+      .single();
+    subrentalIds.push(check(subrentalRes.data, subrentalRes.error, "sub-rental").id as string);
+
+    links = {
+      newRepairBleacher: { ...newRepairBleacher, reportIds: newRepairReportIds },
+      noZoneBleacher,
+      subrentalBleacher,
+      subrental,
+      oldRepair: {
+        id: oldRepairId,
+        invoice: oldInvoice,
+        bleacher: oldBleacher,
+        freeReportId: oldFreeReportId,
+        elsewhereReportId: oldElsewhereReportId,
+        elsewhereRepairId: cadId,
+      },
+      moveRepair: {
+        id: moveRepairId,
+        invoice: moveInvoice,
+        from: moveFrom,
+        to: moveTo,
+        otherZoneBleacher: bleacherB,
+        linkedReportId: moveLinkedReportId,
+        freeReportId: moveFreeReportId,
+      },
+      completedRepair: {
+        id: completedLinksId,
+        invoice: completedLinksInvoice,
+        bleacher: completedBleacher,
+        eventEnd: completedLinksEnd,
+        beforeReportId,
+        afterReportId,
+      },
+    };
+  }
+
   const completedTotal = await costOf(completedId);
   const cadTotal = await costOf(cadId);
 
@@ -389,22 +636,48 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     photoPath,
     vendorAddress: "E2E City, TX, US",
     repairFiles,
+    links,
     cleanup: async () => {
-      await supabase.from("DamageReportPhotos").delete().in("damage_report_uuid", reportIds);
-      await supabase.from("DamageReports").delete().in("id", reportIds);
-      await supabase.from("MaintenancePhotos").delete().in("maintenance_event_uuid", eventIds);
-      await supabase.from("MaintenanceLineItems").delete().in("maintenance_event_uuid", eventIds);
-      await supabase.from("BleacherMaintEvents").delete().in("maintenance_event_uuid", eventIds);
-      await supabase.from("MaintenanceEvents").delete().in("id", eventIds);
+      const bleacherIds = [...bleachers.map((b) => b.id as string), ...extraBleacherIds];
+
+      // What the 09b2 scenarios made through the page: repairs and services on the fixture bleachers,
+      // and the damage reports of those bleachers (their links point at repairs, so they go first).
+      const madeReports = await supabase
+        .from("DamageReports")
+        .select("id")
+        .in("bleacher_uuid", bleacherIds);
+      const allReportIds = [
+        ...new Set([...reportIds, ...(madeReports.data ?? []).map((r) => r.id as string)]),
+      ];
+      const madeJunction = await supabase
+        .from("BleacherMaintEvents")
+        .select("maintenance_event_uuid")
+        .in("bleacher_uuid", bleacherIds);
+      const madeServices = await supabase
+        .from("MaintenanceLineItems")
+        .select("maintenance_event_uuid")
+        .in("bleacher_uuid", bleacherIds);
+      const allEventIds = [
+        ...new Set([
+          ...eventIds,
+          ...(madeJunction.data ?? []).map((r) => r.maintenance_event_uuid as string),
+          ...(madeServices.data ?? []).map((r) => r.maintenance_event_uuid as string),
+        ]),
+      ];
+
+      await supabase.from("DamageReportPhotos").delete().in("damage_report_uuid", allReportIds);
+      await supabase.from("DamageReports").delete().in("id", allReportIds);
+      await supabase.from("SubrentalEvents").delete().in("id", subrentalIds);
+      await supabase.from("MaintenancePhotos").delete().in("maintenance_event_uuid", allEventIds);
+      await supabase
+        .from("MaintenanceLineItems")
+        .delete()
+        .in("maintenance_event_uuid", allEventIds);
+      await supabase.from("BleacherMaintEvents").delete().in("maintenance_event_uuid", allEventIds);
+      await supabase.from("MaintenanceEvents").delete().in("id", allEventIds);
       await supabase.from("Vendors").delete().eq("id", vendorId);
       await supabase.from("Addresses").delete().eq("id", addressId);
-      await supabase
-        .from("Bleachers")
-        .delete()
-        .in(
-          "id",
-          bleachers.map((b) => b.id as string),
-        );
+      await supabase.from("Bleachers").delete().in("id", bleacherIds);
     },
   };
 }

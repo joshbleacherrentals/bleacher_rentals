@@ -1116,6 +1116,11 @@ describe("Repairs page rows", () => {
   const WRITES_SENTENCE =
     "An administrator and a maintainer can add a repair and, in the repair window, change its vendor, invoice number, status, currency, repair days and notes; the status can also be changed from the pill in a row. Moving a repair into Completed records the moment it was completed and closes the damage reports found for it, which then leave the drivers' phones; moving it out of Completed clears that moment and leaves the reports closed. The amounts are edited through the services: an administrator and a maintainer add, change and delete a service, with its bleacher, category, severity, description and its four amounts, and the total of the repair follows a moment later, when the server has added the services up. The total cannot be typed in, and the files cannot be edited yet.";
 
+  // docs/specs/repairs-09b2-bleachers-zone-reports.md §5 (D188): the sentence added at the end of the
+  // description of the costs row.
+  const LINKS_SENTENCE =
+    "A service also decides the repair's bleachers and zone, which the table shows, and a Completed repair closes the damage reports of its bleachers that were reported before it ended.";
+
   it("has the Repair Costs & Vendors row right after Repairs & Maintenance", () => {
     expect(costs).toBeDefined();
     expect(PERMISSIONS.indexOf(costs!)).toBe(PERMISSIONS.indexOf(maintenance!) + 1);
@@ -1164,7 +1169,7 @@ describe("Repairs page rows", () => {
       /A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved\. /,
     );
     expect(costs?.description).toMatch(
-      /have repairs\. A repair opens in place[\s\S]*the files cannot be edited yet\.$/,
+      /have repairs\. A repair opens in place[\s\S]*the files cannot be edited yet\. A service also decides[\s\S]*reported before it ended\.$/,
     );
   });
 
@@ -1174,7 +1179,7 @@ describe("Repairs page rows", () => {
     expect(costs?.description).toContain(
       `whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. ${WRITES_SENTENCE}`,
     );
-    expect(costs?.description?.endsWith(WRITES_SENTENCE)).toBe(true);
+    expect(costs?.description?.endsWith(`${WRITES_SENTENCE} ${LINKS_SENTENCE}`)).toBe(true);
   });
 
   it("tells every role that opens the page about the repair window, and the viewer about the files", () => {
@@ -1228,7 +1233,7 @@ describe("Repairs page rows", () => {
   // and a maintainer do on the Repairs page, and what is still left to the Dashboard.
   it("tells the old row that the Repairs page adds, edits, deletes and restores repairs", () => {
     expect(maintenance?.description).toContain(
-      "On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. They also add, edit and delete the services of a repair, from its open row, from its window and from the service window; a deleted service cannot be brought back. A repair's own list of bleachers and its files are still edited from the Dashboard: a service names a bleacher, but that does not change the repair's list of bleachers yet.",
+      "On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. They also add, edit and delete the services of a repair, from its open row, from its window and from the service window; a deleted service cannot be brought back. A service also keeps the repair's list of bleachers and its zone: the first service on a bleacher adds the bleacher to the repair, removing the last one takes it off, the zone is set from the first bleacher that has one, and a bleacher in another zone is refused. The first service on a bleacher also links the bleacher's open damage reports to the repair; on a Completed repair it links and closes the ones reported before the repair ended. The Dashboard form still edits a repair's bleachers on its own, and a repair's files are still edited from the Dashboard.",
     );
     expect(maintenance?.description).not.toMatch(/until the repair window can edit/);
     expect(maintenance?.description).not.toMatch(/only lists repairs/);
@@ -1236,7 +1241,7 @@ describe("Repairs page rows", () => {
 
   it("tells the administrator, the account manager, the viewer and the maintainer what they do on the page", () => {
     expect(maintenance?.roles.admin.note).toMatch(
-      /Changes the status of any repair from the Repairs page\. On the Repairs page adds, edits, deletes and restores repairs, and adds, edits and deletes their services, but not yet their bleachers or files\.$/,
+      /Changes the status of any repair from the Repairs page\. On the Repairs page adds, edits, deletes and restores repairs, and adds, edits and deletes their services, which also set the repair's bleachers, zone and damage report links, but not yet their files\.$/,
     );
     expect(maintenance?.roles.account_manager.note).toMatch(
       /On the Repairs page sees every repair and its services but cannot add, edit, delete or restore one, change its status, or change its services\.$/,
@@ -1244,7 +1249,39 @@ describe("Repairs page rows", () => {
     expect(maintenance?.roles.account_manager.note).not.toMatch(/status menu/);
     expect(maintenance?.roles.viewer.note).toMatch(/Sees the status but cannot change it\.$/);
     expect(maintenance?.roles.maintainer.note).toBe(
-      "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services, delete and restore them, and the Dashboard for their bleachers and files.",
+      "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair's bleachers, zone and damage report links), delete and restore them, and the Dashboard for their files.",
+    );
+  });
+
+  // docs/specs/repairs-09b2-bleachers-zone-reports.md §5 (D188): the sentences say what a service does
+  // to the repair around it; no level changes in either row.
+  it("tells the matrix that a service keeps the repair's bleachers and zone and links damage reports (D188)", () => {
+    expect(maintenance?.description).toContain(
+      "A service also keeps the repair's list of bleachers and its zone",
+    );
+    expect(maintenance?.description).toContain(
+      "on a Completed repair it links and closes the ones reported before the repair ended",
+    );
+    expect(maintenance?.description).not.toMatch(
+      /does not change the repair's list of bleachers yet/,
+    );
+    expect(costs?.description).toContain(LINKS_SENTENCE);
+    expect(maintenance?.roles.admin.note).toContain(
+      "which also set the repair's bleachers, zone and damage report links",
+    );
+    expect(maintenance?.roles.maintainer.note).toContain(
+      "(which also set the repair's bleachers, zone and damage report links)",
+    );
+    expect(maintenance?.roles.admin.note).not.toMatch(/not yet their bleachers/);
+  });
+
+  it("leaves the notes of the account manager and the viewer, and the notes of the costs row, as they were (D188)", () => {
+    expect(maintenance?.roles.account_manager.note).toMatch(
+      /On the Repairs page sees every repair and its services but cannot add, edit, delete or restore one, change its status, or change its services\.$/,
+    );
+    expect(maintenance?.roles.viewer.note).toMatch(/Sees the status but cannot change it\.$/);
+    expect(costs?.roles.admin.note).toMatch(
+      /edits the amounts through the services, while the total is calculated and cannot be typed in\.$/,
     );
   });
 

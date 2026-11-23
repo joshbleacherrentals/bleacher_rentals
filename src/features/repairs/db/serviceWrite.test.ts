@@ -7,12 +7,16 @@ import type { CompiledQuery } from "kysely";
 // in-memory SQLite shaped like the local PowerSync database. The three writers validate, send one
 // batch, and show a toast only for an error.
 
-const { typedExecuteBatch, toastCustom } = vi.hoisted(() => ({
+const { typedExecuteBatch, toastCustom, writeRepairChanges } = vi.hoisted(() => ({
   typedExecuteBatch: vi.fn(),
   toastCustom: vi.fn(),
+  writeRepairChanges: vi.fn(),
 }));
 
 vi.mock("@/lib/powersync/typedQuery", () => ({ typedExecuteBatch }));
+// 09b2: an added, moved or deleted service goes through the runner of `repairLinkWrite.ts`, which has
+// its own tests; here only what the writers hand it is looked at.
+vi.mock("./repairLinkWrite", () => ({ writeRepairChanges }));
 vi.mock("sonner", () => ({ toast: { custom: toastCustom } }));
 vi.mock("@/components/providers/SystemProvider", async () => {
   const { Kysely, SqliteDialect } = await import("kysely");
@@ -64,6 +68,7 @@ const createInput = (over: Partial<CreateServiceInput> = {}): CreateServiceInput
   repairId: REPAIR,
   values: values(),
   now: NOW,
+  timezone: "America/Toronto",
   ...over,
 });
 
@@ -365,10 +370,14 @@ describe("the builders (run on SQLite)", () => {
 });
 
 describe("the writers", () => {
+  const TZ = "America/Toronto";
+
   beforeEach(() => {
     typedExecuteBatch.mockReset();
     toastCustom.mockReset();
+    writeRepairChanges.mockReset();
     typedExecuteBatch.mockResolvedValue(undefined);
+    writeRepairChanges.mockResolvedValue(null);
   });
 
   describe("createService", () => {
@@ -384,84 +393,123 @@ describe("the writers", () => {
       expect(await createService(input({ values: values({ severity: null }) }))).toEqual({
         severity: SERVICE_FORM_MESSAGES.severityRequired,
       });
+      expect(writeRepairChanges).not.toHaveBeenCalled();
       expect(typedExecuteBatch).not.toHaveBeenCalled();
       expect(toastCustom).not.toHaveBeenCalled();
     });
 
-    it("sends one insert in one batch and shows no toast on success (D155)", async () => {
+    it("hands the insert, the checked bleacher, the time and the failure message to the runner and shows no toast on success (D155, D176)", async () => {
       expect(await createService(input())).toBeNull();
-      expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
-      const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
-      expect(statements).toHaveLength(1);
-      expect(statements[0].sql).toMatch(/^insert into "MaintenanceLineItems"/i);
+      expect(typedExecuteBatch).not.toHaveBeenCalled();
+      expect(writeRepairChanges).toHaveBeenCalledTimes(1);
+      const call = writeRepairChanges.mock.calls[0][0];
+      expect(call.repairId).toBe(REPAIR);
+      expect(call.servicesAffected).toBe(true);
+      expect(call.checkedBleacherUuids).toEqual(["b1"]);
+      expect(call.now).toBe(NOW);
+      expect(call.timezone).toBe(TZ);
+      expect(call.failedMessage).toBe("Failed to save the service.");
+      expect(call.statements).toHaveLength(1);
+      expect(call.statements[0].sql).toMatch(/^insert into "MaintenanceLineItems"/i);
       expect(toastCustom).not.toHaveBeenCalled();
     });
 
-    it("shows a red toast with the message and the error text, and rejects, when the write fails", async () => {
-      typedExecuteBatch.mockRejectedValue(new Error("disk is full"));
+    it("returns a zone refusal of the runner as an error under the Bleacher field", async () => {
+      writeRepairChanges.mockResolvedValue({
+        message: "Bleacher #60 is in Zone 2, but this repair is in Zone 1.",
+      });
+      expect(await createService(input())).toEqual({
+        bleacherUuid: "Bleacher #60 is in Zone 2, but this repair is in Zone 1.",
+      });
+    });
+
+    it("rejects when the runner rejects (it showed the red toast itself)", async () => {
+      writeRepairChanges.mockRejectedValue(new Error("disk is full"));
       await expect(createService(input())).rejects.toThrow("disk is full");
-      expect(toastCustom).toHaveBeenCalledTimes(1);
-      const lines = toastLines();
-      expect(lines[0]).toBe("Failed to save the service.");
-      expect(lines.join(" ")).toContain("disk is full");
+      expect(toastCustom).not.toHaveBeenCalled();
     });
   });
 
   describe("updateService", () => {
+    const update = (initial: ServiceFormValues, next: ServiceFormValues) => ({
+      serviceId: SERVICE,
+      initial,
+      values: next,
+      repairId: REPAIR,
+      now: NOW,
+      timezone: TZ,
+    });
+
     it("writes nothing and checks nothing when nothing changed", async () => {
-      expect(
-        await updateService({ serviceId: SERVICE, initial: values(), values: values() }),
-      ).toBeNull();
+      expect(await updateService(update(values(), values()))).toBeNull();
       expect(typedExecuteBatch).not.toHaveBeenCalled();
+      expect(writeRepairChanges).not.toHaveBeenCalled();
       // Not validated either: a service whose stored values are incomplete can still be left alone.
       expect(
-        await updateService({
-          serviceId: SERVICE,
-          initial: values({ bleacherUuid: null }),
-          values: values({ bleacherUuid: null }),
-        }),
+        await updateService(update(values({ bleacherUuid: null }), values({ bleacherUuid: null }))),
       ).toBeNull();
     });
 
     it("returns the errors and writes nothing when a change leaves no bleacher", async () => {
-      expect(
-        await updateService({
-          serviceId: SERVICE,
-          initial: values(),
-          values: values({ bleacherUuid: null }),
-        }),
-      ).toEqual({ bleacherUuid: SERVICE_FORM_MESSAGES.bleacherRequired });
+      expect(await updateService(update(values(), values({ bleacherUuid: null })))).toEqual({
+        bleacherUuid: SERVICE_FORM_MESSAGES.bleacherRequired,
+      });
       expect(typedExecuteBatch).not.toHaveBeenCalled();
+      expect(writeRepairChanges).not.toHaveBeenCalled();
     });
 
-    it("sends one update and shows no toast on success; a failure shows the red toast and rejects", async () => {
-      const change = {
-        serviceId: SERVICE,
-        initial: values(),
-        values: values({ severity: "major" as const }),
-      };
+    it("a change that keeps the bleacher is one plain batch with no read; a failure shows the red toast and rejects", async () => {
+      const change = update(values(), values({ severity: "major" }));
       expect(await updateService(change)).toBeNull();
       expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
+      expect(writeRepairChanges).not.toHaveBeenCalled();
       expect(toastCustom).not.toHaveBeenCalled();
       typedExecuteBatch.mockRejectedValue(new Error("nope"));
       await expect(updateService(change)).rejects.toThrow("nope");
       expect(toastLines()[0]).toBe("Failed to save the service.");
     });
+
+    it("a change of the bleacher goes through the runner with the new bleacher checked (D176)", async () => {
+      expect(await updateService(update(values(), values({ bleacherUuid: "b2" })))).toBeNull();
+      expect(typedExecuteBatch).not.toHaveBeenCalled();
+      const call = writeRepairChanges.mock.calls[0][0];
+      expect(call.repairId).toBe(REPAIR);
+      expect(call.servicesAffected).toBe(true);
+      expect(call.checkedBleacherUuids).toEqual(["b2"]);
+      expect(call.now).toBe(NOW);
+      expect(call.timezone).toBe(TZ);
+      expect(call.failedMessage).toBe("Failed to save the service.");
+      expect(call.statements).toHaveLength(1);
+      expect(call.statements[0].sql).toMatch(/^update "MaintenanceLineItems"/i);
+    });
+
+    it("returns a zone refusal of the runner as an error under the Bleacher field", async () => {
+      writeRepairChanges.mockResolvedValue({ message: "refused" });
+      expect(await updateService(update(values(), values({ bleacherUuid: "b2" })))).toEqual({
+        bleacherUuid: "refused",
+      });
+    });
   });
 
   describe("deleteService", () => {
-    it("sends one update and shows no toast on success", async () => {
-      await deleteService(SERVICE);
-      const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
-      expect(statements).toHaveLength(1);
-      expect(statements[0].parameters).toEqual([1, SERVICE]);
+    const del = { serviceId: SERVICE, repairId: REPAIR, now: NOW, timezone: TZ };
+
+    it("hands one update, with nothing checked, to the runner and shows no toast on success", async () => {
+      await deleteService(del);
+      expect(typedExecuteBatch).not.toHaveBeenCalled();
+      const call = writeRepairChanges.mock.calls[0][0];
+      expect(call.repairId).toBe(REPAIR);
+      expect(call.servicesAffected).toBe(true);
+      expect(call.checkedBleacherUuids).toEqual([]);
+      expect(call.failedMessage).toBe("Failed to delete the service.");
+      expect(call.statements).toHaveLength(1);
+      expect(call.statements[0].parameters).toEqual([1, SERVICE]);
       expect(toastCustom).not.toHaveBeenCalled();
     });
 
-    it("shows the red toast and rejects when the write fails", async () => {
-      typedExecuteBatch.mockRejectedValue(new Error("nope"));
-      await expect(deleteService(SERVICE)).rejects.toThrow("nope");
-      expect(toastLines()[0]).toBe("Failed to delete the service.");
+    it("rejects when the runner rejects", async () => {
+      writeRepairChanges.mockRejectedValue(new Error("nope"));
+      await expect(deleteService(del)).rejects.toThrow("nope");
     });
   });
 });

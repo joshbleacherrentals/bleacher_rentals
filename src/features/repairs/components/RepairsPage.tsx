@@ -10,6 +10,7 @@ import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canMa
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { changeRepairStatus } from "../db/repairStatusWrite";
 import { createRepair, deleteRepair, restoreRepair, updateRepair } from "../db/repairWrite";
+import { findServiceZoneConflict } from "../db/repairLinkWrite";
 import { createService, deleteService, updateService } from "../db/serviceWrite";
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
 import { useRepairList } from "../hooks/useRepairList";
@@ -46,7 +47,8 @@ import { NewServiceWindow, ServiceWindow, type ServiceEditing } from "./ServiceW
  * opened it (spec 07 D95, D96). It writes, for an administrator or a maintainer: the status chosen in
  * the menu of a pill (spec 08 D110, D111), and the repair itself, from the New repair button and from
  * the repair window: Add, Edit, Delete and Restore (spec 09a D124 to D145), and the services of a repair:
- * Add service, Edit and Delete (spec 09b1 D158 to D165). docs/specs/repairs-04-table.md,
+ * Add service, Edit and Delete (spec 09b1 D158 to D165), which also keep the repair's bleachers, zone
+ * and damage report links (spec 09b2). docs/specs/repairs-04-table.md,
  * docs/specs/repairs-05-toolbar.md, docs/specs/repairs-06-expanded-row.md,
  * docs/specs/repairs-07-repair-window.md §2.7, docs/specs/repairs-08-status.md §2.1 and
  * docs/specs/repairs-09a-repair-writes.md §2.1 and §2.8 and docs/specs/repairs-09b1-services.md §2.8.
@@ -123,6 +125,7 @@ export default function RepairsPage() {
               liveStatus: repair.status,
               reported: repair.reported,
               now: new Date().toISOString(),
+              timezone,
             }),
           onDelete: () => deleteRepair(repair.id),
           onRestore: async () => {
@@ -130,6 +133,7 @@ export default function RepairsPage() {
           },
           onAddService: () => open({ kind: "newService", repairId: repair.id }),
           onOpenServiceReports: (reported) => open({ kind: "reports", reported }),
+          checkServiceZone: (input) => findServiceZoneConflict({ repairId: repair.id, ...input }),
         }
       : undefined;
 
@@ -143,8 +147,22 @@ export default function RepairsPage() {
       ? {
           bleachers: options.bleacher,
           categories: options.category,
-          onSave: (initial, values) => updateService({ serviceId: service.id, initial, values }),
-          onDelete: () => deleteService(service.id),
+          onSave: (initial, values) =>
+            updateService({
+              serviceId: service.id,
+              initial,
+              values,
+              repairId: repair.id,
+              now: new Date().toISOString(),
+              timezone,
+            }),
+          onDelete: () =>
+            deleteService({
+              serviceId: service.id,
+              repairId: repair.id,
+              now: new Date().toISOString(),
+              timezone,
+            }),
         }
       : undefined;
 
@@ -243,8 +261,10 @@ export default function RepairsPage() {
                   services,
                   createdByUserUuid: userId,
                   now: new Date().toISOString(),
+                  timezone,
                 })
               }
+              checkServiceZone={(input) => findServiceZoneConflict({ repairId: null, ...input })}
               onClose={() => close(w.index)}
             />
           );
@@ -291,6 +311,7 @@ export default function RepairsPage() {
                   repairId: w.repair.id,
                   values,
                   now: new Date().toISOString(),
+                  timezone,
                 })
               }
               onClose={() => close(w.index)}

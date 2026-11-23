@@ -103,7 +103,16 @@ export function isRepairFormDirty(initial: RepairFormValues, current: RepairForm
   return changedRepairFields(initial, current).length > 0;
 }
 
-export type RepairFormErrors = { eventStart?: string; eventEnd?: string; invoiceNumber?: string };
+/**
+ * `services` is the red line above the table of services (09b2 D186): a zone conflict found at Save,
+ * which no single field owns.
+ */
+export type RepairFormErrors = {
+  eventStart?: string;
+  eventEnd?: string;
+  invoiceNumber?: string;
+  services?: string;
+};
 
 export const REPAIR_FORM_MESSAGES = {
   eventStartRequired: "Repair from is required.",
@@ -131,8 +140,16 @@ export function clearedRepairFormErrors(
     return rest;
   }
   if (field === "eventStart" || field === "eventEnd") {
-    if (errors.eventStart === undefined && errors.eventEnd === undefined) return errors;
+    // `Repair from` decides the zone of the services (09b2 D186), so a change of it clears that line.
+    const clearsServices = field === "eventStart" && errors.services !== undefined;
+    if (errors.eventStart === undefined && errors.eventEnd === undefined && !clearsServices) {
+      return errors;
+    }
     const { eventStart: _start, eventEnd: _end, ...rest } = errors;
+    if (field === "eventStart") {
+      const { services: _services, ...withoutServices } = rest;
+      return withoutServices;
+    }
     return rest;
   }
   return errors;

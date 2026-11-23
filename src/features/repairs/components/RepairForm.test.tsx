@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { RepairFormErrors, RepairFormValues } from "../utils/repairForm";
-import { RepairFormFields, type RepairFormFieldsProps } from "./RepairForm";
+import { RepairFormFields, firstErrorFieldId, type RepairFormFieldsProps } from "./RepairForm";
 
 // docs/specs/repairs-09a-repair-writes.md §2.3 and §7 (D128 to D138). The fields are rendered on
 // the server (the selects open in portals, which Vitest's node environment does not have); what is
@@ -182,5 +182,28 @@ describe("RepairFormFields while Save runs", () => {
     const markup = render();
     expect(markup).not.toMatch(/<input[^>]*disabled=""/);
     expect(markup).not.toMatch(/<textarea[^>]*disabled=""/);
+  });
+});
+
+// docs/specs/repairs-09b2-bleachers-zone-reports.md §3 (D186): the id Save focuses after a refusal.
+describe("firstErrorFieldId (D138, D186)", () => {
+  it("is the red line above the services when it is the only error", () => {
+    expect(
+      firstErrorFieldId({ services: "Bleacher #60 is in Zone 2, but this repair is in Zone 1." }),
+    ).toBe("repair-services-error");
+  });
+
+  it("keeps the order of the fields when a field has an error too", () => {
+    expect(firstErrorFieldId({ invoiceNumber: "a", eventStart: "b", services: "c" })).toBe(
+      "repair-invoice",
+    );
+    expect(firstErrorFieldId({ eventStart: "b", eventEnd: "c", services: "d" })).toBe(
+      "repair-from",
+    );
+    expect(firstErrorFieldId({ eventEnd: "c", services: "d" })).toBe("repair-to");
+  });
+
+  it("is null when there is no error", () => {
+    expect(firstErrorFieldId({})).toBeNull();
   });
 });

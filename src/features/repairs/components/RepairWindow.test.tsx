@@ -498,3 +498,41 @@ describe("the Services block of the repair window (09b1)", () => {
     expect(markup).toContain('data-testid="repair-window-total"');
   });
 });
+
+// docs/specs/repairs-09b2-bleachers-zone-reports.md §2.4 and §3 (D186): the red line above the table
+// of services, drawn when Save of a New repair or an Edit found a zone conflict.
+describe("the red line above the services (09b2)", () => {
+  const section = (error?: string) =>
+    renderToStaticMarkup(
+      <RepairServicesSection
+        repair={full}
+        onOpenService={() => {}}
+        onAddService={() => {}}
+        error={error}
+      />,
+    );
+
+  it("draws the line with its test id and its text when an error is given", () => {
+    const markup = section(
+      "Bleacher #60 is in Zone 2 on 2026-11-20, but this repair is in Zone 1.",
+    );
+    expect(markup).toContain('data-testid="repair-services-error"');
+    expect(markup).toContain('id="repair-services-error"');
+    expect(markup).toContain(
+      "Bleacher #60 is in Zone 2 on 2026-11-20, but this repair is in Zone 1.",
+    );
+    expect(markup).toContain('role="alert"');
+  });
+
+  it("draws it above the table", () => {
+    const markup = section("x");
+    expect(markup.indexOf('data-testid="repair-services-error"')).toBeLessThan(
+      markup.indexOf('data-testid="repair-service-row"'),
+    );
+  });
+
+  it("draws nothing without an error", () => {
+    expect(section()).not.toContain("repair-services-error");
+    expect(section("")).not.toContain("repair-services-error");
+  });
+});

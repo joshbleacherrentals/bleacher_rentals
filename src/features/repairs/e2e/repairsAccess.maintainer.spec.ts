@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { seedRepairs, usd, type SeededRepairs } from "./helpers/repairsFixtures";
+import { createRepairWithService } from "./helpers/linksFlow";
 import { readRepairWindow } from "./helpers/repairWindowFlow";
 import { readServicesAndReport } from "./helpers/serviceFlow";
 import {
@@ -17,7 +18,8 @@ import {
  * The Repairs page as a maintainer sees it: the whole table, vendors and money included, no Restore
  * and a click on a row that opens its block of services. Written, not run (project rule).
  * Spec: docs/specs/repairs-04-table.md §6 (S10, D52), docs/specs/repairs-05-toolbar.md §6 (S20)
- * docs/specs/repairs-06-expanded-row.md §6 (S27) and docs/specs/repairs-07-repair-window.md §6 (S33).
+ * docs/specs/repairs-06-expanded-row.md §6 (S27), docs/specs/repairs-07-repair-window.md §6 (S33)
+ * and docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S42).
  */
 test.describe("Repairs page (maintainer)", () => {
   let seeded: SeededRepairs;
@@ -86,5 +88,23 @@ test.describe("Repairs page (maintainer)", () => {
     page,
   }) => {
     await readRepairWindow(page, seeded, { canSeeFiles: true });
+  });
+
+  test("S42: Add service on a bleacher of a New repair shows its chip and its zone", async ({
+    page,
+  }) => {
+    test.skip(!seeded.links || !seeded.zones, "the database has fewer than two zones");
+    const bleacher = seeded.links!.newRepairBleacher;
+    await openRepairsPage(page, bleacherQuery(bleacher.uuid));
+    await expect(page.getByTestId("repairs-empty")).toBeVisible({ timeout: 60_000 });
+    await createRepairWithService(page, {
+      bleacherNumber: bleacher.number,
+      from: "2026-10-20",
+      to: "2026-10-25",
+    });
+    await expect(repairRows(page)).toHaveCount(1, { timeout: 60_000 });
+    const row = repairRows(page).first();
+    await expect(cellOf(row, "bleachers")).toContainText(`#${bleacher.number}`);
+    await expect(cellOf(row, "zone")).toContainText(seeded.zones!.a.name);
   });
 });

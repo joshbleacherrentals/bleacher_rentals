@@ -7,10 +7,11 @@ import type { CompiledQuery } from "kysely";
 // an in-memory SQLite shaped like the local PowerSync database. The four writers validate, send one
 // batch, and show a toast only for an error.
 
-const { typedExecuteBatch, typedGetAll, toastCustom } = vi.hoisted(() => ({
+const { typedExecuteBatch, typedGetAll, toastCustom, writeRepairChanges } = vi.hoisted(() => ({
   typedExecuteBatch: vi.fn(),
   typedGetAll: vi.fn(),
   toastCustom: vi.fn(),
+  writeRepairChanges: vi.fn(),
 }));
 
 vi.mock("@/lib/powersync/typedQuery", () => ({
@@ -19,6 +20,9 @@ vi.mock("@/lib/powersync/typedQuery", () => ({
   expect: () => undefined,
 }));
 vi.mock("sonner", () => ({ toast: { custom: toastCustom } }));
+// 09b2: a repair whose services change is written through the runner of `repairLinkWrite.ts`, which
+// has its own tests; here only what the writers hand it is looked at.
+vi.mock("./repairLinkWrite", () => ({ writeRepairChanges }));
 vi.mock("@/components/providers/SystemProvider", async () => {
   const { Kysely, SqliteDialect } = await import("kysely");
   // A dialect that is never connected: `.compile()` needs a query builder, not a database.
@@ -47,6 +51,7 @@ import {
   addDraftService,
   removeDraftService,
   servicesDraftFromRepair,
+  updateDraftService,
   type ServiceFormValues,
   type ServicesDraft,
 } from "../utils/serviceForm";
@@ -74,6 +79,7 @@ const createInput = (over: Partial<CreateRepairInput> = {}): CreateRepairInput =
   values: values(),
   createdByUserUuid: "user-1",
   now: NOW,
+  timezone: "America/Toronto",
   ...over,
 });
 
@@ -84,6 +90,7 @@ const updateInput = (over: Partial<UpdateRepairInput> = {}): UpdateRepairInput =
   liveStatus: "inbound",
   reported: [report("rep-1"), report("rep-2")],
   now: NOW,
+  timezone: "America/Toronto",
   ...over,
 });
 
@@ -690,8 +697,10 @@ describe("the writers", () => {
 });
 
 // docs/specs/repairs-09b1-services.md §2.6 and §3 (D149, D161): the services draft rides in the same
-// batch as the repair, after the statements of the fields and the status.
-describe("the services draft (09b1)", () => {
+// write as the repair, after the statements of the fields and the status. docs/specs/repairs-09b2-
+// bleachers-zone-reports.md §2.3 and §3 (D176, D184, D186): when the draft changes services, the write
+// goes through `writeRepairChanges`; a repair with no change in services is one plain batch as before.
+describe("the services draft (09b1, 09b2)", () => {
   const serviceValues = (over: Partial<ServiceFormValues> = {}): ServiceFormValues => ({
     bleacherUuid: "b1",
     categoryUuid: "c1",
@@ -708,35 +717,68 @@ describe("the services draft (09b1)", () => {
     services: [repairService({ id: "s1", description: "Weld", laborCents: 1000 })],
   });
   const added = (): ServicesDraft =>
-    addDraftService(servicesDraftFromRepair(stored), "n1", serviceValues());
+    addDraftService(servicesDraftFromRepair(stored), "n1", serviceValues({ bleacherUuid: "b2" }));
   const removed = (): ServicesDraft => removeDraftService(servicesDraftFromRepair(stored), "s1");
 
   beforeEach(() => {
     typedExecuteBatch.mockReset();
     typedGetAll.mockReset();
     toastCustom.mockReset();
+    writeRepairChanges.mockReset();
     typedExecuteBatch.mockResolvedValue(undefined);
     typedGetAll.mockResolvedValue([]);
+    writeRepairChanges.mockResolvedValue(null);
   });
 
-  it("createRepair writes the repair first and then the services, in one batch", async () => {
-    const { id: _id, ...rest } = createInput({ services: added() });
+  // A New repair's draft holds added services only.
+  const newDraft = (): ServicesDraft =>
+    addDraftService(
+      addDraftService([], "n1", serviceValues({ bleacherUuid: "b1" })),
+      "n2",
+      serviceValues({ bleacherUuid: "b2" }),
+    );
+
+  it("createRepair with services hands the repair first and then the services to the runner, with the added bleachers checked", async () => {
+    const { id: _id, ...rest } = createInput({ services: newDraft() });
     expect(await createRepair(rest)).toBeNull();
-    expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
-    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(typedExecuteBatch).not.toHaveBeenCalled();
+    expect(writeRepairChanges).toHaveBeenCalledTimes(1);
+    const call = writeRepairChanges.mock.calls[0][0];
+    const statements = call.statements as CompiledQuery[];
     expect(statements.map((s) => s.sql.match(/"(\w+)"/)?.[1])).toEqual([
       "MaintenanceEvents",
       "MaintenanceLineItems",
+      "MaintenanceLineItems",
     ]);
     expect(statements[0].sql).toMatch(/^insert into "MaintenanceEvents"/i);
-    // The service points at the new repair: the id the repair insert was given.
-    expect(statements[1].parameters).toContain(statements[0].parameters[0]);
+    // The services point at the new repair: the id the repair insert was given, which is also the id
+    // the runner is told about.
+    expect(call.repairId).toBe(statements[0].parameters[0]);
+    expect(statements[1].parameters).toContain(call.repairId);
+    expect(call.servicesAffected).toBe(true);
+    expect(call.checkedBleacherUuids).toEqual(["b1", "b2"]);
+    expect(call.now).toBe(NOW);
+    expect(call.timezone).toBe("America/Toronto");
+    expect(call.failedMessage).toBe("Failed to save the repair.");
   });
 
-  it("createRepair without a draft sends the statements it always did", async () => {
+  it("createRepair returns { services } for a zone refusal and shows no toast", async () => {
+    writeRepairChanges.mockResolvedValue({ message: "refused" });
+    const { id: _id, ...rest } = createInput({ services: newDraft() });
+    expect(await createRepair(rest)).toEqual({ services: "refused" });
+    expect(toastCustom).not.toHaveBeenCalled();
+  });
+
+  it("createRepair without services, or with a draft that nets out to nothing, is the plain batch it always was", async () => {
     const { id: _id, ...rest } = createInput();
     await createRepair(rest);
+    expect(writeRepairChanges).not.toHaveBeenCalled();
     expect((typedExecuteBatch.mock.calls[0][0] as CompiledQuery[]).length).toBe(1);
+
+    const cancelled = removeDraftService(addDraftService([], "n1", serviceValues()), "n1");
+    await createRepair({ ...rest, services: cancelled });
+    expect(writeRepairChanges).not.toHaveBeenCalled();
+    expect(typedExecuteBatch).toHaveBeenCalledTimes(2);
   });
 
   it("buildUpdateRepairStatements appends the services after the fields and the status", () => {
@@ -754,14 +796,25 @@ describe("the services draft (09b1)", () => {
     ]);
   });
 
-  it("updateRepair with only a services change writes the services, runs no duplicate check and returns null", async () => {
+  it("updateRepair with only a services change goes through the runner, runs no duplicate check and returns null", async () => {
     expect(await updateRepair(updateInput({ services: removed() }))).toBeNull();
     expect(typedGetAll).not.toHaveBeenCalled();
-    expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
-    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(typedExecuteBatch).not.toHaveBeenCalled();
+    const call = writeRepairChanges.mock.calls[0][0];
+    const statements = call.statements as CompiledQuery[];
     expect(statements).toHaveLength(1);
     expect(statements[0].sql).toMatch(/^update "MaintenanceLineItems"/i);
     expect(statements[0].parameters).toEqual([1, "s1"]);
+    expect(call.repairId).toBe(REPAIR);
+    expect(call.servicesAffected).toBe(true);
+    expect(call.checkedBleacherUuids).toEqual([]);
+  });
+
+  it("updateRepair checks the added services and the stored ones whose bleacher changed", async () => {
+    const base = servicesDraftFromRepair(stored);
+    const moved = updateDraftService(base, "s1", { ...base[0].values, bleacherUuid: "b9" });
+    await updateRepair(updateInput({ services: moved }));
+    expect(writeRepairChanges.mock.calls[0][0].checkedBleacherUuids).toEqual(["b9"]);
   });
 
   it("updateRepair writes nothing when neither a field nor the services changed", async () => {
@@ -769,13 +822,39 @@ describe("the services draft (09b1)", () => {
       await updateRepair(updateInput({ services: servicesDraftFromRepair(stored) })),
     ).toBeNull();
     expect(typedExecuteBatch).not.toHaveBeenCalled();
+    expect(writeRepairChanges).not.toHaveBeenCalled();
   });
 
-  it("updateRepair with both writes the repair's statement first and the services after it", async () => {
+  it("updateRepair with only fields changed is the plain batch, with no runner", async () => {
+    await updateRepair(
+      updateInput({ values: values({ notes: "x" }), services: servicesDraftFromRepair(stored) }),
+    );
+    expect(writeRepairChanges).not.toHaveBeenCalled();
+    expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateRepair with both hands the repair's statement first and the services after it to the runner", async () => {
     await updateRepair(updateInput({ values: values({ notes: "x" }), services: added() }));
-    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    const call = writeRepairChanges.mock.calls[0][0];
+    const statements = call.statements as CompiledQuery[];
     expect(statements).toHaveLength(2);
     expect(statements[0].sql).toMatch(/^update "MaintenanceEvents"/i);
     expect(statements[1].sql).toMatch(/^insert into "MaintenanceLineItems"/i);
+    expect(call.failedMessage).toBe("Failed to save the repair.");
+    expect(call.timezone).toBe("America/Toronto");
+  });
+
+  it("updateRepair returns { services } for a zone refusal", async () => {
+    writeRepairChanges.mockResolvedValue({ message: "refused" });
+    expect(await updateRepair(updateInput({ services: added() }))).toEqual({ services: "refused" });
+  });
+
+  it("the duplicate check still runs first, and a duplicate stops the runner", async () => {
+    typedGetAll.mockResolvedValue([{ id: OTHER_REPAIR }]);
+    const errors = await updateRepair(
+      updateInput({ values: values({ invoiceNumber: "JJ-6" }), services: added() }),
+    );
+    expect(errors).toEqual({ invoiceNumber: REPAIR_FORM_MESSAGES.invoiceDuplicate });
+    expect(writeRepairChanges).not.toHaveBeenCalled();
   });
 });

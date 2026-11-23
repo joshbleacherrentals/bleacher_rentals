@@ -16,7 +16,9 @@ import {
   type RepairFormValues,
 } from "../utils/repairForm";
 import type { ReportedReport } from "../utils/repairRows";
+import { checkedBleachersOfDraft } from "../utils/repairLinks";
 import { isServicesDraftChanged, type ServicesDraft } from "../utils/serviceForm";
+import { writeRepairChanges } from "./repairLinkWrite";
 import { buildStatusStatements } from "./repairStatusWrite";
 import { buildServicesDraftStatements } from "./serviceWrite";
 import { buildVendorAddressQuery, type RawVendorAddressRow } from "./repairWindowQueries";
@@ -28,7 +30,9 @@ import { buildVendorAddressQuery, type RawVendorAddressRow } from "./repairWindo
  * validate before they write. docs/specs/repairs-09a-repair-writes.md §2.4 to §2.6 and §3 (D125 to
  * D145; the signatures here are locked by that spec). The services draft of New repair and Edit rides
  * in the same batch, after the repair's own statements: docs/specs/repairs-09b1-services.md §2.6 and §3
- * (D149, D161).
+ * (D149, D161). When the draft changes services, the write goes through `writeRepairChanges`, which
+ * also keeps the repair's junction, zone and damage report links in step in the same local
+ * transaction: docs/specs/repairs-09b2-bleachers-zone-reports.md §2.3 and §3 (D176, D184, D186).
  */
 
 export type CreateRepairInput = {
@@ -38,6 +42,8 @@ export type CreateRepairInput = {
   now: string; // an ISO timestamp: created_at, and completed_at for a Completed repair
   /** The services of the New repair window (09b1 D149); absent is an empty draft. */
   services?: ServicesDraft;
+  /** The app time zone, for the day of a damage report (09b2 D185). */
+  timezone: string;
 };
 
 /**
@@ -75,6 +81,8 @@ export type UpdateRepairInput = {
   now: string;
   /** The services draft of the Edit window (09b1 D161); absent is an empty draft. */
   services?: ServicesDraft;
+  /** The app time zone, for the day of a damage report (09b2 D185). */
+  timezone: string;
 };
 
 /**
@@ -234,18 +242,25 @@ export async function createRepair(
   if (Object.keys(errors).length > 0) return errors;
 
   const id = crypto.randomUUID();
-  await writeBatch(
-    [
-      buildCreateRepairStatement({ ...input, id }),
-      ...buildServicesDraftStatements({
-        repairId: id,
-        draft: input.services ?? [],
-        now: input.now,
-      }),
-    ],
-    REPAIR_FORM_MESSAGES.saveFailed,
-  );
-  return null;
+  const draft = input.services ?? [];
+  const statements = [
+    buildCreateRepairStatement({ ...input, id }),
+    ...buildServicesDraftStatements({ repairId: id, draft, now: input.now }),
+  ];
+  if (!isServicesDraftChanged(draft)) {
+    await writeBatch(statements, REPAIR_FORM_MESSAGES.saveFailed);
+    return null;
+  }
+  const refusal = await writeRepairChanges({
+    repairId: id,
+    statements,
+    servicesAffected: true,
+    checkedBleacherUuids: checkedBleachersOfDraft(draft),
+    now: input.now,
+    timezone: input.timezone,
+    failedMessage: REPAIR_FORM_MESSAGES.saveFailed,
+  });
+  return refusal ? { services: refusal.message } : null;
 }
 
 /**
@@ -271,8 +286,21 @@ export async function updateRepair(input: UpdateRepairInput): Promise<RepairForm
 
   const statements = buildUpdateRepairStatements(input);
   if (statements.length === 0) return null;
-  await writeBatch(statements, REPAIR_FORM_MESSAGES.saveFailed);
-  return null;
+  const draft = input.services ?? [];
+  if (!isServicesDraftChanged(draft)) {
+    await writeBatch(statements, REPAIR_FORM_MESSAGES.saveFailed);
+    return null;
+  }
+  const refusal = await writeRepairChanges({
+    repairId: input.repairId,
+    statements,
+    servicesAffected: true,
+    checkedBleacherUuids: checkedBleachersOfDraft(draft),
+    now: input.now,
+    timezone: input.timezone,
+    failedMessage: REPAIR_FORM_MESSAGES.saveFailed,
+  });
+  return refusal ? { services: refusal.message } : null;
 }
 
 /** One update; a write error shows `deleteFailed` with the error text and is thrown again. */

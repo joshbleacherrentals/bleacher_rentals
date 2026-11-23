@@ -40,6 +40,7 @@ import {
 } from "../utils/repairForm";
 import type { FilterOption } from "../utils/repairFilters";
 import { reportedCell } from "../utils/repairFormat";
+import { liveBleachersOfDraft, type ServiceZoneCheck } from "../utils/repairLinks";
 import type { RepairListRow, RepairStatus, ReportedReport } from "../utils/repairRows";
 import { canChangeRepairStatus } from "../utils/repairStatus";
 import {
@@ -116,6 +117,8 @@ export type RepairServicesSectionProps = {
   onOpenService: (serviceId: string) => void;
   /** Add service under the table; the button is drawn only when it is given (spec 09b1 D158). */
   onAddService?: () => void;
+  /** The red line above the table: a zone conflict found at Save (spec 09b2 D186). */
+  error?: string;
 };
 
 /** The Services heading and the table of services of a window (also the New repair window's draft). */
@@ -123,10 +126,22 @@ export function RepairServicesSection({
   repair,
   onOpenService,
   onAddService,
+  error,
 }: RepairServicesSectionProps) {
   return (
     <>
       <h3 className="mt-7 text-base leading-6 font-semibold text-[#10365a]">Services</h3>
+      {error ? (
+        <p
+          id="repair-services-error"
+          data-testid="repair-services-error"
+          role="alert"
+          tabIndex={-1}
+          className="mt-2 text-sm leading-5 text-[#a8403a] outline-none"
+        >
+          {error}
+        </p>
+      ) : null}
       <div className="mt-2.5">
         <RepairWindowServices
           repair={repair}
@@ -162,6 +177,8 @@ export type RepairWindowContentProps = {
   fields?: ReactNode;
   /** Add service under the table of services; absent, no button (spec 09b1 D158). */
   onAddService?: () => void;
+  /** The red line above the table of services (spec 09b2 D186). */
+  servicesError?: string;
 };
 
 /** The whole content of the window, a plain component so that a test can render it. */
@@ -177,6 +194,7 @@ export function RepairWindowContent({
   eyebrow = "Repair",
   fields,
   onAddService,
+  servicesError,
 }: RepairWindowContentProps) {
   const created = repairCreatedLine(repair, timezone);
   const reported = reportedCell(repair.reported);
@@ -307,6 +325,7 @@ export function RepairWindowContent({
           repair={repair}
           onOpenService={onOpenService}
           onAddService={onAddService}
+          error={servicesError}
         />
 
         {files}
@@ -434,6 +453,8 @@ export type RepairEditing = {
   onAddService: () => void;
   /** The damage reports of a stored service of an Edit draft, opened through the page. */
   onOpenServiceReports: (reported: ReportedReport[]) => void;
+  /** Called before a service goes into the draft: the refusal text of a zone conflict, or null (09b2 D176). */
+  checkServiceZone: ServiceZoneCheck;
 };
 
 /** The service window a draft has open (spec 09b1 D162): one service of the draft, or Add service. */
@@ -449,6 +470,9 @@ function DraftServiceWindows({
   repair,
   bleachers,
   categories,
+  services,
+  eventStart,
+  checkServiceZone,
   setServices,
   onOpenReports,
   onClose,
@@ -457,6 +481,11 @@ function DraftServiceWindows({
   repair: RepairListRow;
   bleachers: readonly FilterOption[];
   categories: readonly FilterOption[];
+  /** The draft, for the context of the zone check (09b2 D176). */
+  services: ServicesDraft;
+  /** `Repair from` as the window has it; null while it is empty. */
+  eventStart: string | null;
+  checkServiceZone: ServiceZoneCheck;
   setServices: Dispatch<SetStateAction<ServicesDraft>>;
   onOpenReports: (reported: ReportedReport[]) => void;
   onClose: () => void;
@@ -472,6 +501,12 @@ function DraftServiceWindows({
         onCreate={async (values) => {
           const errors = validateServiceForm(values);
           if (Object.keys(errors).length > 0) return errors;
+          const refusal = await checkServiceZone({
+            bleacherUuid: values.bleacherUuid as string,
+            eventStart,
+            otherLiveBleacherUuids: liveBleachersOfDraft(services),
+          });
+          if (refusal) return { bleacherUuid: refusal };
           setServices((draft) => addDraftService(draft, crypto.randomUUID(), values));
           return null;
         }}
@@ -491,9 +526,17 @@ function DraftServiceWindows({
       editing={{
         bleachers,
         categories,
-        onSave: async (_initial: ServiceFormValues, values: ServiceFormValues) => {
+        onSave: async (initial: ServiceFormValues, values: ServiceFormValues) => {
           const errors: ServiceFormErrors = validateServiceForm(values);
           if (Object.keys(errors).length > 0) return errors;
+          if (values.bleacherUuid !== initial.bleacherUuid) {
+            const refusal = await checkServiceZone({
+              bleacherUuid: values.bleacherUuid as string,
+              eventStart,
+              otherLiveBleacherUuids: liveBleachersOfDraft(services, service.id),
+            });
+            if (refusal) return { bleacherUuid: refusal };
+          }
           setServices((draft) => updateDraftService(draft, service.id, values));
           return null;
         },
@@ -526,8 +569,17 @@ function useRepairDraft(params: {
 }) {
   const { mode, initial, initialServices, submit, onSaved } = params;
   const [values, setValues] = useState<RepairFormValues>(initial);
-  const [services, setServices] = useState<ServicesDraft>(initialServices);
+  const [services, setServicesState] = useState<ServicesDraft>(initialServices);
   const [errors, setErrors] = useState<RepairFormErrors>({});
+  // A change of the services drops the red line above them (09b2 D186).
+  const setServices: Dispatch<SetStateAction<ServicesDraft>> = (action) => {
+    setServicesState(action);
+    setErrors((current) => {
+      if (current.services === undefined) return current;
+      const { services: _cleared, ...rest } = current;
+      return rest;
+    });
+  };
   const [saving, setSaving] = useState(false);
   const currencyTouched = useRef(false);
 
@@ -722,6 +774,7 @@ function RepairEditBody({
         onOpenService={(id) => setServiceWindow({ kind: "view", id })}
         onOpenReports={onOpenReports}
         onAddService={() => setServiceWindow({ kind: "new" })}
+        servicesError={draft.errors.services}
         files={files}
         Title={DialogTitle}
         eyebrow="Edit repair"
@@ -753,6 +806,9 @@ function RepairEditBody({
         repair={shown}
         bleachers={editing.bleachers}
         categories={editing.categories}
+        services={draft.services}
+        eventStart={draft.values.eventStart || null}
+        checkServiceZone={editing.checkServiceZone}
         setServices={draft.setServices}
         onOpenReports={editing.onOpenServiceReports}
         onClose={() => setServiceWindow(null)}
@@ -900,6 +956,8 @@ export type NewRepairWindowProps = {
   bleachers: readonly FilterOption[];
   categories: readonly FilterOption[];
   onCreate: (values: RepairFormValues, services: ServicesDraft) => Promise<RepairFormErrors | null>;
+  /** Called before a service goes into the draft: the refusal text of a zone conflict, or null (09b2 D176). */
+  checkServiceZone: ServiceZoneCheck;
   onClose: () => void;
 };
 
@@ -912,6 +970,7 @@ export function NewRepairWindow({
   bleachers,
   categories,
   onCreate,
+  checkServiceZone,
   onClose,
 }: NewRepairWindowProps) {
   const [initial] = useState(emptyRepairForm);
@@ -970,6 +1029,7 @@ export function NewRepairWindow({
               repair={shown}
               onOpenService={(id) => setServiceWindow({ kind: "view", id })}
               onAddService={() => setServiceWindow({ kind: "new" })}
+              error={draft.errors.services}
             />
           </div>
           <RepairWindowFooter
@@ -994,6 +1054,9 @@ export function NewRepairWindow({
         repair={shown}
         bleachers={bleachers}
         categories={categories}
+        services={draft.services}
+        eventStart={draft.values.eventStart || null}
+        checkServiceZone={checkServiceZone}
         setServices={draft.setServices}
         onOpenReports={() => {}}
         onClose={() => setServiceWindow(null)}

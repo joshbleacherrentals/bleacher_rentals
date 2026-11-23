@@ -16,15 +16,18 @@ import {
   type ServiceFormValues,
   type ServicesDraft,
 } from "../utils/serviceForm";
+import { writeRepairChanges } from "./repairLinkWrite";
 
 /**
  * The writes of a service: Add service, Save of an Edit and Delete, and the statements a draft
  * writes with its repair. Local-first, through the app's Kysely and one local transaction per action
  * (docs/POWERSYNC_ARCHITECTURE.md). The statements are built apart from the run so that they are
  * tested on SQLite, and the writers validate before they write. A service write never writes the
- * repair's `cost_cents` (the server's trigger does), its junction, its zone or a damage report.
+ * repair's `cost_cents` (the server's trigger does). An added, moved or deleted service goes through
+ * `writeRepairChanges`, which also keeps the repair's junction, its zone and its damage report links
+ * in step in the same local transaction (docs/specs/repairs-09b2-bleachers-zone-reports.md).
  * docs/specs/repairs-09b1-services.md §2.5, §2.6 and §3 (D151 to D161; the signatures here are
- * locked by that spec).
+ * locked by that spec and by 09b2 §3).
  */
 
 export type CreateServiceInput = {
@@ -32,13 +35,16 @@ export type CreateServiceInput = {
   repairId: string;
   values: ServiceFormValues;
   now: string; // an ISO timestamp: created_at
+  timezone: string; // the app time zone (09b2: the day of a report, D185)
 };
 
 /**
  * The insert of §2.5. Never writes `cost_cents` (D159). A service needs a bleacher and a severity:
  * the writers check that before they get here, so a statement without them is a bug and throws.
  */
-export function buildCreateServiceStatement(input: CreateServiceInput): CompiledQuery {
+export function buildCreateServiceStatement(
+  input: Pick<CreateServiceInput, "id" | "repairId" | "values" | "now">,
+): CompiledQuery {
   const { id, repairId, values, now } = input;
   if (!values.bleacherUuid || !values.severity) {
     throw new Error("A service needs a bleacher and a severity.");
@@ -67,10 +73,15 @@ export type UpdateServiceInput = {
   serviceId: string;
   initial: ServiceFormValues;
   values: ServiceFormValues;
+  repairId: string;
+  now: string;
+  timezone: string;
 };
 
 /** The update of the changed columns only (D155); null when nothing changed. */
-export function buildUpdateServiceStatement(input: UpdateServiceInput): CompiledQuery | null {
+export function buildUpdateServiceStatement(
+  input: Pick<UpdateServiceInput, "serviceId" | "initial" | "values">,
+): CompiledQuery | null {
   const { serviceId, initial, values } = input;
   const columns: Record<string, string | number | null> = {};
   for (const field of changedServiceFields(initial, values)) {
@@ -183,34 +194,78 @@ async function writeBatch(statements: CompiledQuery[], message: string): Promise
 }
 
 /**
- * Validates (`validateServiceForm`), writes one insert with `typedExecuteBatch`, and returns null when
- * written or the errors when nothing was written. A write error shows an `ErrorToast` (`saveFailed`
- * and the error text) and is thrown again.
+ * Validates (`validateServiceForm`), writes the insert through `writeRepairChanges` (one local
+ * transaction that also keeps the repair's bleachers, zone and damage report links), and returns null
+ * when written or the errors when nothing was written: the validation errors, or the zone refusal
+ * under the Bleacher field (D176). A write error shows an `ErrorToast` (`saveFailed` and the error
+ * text) and is thrown again.
  */
 export async function createService(
   input: Omit<CreateServiceInput, "id">,
 ): Promise<ServiceFormErrors | null> {
   const errors = validateServiceForm(input.values);
   if (Object.keys(errors).length > 0) return errors;
-  await writeBatch(
-    [buildCreateServiceStatement({ ...input, id: crypto.randomUUID() })],
-    SERVICE_FORM_MESSAGES.saveFailed,
-  );
-  return null;
+  const refusal = await writeRepairChanges({
+    repairId: input.repairId,
+    statements: [buildCreateServiceStatement({ ...input, id: crypto.randomUUID() })],
+    servicesAffected: true,
+    checkedBleacherUuids: input.values.bleacherUuid ? [input.values.bleacherUuid] : [],
+    now: input.now,
+    timezone: input.timezone,
+    failedMessage: SERVICE_FORM_MESSAGES.saveFailed,
+  });
+  return refusal ? { bleacherUuid: refusal.message } : null;
 }
 
-/** The same for an Edit. Nothing changed: nothing is checked and nothing is written. */
+/**
+ * The same for an Edit. Nothing changed: nothing is checked and nothing is written. A change that
+ * keeps the bleacher is one plain batch with no read (D182); a change of the bleacher goes through
+ * `writeRepairChanges` with the new bleacher checked (D176).
+ */
 export async function updateService(input: UpdateServiceInput): Promise<ServiceFormErrors | null> {
-  if (changedServiceFields(input.initial, input.values).length === 0) return null;
+  const changed = changedServiceFields(input.initial, input.values);
+  if (changed.length === 0) return null;
   const errors = validateServiceForm(input.values);
   if (Object.keys(errors).length > 0) return errors;
   const statement = buildUpdateServiceStatement(input);
   if (!statement) return null;
-  await writeBatch([statement], SERVICE_FORM_MESSAGES.saveFailed);
-  return null;
+
+  if (!changed.includes("bleacherUuid")) {
+    await writeBatch([statement], SERVICE_FORM_MESSAGES.saveFailed);
+    return null;
+  }
+  const refusal = await writeRepairChanges({
+    repairId: input.repairId,
+    statements: [statement],
+    servicesAffected: true,
+    checkedBleacherUuids: input.values.bleacherUuid ? [input.values.bleacherUuid] : [],
+    now: input.now,
+    timezone: input.timezone,
+    failedMessage: SERVICE_FORM_MESSAGES.saveFailed,
+  });
+  return refusal ? { bleacherUuid: refusal.message } : null;
 }
 
-/** One update; a write error shows `deleteFailed` with the error text and is thrown again. */
-export async function deleteService(serviceId: string): Promise<void> {
-  await writeBatch([buildDeleteServiceStatement(serviceId)], SERVICE_FORM_MESSAGES.deleteFailed);
+export type DeleteServiceInput = {
+  serviceId: string;
+  repairId: string;
+  now: string;
+  timezone: string;
+};
+
+/**
+ * One update through `writeRepairChanges`, with nothing checked: the bleacher of the service is a
+ * loss when it was its last live service (D169). A write error shows `deleteFailed` with the error
+ * text and is thrown again.
+ */
+export async function deleteService(input: DeleteServiceInput): Promise<void> {
+  await writeRepairChanges({
+    repairId: input.repairId,
+    statements: [buildDeleteServiceStatement(input.serviceId)],
+    servicesAffected: true,
+    checkedBleacherUuids: [],
+    now: input.now,
+    timezone: input.timezone,
+    failedMessage: SERVICE_FORM_MESSAGES.deleteFailed,
+  });
 }
