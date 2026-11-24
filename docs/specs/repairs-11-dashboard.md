@@ -808,7 +808,8 @@ the spreadsheet, and the page itself is refactored, not added.
 - **D222 (a report asks for a service):** the New repair window that was opened from a damage
   report does not save without at least one service.
 - **D223 (what a report fills):** only the bleacher of the report. The days, the vendor and the
-  rest stay empty.
+  rest stay empty. _Amended by D236 (2026-11-24): when the card was opened from a Dashboard cell,
+  the days of that cell are filled too. On the Damage Reports page nothing changes._
 - **D224 (the database):** it is not changed. It still lets an account manager write repairs,
   services, the junction, files and reports, though no screen offers it. No migration.
 - **D225 (the grid):** while a window is open the grid does nothing. The selection mode of the old
@@ -834,6 +835,14 @@ the spreadsheet, and the page itself is refactored, not added.
   with the window, and the list updates, as the old modal did.
 - **D235 (the button on a linked report):** "Create Maintenance to Resolve" is not drawn for a
   report that is already linked to a repair.
+- **D236 (the days of the cell for a report, 2026-11-24, user):** when the card of a damage report is
+  opened from a cell of the Dashboard (the "View Damage Report" icon of the cell editor),
+  "Create Maintenance to Resolve" fills Repair from with the clicked day and Repair to with the same
+  day the maintenance icon of that cell gives (D216: seven days later, cut by the accepted
+  sub-rentals of the bleacher). The bleacher, the required service (D222) and the closing of the card
+  (D234) are as before. The card opened from the Damage Reports page has no cell, so it fills only
+  the bleacher (D223). This amends D223 and the click of §2.5; it adds `reportRepairPreset` and the
+  prop `repairDays` of `DamageReportModal` (§3).
 
 **Carried over, not asked again.** D20 (the form is replaced by the New repair window and
 deleted: this spec does it) and D173 (the form and the modal waited for this spec); D18 (no
@@ -1020,8 +1029,9 @@ The checks for an account manager (own zone, subrented out, `subrentalConstraint
   `maintenance_event_uuid`. The hint line above it becomes "To resolve this report, create a repair
   for it. The report closes when the repair is Completed."
 - **A click** opens
-  `{ kind: "new", preset: { bleacherUuid: report.bleacher_uuid, requireService: true, onCreated } }`
-  in the store. `onCreated` does what `onResolved` did: it closes the card of the report, resets
+  `{ kind: "new", preset: reportRepairPreset({ bleacherUuid: report.bleacher_uuid, days: repairDays, onCreated }) }`
+  in the store: `{ bleacherUuid, requireService: true, onCreated }`, plus `eventStart` and
+  `eventEnd` when the card has `repairDays`, that is, when it was opened from a cell (D236). `onCreated` does what `onResolved` did: it closes the card of the report, resets
   its form and calls `onSaved`, which refreshes the list.
 - **Add repair** is refused with the red line "Add at least one service." above the table of
   services when the window has no service (D222). Any service is enough, also one of another

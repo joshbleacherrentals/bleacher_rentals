@@ -91,6 +91,17 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
     : null;
   const [viewingDamageReport, setViewingDamageReport] = useState<EditDamageReport | null>(null);
 
+  // The days a repair started from this cell gets: the clicked day, seven days later, cut by the
+  // accepted sub-rentals of the bleacher (docs/specs/repairs-11-dashboard.md §2.4, D216). The
+  // maintenance icon and "Create Maintenance to Resolve" on the card of a report both use them (D236).
+  // The blocks come from the original row of the bleacher: when a zone filter shows only its
+  // sub-rental row, they still come from the original one.
+  const original = dashBleachers.find((b) => b.bleacherUuid === bleacherUuid && !b.isSubrentalRow);
+  const cellDays =
+    date && bleacherUuid
+      ? cellRepairDates(date, original?.acceptedSubrentalBlocks ?? [])
+      : undefined;
+
   const handleViewDamageReport = () => {
     if (openDamageReport) setViewingDamageReport(openDamageReport as EditDamageReport);
   };
@@ -174,26 +185,17 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
     onWorkTrackerOpen?.(buildWorkTrackerDraft({ bleacherUuid, date, workTrackerUuid }));
   };
 
-  // The icon of a cell opens the New repair window with the bleacher and the days of the cell:
-  // the clicked day, seven days later, cut by the accepted sub-rentals of the bleacher
-  // (docs/specs/repairs-11-dashboard.md §2.4, D216). The checks the form had for an account manager
-  // went with their right to write.
+  // The icon of a cell opens the New repair window with the bleacher and the days of the cell
+  // (D216). The checks the form had for an account manager went with their right to write.
   const handleCreateMaintenance = () => {
-    if (!date || !bleacherUuid) {
+    if (!date || !bleacherUuid || !cellDays) {
       createErrorToast(["Failed to create maintenance event. Missing date or bleacher id."]);
       return;
     }
 
-    // The original row of the bleacher: when a zone filter shows only its sub-rental row, the blocks
-    // still come from the original one.
-    const original = useDashboardBleachersStore
-      .getState()
-      .data.find((b) => b.bleacherUuid === bleacherUuid && !b.isSubrentalRow);
-    const { eventStart, eventEnd } = cellRepairDates(date, original?.acceptedSubrentalBlocks ?? []);
-
     useRepairWindowsStore.getState().open({
       kind: "new",
-      preset: { eventStart, eventEnd, bleacherUuid },
+      preset: { ...cellDays, bleacherUuid },
     });
 
     // Close the cell editor
@@ -388,6 +390,7 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
           }}
           onSaved={() => setViewingDamageReport(null)}
           editReport={viewingDamageReport}
+          repairDays={cellDays}
         />
       )}
     </div>

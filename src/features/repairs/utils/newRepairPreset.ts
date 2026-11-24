@@ -69,6 +69,25 @@ export function presetRepairForm(preset: NewRepairPreset | undefined): RepairFor
   };
 }
 
+/**
+ * What the New repair window starts with when it is opened from the card of a damage report (D222,
+ * D223, D234, D236): the bleacher of the report, a required service, and a tell-back when the repair
+ * is added. `days` are the days of the cell the card was opened from; the Damage Reports page has no
+ * cell, so it gives none and the days stay empty (D223).
+ */
+export function reportRepairPreset(args: {
+  bleacherUuid: string;
+  days?: { eventStart: string; eventEnd: string };
+  onCreated: () => void;
+}): NewRepairPreset {
+  return {
+    bleacherUuid: args.bleacherUuid,
+    ...(args.days ? { eventStart: args.days.eventStart, eventEnd: args.days.eventEnd } : {}),
+    requireService: true,
+    onCreated: args.onCreated,
+  };
+}
+
 /** The line above the services of a refused Add repair (D222). */
 export const REQUIRE_SERVICE_MESSAGE = "Add at least one service.";
 

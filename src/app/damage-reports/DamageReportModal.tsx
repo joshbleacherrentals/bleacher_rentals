@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/command";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { useRepairWindowsStore } from "@/features/repairs/state/useRepairWindowsStore";
+import { reportRepairPreset } from "@/features/repairs/utils/newRepairPreset";
 import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
 import { useAcknowledgements } from "./_lib/acknowledgements";
 import {
@@ -128,6 +129,12 @@ type DamageReportModalProps = {
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
   editReport?: EditDamageReport | null;
+  /**
+   * The days of the Dashboard cell this card was opened from. "Create Maintenance to Resolve" puts
+   * them in Repair from and Repair to of the New repair window (spec 11 D236). The Damage Reports
+   * page has no cell and gives none, so the days stay empty there (D223).
+   */
+  repairDays?: { eventStart: string; eventEnd: string };
 };
 
 export function DamageReportModal({
@@ -135,6 +142,7 @@ export function DamageReportModal({
   onOpenChange,
   onSaved,
   editReport,
+  repairDays,
 }: DamageReportModalProps) {
   const supabase = useClerkSupabaseClient();
   const isEditing = !!editReport;
@@ -627,18 +635,19 @@ export function DamageReportModal({
                       <button
                         type="button"
                         onClick={() =>
-                          // The New repair window with the bleacher of the report and a service
-                          // required; when the repair is added the card closes (D222, D234).
+                          // The New repair window with the bleacher of the report, the days of the
+                          // cell it was opened from (if any) and a service required; when the repair
+                          // is added the card closes (D222, D234, D236).
                           useRepairWindowsStore.getState().open({
                             kind: "new",
-                            preset: {
+                            preset: reportRepairPreset({
                               bleacherUuid: editReport.bleacher_uuid,
-                              requireService: true,
+                              days: repairDays,
                               onCreated: () => {
                                 resetForm();
                                 onSaved();
                               },
-                            },
+                            }),
                           })
                         }
                         className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer text-sm font-semibold"

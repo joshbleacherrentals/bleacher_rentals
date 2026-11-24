@@ -4,6 +4,7 @@ import {
   REQUIRE_SERVICE_MESSAGE,
   cellRepairDates,
   presetRepairForm,
+  reportRepairPreset,
   requiredServiceError,
   type NewRepairPreset,
 } from "./newRepairPreset";
@@ -113,6 +114,51 @@ describe("presetRepairForm (D216, D221)", () => {
     expect(presetRepairForm({ bleacherUuid: "b-40", requireService: true })).toEqual(
       emptyRepairForm(),
     );
+  });
+});
+
+describe("reportRepairPreset (D223, amended by D236)", () => {
+  const onCreated = () => {};
+
+  it("has only the bleacher and the service requirement when no day comes with the report", () => {
+    // The Damage Reports page has no cell, so the days stay empty (D223).
+    expect(reportRepairPreset({ bleacherUuid: "b-40", onCreated })).toEqual({
+      bleacherUuid: "b-40",
+      requireService: true,
+      onCreated,
+    });
+  });
+
+  it("adds the days of the clicked cell when the card was opened from a cell (D236)", () => {
+    const preset = reportRepairPreset({
+      bleacherUuid: "b-40",
+      days: { eventStart: "2026-11-23", eventEnd: "2026-11-30" },
+      onCreated,
+    });
+    expect(preset).toEqual({
+      bleacherUuid: "b-40",
+      eventStart: "2026-11-23",
+      eventEnd: "2026-11-30",
+      requireService: true,
+      onCreated,
+    });
+  });
+
+  it("puts the clicked day into Repair from and the cut end into Repair to of the form", () => {
+    const days = cellRepairDates("2026-11-23", [block("2026-11-27", "2026-12-05")]);
+    const form = presetRepairForm(reportRepairPreset({ bleacherUuid: "b-40", days, onCreated }));
+    expect(form.eventStart).toBe("2026-11-23");
+    expect(form.eventEnd).toBe("2026-11-26");
+  });
+
+  it("still requires a service and tells the card when the repair is added", () => {
+    const preset = reportRepairPreset({
+      bleacherUuid: "b-40",
+      days: { eventStart: "2026-11-23", eventEnd: "2026-11-30" },
+      onCreated,
+    });
+    expect(requiredServiceError(preset, [])).toBe(REQUIRE_SERVICE_MESSAGE);
+    expect(preset.onCreated).toBe(onCreated);
   });
 });
 
