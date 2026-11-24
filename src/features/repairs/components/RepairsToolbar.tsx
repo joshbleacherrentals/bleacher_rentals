@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, Trash2, X } from "lucide-react";
+import { FilterX, Search, Trash2, X } from "lucide-react";
 import {
   SEARCH_HINT,
   SEARCH_PAUSE_MS,
@@ -9,7 +9,11 @@ import {
   type FilterKey,
   type RepairFilterOptions,
 } from "../utils/repairFilters";
-import type { RepairsUrlPatch } from "../utils/repairPageState";
+import {
+  CLEAR_FILTERS_PATCH,
+  hasActiveFilters,
+  type RepairsUrlPatch,
+} from "../utils/repairPageState";
 import { RepairFilterMenu } from "./RepairFilterMenu";
 
 export type RepairsToolbarProps = {
@@ -32,7 +36,8 @@ const normalized = (text: string) => (text.trim() === "" ? "" : text);
 
 /**
  * The toolbar of the Repairs page: the search box, the filters Bleacher, Zone, Vendor and
- * Category, and Show Deleted at the right end. docs/specs/repairs-05-toolbar.md §2.1 to §2.3, §2.6.
+ * Category, "Clear All Filters" while any of them is ticked, and Show Deleted at the right end.
+ * docs/specs/repairs-05-toolbar.md §2.1 to §2.3, §2.6 and §2.8 (D237).
  */
 export function RepairsToolbar({
   search,
@@ -149,6 +154,18 @@ export function RepairsToolbar({
           onChange={(values) => onChange(patch(values))}
         />
       ))}
+
+      {hasActiveFilters({ bleacherUuids, zoneUuids, vendorUuids, categoryUuids }) && (
+        <button
+          type="button"
+          data-testid="repairs-clear-filters"
+          onClick={() => onChange(CLEAR_FILTERS_PATCH)}
+          className="flex h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium text-[#6b7280] transition hover:bg-gray-100 hover:text-gray-800"
+        >
+          <FilterX className="h-3.5 w-3.5" aria-hidden="true" />
+          Clear All Filters
+        </button>
+      )}
 
       {canShowDeleted && (
         <button

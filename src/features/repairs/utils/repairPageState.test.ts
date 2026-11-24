@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLEAR_FILTERS_PATCH,
   buildRepairsView,
+  hasActiveFilters,
   narrowRepairsUrlState,
   readRepairsUrlState,
   writeRepairsUrlState,
@@ -243,6 +245,86 @@ describe("narrowRepairsUrlState", () => {
 
   it("goes to page 1 for an empty patch and changes nothing else", () => {
     expect(narrowRepairsUrlState(state, {})).toEqual({ ...state, page: 1 });
+  });
+});
+
+describe("hasActiveFilters (D237)", () => {
+  it("is false with no filter ticked", () => {
+    expect(hasActiveFilters(DEFAULT_STATE)).toBe(false);
+  });
+
+  it("is true when any one of the four filters has a ticked value", () => {
+    expect(hasActiveFilters({ ...DEFAULT_STATE, bleacherUuids: ["b-1"] })).toBe(true);
+    expect(hasActiveFilters({ ...DEFAULT_STATE, zoneUuids: ["z-1"] })).toBe(true);
+    expect(hasActiveFilters({ ...DEFAULT_STATE, vendorUuids: ["v-1"] })).toBe(true);
+    expect(hasActiveFilters({ ...DEFAULT_STATE, categoryUuids: ["c-1"] })).toBe(true);
+  });
+
+  it("is false for the search, the tab, the sort and Show Deleted: they are not filters", () => {
+    const state: RepairsUrlState = {
+      ...DEFAULT_STATE,
+      search: "tire",
+      tab: "completed",
+      sort: { key: "total", direction: "asc" },
+      showDeleted: true,
+    };
+    expect(hasActiveFilters(state)).toBe(false);
+  });
+});
+
+describe("CLEAR_FILTERS_PATCH (D237)", () => {
+  const state: RepairsUrlState = {
+    tab: "completed",
+    page: 3,
+    pageSize: 50,
+    search: "tire",
+    bleacherUuids: ["b-1", "b-2"],
+    zoneUuids: ["z-1"],
+    vendorUuids: ["v-1"],
+    categoryUuids: ["c-1"],
+    sort: { key: "total", direction: "asc" },
+    showDeleted: true,
+  };
+
+  it("empties the four filters, goes to page 1 and keeps everything else", () => {
+    expect(narrowRepairsUrlState(state, CLEAR_FILTERS_PATCH)).toEqual({
+      ...state,
+      bleacherUuids: [],
+      zoneUuids: [],
+      vendorUuids: [],
+      categoryUuids: [],
+      page: 1,
+    });
+  });
+
+  it("leaves hasActiveFilters false", () => {
+    expect(hasActiveFilters(narrowRepairsUrlState(state, CLEAR_FILTERS_PATCH))).toBe(false);
+  });
+
+  it("takes the four parameters out of the address and keeps the search, the tab, the sort", () => {
+    const cleared = narrowRepairsUrlState(state, CLEAR_FILTERS_PATCH);
+    const params = write(
+      cleared,
+      "tab=completed&page=3&q=tire&bleachers=b-1,b-2&zones=z-1&vendors=v-1&categories=c-1&sort=total&showDeleted=1",
+    );
+    for (const key of ["bleachers", "zones", "vendors", "categories", "page"]) {
+      expect(params.has(key), key).toBe(false);
+    }
+    expect(params.get("tab")).toBe("completed");
+    expect(params.get("q")).toBe("tire");
+    expect(params.get("showDeleted")).toBe("1");
+    expect(params.has("sort")).toBe(true);
+  });
+
+  it("also drops the old one-bleacher parameter, which would read back as a ticked bleacher", () => {
+    const fromOldLink = read("bleacher_uuid=b-9");
+    expect(hasActiveFilters(fromOldLink)).toBe(true);
+    const params = write(
+      narrowRepairsUrlState(fromOldLink, CLEAR_FILTERS_PATCH),
+      "bleacher_uuid=b-9",
+    );
+    expect(params.has("bleacher_uuid")).toBe(false);
+    expect(hasActiveFilters(read(params.toString()))).toBe(false);
   });
 });
 

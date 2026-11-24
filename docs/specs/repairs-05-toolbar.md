@@ -239,7 +239,9 @@ the spreadsheet, and the page itself is refactored, not added.
 - **D70 (the strip caption in Show Deleted):** "Deleted open repairs that match the filters" and
   "Deleted completed repairs that match the filters".
 - **D71 (nothing found):** the same wrench and "No repairs found." as now. There is no "Clear all"
-  button anywhere: each filter has its own Clear, and the search has its ✕.
+  button anywhere: each filter has its own Clear, and the search has its ✕. _Amended by D237
+  (2026-11-24): the toolbar has one "Clear All Filters" button while a filter is ticked. The empty
+  block itself still has none._
 - **D72 (a click on a header):** two directions, as in the Quotes list. The first click on a text
   column (Zone, Notes, Status, Vendor, Invoice #) is A to Z. The first click on a date column
   (Reported, Repair from, Repair to, Completed) or a money column (Labor, Parts, Tax, Freight,
@@ -260,6 +262,13 @@ the spreadsheet, and the page itself is refactored, not added.
   the viewer and the maintainer. Written, not run.
 - **D79 (the browser check):** skipped, as in spec 04: the Browser pane cannot run PowerSync. The
   report says so and lists what nobody has seen.
+- **D237 ("Clear All Filters", 2026-11-24, user):** a button "Clear All Filters" stands after the
+  four filter buttons and before Show Deleted. It is drawn only while at least one of Bleacher,
+  Zone, Vendor and Category has a ticked value, and it empties all four at once and goes to page 1.
+  The search text, the tab, the sort, the page size and Show Deleted are not filters and stay as
+  they are. An old `?bleacher_uuid=` link counts as a ticked bleacher and is dropped by the click.
+  `hasActiveFilters(state)` and `CLEAR_FILTERS_PATCH` are in `repairPageState.ts`; the test hook is
+  `repairs-clear-filters`. The matrix does not change (it only narrows what the person sees).
 
 **What follows from the design and from earlier decisions (no new decision).** Each item names its
 source, so a reviewer can check it.
@@ -359,8 +368,9 @@ source, so a reviewer can check it.
 - **Header.** The title "Repairs" and the subtitle "All maintenance and repair events across the
   fleet", always (D69).
 - **The strip**, **the tabs**, then **the toolbar** in one row that wraps on a narrow screen:
-  the search box, the buttons Bleacher, Zone, Vendor and Category, and Show Deleted at the right
-  end for an administrator or a maintainer. Then **the table** and **the pager** (spec 04).
+  the search box, the buttons Bleacher, Zone, Vendor and Category, "Clear All Filters" while any of
+  the four has a ticked value (D237), and Show Deleted at the right end for an administrator or a
+  maintainer. Then **the table** and **the pager** (spec 04).
 
 ### 2.2 The search box
 
@@ -758,6 +768,9 @@ Administrator (`repairsToolbar.admin.spec.ts`):
   removes the parameter; a search or a filter applies to that view.
 - **S19:** with a filter that matches nothing the table says "No repairs found." and the pager
   reads "0–0 of 0".
+- **S57 (D237):** "Clear All Filters" is not there with no filter ticked, nor for a search text
+  alone; with a Bleacher and a Vendor ticked it is there, one click empties both filters and the
+  four parameters go from the address, and the search text and the tab stay.
 
 Account manager, viewer and maintainer (a test added to each `repairsAccess.<role>.spec.ts`):
 

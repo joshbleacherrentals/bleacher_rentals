@@ -20,7 +20,7 @@ import {
  * The toolbar of the Repairs page as an administrator uses it: the search box, the four filters,
  * sorting from the headers and Show Deleted in the address. Written, not run (project rule); the
  * admin project cannot run locally.
- * Spec: docs/specs/repairs-05-toolbar.md §6 (S11 to S19).
+ * Spec: docs/specs/repairs-05-toolbar.md §6 (S11 to S19, S57).
  */
 test.describe.configure({ mode: "serial" });
 
@@ -303,5 +303,37 @@ test.describe("Repairs toolbar (admin)", () => {
     await expect(page.getByRole("navigation", { name: "Pagination" })).toContainText("0–0 of 0");
     await expect(page.getByTestId("repairs-strip-usd")).toHaveText("$0.00");
     await expect(page.getByTestId("repairs-strip-cad")).toHaveText("C$0.00");
+  });
+
+  test("S57: Clear All Filters shows only while a filter is ticked and empties all four, nothing else", async ({
+    page,
+  }) => {
+    const { bleacherA, completed, vendorName } = seeded;
+    const clear = page.getByTestId("repairs-clear-filters");
+    await openRepairsPage(page, "?tab=completed");
+    await expect(clear).toHaveCount(0);
+
+    // A search text alone is not a filter.
+    await searchBox(page).fill(completed.invoice);
+    await expect(rowWith(page, completed.invoice)).toHaveCount(1, { timeout: 60_000 });
+    await expect(clear).toHaveCount(0);
+
+    // Two filters: the button appears, and one click empties both.
+    await toggleOption(page, "bleacher", `#${bleacherA.number}`);
+    await toggleOption(page, "vendor", vendorName);
+    await expect(clear).toBeVisible();
+    await expect(clear).toHaveText("Clear All Filters");
+    await expect(page).toHaveURL(/bleachers=/);
+    await expect(page).toHaveURL(/vendors=/);
+    await clear.click();
+    await expect(clear).toHaveCount(0);
+    await expect(page).not.toHaveURL(/bleachers=|zones=|vendors=|categories=|page=/);
+    await expect(filterButton(page, "bleacher")).not.toContainText("1");
+    await expect(filterButton(page, "vendor")).not.toContainText("1");
+
+    // The search and the tab stay.
+    await expect(searchBox(page)).toHaveValue(completed.invoice);
+    await expect(page).toHaveURL(/q=/);
+    await expect(page).toHaveURL(/tab=completed/);
   });
 });

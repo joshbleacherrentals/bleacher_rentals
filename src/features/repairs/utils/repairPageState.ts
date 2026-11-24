@@ -111,6 +111,32 @@ export function writeRepairsUrlState(
   return params;
 }
 
+/** Whether any of the four filters (Bleacher, Zone, Vendor, Category) has a ticked value (D237). */
+export function hasActiveFilters(state: {
+  bleacherUuids: readonly string[];
+  zoneUuids: readonly string[];
+  vendorUuids: readonly string[];
+  categoryUuids: readonly string[];
+}): boolean {
+  return (
+    state.bleacherUuids.length > 0 ||
+    state.zoneUuids.length > 0 ||
+    state.vendorUuids.length > 0 ||
+    state.categoryUuids.length > 0
+  );
+}
+
+/**
+ * The patch of "Clear All Filters" (D237): the four filters empty. The search, the tab, the sort,
+ * the page size and Show Deleted are not filters and are kept.
+ */
+export const CLEAR_FILTERS_PATCH: RepairsUrlPatch = {
+  bleacherUuids: [],
+  zoneUuids: [],
+  vendorUuids: [],
+  categoryUuids: [],
+};
+
 /**
  * Any change except a bare page change is a new question for the list, so it starts from page 1
  * (the rule of the Quotes & Bookings list). The patch names what changes; the rest is kept. An
