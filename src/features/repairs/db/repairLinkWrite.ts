@@ -339,6 +339,11 @@ export type WriteRepairChangesInput = {
   now: string; // one reading of the clock for the whole write
   timezone: string;
   failedMessage: string; // the red toast on a failed local write
+  /**
+   * The free reports of a Completed repair that the person chose to close (08a D245, D246); none when
+   * nobody was asked. Only the ones the plan offers (D179, D185) are closed.
+   */
+  closeFreeIds?: readonly string[];
 };
 
 /**
@@ -349,6 +354,7 @@ export async function writeRepairChanges(
   input: WriteRepairChangesInput,
 ): Promise<{ message: string } | null> {
   const { repairId, statements, servicesAffected, checkedBleacherUuids, now, timezone } = input;
+  const closeFreeIds = input.closeFreeIds ?? [];
 
   try {
     if (!servicesAffected) {
@@ -424,6 +430,7 @@ export async function writeRepairChanges(
         openReports,
         zoneToStore: verdict.zoneToStore,
         timezone,
+        closeFreeIds,
       });
       for (const statement of buildLinkStatements(plan, { repairId, now })) await run(statement);
     });

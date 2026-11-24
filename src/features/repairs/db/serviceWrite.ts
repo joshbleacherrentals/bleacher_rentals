@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ErrorToast } from "@/components/toasts/ErrorToast";
 import { db } from "@/components/providers/SystemProvider";
 import { typedExecuteBatch } from "@/lib/powersync/typedQuery";
+import { NO_CLOSING, type CloseChoice } from "../utils/closeReports";
 import {
   SERVICE_FORM_MESSAGES,
   amountTextToCents,
@@ -27,7 +28,9 @@ import { writeRepairChanges } from "./repairLinkWrite";
  * `writeRepairChanges`, which also keeps the repair's junction, its zone and its damage report links
  * in step in the same local transaction (docs/specs/repairs-09b2-bleachers-zone-reports.md).
  * docs/specs/repairs-09b1-services.md §2.5, §2.6 and §3 (D151 to D161; the signatures here are
- * locked by that spec and by 09b2 §3).
+ * locked by that spec and by 09b2 §3). A service that may give a bleacher of a Completed repair its first
+ * service asks which damage reports to close, through the optional `chooseClosing`, after validation and
+ * before the write (docs/specs/repairs-08a-choose-reports-to-close.md §2.3 and §3, D246).
  */
 
 export type CreateServiceInput = {
@@ -36,6 +39,8 @@ export type CreateServiceInput = {
   values: ServiceFormValues;
   now: string; // an ISO timestamp: created_at
   timezone: string; // the app time zone (09b2: the day of a report, D185)
+  /** Asks which damage reports to close (08a D246); rejects when the person cancels, which writes nothing. */
+  chooseClosing?: () => Promise<CloseChoice>;
 };
 
 /**
@@ -76,6 +81,8 @@ export type UpdateServiceInput = {
   repairId: string;
   now: string;
   timezone: string;
+  /** Asks which damage reports to close (08a D246), only when the bleacher changes. */
+  chooseClosing?: () => Promise<CloseChoice>;
 };
 
 /** The update of the changed columns only (D155); null when nothing changed. */
@@ -205,14 +212,17 @@ export async function createService(
 ): Promise<ServiceFormErrors | null> {
   const errors = validateServiceForm(input.values);
   if (Object.keys(errors).length > 0) return errors;
+  const closing = (await input.chooseClosing?.()) ?? NO_CLOSING;
+  const now = closing.confirmedAt ?? input.now; // the moment of the Confirm click (08a D239)
   const refusal = await writeRepairChanges({
     repairId: input.repairId,
-    statements: [buildCreateServiceStatement({ ...input, id: crypto.randomUUID() })],
+    statements: [buildCreateServiceStatement({ ...input, id: crypto.randomUUID(), now })],
     servicesAffected: true,
     checkedBleacherUuids: input.values.bleacherUuid ? [input.values.bleacherUuid] : [],
-    now: input.now,
+    now,
     timezone: input.timezone,
     failedMessage: SERVICE_FORM_MESSAGES.saveFailed,
+    closeFreeIds: closing.closeFreeIds,
   });
   return refusal ? { bleacherUuid: refusal.message } : null;
 }
@@ -234,14 +244,16 @@ export async function updateService(input: UpdateServiceInput): Promise<ServiceF
     await writeBatch([statement], SERVICE_FORM_MESSAGES.saveFailed);
     return null;
   }
+  const closing = (await input.chooseClosing?.()) ?? NO_CLOSING;
   const refusal = await writeRepairChanges({
     repairId: input.repairId,
     statements: [statement],
     servicesAffected: true,
     checkedBleacherUuids: input.values.bleacherUuid ? [input.values.bleacherUuid] : [],
-    now: input.now,
+    now: closing.confirmedAt ?? input.now, // the moment of the Confirm click (08a D239)
     timezone: input.timezone,
     failedMessage: SERVICE_FORM_MESSAGES.saveFailed,
+    closeFreeIds: closing.closeFreeIds,
   });
   return refusal ? { bleacherUuid: refusal.message } : null;
 }

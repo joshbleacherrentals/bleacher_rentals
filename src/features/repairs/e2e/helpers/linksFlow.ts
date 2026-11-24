@@ -15,6 +15,8 @@ import {
  * from the New service window, make a repair with one service, and read the junction, the zone and
  * the damage reports with the service role. The page writes locally and the connector uploads, so
  * every read of the database polls. docs/specs/repairs-09b2-bleachers-zone-reports.md §6.
+ * It also holds what the 08a scenarios (S37, S58 to S62) do with the dialog that asks which damage
+ * reports to close, and a read of a repair's status. docs/specs/repairs-08a-choose-reports-to-close.md §6.
  */
 
 /** The upload of a local write can take a while; the database is read until it shows it. */
@@ -137,6 +139,47 @@ export async function reportState(reportId: string): Promise<{
   };
 }
 
+/**
+ * The same, with the moment of the closing: `{ repairId, resolvedAt }` (`resolvedAt` is null while the
+ * report is open). S58 compares it with `completed_at` of the repair.
+ */
+export async function reportRow(reportId: string): Promise<{
+  repairId: string | null;
+  resolvedAt: string | null;
+}> {
+  const res = await serviceRoleClient()
+    .from("DamageReports")
+    .select("maintenance_event_uuid, resolved_at")
+    .eq("id", reportId)
+    .single();
+  if (res.error) throw new Error(`report read failed: ${res.error.message}`);
+  return {
+    repairId: (res.data?.maintenance_event_uuid as string | null) ?? null,
+    resolvedAt: (res.data?.resolved_at as string | null) ?? null,
+  };
+}
+
+/** The status and the completion moment of a repair, read with the service role. */
+export async function repairStatusRow(repairId: string): Promise<{
+  status: string | null;
+  completedAt: string | null;
+}> {
+  const res = await serviceRoleClient()
+    .from("MaintenanceEvents")
+    .select("status, completed_at")
+    .eq("id", repairId)
+    .single();
+  if (res.error) throw new Error(`repair read failed: ${res.error.message}`);
+  return {
+    status: (res.data?.status as string | null) ?? null,
+    completedAt: (res.data?.completed_at as string | null) ?? null,
+  };
+}
+
+/** True when two timestamps from the database name the same moment (the text may differ in form). */
+export const sameMoment = (a: string | null, b: string | null): boolean =>
+  a !== null && b !== null && new Date(a).getTime() === new Date(b).getTime();
+
 /** How many services of any repair exist on a bleacher (the refusals of D176 write none). */
 export async function serviceCountOnBleacher(bleacherUuid: string): Promise<number> {
   const res = await serviceRoleClient()
@@ -173,4 +216,79 @@ export async function readRepairMadeByServices(page: Page, seeded: SeededRepairs
   const win = windowOf(page, "repair");
   await expect(win).toBeVisible();
   await expect(win.getByTestId("add-service")).toHaveCount(0);
+}
+
+// ── The dialog that asks which damage reports to close (spec 08a) ──────────────────────────────────
+
+export const closeDialog = (page: Page) => page.getByTestId("close-reports-dialog");
+export const closeRows = (page: Page) => closeDialog(page).getByTestId("close-report-row");
+
+/** The ids of the reports the dialog lists, sorted; waits until the dialog is on the page. */
+export async function closeDialogReportIds(page: Page): Promise<string[]> {
+  await expect(closeDialog(page)).toBeVisible({ timeout: 60_000 });
+  const ids = await closeRows(page).evaluateAll((rows) =>
+    rows.map((row) => row.getAttribute("data-report-id") ?? ""),
+  );
+  return ids.sort();
+}
+
+/** The ids of the rows of one section (`linked` or `free`), sorted. */
+export async function closeDialogGroup(page: Page, group: "linked" | "free"): Promise<string[]> {
+  await expect(closeDialog(page)).toBeVisible({ timeout: 60_000 });
+  const ids = await closeDialog(page)
+    .locator(`[data-testid="close-report-row"][data-group="${group}"]`)
+    .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-report-id") ?? ""));
+  return ids.sort();
+}
+
+export const closeSwitch = (page: Page, reportId: string) =>
+  closeDialog(page).locator(`[data-report-id="${reportId}"]`).getByTestId("close-report-switch");
+
+/** Puts the switch of a report on or off (they all start on, D242) and checks that it took. */
+export async function setCloseSwitch(page: Page, reportId: string, on: boolean) {
+  const toggle = closeSwitch(page, reportId);
+  if ((await toggle.getAttribute("aria-checked")) !== String(on)) await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", String(on));
+}
+
+/** Confirm, and waits until the dialog has gone. */
+export async function confirmClose(page: Page) {
+  await closeDialog(page).getByTestId("close-reports-confirm").click();
+  await expect(closeDialog(page)).toHaveCount(0);
+}
+
+/** Cancel, and waits until the dialog has gone. */
+export async function cancelClose(page: Page) {
+  await closeDialog(page).getByTestId("close-reports-cancel").click();
+  await expect(closeDialog(page)).toHaveCount(0);
+}
+
+/**
+ * Checks that no dialog is on the page. The flow reads the reports and opens the dialog a moment after
+ * the click, so the check waits a little before it looks.
+ */
+export async function expectNoCloseDialog(page: Page) {
+  await page.waitForTimeout(1_500);
+  await expect(closeDialog(page)).toHaveCount(0);
+}
+
+/** Opens the status menu of a repair row and picks a status (`inbound`, `in_repair`, `completed`, ...). */
+export async function chooseRowStatus(page: Page, row: Locator, status: string) {
+  await row.getByTestId("repair-status-menu").click();
+  await page.locator(`[data-testid="repair-status-option"][data-status="${status}"]`).click();
+}
+
+/**
+ * Picks a status in the Status select of the Edit or New repair window (`Dropdown`: a button after the
+ * label "Status", and a list portaled to the body, whose rows choose on pointer down). `label` is the
+ * word of the pill: "Completed", "In repair".
+ */
+export async function chooseFormStatus(page: Page, win: Locator, label: string) {
+  await win
+    .locator('xpath=.//label[normalize-space()="Status"]/following-sibling::div//button')
+    .click();
+  await page
+    .locator("body > ul > li")
+    .filter({ hasText: new RegExp(`^${label}$`) })
+    .click();
 }

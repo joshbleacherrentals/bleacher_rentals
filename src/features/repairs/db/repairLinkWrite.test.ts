@@ -460,19 +460,41 @@ describe("writeRepairChanges (run on SQLite)", () => {
     expect(junction()).toHaveLength(1);
   });
 
-  it("a Completed repair: only the report created no later than event_end is linked and closed, with now as resolved_at (D181, D185)", async () => {
+  it("a Completed repair: only the chosen report created no later than event_end is linked and closed, with now as resolved_at (09b2 D185, 08a D246)", async () => {
     sqlite.exec(`
       update "MaintenanceEvents" set status = 'completed', event_end = '2026-11-05' where id = '${R1}';
       insert into "BleacherMaintEvents" values ('j1', 'b1', '${R1}', 'x');
       insert into "DamageReports" values
         ('rep-before', 'b1', '2026-11-03T15:00:00Z', null, null, 0),
+        ('rep-before-kept', 'b1', '2026-11-04T15:00:00Z', null, null, 0),
         ('rep-after', 'b1', '2026-11-10T15:00:00Z', null, null, 0);
+    `);
+    await writeRepairChanges(
+      input([serviceInsert("s1", R1, "b1")], {
+        checkedBleacherUuids: ["b1"],
+        // `rep-after` is chosen too, and is not offered: it is later than event_end.
+        closeFreeIds: ["rep-before", "rep-after"],
+      }),
+    );
+    expect(report("rep-before")).toMatchObject({ maintenance_event_uuid: R1, resolved_at: NOW });
+    expect(report("rep-before-kept")).toMatchObject({
+      maintenance_event_uuid: null,
+      resolved_at: null,
+    });
+    expect(report("rep-after")).toMatchObject({ maintenance_event_uuid: null, resolved_at: null });
+  });
+
+  it("a Completed repair with an empty choice closes and links no report (08a D243)", async () => {
+    sqlite.exec(`
+      update "MaintenanceEvents" set status = 'completed', event_end = '2026-11-05' where id = '${R1}';
+      insert into "DamageReports" values
+        ('rep-before', 'b1', '2026-11-03T15:00:00Z', null, null, 0);
     `);
     await writeRepairChanges(
       input([serviceInsert("s1", R1, "b1")], { checkedBleacherUuids: ["b1"] }),
     );
-    expect(report("rep-before")).toMatchObject({ maintenance_event_uuid: R1, resolved_at: NOW });
-    expect(report("rep-after")).toMatchObject({ maintenance_event_uuid: null, resolved_at: null });
+    expect(report("rep-before")).toMatchObject({ maintenance_event_uuid: null, resolved_at: null });
+    expect(one(`select count(*) as n from "MaintenanceLineItems"`).n).toBe(1);
   });
 
   it("a bleacher with no zone is allowed and sets no zone; a later bleacher with a zone sets it (D175)", async () => {

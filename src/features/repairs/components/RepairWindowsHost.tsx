@@ -8,34 +8,21 @@ import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canMa
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { makeRepairFilesClient, saveRepairFiles } from "../db/repairFileWrite";
-import { changeRepairStatus } from "../db/repairStatusWrite";
 import { createRepair, deleteRepair, restoreRepair, updateRepair } from "../db/repairWrite";
 import { findServiceZoneConflict } from "../db/repairLinkWrite";
 import { createService, deleteService, updateService } from "../db/serviceWrite";
+import { useCloseReportsFlow } from "../hooks/useCloseReportsFlow";
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
 import { useRepairList } from "../hooks/useRepairList";
 import { useRepairWindowsStore } from "../state/useRepairWindowsStore";
+import { bleachersAfterServiceChange, liveServiceBleachers } from "../utils/closeReports";
 import { resolveWindows } from "../utils/repairDetails";
 import { filesFailureLines, isFilesDraftChanged, type FilesDraft } from "../utils/repairFiles";
-import type { RepairListRow, RepairService, RepairStatus } from "../utils/repairRows";
+import { liveBleachersOfDraft } from "../utils/repairLinks";
+import type { RepairListRow, RepairService } from "../utils/repairRows";
 import { DamageReportWindow } from "./DamageReportWindow";
 import { NewRepairWindow, RepairWindow, type RepairEditing } from "./RepairWindow";
 import { NewServiceWindow, ServiceWindow, type ServiceEditing } from "./ServiceWindow";
-
-/**
- * One clock reading is the moment of the whole change (spec 08 D112, D116). The writer shows its own
- * error toast (D119); the catch only stops an unhandled rejection. The status menu of the table and the
- * one of the repair window both call it.
- */
-export function startStatusChange(repair: RepairListRow, to: RepairStatus): void {
-  void changeRepairStatus({
-    repairId: repair.id,
-    from: repair.status,
-    to,
-    reported: repair.reported,
-    now: new Date().toISOString(),
-  }).catch(() => {});
-}
 
 export type RepairWindowsHostProps = {
   /**
@@ -69,6 +56,22 @@ function RepairWindowsOwnRows() {
   return <RepairWindowsView rows={rows} />;
 }
 
+/**
+ * What a service write tells the flow: the repair keeps its status, and the bleachers of its live
+ * services change by the one service that is added (`removed` is null) or moved (08a D246).
+ */
+function serviceClosingInput(repair: RepairListRow, removed: string | null, added: string | null) {
+  const before = liveServiceBleachers(repair);
+  return {
+    repairId: repair.id,
+    fromStatus: repair.status,
+    toStatus: repair.status,
+    eventEnd: repair.eventEnd,
+    bleachersBefore: before,
+    bleachersAfter: bleachersAfterServiceChange(before, { removed, added }),
+  };
+}
+
 function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
   const timezone = useTimezoneStore((s) => s.timezone);
   const stack = useRepairWindowsStore((s) => s.stack);
@@ -85,6 +88,11 @@ function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
   const filesClient = useMemo(() => makeRepairFilesClient(supabase), [supabase]);
 
   const { options } = useRepairFilterOptions();
+
+  // Asks which damage reports to close when a write puts a repair into Completed, or puts a bleacher on
+  // a Completed repair, and draws the dialog (spec 08a). The writers call `chooseClosing` after their
+  // validation; a Cancel rejects it and the window stays as it is.
+  const { changeStatus, chooseClosing, dialog: closeReportsDialog } = useCloseReportsFlow();
 
   // The windows are found again in the whole list on every render, so they show the newest values; one
   // whose repair or service is no longer in the list is not drawn (spec 06 §2.5, spec 07 §2.7).
@@ -121,9 +129,17 @@ function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
               values,
               services,
               liveStatus: repair.status,
-              reported: repair.reported,
               now: new Date().toISOString(),
               timezone,
+              chooseClosing: () =>
+                chooseClosing({
+                  repairId: repair.id,
+                  fromStatus: repair.status,
+                  toStatus: values.status,
+                  eventEnd: values.eventEnd || null,
+                  bleachersBefore: liveServiceBleachers(repair),
+                  bleachersAfter: liveBleachersOfDraft(services),
+                }),
             });
             if (errors) return errors;
             await saveFiles(repair.id, files);
@@ -163,6 +179,10 @@ function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
               repairId: repair.id,
               now: new Date().toISOString(),
               timezone,
+              chooseClosing: () =>
+                chooseClosing(
+                  serviceClosingInput(repair, initial.bleacherUuid, values.bleacherUuid),
+                ),
             }),
           onDelete: () =>
             deleteService({
@@ -176,6 +196,7 @@ function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
 
   return (
     <>
+      {closeReportsDialog}
       {windows.map((w) => {
         if (w.kind === "new") {
           // A repair is made only by an administrator or a maintainer, whoever asked for the window.
@@ -196,6 +217,15 @@ function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
                   createdByUserUuid: userId,
                   now: new Date().toISOString(),
                   timezone,
+                  chooseClosing: () =>
+                    chooseClosing({
+                      repairId: null,
+                      fromStatus: null,
+                      toStatus: values.status,
+                      eventEnd: values.eventEnd || null,
+                      bleachersBefore: [],
+                      bleachersAfter: liveBleachersOfDraft(services),
+                    }),
                 });
                 if (errors) return errors;
                 await saveFiles(id, files);
@@ -216,7 +246,7 @@ function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
               }
               onOpenReports={() => open({ kind: "reports", reported: w.repair.reported })}
               onClose={() => close(w.index)}
-              onChangeStatus={canManage ? (to) => startStatusChange(w.repair, to) : undefined}
+              onChangeStatus={canManage ? (to) => changeStatus(w.repair, to) : undefined}
               editing={editingFor(w.repair)}
             />
           );
@@ -249,6 +279,8 @@ function RepairWindowsView({ rows }: { rows: readonly RepairListRow[] }) {
                   values,
                   now: new Date().toISOString(),
                   timezone,
+                  chooseClosing: () =>
+                    chooseClosing(serviceClosingInput(w.repair, null, values.bleacherUuid)),
                 })
               }
               onClose={() => close(w.index)}

@@ -4,6 +4,9 @@ import {
   UPLOAD_TIMEOUT,
   addService,
   chooseBleacher,
+  closeDialogGroup,
+  closeDialogReportIds,
+  confirmClose,
   createRepairWithService,
   fillService,
   junctionBleachers,
@@ -33,7 +36,8 @@ import {
  * reports of the service's bleacher. Written, not run (project rule); the admin project cannot run
  * locally. Every scenario reads what the page wrote from the database with the service role, and
  * polls, because the page writes locally and the connector uploads.
- * Spec: docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S34 to S39, D187).
+ * Spec: docs/specs/repairs-09b2-bleachers-zone-reports.md §6 (S34 to S39, D187). S37 is rewritten
+ * for the dialog of docs/specs/repairs-08a-choose-reports-to-close.md §6 (D246, D251).
  */
 test.describe.configure({ mode: "serial" });
 
@@ -190,7 +194,7 @@ test.describe("Repairs: what a service does to its repair (admin)", () => {
       .toEqual({ repairId: null, closed: false });
   });
 
-  test("S37: a service on a Completed repair links and closes the report created before it ended, and leaves the later one open and free", async ({
+  test("S37: a service on a Completed repair opens the dialog with the report created before it ended and not the later one; Confirm links and closes it, the later one stays open and free", async ({
     page,
   }) => {
     const { links } = need();
@@ -201,7 +205,15 @@ test.describe("Repairs: what a service does to its repair (admin)", () => {
     await expect(row).toBeVisible({ timeout: 60_000 });
     await row.click();
     await blockOf(row).getByTestId("add-service").click();
-    await addService(page, done.bleacher.number);
+    await fillService(page, done.bleacher.number);
+    await newServiceWindow(page).getByTestId("service-save").click();
+
+    // The dialog comes after Save: the report created before the end of the repair is the only one
+    // offered, in the section of the added bleachers; nothing is written until Confirm.
+    expect(await closeDialogReportIds(page)).toEqual([done.beforeReportId]);
+    expect(await closeDialogGroup(page, "free")).toEqual([done.beforeReportId]);
+    expect(await closeDialogGroup(page, "linked")).toEqual([]);
+    await confirmClose(page);
     await expect(newServiceWindow(page)).toHaveCount(0);
     await expect(serviceRows(page)).toHaveCount(1, { timeout: 60_000 });
 

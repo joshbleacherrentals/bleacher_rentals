@@ -45,6 +45,7 @@ import {
   type CreateRepairInput,
   type UpdateRepairInput,
 } from "./repairWrite";
+import { NO_CLOSING, type CloseChoice } from "../utils/closeReports";
 import { REPAIR_FORM_MESSAGES, type RepairFormValues } from "../utils/repairForm";
 import { repairRow, repairService } from "../utils/repairRowFixture";
 import {
@@ -61,7 +62,12 @@ const OTHER_REPAIR = "r0000000-0000-4000-8000-000000000002";
 const VENDOR = "v0000000-0000-4000-8000-000000000001";
 const OTHER_VENDOR = "v0000000-0000-4000-8000-000000000002";
 const NOW = "2026-11-20T15:30:00.000Z";
-const report = (id: string) => ({ id, day: "2026-11-01", createdAt: "2026-11-01T12:00:00Z" });
+const closing = (over: Partial<CloseChoice> = {}): CloseChoice => ({
+  closeLinkedIds: [],
+  unlinkLinkedIds: [],
+  closeFreeIds: [],
+  ...over,
+});
 
 const values = (over: Partial<RepairFormValues> = {}): RepairFormValues => ({
   vendorUuid: VENDOR,
@@ -88,7 +94,6 @@ const updateInput = (over: Partial<UpdateRepairInput> = {}): UpdateRepairInput =
   initial: values(),
   values: values(),
   liveStatus: "inbound",
-  reported: [report("rep-1"), report("rep-2")],
   now: NOW,
   timezone: "America/Toronto",
   ...over,
@@ -198,9 +203,9 @@ describe("the builders (run on SQLite)", () => {
         ('${OTHER_REPAIR}', 'Maintenance / Repair', '2026-11-02', '2026-11-06', '${VENDOR}', 'JJ-6',
          'inbound', 'USD', null, null, 500, null, null, 'owner-2', '2026-10-31T10:00:00.000Z', 0);
       insert into "DamageReports" values
-        ('rep-1', null, null, 'b1'),
-        ('rep-2', null, null, 'b1'),
-        ('rep-closed', '2026-10-01T10:00:00.000Z', 'older-repair', 'b1'),
+        ('rep-1', null, '${REPAIR}', 'b1'),
+        ('rep-2', null, '${REPAIR}', 'b1'),
+        ('rep-closed', '2026-10-01T10:00:00.000Z', '${REPAIR}', 'b1'),
         ('rep-outside', null, null, 'b2');
     `);
   });
@@ -292,9 +297,10 @@ describe("the builders (run on SQLite)", () => {
       }
     });
 
-    it("adds the statements of spec 08 when the person picked another status (into Completed)", () => {
+    it("adds the statements of spec 08 and 08a when the person picked another status (into Completed)", () => {
       const statements = buildUpdateRepairStatements(
         updateInput({ values: values({ status: "completed", notes: "Done" }) }),
+        closing({ closeLinkedIds: ["rep-1", "rep-2"] }),
       );
       expect(statements).toHaveLength(3);
       expect(statements[0].sql).toContain('"notes"');
@@ -304,7 +310,15 @@ describe("the builders (run on SQLite)", () => {
       expect(statements[1].parameters).toEqual(["completed", NOW, REPAIR]);
       expect(statements[2].sql).toMatch(/^update "DamageReports" set/i);
       expect(statements[2].sql).toMatch(/"resolved_at" is null/i);
-      expect(statements[2].parameters).toEqual([NOW, REPAIR, "rep-1", "rep-2"]);
+      expect(statements[2].parameters).toEqual([NOW, "rep-1", "rep-2", REPAIR]);
+    });
+
+    it("closes no report into Completed when the choice is empty (08a D238: nothing closes by itself)", () => {
+      const statements = buildUpdateRepairStatements(
+        updateInput({ values: values({ status: "completed" }) }),
+      );
+      expect(statements).toHaveLength(1);
+      expect(statements[0].parameters).toEqual(["completed", NOW, REPAIR]);
     });
 
     it("clears completed_at and closes no report when the status leaves Completed", () => {
@@ -349,13 +363,11 @@ describe("the builders (run on SQLite)", () => {
       expect(repairRowOf(OTHER_REPAIR)).toMatchObject({ notes: null, event_end: "2026-11-06" });
     });
 
-    it("run on SQLite: a status change closes only the open listed reports", () => {
+    it("run on SQLite: a status change closes only the chosen open reports and unlinks the others (08a D244)", () => {
       run(
         buildUpdateRepairStatements(
-          updateInput({
-            values: values({ status: "completed" }),
-            reported: [report("rep-1"), report("rep-closed")],
-          }),
+          updateInput({ values: values({ status: "completed" }) }),
+          closing({ closeLinkedIds: ["rep-1", "rep-closed"], unlinkLinkedIds: ["rep-2"] }),
         ),
       );
       expect(repairRowOf()).toMatchObject({ status: "completed", completed_at: NOW });
@@ -365,9 +377,12 @@ describe("the builders (run on SQLite)", () => {
       });
       expect(reportRowOf("rep-closed")).toMatchObject({
         resolved_at: "2026-10-01T10:00:00.000Z",
-        maintenance_event_uuid: "older-repair",
+        maintenance_event_uuid: REPAIR,
       });
-      expect(reportRowOf("rep-2")).toMatchObject({ resolved_at: null });
+      expect(reportRowOf("rep-2")).toMatchObject({
+        resolved_at: null,
+        maintenance_event_uuid: null,
+      });
       expect(reportRowOf("rep-outside")).toMatchObject({ resolved_at: null });
     });
   });
@@ -637,7 +652,8 @@ describe("the writers", () => {
         await updateRepair(updateInput({ values: values({ notes: "x", status: "completed" }) })),
       ).toBeNull();
       expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
-      expect((typedExecuteBatch.mock.calls[0][0] as CompiledQuery[]).length).toBe(3);
+      // The notes, the status and nothing for the reports: nobody was asked (08a D238).
+      expect((typedExecuteBatch.mock.calls[0][0] as CompiledQuery[]).length).toBe(2);
       expect(toastCustom).not.toHaveBeenCalled();
     });
 
@@ -713,6 +729,179 @@ describe("the writers", () => {
 // write as the repair, after the statements of the fields and the status. docs/specs/repairs-09b2-
 // bleachers-zone-reports.md §2.3 and §3 (D176, D184, D186): when the draft changes services, the write
 // goes through `writeRepairChanges`; a repair with no change in services is one plain batch as before.
+describe("chooseClosing (08a D238 to D248)", () => {
+  const serviceValues = (over: Partial<ServiceFormValues> = {}): ServiceFormValues => ({
+    bleacherUuid: "b1",
+    categoryUuid: "c1",
+    severity: "minor",
+    description: "Weld",
+    laborText: "10.00",
+    partsText: "",
+    taxText: "",
+    freightText: "",
+    ...over,
+  });
+  const newDraft = (): ServicesDraft => addDraftService([], "n1", serviceValues());
+  const stored = repairRow({
+    id: REPAIR,
+    services: [repairService({ id: "s1", description: "Weld", laborCents: 1000 })],
+  });
+  const added = (): ServicesDraft =>
+    addDraftService(servicesDraftFromRepair(stored), "n1", serviceValues({ bleacherUuid: "b2" }));
+
+  beforeEach(() => {
+    typedExecuteBatch.mockReset();
+    typedGetAll.mockReset();
+    toastCustom.mockReset();
+    writeRepairChanges.mockReset();
+    typedExecuteBatch.mockResolvedValue(undefined);
+    typedGetAll.mockResolvedValue([]);
+    writeRepairChanges.mockResolvedValue(null);
+  });
+
+  const createRest = (over: Partial<CreateRepairInput> = {}) => {
+    const { id: _id, ...rest } = createInput(over);
+    return rest;
+  };
+
+  it("createRepair asks after validation and hands the chosen free ids to the runner", async () => {
+    const chooseClosing = vi.fn().mockResolvedValue(closing({ closeFreeIds: ["rep-a"] }));
+    await createRepair({ ...createRest({ services: newDraft() }), chooseClosing });
+    expect(chooseClosing).toHaveBeenCalledTimes(1);
+    expect(writeRepairChanges.mock.calls[0][0].closeFreeIds).toEqual(["rep-a"]);
+  });
+
+  it("createRepair does not ask when validation fails or a duplicate is found", async () => {
+    const chooseClosing = vi.fn().mockResolvedValue(NO_CLOSING);
+    await createRepair({
+      ...createRest({ values: values({ eventEnd: "2026-10-01" }) }),
+      chooseClosing,
+    });
+    typedGetAll.mockResolvedValue([{ id: OTHER_REPAIR }]);
+    await createRepair({ ...createRest(), chooseClosing });
+    expect(chooseClosing).not.toHaveBeenCalled();
+    expect(typedExecuteBatch).not.toHaveBeenCalled();
+  });
+
+  it("createRepair writes nothing and rejects with the same error when the person cancels", async () => {
+    const cancelled = new Error("cancelled");
+    const chooseClosing = vi.fn().mockRejectedValue(cancelled);
+    await expect(
+      createRepair({ ...createRest({ services: newDraft() }), chooseClosing }),
+    ).rejects.toBe(cancelled);
+    expect(typedExecuteBatch).not.toHaveBeenCalled();
+    expect(writeRepairChanges).not.toHaveBeenCalled();
+    expect(toastCustom).not.toHaveBeenCalled();
+  });
+
+  it("createRepair without services hands no closing to anyone and still writes the plain batch", async () => {
+    const chooseClosing = vi.fn().mockResolvedValue(NO_CLOSING);
+    await createRepair({ ...createRest(), chooseClosing });
+    expect(typedExecuteBatch).toHaveBeenCalledTimes(1);
+    expect(writeRepairChanges).not.toHaveBeenCalled();
+  });
+
+  it("updateRepair asks after validation and the duplicate check, only when something is to be written", async () => {
+    const chooseClosing = vi.fn().mockResolvedValue(NO_CLOSING);
+    await updateRepair({ ...updateInput(), chooseClosing }); // nothing changed
+    await updateRepair({
+      ...updateInput({ values: values({ eventStart: "2026-11-09", eventEnd: "2026-11-05" }) }),
+      chooseClosing,
+    }); // invalid
+    typedGetAll.mockResolvedValue([{ id: OTHER_REPAIR }]);
+    await updateRepair({
+      ...updateInput({ values: values({ invoiceNumber: "JJ-6" }) }),
+      chooseClosing,
+    }); // duplicate
+    expect(chooseClosing).not.toHaveBeenCalled();
+
+    typedGetAll.mockResolvedValue([]);
+    await updateRepair({ ...updateInput({ values: values({ notes: "x" }) }), chooseClosing });
+    expect(chooseClosing).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateRepair into Completed writes the chosen linked reports in the plain batch", async () => {
+    const chooseClosing = vi
+      .fn()
+      .mockResolvedValue(closing({ closeLinkedIds: ["rep-1"], unlinkLinkedIds: ["rep-2"] }));
+    await updateRepair({
+      ...updateInput({ values: values({ status: "completed" }) }),
+      chooseClosing,
+    });
+    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(statements).toHaveLength(3);
+    expect(statements[0].parameters).toEqual(["completed", NOW, REPAIR]);
+    expect(statements[1].parameters).toEqual([NOW, "rep-1", REPAIR]);
+    expect(statements[2].parameters).toEqual([null, "rep-2", REPAIR]);
+  });
+
+  it("updateRepair with services changed hands the closing statements and the free ids to the runner", async () => {
+    const chooseClosing = vi
+      .fn()
+      .mockResolvedValue(closing({ closeLinkedIds: ["rep-1"], closeFreeIds: ["rep-free"] }));
+    await updateRepair({
+      ...updateInput({ values: values({ status: "completed" }), services: added() }),
+      chooseClosing,
+    });
+    expect(typedExecuteBatch).not.toHaveBeenCalled();
+    const call = writeRepairChanges.mock.calls[0][0];
+    expect(call.closeFreeIds).toEqual(["rep-free"]);
+    const statements = call.statements as CompiledQuery[];
+    expect(statements.map((s) => s.sql.match(/^(\w+ (?:into )?"\w+")/)?.[1])).toEqual([
+      'update "MaintenanceEvents"',
+      'update "DamageReports"',
+      'insert into "MaintenanceLineItems"',
+    ]);
+  });
+
+  it("the moment of the Confirm click replaces `now` for the whole write (D239): completed_at, the runner's now", async () => {
+    const CONFIRMED = "2026-11-24T18:45:00.000Z";
+    const chooseClosing = vi.fn().mockResolvedValue(closing({ confirmedAt: CONFIRMED }));
+    await updateRepair({
+      ...updateInput({ values: values({ status: "completed" }) }),
+      chooseClosing,
+    });
+    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(statements[0].parameters).toEqual(["completed", CONFIRMED, REPAIR]);
+
+    typedExecuteBatch.mockClear();
+    await updateRepair({
+      ...updateInput({ values: values({ status: "completed" }), services: added() }),
+      chooseClosing,
+    });
+    expect(writeRepairChanges.mock.calls[0][0].now).toBe(CONFIRMED);
+
+    const { id: _id, ...rest } = createInput({
+      values: values({ status: "completed" }),
+      services: newDraft(),
+    });
+    await createRepair({ ...rest, chooseClosing });
+    const call = writeRepairChanges.mock.calls[1][0];
+    expect(call.now).toBe(CONFIRMED);
+    expect((call.statements as CompiledQuery[])[0].parameters).toContain(CONFIRMED);
+  });
+
+  it("without a Confirm moment the writer's own `now` stands (nobody was asked)", async () => {
+    await updateRepair(updateInput({ values: values({ status: "completed" }) }));
+    const statements = typedExecuteBatch.mock.calls[0][0] as CompiledQuery[];
+    expect(statements[0].parameters).toEqual(["completed", NOW, REPAIR]);
+  });
+
+  it("updateRepair writes nothing and rejects with the same error when the person cancels", async () => {
+    const cancelled = new Error("cancelled");
+    const chooseClosing = vi.fn().mockRejectedValue(cancelled);
+    await expect(
+      updateRepair({
+        ...updateInput({ values: values({ status: "completed" }), services: added() }),
+        chooseClosing,
+      }),
+    ).rejects.toBe(cancelled);
+    expect(typedExecuteBatch).not.toHaveBeenCalled();
+    expect(writeRepairChanges).not.toHaveBeenCalled();
+    expect(toastCustom).not.toHaveBeenCalled();
+  });
+});
+
 describe("the services draft (09b1, 09b2)", () => {
   const serviceValues = (over: Partial<ServiceFormValues> = {}): ServiceFormValues => ({
     bleacherUuid: "b1",
@@ -812,7 +1001,6 @@ describe("the services draft (09b1, 09b2)", () => {
     expect(statements.map((s) => s.sql.match(/^(update "\w+"|insert into "\w+")/)?.[1])).toEqual([
       'update "MaintenanceEvents"',
       'update "MaintenanceEvents"',
-      'update "DamageReports"',
       'insert into "MaintenanceLineItems"',
     ]);
   });

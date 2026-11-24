@@ -1115,7 +1115,7 @@ describe("Repairs page rows", () => {
   // (D166): what the last sentences of the row say, since the repair window writes and the services
   // carry the amounts.
   const WRITES_SENTENCE =
-    "An administrator and a maintainer can add a repair and, in the repair window, change its vendor, invoice number, status, currency, repair days and notes; the status can also be changed from the pill in a row. Moving a repair into Completed records the moment it was completed and closes the damage reports found for it, which then leave the drivers' phones; moving it out of Completed clears that moment and leaves the reports closed. The amounts are edited through the services: an administrator and a maintainer add, change and delete a service, with its bleacher, category, severity, description and its four amounts, and the total of the repair follows a moment later, when the server has added the services up. The total cannot be typed in. An administrator and a maintainer also add files to a repair and delete them, in the repair window.";
+    "An administrator and a maintainer can add a repair and, in the repair window, change its vendor, invoice number, status, currency, repair days and notes; the status can also be changed from the pill in a row. Moving a repair into Completed records the moment it was completed and asks which of the open damage reports linked to the repair to close; the closed ones leave the drivers' phones, and the ones not chosen stay open and are unlinked from the repair; moving it out of Completed clears that moment and leaves the reports closed. The amounts are edited through the services: an administrator and a maintainer add, change and delete a service, with its bleacher, category, severity, description and its four amounts, and the total of the repair follows a moment later, when the server has added the services up. The total cannot be typed in. An administrator and a maintainer also add files to a repair and delete them, in the repair window.";
 
   // docs/specs/repairs-09b2-bleachers-zone-reports.md §5 (D188): the sentence added at the end of the
   // description of the costs row.
@@ -1124,7 +1124,7 @@ describe("Repairs page rows", () => {
     "The same window opens from the bar of a repair on the Dashboard.";
 
   const LINKS_SENTENCE =
-    "A service also decides the repair's bleachers and zone, which the table shows, and a Completed repair closes the damage reports of its bleachers that were reported before it ended.";
+    "A service also decides the repair's bleachers and zone, which the table shows, and when a service puts a bleacher on a Completed repair, the person is asked which of the bleacher's open damage reports, reported before the repair ended, to close.";
 
   it("has the Repair Costs & Vendors row right after Repairs & Maintenance", () => {
     expect(costs).toBeDefined();
@@ -1174,7 +1174,7 @@ describe("Repairs page rows", () => {
       /A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved\. /,
     );
     expect(costs?.description).toMatch(
-      /have repairs\. A repair opens in place[\s\S]*delete them, in the repair window\. A service also decides[\s\S]*reported before it ended\.$/,
+      /have repairs\. A repair opens in place[\s\S]*delete them, in the repair window\. A service also decides[\s\S]*ended, to close\.$/,
     );
   });
 
@@ -1238,7 +1238,7 @@ describe("Repairs page rows", () => {
   // and a maintainer do on the Repairs page, and what is still left to the Dashboard.
   it("tells the old row that the Repairs page adds, edits, deletes and restores repairs", () => {
     expect(maintenance?.description).toContain(
-      "On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. They also add, edit and delete the services of a repair, from its open row, from its window and from the service window; a deleted service cannot be brought back. A service also keeps the repair's list of bleachers and its zone: the first service on a bleacher adds the bleacher to the repair, removing the last one takes it off, the zone is set from the first bleacher that has one, and a bleacher in another zone is refused. The first service on a bleacher also links the bleacher's open damage reports to the repair; on a Completed repair it links and closes the ones reported before the repair ended. They also add files to a repair and delete them, in its window. On the Dashboard the same window opens from the bar of a repair, from \"+ Create\" and from the maintenance icon of a cell: an administrator and a maintainer add and change repairs there, and everyone else who opens the Dashboard only reads them.",
+      "On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. They also add, edit and delete the services of a repair, from its open row, from its window and from the service window; a deleted service cannot be brought back. A service also keeps the repair's list of bleachers and its zone: the first service on a bleacher adds the bleacher to the repair, removing the last one takes it off, the zone is set from the first bleacher that has one, and a bleacher in another zone is refused. The first service on a bleacher also links the bleacher's open damage reports to the repair; on a Completed repair the person is asked which of the ones reported before the repair ended to close, and the ones not chosen stay open and unlinked. They also add files to a repair and delete them, in its window. On the Dashboard the same window opens from the bar of a repair, from \"+ Create\" and from the maintenance icon of a cell: an administrator and a maintainer add and change repairs there, and everyone else who opens the Dashboard only reads them.",
     );
     expect(maintenance?.description).not.toMatch(/until the repair window can edit/);
     expect(maintenance?.description).not.toMatch(/only lists repairs/);
@@ -1265,7 +1265,7 @@ describe("Repairs page rows", () => {
       "A service also keeps the repair's list of bleachers and its zone",
     );
     expect(maintenance?.description).toContain(
-      "on a Completed repair it links and closes the ones reported before the repair ended",
+      "on a Completed repair the person is asked which of the ones reported before the repair ended to close",
     );
     expect(maintenance?.description).not.toMatch(
       /does not change the repair's list of bleachers yet/,
@@ -1370,7 +1370,7 @@ describe("the Dashboard uses the repair window (spec 11)", () => {
 
   it("tells the matrix who creates a repair from a damage report (D217, D235)", () => {
     const sentence =
-      "Can create a repair from an open report; the report closes when the repair is Completed.";
+      "Can create a repair from an open report; when the repair is Completed the person is asked whether to close the report.";
     expect(reports?.roles.admin.note).toMatch(/regardless of who created it\. Can create a repair/);
     expect(reports?.roles.admin.note?.endsWith(sentence)).toBe(true);
     expect(reports?.roles.maintainer.note?.endsWith(sentence)).toBe(true);

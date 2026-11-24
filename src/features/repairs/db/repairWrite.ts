@@ -15,7 +15,7 @@ import {
   type RepairFormErrors,
   type RepairFormValues,
 } from "../utils/repairForm";
-import type { ReportedReport } from "../utils/repairRows";
+import { NO_CLOSING, type CloseChoice } from "../utils/closeReports";
 import { checkedBleachersOfDraft } from "../utils/repairLinks";
 import { isServicesDraftChanged, type ServicesDraft } from "../utils/serviceForm";
 import { writeRepairChanges } from "./repairLinkWrite";
@@ -32,7 +32,9 @@ import { buildVendorAddressQuery, type RawVendorAddressRow } from "./repairWindo
  * in the same batch, after the repair's own statements: docs/specs/repairs-09b1-services.md §2.6 and §3
  * (D149, D161). When the draft changes services, the write goes through `writeRepairChanges`, which
  * also keeps the repair's junction, zone and damage report links in step in the same local
- * transaction: docs/specs/repairs-09b2-bleachers-zone-reports.md §2.3 and §3 (D176, D184, D186).
+ * transaction: docs/specs/repairs-09b2-bleachers-zone-reports.md §2.3 and §3 (D176, D184, D186). A write
+ * that may close damage reports asks first, through the optional `chooseClosing`, after validation and
+ * before any write: docs/specs/repairs-08a-choose-reports-to-close.md §2.3 and §3 (D238 to D248).
  */
 
 export type CreateRepairInput = {
@@ -44,6 +46,11 @@ export type CreateRepairInput = {
   services?: ServicesDraft;
   /** The app time zone, for the day of a damage report (09b2 D185). */
   timezone: string;
+  /**
+   * Asks which damage reports to close (08a). Called after validation, before any write; resolves the
+   * person's choice, or rejects when they cancel, which writes nothing. Absent: nothing is closed.
+   */
+  chooseClosing?: () => Promise<CloseChoice>;
 };
 
 /**
@@ -77,20 +84,24 @@ export type UpdateRepairInput = {
   initial: RepairFormValues;
   values: RepairFormValues;
   liveStatus: string; // the status the list shows at Save (the `from` of spec 08)
-  reported: readonly ReportedReport[];
   now: string;
   /** The services draft of the Edit window (09b1 D161); absent is an empty draft. */
   services?: ServicesDraft;
   /** The app time zone, for the day of a damage report (09b2 D185). */
   timezone: string;
+  /** Asks which damage reports to close (08a D247); see `CreateRepairInput.chooseClosing`. */
+  chooseClosing?: () => Promise<CloseChoice>;
 };
 
 /**
  * The statements of §2.5 for an Edit, in order: one update of the changed columns (never `status`),
- * then the statements of spec 08 when the person picked another status, then the statements of the
- * services draft (09b1). Empty when nothing is to be written.
+ * then the statements of spec 08 when the person picked another status (with the reports the person
+ * chose, 08a), then the statements of the services draft (09b1). Empty when nothing is to be written.
  */
-export function buildUpdateRepairStatements(input: UpdateRepairInput): CompiledQuery[] {
+export function buildUpdateRepairStatements(
+  input: UpdateRepairInput,
+  closing: CloseChoice = NO_CLOSING,
+): CompiledQuery[] {
   const { repairId, initial, values } = input;
   const changed = changedRepairFields(initial, values);
   const statements: CompiledQuery[] = [];
@@ -132,7 +143,8 @@ export function buildUpdateRepairStatements(input: UpdateRepairInput): CompiledQ
         repairId,
         from: input.liveStatus,
         to: values.status,
-        reported: input.reported,
+        closeLinkedIds: closing.closeLinkedIds,
+        unlinkLinkedIds: closing.unlinkLinkedIds,
         now: input.now,
       }),
     );
@@ -241,12 +253,17 @@ export async function createRepair(
   if (duplicate) errors.invoiceNumber = REPAIR_FORM_MESSAGES.invoiceDuplicate;
   if (Object.keys(errors).length > 0) return errors;
 
+  // The person is asked which damage reports to close only now: the form is valid (08a D245). The
+  // moment of their Confirm click is the moment of the whole write (D239).
+  const closing = (await input.chooseClosing?.()) ?? NO_CLOSING;
+  const now = closing.confirmedAt ?? input.now;
+
   // The page may make the id itself, so that the files can be written for it afterwards (09b3).
   const id = input.id ?? crypto.randomUUID();
   const draft = input.services ?? [];
   const statements = [
-    buildCreateRepairStatement({ ...input, id }),
-    ...buildServicesDraftStatements({ repairId: id, draft, now: input.now }),
+    buildCreateRepairStatement({ ...input, id, now }),
+    ...buildServicesDraftStatements({ repairId: id, draft, now }),
   ];
   if (!isServicesDraftChanged(draft)) {
     await writeBatch(statements, REPAIR_FORM_MESSAGES.saveFailed);
@@ -257,9 +274,10 @@ export async function createRepair(
     statements,
     servicesAffected: true,
     checkedBleacherUuids: checkedBleachersOfDraft(draft),
-    now: input.now,
+    now,
     timezone: input.timezone,
     failedMessage: REPAIR_FORM_MESSAGES.saveFailed,
+    closeFreeIds: closing.closeFreeIds,
   });
   return refusal ? { services: refusal.message } : null;
 }
@@ -285,7 +303,11 @@ export async function updateRepair(input: UpdateRepairInput): Promise<RepairForm
   }
   if (Object.keys(errors).length > 0) return errors;
 
-  const statements = buildUpdateRepairStatements(input);
+  // Something is to be written, so the person is asked which damage reports to close (08a D247).
+  const closing = (await input.chooseClosing?.()) ?? NO_CLOSING;
+  const now = closing.confirmedAt ?? input.now; // the moment of the Confirm click (D239)
+
+  const statements = buildUpdateRepairStatements({ ...input, now }, closing);
   if (statements.length === 0) return null;
   const draft = input.services ?? [];
   if (!isServicesDraftChanged(draft)) {
@@ -297,9 +319,10 @@ export async function updateRepair(input: UpdateRepairInput): Promise<RepairForm
     statements,
     servicesAffected: true,
     checkedBleacherUuids: checkedBleachersOfDraft(draft),
-    now: input.now,
+    now,
     timezone: input.timezone,
     failedMessage: REPAIR_FORM_MESSAGES.saveFailed,
+    closeFreeIds: closing.closeFreeIds,
   });
   return refusal ? { services: refusal.message } : null;
 }

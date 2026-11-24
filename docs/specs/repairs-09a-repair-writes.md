@@ -1,5 +1,10 @@
 # Repairs 09a: Edit, New repair, Delete and Restore of a repair
 
+> **Amended by [repairs-08a-choose-reports-to-close.md](repairs-08a-choose-reports-to-close.md)
+> (2026-11-24).** D135 (the Status select uses the rules of the menu) stands, but Save now raises the
+> dialog of 08a when the repair moves into Completed and has open linked reports (08a D247). The
+> writers `createRepair` and `updateRepair` take an optional `chooseClosing` (08a §3).
+
 Status: **APPROVED and IMPLEMENTED 2026-11-20**, uncommitted (0 open decisions; D123 to D147 were
 taken by the user in eight question batches; the results are in §11; no Playwright scenarios were
 written (D147) and the browser check was not done). Build order: **09a of 11** (the plan's spec 09 is split in

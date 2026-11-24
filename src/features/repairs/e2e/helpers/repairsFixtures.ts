@@ -14,7 +14,9 @@ import { randomUUID } from "node:crypto";
  * bleacher with one repair for each files scenario, whose stored files have real objects in the
  * bucket, and the payloads the scenarios pick), and docs/specs/repairs-11-dashboard.md §6
  * (`dashboard`: a fresh bleacher with an open damage report that no repair has, and another with an
- * open report linked to a repair, for the "Create Maintenance to Resolve" button).
+ * open report linked to a repair, for the "Create Maintenance to Resolve" button), and
+ * docs/specs/repairs-08a-choose-reports-to-close.md §6 (`close`: fresh bleachers with a repair and its
+ * linked open reports for each scenario of the dialog that asks which damage reports to close).
  *
  * It writes `MaintenanceLineItems` and `Vendors`, which reach a user's device only where the sync
  * rules of docs/specs/repairs-02-sync-rules.md are deployed.
@@ -180,6 +182,33 @@ export type SeededDashboard = {
   linked: { bleacher: BleacherRef; reportId: string; note: string; repairId: string };
 };
 
+/** A repair of the `close` fixtures: its invoice number, its bleacher and the reports linked to it. */
+export type CloseRepair = {
+  id: string;
+  invoice: string;
+  bleacher: BleacherRef;
+  /** The open damage reports linked to the repair (`maintenance_event_uuid`), earliest first. */
+  reportIds: string[];
+};
+
+/**
+ * What the 08a scenarios (S58 to S62) need. Every repair sits on its own fresh bleacher with no zone,
+ * so that `?bleachers=` finds it alone and a service on its bleacher is a real gain. Every damage
+ * report here is open. docs/specs/repairs-08a-choose-reports-to-close.md §6.
+ */
+export type SeededClose = {
+  /** S58: in repair, two open reports linked to it. */
+  linked: CloseRepair;
+  /** S59: in repair, two open reports linked to it (Cancel writes nothing). */
+  cancel: CloseRepair;
+  /** S60: in repair, no report linked; one free open report lies on its bleacher. */
+  plain: CloseRepair & { freeReportId: string };
+  /** S61: inbound, 2026-10-20 to 2026-10-25, one open report linked to it. */
+  edit: CloseRepair;
+  /** S62: a bleacher with no repair and one open report created on 2026-10-10. */
+  newRepair: { bleacher: BleacherRef; reportId: string };
+};
+
 export type SeededRepairs = {
   /**
    * Holds the completed USD repair and the in-repair CAD repair. It has a model number and, when
@@ -226,6 +255,8 @@ export type SeededRepairs = {
   files: SeededFiles;
   /** The fixtures of spec 11 (the button of a damage report). */
   dashboard: SeededDashboard;
+  /** The fixtures of spec 08a (the dialog that asks which damage reports to close). */
+  close: SeededClose;
   cleanup: () => Promise<void>;
 };
 
@@ -855,6 +886,102 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     },
   };
 
+  // ── Spec 08a: the dialog that asks which damage reports to close ────────────────────────────
+  // Five fresh bleachers with no zone (smallint numbers, clear of the ones above). Each repair sits on
+  // its own bleacher; the reports are open, and the linked ones point at their repair.
+  const closeBleacherRes = await supabase
+    .from("Bleachers")
+    .insert(
+      [0, 1, 2, 3, 4].map((i) => ({
+        bleacher_number: base + 130 + i,
+        bleacher_rows: 5,
+        bleacher_seats: 50,
+      })),
+    )
+    .select("id, bleacher_number");
+  const closeBleachers = check(closeBleacherRes.data, closeBleacherRes.error, "close bleachers");
+  extraBleacherIds.push(...closeBleachers.map((b) => b.id as string));
+  const closeBleacher = (offset: number): BleacherRef => {
+    const found = closeBleachers.find((b) => b.bleacher_number === base + 130 + offset);
+    if (!found) throw new Error(`fixture close bleacher ${offset} missing`);
+    return { uuid: found.id as string, number: base + 130 + offset };
+  };
+  const insertCloseReport = async (
+    bleacherUuid: string,
+    createdAt: string,
+    repairId: string | null,
+  ) => {
+    const res = await supabase
+      .from("DamageReports")
+      .insert({
+        bleacher_uuid: bleacherUuid,
+        seat_damage: "minor",
+        haul_damage: "none",
+        is_safe_to_sit: false,
+        is_safe_to_haul: true,
+        note: reportNote,
+        maintenance_event_uuid: repairId,
+        created_at: createdAt,
+      })
+      .select("id")
+      .single();
+    const id = check(res.data, res.error, "close report").id as string;
+    reportIds.push(id);
+    return id;
+  };
+  const insertCloseRepair = async (
+    label: string,
+    bleacher: BleacherRef,
+    status: "in_repair" | "inbound",
+    days: { from: string; to: string },
+    reportDays: string[],
+  ): Promise<CloseRepair> => {
+    const closeInvoice = `E2E-CLOSE-${label}-${suffix}`;
+    const id = await insertEvent(
+      {
+        event_start: days.from,
+        event_end: days.to,
+        status,
+        currency: "USD",
+        invoice_number: closeInvoice,
+      },
+      bleacher.uuid,
+    );
+    const linkedReportIds: string[] = [];
+    for (const day of reportDays) {
+      linkedReportIds.push(await insertCloseReport(bleacher.uuid, `${day}T16:00:00Z`, id));
+    }
+    return { id, invoice: closeInvoice, bleacher, reportIds: linkedReportIds };
+  };
+  const closeWindow = { from: "2026-10-08", to: "2026-10-14" };
+  const plainBleacher = closeBleacher(2);
+  const plainRepair = await insertCloseRepair("S60", plainBleacher, "in_repair", closeWindow, []);
+  const close: SeededClose = {
+    linked: await insertCloseRepair("S58", closeBleacher(0), "in_repair", closeWindow, [
+      "2026-10-10",
+      "2026-10-12",
+    ]),
+    cancel: await insertCloseRepair("S59", closeBleacher(1), "in_repair", closeWindow, [
+      "2026-10-10",
+      "2026-10-12",
+    ]),
+    plain: {
+      ...plainRepair,
+      freeReportId: await insertCloseReport(plainBleacher.uuid, "2026-10-11T16:00:00Z", null),
+    },
+    edit: await insertCloseRepair(
+      "S61",
+      closeBleacher(3),
+      "inbound",
+      { from: "2026-10-20", to: "2026-10-25" },
+      ["2026-10-21"],
+    ),
+    newRepair: {
+      bleacher: closeBleacher(4),
+      reportId: await insertCloseReport(closeBleacher(4).uuid, "2026-10-10T16:00:00Z", null),
+    },
+  };
+
   const completedTotal = await costOf(completedId);
   const cadTotal = await costOf(cadId);
 
@@ -880,6 +1007,7 @@ export async function seedRepairs(): Promise<SeededRepairs> {
     links,
     files,
     dashboard,
+    close,
     cleanup: async () => {
       const bleacherIds = [...bleachers.map((b) => b.id as string), ...extraBleacherIds];
 

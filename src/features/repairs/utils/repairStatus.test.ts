@@ -4,16 +4,15 @@ import type { RepairStatus } from "./repairRows";
 import {
   REPAIR_STATUSES,
   canChangeRepairStatus,
-  reportIdsToClose,
   statusMenuEntries,
   statusPatch,
 } from "./repairStatus";
 
 // docs/specs/repairs-08-status.md §2.3, §3 and §7 (D112 to D118). The rules of the status menu are
-// pure functions, so they are tested without React and without a database.
+// pure functions, so they are tested without React and without a database. The choice of the reports
+// to close moved to utils/closeReports.ts (docs/specs/repairs-08a-choose-reports-to-close.md §3).
 
 const NOW = "2026-11-20T15:30:00.000Z";
-const report = (id: string) => ({ id, day: "2026-11-01", createdAt: "2026-11-01T12:00:00Z" });
 
 describe("REPAIR_STATUSES", () => {
   it("lists the six statuses in the course of a repair (spec 05 D74)", () => {
@@ -93,29 +92,6 @@ describe("statusPatch", () => {
       status: "triaged",
       completedAt: undefined,
     });
-  });
-});
-
-describe("reportIdsToClose", () => {
-  const reported = [report("a"), report("b"), report("c")];
-
-  it("gives the ids, in order, when a repair moves into Completed from another status (D116)", () => {
-    expect(reportIdsToClose("in_repair", "completed", reported)).toEqual(["a", "b", "c"]);
-    expect(reportIdsToClose("inbound", "completed", reported)).toEqual(["a", "b", "c"]);
-  });
-
-  it("gives none when the repair is already Completed, or moves out of it (D117)", () => {
-    expect(reportIdsToClose("completed", "completed", reported)).toEqual([]);
-    expect(reportIdsToClose("completed", "in_repair", reported)).toEqual([]);
-  });
-
-  it("gives none between two statuses that are not Completed", () => {
-    expect(reportIdsToClose("inbound", "triaged", reported)).toEqual([]);
-    expect(reportIdsToClose("confirm_repair", "in_repair", reported)).toEqual([]);
-  });
-
-  it("gives none when the repair has no reports", () => {
-    expect(reportIdsToClose("in_repair", "completed", [])).toEqual([]);
   });
 });
 

@@ -84,8 +84,9 @@ describe("the layers of the repair windows", () => {
         expect(tag, where).toMatch(/REPAIR_LAYER_CLASS|REPAIR_WINDOW_CLASS|SERVICE_WINDOW_CLASS/);
       }
     }
-    // Four windows and their five confirmation dialogs, and the damage report window: ten in all.
-    expect(tags).toBe(10);
+    // Four windows and their five confirmation dialogs, the damage report window and the dialog that
+    // asks which damage reports to close (spec 08a): eleven in all.
+    expect(tags).toBe(11);
   });
 
   it("is on every menu that opens inside a window", () => {

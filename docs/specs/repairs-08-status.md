@@ -1,5 +1,12 @@
 # Repairs 08: the status menu
 
+> **Amended by [repairs-08a-choose-reports-to-close.md](repairs-08a-choose-reports-to-close.md)
+> (2026-11-24).** D116 (the reports found for the repair are closed on the way into Completed) is
+> replaced: a dialog asks which open linked reports to close (08a D238 to D244). D115 (no
+> confirmation) now holds only where no dialog is drawn (08a D249). §2.3, §3 (`StatusChange`,
+> `reportIdsToClose`) and §5 (the matrix sentences) follow 08a §2.4, §3 and §5. D112 reads "the
+> moment of the write" (08a D239). D117 and D122 stand, except that 08a D251 writes scenarios.
+
 Status: **APPROVED and IMPLEMENTED 2026-11-20**, uncommitted (0 open decisions; D110 to D122 were
 taken by the user in four question batches; the results are in §11; no Playwright scenarios were
 written (D122) and the browser check was not done). Build order: **08 of 11**.

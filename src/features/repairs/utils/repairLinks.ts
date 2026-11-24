@@ -1,4 +1,4 @@
-import { dayInZone } from "./dayInZone";
+import { offeredFreeReports } from "./closeReports";
 import type { ServicesDraft } from "./serviceForm";
 
 /**
@@ -164,6 +164,8 @@ export type LinkPlanInput = {
   openReports: readonly OpenReportForLink[];
   zoneToStore: string | null; // from `judgeZones`
   timezone: string;
+  /** The free reports the person chose to close in the dialog (08a D245, D246); none when nobody was asked. */
+  closeFreeIds: readonly string[];
 };
 
 export type LinkPlan = {
@@ -175,9 +177,15 @@ export type LinkPlan = {
   closeReportIds: string[]; // D181, D185: Completed: the same, created no later than `eventEnd`
 };
 
-/** The plan of §2.1 step 6. A report linked to any repair (this one included) is never in a list. */
+/**
+ * The plan of §2.1 step 6. A report linked to any repair (this one included) is never in a list. On a
+ * Completed repair the free reports are not linked and closed on their own: those that
+ * `offeredFreeReports` offers and whose id is in `closeFreeIds` are closed, and the rest stay open and
+ * unlinked (08a D243 to D246).
+ */
 export function planRepairLinks(input: LinkPlanInput): LinkPlan {
-  const { repair, gained, lost, junction, openReports, zoneToStore, timezone } = input;
+  const { repair, gained, lost, junction, openReports, zoneToStore, timezone, closeFreeIds } =
+    input;
 
   const inJunction = new Set(junction.map((row) => row.bleacherUuid));
   const gainedSet = new Set(gained);
@@ -188,14 +196,19 @@ export function planRepairLinks(input: LinkPlanInput): LinkPlan {
   const completed = repair.status === "completed";
 
   const linkReportIds: string[] = [];
-  const closeReportIds: string[] = [];
+  let closeReportIds: string[] = [];
   if (!completed) {
     for (const report of free) linkReportIds.push(report.id);
-  } else if (repair.eventEnd) {
-    for (const report of free) {
-      const day = dayInZone(report.createdAt, timezone);
-      if (day !== null && day <= repair.eventEnd) closeReportIds.push(report.id);
-    }
+  } else {
+    const chosen = new Set(closeFreeIds);
+    closeReportIds = offeredFreeReports({
+      openReports,
+      gained,
+      eventEnd: repair.eventEnd,
+      timezone,
+    })
+      .map((report) => report.id)
+      .filter((id) => chosen.has(id));
   }
 
   return {

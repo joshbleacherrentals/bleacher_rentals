@@ -1,5 +1,9 @@
 # Repairs 11: The Dashboard uses the repair window (the old form and its store are deleted)
 
+> **Pointer from [repairs-08a-choose-reports-to-close.md](repairs-08a-choose-reports-to-close.md)
+> (2026-11-24).** D230 and D234 stand (the report made into a repair stays linked and open until the
+> repair is Completed); the moment of Completed now asks which reports to close (08a D238 to D248).
+
 Status: **APPROVED and IMPLEMENTED 2026-11-23**, uncommitted (0 open decisions; D214 to D235 were
 taken by the user in seven question batches on 2026-11-23; the results are in §11; the Playwright
 scenarios are written and not run (D228) and the browser check is the user's (D232)). Build order: **11 of 11**; there is no spec 10, its work is

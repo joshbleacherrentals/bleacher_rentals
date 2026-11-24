@@ -491,6 +491,75 @@ describe("the writers", () => {
     });
   });
 
+  describe("chooseClosing (08a D246)", () => {
+    const input = () => {
+      const { id: _id, ...rest } = createInput();
+      return rest;
+    };
+    const update = (initial: ServiceFormValues, next: ServiceFormValues) => ({
+      serviceId: SERVICE,
+      initial,
+      values: next,
+      repairId: REPAIR,
+      now: NOW,
+      timezone: TZ,
+    });
+    const choice = { closeLinkedIds: [], unlinkLinkedIds: [], closeFreeIds: ["rep-free"] };
+
+    it("createService asks after validation and hands the chosen free ids to the runner", async () => {
+      const chooseClosing = vi.fn().mockResolvedValue(choice);
+      await createService({ ...input(), chooseClosing });
+      expect(chooseClosing).toHaveBeenCalledTimes(1);
+      expect(writeRepairChanges.mock.calls[0][0].closeFreeIds).toEqual(["rep-free"]);
+    });
+
+    it("createService does not ask when validation fails", async () => {
+      const chooseClosing = vi.fn().mockResolvedValue(choice);
+      await createService({ ...input(), values: values({ bleacherUuid: null }), chooseClosing });
+      expect(chooseClosing).not.toHaveBeenCalled();
+    });
+
+    it("createService writes nothing and rejects with the same error when the person cancels", async () => {
+      const cancelled = new Error("cancelled");
+      const chooseClosing = vi.fn().mockRejectedValue(cancelled);
+      await expect(createService({ ...input(), chooseClosing })).rejects.toBe(cancelled);
+      expect(writeRepairChanges).not.toHaveBeenCalled();
+      expect(toastCustom).not.toHaveBeenCalled();
+    });
+
+    it("the moment of the Confirm click is the moment of the write (08a D239)", async () => {
+      const CONFIRMED = "2026-11-24T18:45:00.000Z";
+      const chooseClosing = vi.fn().mockResolvedValue({ ...choice, confirmedAt: CONFIRMED });
+      await createService({ ...input(), chooseClosing });
+      const created = writeRepairChanges.mock.calls[0][0];
+      expect(created.now).toBe(CONFIRMED);
+      expect(created.statements[0].parameters).toContain(CONFIRMED);
+
+      await updateService({ ...update(values(), values({ bleacherUuid: "b2" })), chooseClosing });
+      expect(writeRepairChanges.mock.calls[1][0].now).toBe(CONFIRMED);
+    });
+
+    it("updateService asks only on the branch that changes the bleacher", async () => {
+      const chooseClosing = vi.fn().mockResolvedValue(choice);
+      await updateService({ ...update(values(), values()), chooseClosing }); // nothing changed
+      await updateService({ ...update(values(), values({ severity: "major" })), chooseClosing });
+      expect(chooseClosing).not.toHaveBeenCalled();
+
+      await updateService({ ...update(values(), values({ bleacherUuid: "b2" })), chooseClosing });
+      expect(chooseClosing).toHaveBeenCalledTimes(1);
+      expect(writeRepairChanges.mock.calls[0][0].closeFreeIds).toEqual(["rep-free"]);
+    });
+
+    it("updateService writes nothing and rejects with the same error when the person cancels", async () => {
+      const cancelled = new Error("cancelled");
+      const chooseClosing = vi.fn().mockRejectedValue(cancelled);
+      await expect(
+        updateService({ ...update(values(), values({ bleacherUuid: "b2" })), chooseClosing }),
+      ).rejects.toBe(cancelled);
+      expect(writeRepairChanges).not.toHaveBeenCalled();
+    });
+  });
+
   describe("deleteService", () => {
     const del = { serviceId: SERVICE, repairId: REPAIR, now: NOW, timezone: TZ };
 

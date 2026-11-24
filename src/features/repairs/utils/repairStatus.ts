@@ -1,9 +1,10 @@
 import { statusPill } from "./repairFormat";
-import type { RepairStatus, ReportedReport } from "./repairRows";
+import type { RepairStatus } from "./repairRows";
 
 /**
  * The rules of the status menu, pure so they are tested without React and without a database: the
- * order of the menu, what a change writes, which reports it closes and who gets the menu.
+ * order of the menu, what a change writes and who gets the menu. Which reports a move into Completed
+ * closes is the person's choice (utils/closeReports.ts, docs/specs/repairs-08a-choose-reports-to-close.md).
  * docs/specs/repairs-08-status.md §2.3 and §3 (D110 to D118; the signatures here are locked by it).
  */
 
@@ -34,19 +35,6 @@ export function statusPatch(from: string, to: RepairStatus, now: string): Status
   if (to === "completed") return { status: to, completedAt: now };
   if (from === "completed") return { status: to, completedAt: null };
   return { status: to, completedAt: undefined };
-}
-
-/**
- * The ids of the reports a change closes: the ids of `reported`, but only when `to` is Completed
- * and `from` is not (D116); none when a repair leaves Completed (D117) or moves between the others.
- */
-export function reportIdsToClose(
-  from: string,
-  to: RepairStatus,
-  reported: readonly ReportedReport[],
-): string[] {
-  if (to !== "completed" || from === "completed") return [];
-  return reported.map((report) => report.id);
 }
 
 /** The menu is drawn when the role may (`allowed`) and the repair is live (D110, D118). */

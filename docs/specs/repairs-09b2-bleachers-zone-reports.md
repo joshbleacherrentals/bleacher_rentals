@@ -1,5 +1,12 @@
 # Repairs 09b2: What a service does to its repair (bleachers, zone, damage report links)
 
+> **Amended by [repairs-08a-choose-reports-to-close.md](repairs-08a-choose-reports-to-close.md)
+> (2026-11-24).** D181 (a Completed repair links and closes at once) is replaced: the open reports
+> that D178, D179 and D185 select are offered in a dialog and only the ones the person chooses are
+> linked and closed; the others stay open and unlinked (08a D245, D246). D185 stays as the rule of
+> which reports are offered. The paragraph "The status that counts" holds with that change.
+> `planRepairLinks` gets `closeFreeIds` (08a §3).
+
 Status: **APPROVED and IMPLEMENTED 2026-11-23**, uncommitted (0 open decisions; D168 to D188 were
 taken by the user in seven question batches; the results are in §11; the Playwright scenarios are
 written and not run (D187) and the browser check was not done). Build order: **09b2 of 11** (the plan's

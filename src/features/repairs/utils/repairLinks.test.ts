@@ -320,6 +320,7 @@ describe("planRepairLinks (D169 to D185)", () => {
     openReports: [],
     zoneToStore: null,
     timezone: "America/Toronto",
+    closeFreeIds: [],
     ...over,
   });
 
@@ -403,11 +404,12 @@ describe("planRepairLinks (D169 to D185)", () => {
     expect(plan.closeReportIds).toEqual([]);
   });
 
-  it("for a Completed repair closes only the reports created no later than event_end, and links none to stay open (D181, D185)", () => {
+  it("for a Completed repair closes only the chosen reports created no later than event_end, and links none (09b2 D185, 08a D245, D246)", () => {
     const plan = planRepairLinks(
       input({
         repair: { id: "r1", status: "completed", eventEnd: "2026-11-05", zoneUuid: null },
         gained: ["b1"],
+        closeFreeIds: ["before", "after"],
         openReports: [
           report({ id: "before", createdAt: "2026-11-03T15:00:00Z" }),
           report({ id: "after", createdAt: "2026-11-10T15:00:00Z" }),
@@ -425,6 +427,7 @@ describe("planRepairLinks (D169 to D185)", () => {
       input({
         repair: completed,
         gained: ["b1"],
+        closeFreeIds: ["edge"],
         openReports: [report({ id: "edge", createdAt: "2026-11-06T02:00:00Z" })],
       }),
     );
@@ -433,6 +436,7 @@ describe("planRepairLinks (D169 to D185)", () => {
       input({
         repair: completed,
         gained: ["b1"],
+        closeFreeIds: ["edge"],
         timezone: "UTC",
         openReports: [report({ id: "edge", createdAt: "2026-11-06T02:00:00Z" })],
       }),
@@ -445,6 +449,7 @@ describe("planRepairLinks (D169 to D185)", () => {
       input({
         repair: { id: "r1", status: "completed", eventEnd: null, zoneUuid: null },
         gained: ["b1"],
+        closeFreeIds: ["x"],
         openReports: [report({ id: "x" })],
       }),
     );
@@ -453,10 +458,65 @@ describe("planRepairLinks (D169 to D185)", () => {
       input({
         repair: { id: "r1", status: "completed", eventEnd: "2026-11-30", zoneUuid: null },
         gained: ["b1"],
+        closeFreeIds: ["x"],
         openReports: [report({ id: "x", createdAt: "" })],
       }),
     );
     expect(noDay.closeReportIds).toEqual([]);
+  });
+
+  it("closes only the ids the person chose among the offered reports; the others stay open and free (08a D243 to D246)", () => {
+    const completed = { id: "r1", status: "completed", eventEnd: "2026-11-05", zoneUuid: null };
+    const openReports = [
+      report({ id: "chosen", createdAt: "2026-11-03T15:00:00Z" }),
+      report({ id: "kept", createdAt: "2026-11-04T15:00:00Z" }),
+    ];
+    const plan = planRepairLinks(
+      input({ repair: completed, gained: ["b1"], closeFreeIds: ["chosen"], openReports }),
+    );
+    expect(plan.closeReportIds).toEqual(["chosen"]);
+    expect(plan.linkReportIds).toEqual([]);
+  });
+
+  it("an empty choice closes nothing on a Completed repair (Confirm with every switch off)", () => {
+    const plan = planRepairLinks(
+      input({
+        repair: { id: "r1", status: "completed", eventEnd: "2026-11-05", zoneUuid: null },
+        gained: ["b1"],
+        closeFreeIds: [],
+        openReports: [report({ id: "x", createdAt: "2026-11-03T15:00:00Z" })],
+      }),
+    );
+    expect(plan.closeReportIds).toEqual([]);
+    expect(plan.linkReportIds).toEqual([]);
+  });
+
+  it("ignores a chosen id that is not offered: later than event_end, linked elsewhere or on a bleacher that was not gained", () => {
+    const plan = planRepairLinks(
+      input({
+        repair: { id: "r1", status: "completed", eventEnd: "2026-11-05", zoneUuid: null },
+        gained: ["b1"],
+        closeFreeIds: ["late", "elsewhere", "other-bleacher"],
+        openReports: [
+          report({ id: "late", createdAt: "2026-11-10T15:00:00Z" }),
+          report({ id: "elsewhere", createdAt: "2026-11-03T15:00:00Z", repairId: "r2" }),
+          report({ id: "other-bleacher", createdAt: "2026-11-03T15:00:00Z", bleacherUuid: "b2" }),
+        ],
+      }),
+    );
+    expect(plan.closeReportIds).toEqual([]);
+  });
+
+  it("a repair that is not Completed still links every free report and ignores the choice (09b2 D178)", () => {
+    const plan = planRepairLinks(
+      input({
+        gained: ["b1"],
+        closeFreeIds: ["free"],
+        openReports: [report({ id: "free" })],
+      }),
+    );
+    expect(plan.linkReportIds).toEqual(["free"]);
+    expect(plan.closeReportIds).toEqual([]);
   });
 
   it("a loss and a gain in one plan", () => {

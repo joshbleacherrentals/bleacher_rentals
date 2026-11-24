@@ -10,6 +10,7 @@ import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canMa
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { restoreRepair } from "../db/repairWrite";
 import { useRepairFilterOptions } from "../hooks/useRepairFilterOptions";
+import { useCloseReportsFlow } from "../hooks/useCloseReportsFlow";
 import { useRepairList } from "../hooks/useRepairList";
 import { useRepairWindowsStore } from "../state/useRepairWindowsStore";
 import {
@@ -28,7 +29,7 @@ import {
   type RepairsUrlState,
 } from "../utils/repairPageState";
 import { nextRepairSort, type RepairSortKey } from "../utils/repairSort";
-import { RepairWindowsHost, startStatusChange } from "./RepairWindowsHost";
+import { RepairWindowsHost } from "./RepairWindowsHost";
 import { RepairsTable } from "./RepairsTable";
 import { RepairsToolbar } from "./RepairsToolbar";
 import { RepairsTotalsStrip } from "./RepairsTotalsStrip";
@@ -74,6 +75,10 @@ export default function RepairsPage() {
   // The windows are a stack in a store: a new one opens over the one that opened it, and the host below
   // draws them, found again in the whole list of this page on every render (spec 06 §2.5, spec 07 §2.7).
   const open = useRepairWindowsStore((s) => s.open);
+
+  // The status menu of a row asks which damage reports to close when a repair moves into Completed
+  // (spec 08a); this page draws the dialog for it, and the host draws its own for the windows.
+  const { changeStatus, dialog: closeReportsDialog } = useCloseReportsFlow();
 
   // The page reads its state from the URL and writes it only when the person acts.
   const go = (next: RepairsUrlState) => {
@@ -162,11 +167,12 @@ export default function RepairsPage() {
           onAddService={
             canManage ? (repairId) => open({ kind: "newService", repairId }) : undefined
           }
-          onChangeStatus={canManage ? startStatusChange : undefined}
+          onChangeStatus={canManage ? changeStatus : undefined}
         />
       </div>
 
       <RepairWindowsHost rows={rows} />
+      {closeReportsDialog}
 
       {!isLoading && (
         <Pagination
