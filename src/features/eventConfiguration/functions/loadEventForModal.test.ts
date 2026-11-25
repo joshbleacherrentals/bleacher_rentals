@@ -36,7 +36,6 @@ vi.mock("@/lib/powersync/typedQuery", () => ({
 
 import { loadEventForModal } from "./loadEventForModal";
 import { useCurrentEventStore } from "../state/useCurrentEventStore";
-import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 
 const EVENT_ROW = {
   id: "ev-1",
@@ -72,7 +71,6 @@ const EVENT_ROW = {
 
 beforeEach(() => {
   useCurrentEventStore.getState().resetForm();
-  useMaintenanceEventStore.getState().resetForm();
   rowsByTable = {
     Events: [EVENT_ROW],
     BleacherEvents: [{ bleacher_uuid: "b-1" }],
@@ -108,13 +106,10 @@ describe("loadEventForModal — opening an event on the dashboard", () => {
     expect(s.venueName).toBe("");
   });
 
-  it("expands the dashboard form and closes an open maintenance form", async () => {
-    useMaintenanceEventStore.getState().setField("isFormExpanded", true);
-
+  it("expands the dashboard form", async () => {
     await loadEventForModal("ev-1", "dashboard");
 
     expect(useCurrentEventStore.getState().isFormExpanded).toBe(true);
     expect(useCurrentEventStore.getState().isModalOpen).toBe(false);
-    expect(useMaintenanceEventStore.getState().isFormExpanded).toBe(false);
   });
 });

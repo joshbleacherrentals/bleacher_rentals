@@ -22,6 +22,7 @@ import { usePsZones } from "./usePsZones";
 import { usePsStorageLocations } from "./usePsStorageLocations";
 import { usePsSubrentalEvents } from "./usePsSubrentalEvents";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
+import { canAccessBleacherRow } from "@/features/userAccess/logic/canAccessBleacherRow";
 import { formatWorkTrackerTime, type WorkTrackerTimeMode } from "@/features/workTrackers/util";
 
 function toBool(v: number | null | boolean): boolean {
@@ -36,7 +37,7 @@ export function useDashboardPowerSync(opts?: {
 }) {
   // ── Individual reactive queries ──────────────────────────────────────
   const allBleacherRows = usePsBleachers();
-  const { isAdmin, isAccountManager, accountManagerZoneIds } = usePermissionsStore();
+  const { isAdmin, isMaintainer, isAccountManager, accountManagerZoneIds } = usePermissionsStore();
   const homeBaseRows = usePsHomeBases();
   const bleacherEventRows = usePsBleacherEvents();
   const eventRows = usePsEvents();
@@ -308,9 +309,13 @@ export function useDashboardPowerSync(opts?: {
         .filter((sr) => sr.status === "accepted")
         .map((sr) => ({ eventStart: sr.event_start ?? "", eventEnd: sr.event_end ?? "" }));
 
-      const isAccessible =
-        isAdmin ||
-        (isAccountManager && !!b.zone_uuid && accountManagerZoneIds.includes(b.zone_uuid));
+      const isAccessible = canAccessBleacherRow({
+        isAdmin,
+        isMaintainer,
+        isAccountManager,
+        accountManagerZoneIds,
+        zoneUuid: b.zone_uuid,
+      });
 
       return {
         bleacherUuid: b.id,
@@ -374,8 +379,13 @@ export function useDashboardPowerSync(opts?: {
           .filter((sr) => sr.status === "accepted")
           .map((sr) => ({ eventStart: sr.event_start ?? "", eventEnd: sr.event_end ?? "" }));
 
-        const subrentalRowIsAccessible =
-          isAdmin || (isAccountManager && accountManagerZoneIds.includes(targetZoneUuid));
+        const subrentalRowIsAccessible = canAccessBleacherRow({
+          isAdmin,
+          isMaintainer,
+          isAccountManager,
+          accountManagerZoneIds,
+          zoneUuid: targetZoneUuid,
+        });
 
         const subrentalRowSummerHomeBase = b.summer_home_base_uuid
           ? {
@@ -440,6 +450,7 @@ export function useDashboardPowerSync(opts?: {
     subrentalEventRows,
     damageReportRows,
     isAdmin,
+    isMaintainer,
     isAccountManager,
     accountManagerZoneIds,
   ]);

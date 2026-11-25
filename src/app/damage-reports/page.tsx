@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import { DamageReportModal, EditDamageReport } from "./DamageReportModal";
+import { RepairWindowsHost } from "@/features/repairs/components/RepairWindowsHost";
 import { useAcknowledgements, type AcknowledgementSummary } from "./_lib/acknowledgements";
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
@@ -242,6 +243,9 @@ function DamageReportsContent() {
           editReport={editingReport as EditDamageReport}
         />
       )}
+
+      {/* The New repair window that "Create Maintenance to Resolve" opens (spec 11 D217) */}
+      <RepairWindowsHost />
     </>
   );
 }

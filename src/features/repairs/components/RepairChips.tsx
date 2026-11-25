@@ -1,0 +1,64 @@
+import { ChevronDown } from "lucide-react";
+import type { RepairSeverity } from "../utils/repairRows";
+import { severityPill, statusPill } from "../utils/repairFormat";
+
+/**
+ * The small pieces the Repairs table is made of: the chips and the coloured pills. Sizes and colours
+ * are the canvas's (docs/design/repairs/Main.dc.html, spec 04 §2.5). A pill carries its word, so
+ * colour is never the only signal.
+ */
+
+/** `#52`; `#?` for a bleacher whose number has not synced yet. */
+export function BleacherChip({ number }: { number: number | null }) {
+  return (
+    <span className="inline-block rounded bg-[#f3f4f6] px-2 py-0.5 text-xs leading-4 font-semibold text-[#10365a]">
+      {`#${number ?? "?"}`}
+    </span>
+  );
+}
+
+export function CategoryChip({ name }: { name: string | null }) {
+  return (
+    <span className="inline-block rounded-full border border-[#d1d5db] bg-white px-2 py-px text-xs leading-[18px] whitespace-nowrap text-[#374151]">
+      {name ?? "—"}
+    </span>
+  );
+}
+
+export function SeverityPill({ severity }: { severity: RepairSeverity }) {
+  const pill = severityPill(severity);
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-px text-xs leading-[18px] font-medium ${pill.className}`}
+    >
+      {pill.label}
+    </span>
+  );
+}
+
+/**
+ * The pill of a status. Plain by default; with `chevron` it is the face of the status menu
+ * (`RepairStatusMenu`, spec 08), drawn only where the menu works.
+ */
+export function StatusPill({ status, chevron = false }: { status: string; chevron?: boolean }) {
+  const pill = statusPill(status);
+  return (
+    <span
+      className={`inline-flex h-7 items-center rounded-full text-[13px] leading-5 font-medium whitespace-nowrap ${
+        chevron ? "gap-1 pr-2 pl-3" : "px-3"
+      } ${pill.className}`}
+    >
+      {pill.label}
+      {chevron && <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />}
+    </span>
+  );
+}
+
+/** The small grey mark of a service that was deleted on its own (spec 06 D89). */
+export function DeletedBadge() {
+  return (
+    <span className="inline-block shrink-0 rounded-full bg-[#f3f4f6] px-2 py-px text-xs leading-[18px] font-medium whitespace-nowrap text-[#4b5563]">
+      Deleted
+    </span>
+  );
+}
