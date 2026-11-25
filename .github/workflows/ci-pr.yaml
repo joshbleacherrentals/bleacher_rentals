@@ -52,6 +52,28 @@ jobs:
       - name: Check version bump and release notes
         run: npx tsx scripts/changelog/checkChangelog.cli.ts ${{ github.base_ref }}
 
+  migrations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Production is main: production.yaml runs `supabase db push` on every push to it. develop and
+      # staging are the other deployed databases, whose migrations must not be edited or deleted.
+      - name: Fetch deployed branches
+        run: git fetch --depth=1 origin develop staging main
+
+      - name: Check migrations (new ones after production's newest; deployed ones unchanged)
+        run: npx tsx scripts/migrations/checkMigrationOrder.cli.ts
+
   preflight:
     runs-on: ubuntu-latest
     # Same gate as the changelog job: only promotions into a deployable branch

@@ -60,7 +60,7 @@ export default function RouteMapPreview({
             process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
           }&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(
             destination,
-          )}&mode=driving`}
+          )}&mode=driving&avoid=tolls`}
           allowFullScreen
         />
       </div>

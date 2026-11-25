@@ -98,6 +98,15 @@ describe("planWorkTrackerSave", () => {
     expect(plan.statements[0].sql).toContain('update "WorkTrackers"');
   });
 
+  it("clears the Auto Work Trackers key, so the model's bulk delete keeps an edited tracker", () => {
+    const stmt = planWorkTrackerSave(input()).statements[0];
+
+    expect(stmt.sql).toContain('"auto_work_tracker_id" = ?');
+    const sets = stmt.sql.match(/set (.*) where/)![1].split(", ");
+    const at = sets.findIndex((s) => s.startsWith('"auto_work_tracker_id"'));
+    expect(stmt.parameters[at]).toBeNull();
+  });
+
   it("generates the work tracker id up front for an insert", () => {
     const plan = planWorkTrackerSave(input({ workTracker: tracker({ id: "-1" }) }));
 
