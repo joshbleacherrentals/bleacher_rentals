@@ -24,10 +24,16 @@ const UNAVAILABLE = "The analytics database is unavailable right now. Try again 
 
 const INSTRUCTIONS = [
   "Read-only access to the Bleacher Rentals database (Postgres).",
-  "Call describe_schema first to see the tables, columns and foreign keys.",
+  "Call describe_schema first: it gives the rules for reading the data the way the app does, then the tables, columns and foreign keys.",
   `Table names are PascalCase and must be double-quoted, e.g. select count(*) from "Events".`,
   `A query returns at most ${MAX_ROWS} rows and runs for at most 15 seconds: aggregate in SQL (count, sum, group by) instead of fetching rows.`,
   "Only one SELECT statement per call. Nothing can be changed.",
+  // docs/specs/analytics-mcp.md §11 D9: the rules most often got wrong, in context before any call.
+  "Key rules: money columns ending in _cents are cents, and Events.contract_revenue_cents includes tax;",
+  "never add CAD and USD amounts together (an event's currency is on EventLineItems.currency);",
+  "exclude soft-deleted rows (deleted = false, or deleted_at is null);",
+  "timestamps are UTC, and the app counts days in America/Toronto;",
+  "driver pay is WorkTrackers.pay_cents.",
 ].join(" ");
 
 const text = (t: string, isError = false) => ({
@@ -115,7 +121,7 @@ export async function handleMcpRequest(req: Request, deps: McpDeps): Promise<Res
     "describe_schema",
     {
       description:
-        "Lists every table, its columns with types, and the foreign keys. Call this first, before writing a query.",
+        "Explains how the app reads the data (status meanings, revenue, pay, currency, dates), then lists every table with its purpose, its columns with types and notes, and the foreign keys. Call this first, before writing a query.",
       annotations: { readOnlyHint: true },
     },
     async () => {

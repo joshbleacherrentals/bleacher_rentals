@@ -124,6 +124,24 @@ describe("handleMcpRequest — the tools", () => {
     for (const t of result.tools) expect(t.annotations?.readOnlyHint).toBe(true);
   });
 
+  it("puts the rules most often got wrong in the instructions (§11 D9)", async () => {
+    const res = await handleMcpRequest(
+      rpc("initialize", {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" },
+      }),
+      makeDeps(),
+    );
+    expect(res.status).toBe(200);
+    const { result } = await res.json();
+    expect(result.instructions).toContain("_cents");
+    expect(result.instructions).toMatch(/CAD and USD/);
+    expect(result.instructions).toContain("deleted = false");
+    expect(result.instructions).toContain("America/Toronto");
+    expect(result.instructions).toContain("WorkTrackers.pay_cents");
+  });
+
   it("query returns columns, rows, count and truncated, and logs the call", async () => {
     fetchRows = [{ n: 7 }];
     fields = [{ name: "n" }];

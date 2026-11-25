@@ -1,6 +1,6 @@
 # Analytics MCP — staff ask Claude questions about our data, read-only
 
-Status: **IMPLEMENTED 2026-11-17, awaiting review** — approved by the user's "BUILD IT NOW GO AHEAD" the
+Status: **IMPLEMENTED 2026-11-17, awaiting review**; section 11 (data dictionary) **APPROVED 2026-11-25** ("Approved"). Sections 0–10 were approved by the user's "BUILD IT NOW GO AHEAD" the
 same day (taken as the "Approved" the SDD rule asks for). 0 open decisions. Not tried against real Clerk
 OAuth, Claude, or the production database: the migration is applied to the local database only, and the
 query layer was checked against the local Postgres as `analytics_ro` (21 attempts to write, escape or
@@ -221,3 +221,109 @@ The Clerk frontend API URL is decoded from `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`; 
   `COMMIT; BEGIN READ WRITE; …`, a writing `SECURITY DEFINER` function, `set_config('transaction_read_only')`,
   `pg_read_file`, `lo_import`, `pg_authid`, `FOR UPDATE`, a 15 s timeout, a 500-row cap.
 - Playwright: **none** — the flow needs Claude and Clerk OAuth (see section 8).
+
+## 11. Data dictionary — what the app means by the data (v1.1, APPROVED 2026-11-25)
+
+Status: **Approved** 2026-11-25. Request: "expose the source code so the models have more context as to
+how the code is using the data and displaying it" → agreed instead: write the meaning down once, from the
+code, and serve it through the existing connector.
+
+### 11.1 Decisions
+
+- **D6 — no source code is served.** Anyone with the connector could read the server code (auth, routes),
+  and raw code is noise for a data question. The meaning is written down instead, in TypeScript.
+- **D7 — the dictionary lives in TypeScript, not in `COMMENT ON`.** One file,
+  `src/features/analyticsMcp/dataDictionary.ts`, typed against `database.types.ts`: a renamed or dropped
+  table or column breaks `npm run tc`. No migration, nothing to deploy to the database, and it sits next to
+  the code it describes (CLAUDE.md: rules live in TypeScript).
+- **D8 — every table has an entry.** `DataDictionary` is a mapped type over every table in
+  `database.types.ts`, so `npm run tc` fails when a table has no entry, and the next migration that adds a table also has to say what it means. Plumbing tables get a one-line
+  "internal — ignore for business questions" entry. `McpQueryLog` and `QboConnections` are listed as
+  not readable.
+- **D9 — still one call.** `describe_schema` returns the business rules first, then the tables (each with a
+  one-line purpose, and notes only on columns whose meaning is not obvious), then the foreign keys. No new
+  tool: a model that skips an optional tool would miss the rules. The server `instructions` gain the five
+  rules most often got wrong (money in cents, revenue incl. tax, never add CAD+USD, `deleted = false`, Toronto
+  days, `pay_cents` is driver pay) so they are in context even before the call.
+- **D10 — enums show their values.** `describe_schema` prints `event_status enum(draft|quoted|booked|unsigned_changes|lost)`
+  instead of `USER-DEFINED`, read live from `pg_enum` so it never drifts.
+- **D11 — "match the app" by default.** Where the app's own number has a quirk (scorecard revenue includes
+  tax and adds CAD to USD; the leaderboard does not filter `deleted`; scorecard driver pay ignores status),
+  the rules give the app's formula **and** the caveat, and tell the model to say which one it used. Each
+  rule names the source file it was taken from, so it can be checked and kept in step.
+
+### 11.2 Types
+
+```ts
+// src/features/analyticsMcp/dataDictionary.ts
+import type { Database } from "../../../database.types";
+type PublicTables = Database["public"]["Tables"];
+export type TableName = keyof PublicTables;
+
+export type TableDoc<T extends TableName> = {
+  /** One line: what a row is, or "Internal: …" for plumbing. */
+  purpose: string;
+  /** Only columns whose meaning is not obvious from the name. */
+  columns?: Partial<Record<keyof PublicTables[T]["Row"] & string, string>>;
+};
+
+export type DataDictionary = { [T in TableName]: TableDoc<T> }; // every table: D8
+
+export type BusinessRule = { topic: string; rule: string; source: string /* file path(s) */ };
+
+export const DATA_DICTIONARY: DataDictionary;
+export const BUSINESS_RULES: BusinessRule[];
+```
+
+`formatSchema(columns, foreignKeys, dictionary, rules)` — `SchemaColumn` gains `enum_labels: string | null`.
+Pure, unit-tested; `describeSchema` passes the real dictionary.
+
+### 11.3 What the rules cover (taken from the code, with sources)
+
+Money & currency (cents; `contract_revenue_cents` includes tax; currency comes from the sales office and
+is copied onto `EventLineItems.currency` / `PaymentInstallments.currency` — use those, since
+`QboConnections` is not readable; events with no sales office are older ones, which the app treats as USD) ·
+dates & timezone (DATE columns vs timestamptz; days are `America/Toronto`) · soft deletes per table ·
+event status meanings and transitions, `booked_at` / `quote_sent_at` · scorecard KPIs (quotes, sales, revenue,
+gross margin, attribution by `created_by_user_uuid`) · AR total / received / amount due · driver pay
+(`pay_cents`, line items, `qty_decimal`, `tax_dec`, pay ranges in dollars, weekly groups, `is_paid`) ·
+trip status lifecycle and which statuses are "off" · employee vs contractor · zones (event zone derived from
+address state) and that seasons / home bases / `summer_*_account_manager_uuid` are legacy · roles from
+active rows, not `Users.role` · damage severity rule and "open" reports · repair status, `cost_cents`,
+budgets · survey NPS · things the app does **not** have (no utilization metric, no out-of-service flag, no
+budget-vs-spend page), so the model does not invent them.
+
+### 11.4 Edge cases
+
+- **Dictionary names a column the database no longer has** (production ahead of or behind local types):
+  the note is skipped; only live columns are printed. A table in the dictionary but not live is skipped.
+- **Live table with no dictionary entry** (production has a table the deployed code doesn't know): printed
+  with no purpose, as today.
+- **Output size:** about 48 000 characters for rules and tables plus ~15 000 for foreign keys (~16k
+  tokens) — one call, well under the 200 000 cap. A test pins rules + tables under 80 000 characters so
+  the dictionary cannot grow unnoticed.
+- **Permissions:** no change — same connector, same people (D2). `permissionPageData.ts` unchanged.
+
+### 11.5 Tests
+
+- `dataDictionary.test.ts`: every entry has a non-empty purpose (completeness itself is enforced by `tsc`,
+  D8); every rule has a topic, rule and source; each `source` path exists on disk.
+- `formatSchema.test.ts`: enum labels printed; table purpose and column notes printed; notes for columns
+  not live are skipped; rules come before tables; output for the real dictionary stays under 80 000 chars.
+- `handleMcpRequest.test.ts`: `describe_schema` still returns the tables; the instructions mention cents,
+  currency and `deleted`.
+- Playwright: none (unchanged — section 8).
+
+### 11.6 Keeping it up to date
+
+Added 2026-11-25 at the user's request ("we need a trigger in the development cycle"). Three layers:
+
+- **CLAUDE.md** — "Data dictionary" section: a change that alters what data means or how a number is
+  computed updates `dataDictionary.ts` in the same commit.
+- **Column snapshot** — `dataDictionary.columns.test.ts` keeps every `Table.column` from
+  `database.types.ts` in `__snapshots__/dataDictionary.columns.txt`. A new or dropped column fails the
+  test with a message asking for a note; accept with `-u`. (A new table already fails `tsc`, D8.)
+- **`/preflight`** — step 2b re-reads every rule whose `source` file the PR changed, checks new
+  migrations, and reports the rules checked or changed.
+
+No further CI gate: whether a rule is still true needs reading, and a gate would be rubber-stamped.
