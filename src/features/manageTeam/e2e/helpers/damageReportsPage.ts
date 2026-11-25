@@ -12,8 +12,16 @@ export async function waitForDamageReportsLoaded(page: Page) {
   await spinner.waitFor({ state: "hidden", timeout: 120_000 }).catch(() => undefined);
 }
 
+/**
+ * Opens the first open report that no repair holds. A report linked to a repair is open too, but its
+ * card has no "Create Maintenance to Resolve" (docs/specs/repairs-11-dashboard.md D235), so it is
+ * skipped: such a card says "Linked to:".
+ */
 export async function openFirstOpenDamageReportCard(page: Page) {
-  const openCard = page.locator(".border-red-300.bg-red-50\\/30").first();
+  const openCard = page
+    .locator(".border-red-300.bg-red-50\\/30")
+    .filter({ hasNotText: "Linked to:" })
+    .first();
   const hasOpen = await openCard.isVisible().catch(() => false);
   if (!hasOpen) return false;
   await openCard.click();

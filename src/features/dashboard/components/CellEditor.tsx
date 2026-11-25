@@ -8,13 +8,14 @@ import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteBlock, saveBlock } from "../db/client/db";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
-import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
+import { useRepairWindowsStore } from "@/features/repairs/state/useRepairWindowsStore";
+import { cellRepairDates } from "@/features/repairs/utils/newRepairPreset";
 import { useUser } from "@clerk/nextjs";
 import { usePsUsers } from "@/features/dashboard/db/hooks/powersync/usePsUsers";
 import { AppTooltip } from "@/components/AppTooltip";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
 import { useDashboardBleachersStore } from "../state/useDashboardBleachersStore";
-import { isBleacherOwnedByAM } from "@/features/userAccess/logic/isBleacherOwnedByAM";
+import { canManageDamageAndMaintenance } from "@/features/userAccess/logic/canManageDamageAndMaintenance";
 import { canEditCell as canEditCellFn } from "@/features/userAccess/logic/canEditCell";
 import { useSubrentalEventStore } from "@/features/subrentals/state/useSubrentalEventStore";
 import { SUBRENTAL_COLOR } from "@/features/dashboard/values/constants";
@@ -51,6 +52,12 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
   const perms = usePermissionsStore();
   const dashBleachers = useDashboardBleachersStore((s) => s.data);
   const isViewer = !perms.isAdmin && !perms.isAccountManager;
+  // The maintenance icon opens the New repair window, so it follows who writes repairs: an
+  // administrator and a maintainer, on every cell (docs/specs/repairs-11-dashboard.md D218, D231).
+  const canCreateRepair = canManageDamageAndMaintenance({
+    isAdmin: perms.isAdmin,
+    isMaintainer: perms.isMaintainer,
+  });
   const bl = dashBleachers.find((b) => b.bleacherUuid === bleacherUuid) ?? null;
   const canEditCell = canEditCellFn({
     isAdmin: perms.isAdmin,
@@ -83,6 +90,17 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
         : null))
     : null;
   const [viewingDamageReport, setViewingDamageReport] = useState<EditDamageReport | null>(null);
+
+  // The days a repair started from this cell gets: the clicked day, seven days later, cut by the
+  // accepted sub-rentals of the bleacher (docs/specs/repairs-11-dashboard.md §2.4, D216). The
+  // maintenance icon and "Create Maintenance to Resolve" on the card of a report both use them (D236).
+  // The blocks come from the original row of the bleacher: when a zone filter shows only its
+  // sub-rental row, they still come from the original one.
+  const original = dashBleachers.find((b) => b.bleacherUuid === bleacherUuid && !b.isSubrentalRow);
+  const cellDays =
+    date && bleacherUuid
+      ? cellRepairDates(date, original?.acceptedSubrentalBlocks ?? [])
+      : undefined;
 
   const handleViewDamageReport = () => {
     if (openDamageReport) setViewingDamageReport(openDamageReport as EditDamageReport);
@@ -167,135 +185,18 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
     onWorkTrackerOpen?.(buildWorkTrackerDraft({ bleacherUuid, date, workTrackerUuid }));
   };
 
+  // The icon of a cell opens the New repair window with the bleacher and the days of the cell
+  // (D216). The checks the form had for an account manager went with their right to write.
   const handleCreateMaintenance = () => {
-    if (!date || !bleacherUuid) {
+    if (!date || !bleacherUuid || !cellDays) {
       createErrorToast(["Failed to create maintenance event. Missing date or bleacher id."]);
       return;
     }
 
-    // AM can only create maintenance events with own bleachers — OR within an accepted subrental date range
-    const perms = usePermissionsStore.getState();
-    let subrentalConstraint: { eventStart: string; eventEnd: string } | null = null;
-    if (perms.isAccountManager && !perms.isAdmin) {
-      const dashBleachers = useDashboardBleachersStore.getState().data;
-      // Must find the original (non-subrental) row — when a zone filter hides the original zone,
-      // only the subrental row is in the store; treat that as "not owned" so we fall through
-      // to the subrental constraint check rather than bypassing it entirely.
-      const bleacher = dashBleachers.find(
-        (b) => b.bleacherUuid === bleacherUuid && !b.isSubrentalRow,
-      );
-      const ownedByAM =
-        bleacher &&
-        isBleacherOwnedByAM({
-          bleacherZoneUuid: bleacher.zoneUuid,
-          accountManagerZoneIds: perms.accountManagerZoneIds,
-        });
-      // Block if owned but subrented out on the clicked date
-      if (ownedByAM) {
-        const subrented = (bleacher?.acceptedSubrentalBlocks ?? []).some(
-          (r) => date >= r.eventStart.substring(0, 10) && date <= r.eventEnd.substring(0, 10),
-        );
-        if (subrented) {
-          createErrorToast(["This bleacher is subrented out on this date."]);
-          return;
-        }
-      }
-      if (!ownedByAM) {
-        const subrentalRow = dashBleachers.find(
-          (b) =>
-            b.bleacherUuid === bleacherUuid &&
-            b.isSubrentalRow &&
-            perms.accountManagerZoneIds.includes(b.zoneUuid ?? "") &&
-            (b.acceptedSubrentalAccess ?? []).some(
-              (r) => date >= r.eventStart.substring(0, 10) && date <= r.eventEnd.substring(0, 10),
-            ),
-        );
-        const matchingRange = subrentalRow?.acceptedSubrentalAccess?.find(
-          (r) => date >= r.eventStart.substring(0, 10) && date <= r.eventEnd.substring(0, 10),
-        );
-        if (!matchingRange) {
-          createErrorToast([
-            "You can only create maintenance events with bleachers assigned to you.",
-          ]);
-          return;
-        }
-        subrentalConstraint = {
-          eventStart: matchingRange.eventStart.substring(0, 10),
-          eventEnd: matchingRange.eventEnd.substring(0, 10),
-        };
-      }
-    }
-
-    const maintenanceStore = useMaintenanceEventStore.getState();
-
-    // Calculate end date (7 days after start date), clamped to subrental window if applicable
-    const startDate = new Date(date);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 7);
-
-    // Format dates as YYYY-MM-DD
-    const formatDate = (d: Date) => d.toISOString().split("T")[0];
-
-    let clampedStart = formatDate(startDate);
-    let clampedEnd = formatDate(endDate);
-    if (subrentalConstraint) {
-      const { eventStart: srStart, eventEnd: srEnd } = subrentalConstraint;
-      if (clampedStart < srStart) clampedStart = srStart;
-      if (clampedStart > srEnd) clampedStart = srStart;
-      if (clampedEnd > srEnd) clampedEnd = srEnd;
-      if (clampedEnd < clampedStart) clampedEnd = clampedStart;
-    }
-
-    // Cap end date at the day before the next accepted subrental block on this bleacher
-    {
-      const allBleachers = useDashboardBleachersStore.getState().data;
-      const originalBleacher = allBleachers.find(
-        (b) => b.bleacherUuid === bleacherUuid && !b.isSubrentalRow,
-      );
-      const blocks = originalBleacher?.acceptedSubrentalBlocks ?? [];
-
-      // Current block: a block that contains clampedStart
-      const currentBlock = blocks.find(
-        (r) =>
-          r.eventStart.substring(0, 10) <= clampedStart &&
-          r.eventEnd.substring(0, 10) >= clampedStart,
-      );
-      if (currentBlock) {
-        const blockEnd = currentBlock.eventEnd.substring(0, 10);
-        if (blockEnd < clampedEnd) clampedEnd = blockEnd;
-      }
-
-      // Next block: the earliest block starting strictly after clampedStart
-      const nextBlockStart = blocks
-        .map((r) => r.eventStart.substring(0, 10))
-        .filter((s) => s > clampedStart)
-        .sort()[0];
-      if (nextBlockStart) {
-        const d = new Date(nextBlockStart + "T12:00:00Z");
-        d.setUTCDate(d.getUTCDate() - 1);
-        const dayBefore = d.toISOString().split("T")[0];
-        if (dayBefore < clampedEnd) clampedEnd = dayBefore;
-      }
-
-      if (clampedEnd < clampedStart) clampedEnd = clampedStart;
-    }
-
-    // Open the maintenance form (resets to initial state) then prefill
-    maintenanceStore.openForm();
-    const ms = useMaintenanceEventStore.getState();
-    ms.setField("eventStart", clampedStart);
-    ms.setField("eventEnd", clampedEnd);
-    ms.setField("bleacherUuids", [bleacherUuid]);
-    if (subrentalConstraint) {
-      ms.setField("subrentalConstraint", subrentalConstraint);
-    }
-
-    // Set current user as owner
-    const clerkId = user?.id;
-    if (clerkId) {
-      const match = users.find((u) => u.clerk_user_id === clerkId);
-      if (match) ms.setField("ownerUserUuid", match.id);
-    }
+    useRepairWindowsStore.getState().open({
+      kind: "new",
+      preset: { ...cellDays, bleacherUuid },
+    });
 
     // Close the cell editor
     handleClose();
@@ -419,25 +320,29 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
               </AppTooltip>
             )}
             {!isViewer && (
+              <AppTooltip content="Work Tracker">
+                <button
+                  aria-label="Work Tracker"
+                  className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-black hover:bg-gray-100 transition-all duration-200"
+                  onClick={handleOpenWorkTracker}
+                >
+                  <Truck className="h-4 w-4" />
+                </button>
+              </AppTooltip>
+            )}
+            {canCreateRepair && (
+              <AppTooltip content="Maintenance">
+                <button
+                  aria-label="Maintenance"
+                  className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-red-700 hover:bg-gray-100 transition-all duration-200"
+                  onClick={handleCreateMaintenance}
+                >
+                  <Wrench className="h-4 w-4" />
+                </button>
+              </AppTooltip>
+            )}
+            {!isViewer && (
               <>
-                <AppTooltip content="Work Tracker">
-                  <button
-                    aria-label="Work Tracker"
-                    className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-black hover:bg-gray-100 transition-all duration-200"
-                    onClick={handleOpenWorkTracker}
-                  >
-                    <Truck className="h-4 w-4" />
-                  </button>
-                </AppTooltip>
-                <AppTooltip content="Maintenance">
-                  <button
-                    aria-label="Maintenance"
-                    className="flex items-center justify-center h-8 w-8 rounded text-gray-500 cursor-pointer hover:text-red-700 hover:bg-gray-100 transition-all duration-200"
-                    onClick={handleCreateMaintenance}
-                  >
-                    <Wrench className="h-4 w-4" />
-                  </button>
-                </AppTooltip>
                 <AppTooltip content="Create Sub-Rental">
                   <button
                     aria-label="Create Sub-Rental"
@@ -485,6 +390,7 @@ export default function CellEditor({ onWorkTrackerOpen }: CellEditorProps) {
           }}
           onSaved={() => setViewingDamageReport(null)}
           editReport={viewingDamageReport}
+          repairDays={cellDays}
         />
       )}
     </div>

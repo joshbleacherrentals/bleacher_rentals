@@ -8,7 +8,6 @@ import { Bleacher } from "../types";
 import { CELL_WIDTH } from "../values/constants";
 import { isBleacherAccessible } from "../ui/NoAccessFilter";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
-import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useSubrentalEventStore } from "@/features/subrentals/state/useSubrentalEventStore";
 
 export class PinnedYCellRenderer implements ICellRenderer {
@@ -66,18 +65,6 @@ export class PinnedYCellRenderer implements ICellRenderer {
             goodshuffleUrl: sel.goodshuffleUrl ?? null,
           }
         : undefined;
-    const mt = useMaintenanceEventStore.getState();
-    const selectedMaintenance =
-      mt.isFormExpanded && mt.eventStart && mt.eventEnd
-        ? {
-            maintenanceEventUuid: mt.maintenanceEventUuid ?? null,
-            bleacherUuids: mt.bleacherUuids ?? [],
-            eventStart: mt.eventStart,
-            eventEnd: mt.eventEnd,
-            eventName: mt.eventName || undefined,
-            address: mt.addressData?.address || undefined,
-          }
-        : undefined;
     const sr = useSubrentalEventStore.getState();
     const selectedSubrental =
       sr.isFormExpanded && sr.eventStart && sr.eventEnd && sr.bleacherUuid
@@ -88,7 +75,7 @@ export class PinnedYCellRenderer implements ICellRenderer {
             eventEnd: sr.eventEnd,
           }
         : undefined;
-    return { selected, selectedMaintenance, selectedSubrental };
+    return { selected, selectedSubrental };
   }
 
   /**

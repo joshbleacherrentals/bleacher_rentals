@@ -12,7 +12,7 @@ import { DashboardOptions } from "@/features/dashboardOptions/DashboardOptions";
 import { SeasonToggle } from "@/features/dashboardOptions/SeasonToggle";
 import { CreateEventButton } from "@/features/eventConfiguration/components/CreateEventButton";
 import { EventConfiguration } from "@/features/eventConfiguration/components/EventConfiguration";
-import { MaintenanceEventPanel } from "@/features/maintenanceEvents/components/MaintenanceEventPanel";
+import { RepairWindowsHost } from "@/features/repairs/components/RepairWindowsHost";
 import BleacherLocationModal from "@/features/dashboard/components/BleacherLocationModal";
 import SwapConfirmationModal from "@/features/dashboard/components/SwapConfirmationModal";
 import WorkTrackerDragConfirmModal from "@/features/workTrackers/components/WorkTrackerDragConfirmModal";
@@ -155,7 +155,7 @@ export default function Page() {
           <CreateEventButton />
         </div>
         <EventConfiguration showSetupTeardown={false} />
-        <MaintenanceEventPanel />
+        <RepairWindowsHost />
         <SubrentalEventPanel />
       </div>
       <div className="min-h-0 min-w-0 overflow-hidden">

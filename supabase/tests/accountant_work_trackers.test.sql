@@ -375,7 +375,8 @@ SELECT is((SELECT count(*)::int FROM public."Users" WHERE id = :'user_admin'), 1
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_wt_maint')::text, true);
 SELECT is((SELECT count(*)::int FROM public."WorkTrackers" WHERE id = :'tracker'), 1, 'a maintainer still reads WorkTrackers');
 SELECT is((SELECT count(*)::int FROM public."WorkTrackerGroups"), 0, 'a maintainer still cannot read WorkTrackerGroups');
-SELECT is((SELECT count(*)::int FROM public."Vendors"), 0, 'a maintainer still cannot read Vendors');
+-- Maintenance 01 (D19) lets a maintainer read vendors.
+SELECT is((SELECT count(*)::int FROM public."Vendors" WHERE id = :'vendor'), 1, 'a maintainer reads Vendors (maintenance-01 D19)');
 
 SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_wt_admin')::text, true);
 SELECT is((SELECT count(*)::int FROM public."ZoneQboClasses" WHERE qbo_connection_uuid = :'qbo_conn'), 1, 'an admin still reads ZoneQboClasses');

@@ -17,7 +17,6 @@ import { useDashboardBleachersStore } from "../state/useDashboardBleachersStore"
 import { useSelectedBlockStore } from "../state/useSelectedBlock";
 import { useWorkTrackerSelectionStore } from "@/features/workTrackers/state/useWorkTrackerSelectionStore";
 import { useCurrentEventStore } from "@/features/eventConfiguration/state/useCurrentEventStore";
-import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import { useSubrentalEventStore } from "@/features/subrentals/state/useSubrentalEventStore";
 import { isBleacherAccessible } from "../ui/NoAccessFilter";
 import { SubrentalOverlayBody } from "../ui/event/SubrentalOverlayBody";
@@ -102,18 +101,6 @@ export class MainGridCellRenderer implements ICellRenderer {
               goodshuffleUrl: sel.goodshuffleUrl ?? null,
             }
           : undefined;
-      const mt = useMaintenanceEventStore.getState();
-      const selectedMaintenance =
-        mt.isFormExpanded && mt.eventStart && mt.eventEnd
-          ? {
-              maintenanceEventUuid: mt.maintenanceEventUuid ?? null,
-              bleacherUuids: mt.bleacherUuids ?? [],
-              eventStart: mt.eventStart,
-              eventEnd: mt.eventEnd,
-              eventName: mt.eventName || undefined,
-              address: mt.addressData?.address || undefined,
-            }
-          : undefined;
       const sr = useSubrentalEventStore.getState();
       const selectedSubrental =
         sr.isFormExpanded && sr.eventStart && sr.eventEnd && sr.bleacherUuid
@@ -126,7 +113,6 @@ export class MainGridCellRenderer implements ICellRenderer {
           : undefined;
       const { spansByRow } = EventsUtil.calculateEventSpans(bleachers, dates, {
         selected,
-        selectedMaintenance,
         selectedSubrental,
       });
       this.spansByRow = spansByRow;
@@ -235,18 +221,6 @@ export class MainGridCellRenderer implements ICellRenderer {
               goodshuffleUrl: sel.goodshuffleUrl ?? null,
             }
           : undefined;
-      const mt = useMaintenanceEventStore.getState();
-      const selectedMaintenance =
-        mt.isFormExpanded && mt.eventStart && mt.eventEnd
-          ? {
-              maintenanceEventUuid: mt.maintenanceEventUuid ?? null,
-              bleacherUuids: mt.bleacherUuids ?? [],
-              eventStart: mt.eventStart,
-              eventEnd: mt.eventEnd,
-              eventName: mt.eventName || undefined,
-              address: mt.addressData?.address || undefined,
-            }
-          : undefined;
       const sr = useSubrentalEventStore.getState();
       const selectedSubrental =
         sr.isFormExpanded && sr.eventStart && sr.eventEnd && sr.bleacherUuid
@@ -259,7 +233,6 @@ export class MainGridCellRenderer implements ICellRenderer {
           : undefined;
       const { spansByRow } = EventsUtil.calculateEventSpans(bleachers, this.dates, {
         selected,
-        selectedMaintenance,
         selectedSubrental,
       });
       this.spansByRow = spansByRow;

@@ -1105,3 +1105,285 @@ describe("Send Emails", () => {
     expect(row?.roles.viewer.note).toMatch(/dimmed/i);
   });
 });
+
+// docs/specs/repairs-04-table.md §5: the Repairs page shows vendors, invoices and costs to the four
+// roles that open it, and for now it only lists repairs (editing is on the Dashboard).
+describe("Repairs page rows", () => {
+  const maintenance = PERMISSIONS.find((p) => p.label === "Repairs & Maintenance");
+  const costs = PERMISSIONS.find((p) => p.label === "Repair Costs & Vendors");
+  // docs/specs/repairs-09a-repair-writes.md §5 (D146) and docs/specs/repairs-09b1-services.md §5
+  // (D166): what the last sentences of the row say, since the repair window writes and the services
+  // carry the amounts.
+  const WRITES_SENTENCE =
+    "An administrator and a maintainer can add a repair and, in the repair window, change its vendor, invoice number, status, currency, repair days and notes; the status can also be changed from the pill in a row. Moving a repair into Completed records the moment it was completed and asks which of the open damage reports linked to the repair to close; the closed ones leave the drivers' phones, and the ones not chosen stay open and are unlinked from the repair; moving it out of Completed clears that moment and leaves the reports closed. The amounts are edited through the services: an administrator and a maintainer add, change and delete a service, with its bleacher, category, severity, description and its four amounts, and the total of the repair follows a moment later, when the server has added the services up. The total cannot be typed in. An administrator and a maintainer also add files to a repair and delete them, in the repair window.";
+
+  // docs/specs/repairs-09b2-bleachers-zone-reports.md §5 (D188): the sentence added at the end of the
+  // description of the costs row.
+  // docs/specs/repairs-11-dashboard.md §5 (D214): the same window opens from a bar on the Dashboard.
+  const DASHBOARD_WINDOW_SENTENCE =
+    "The same window opens from the bar of a repair on the Dashboard.";
+
+  const LINKS_SENTENCE =
+    "A service also decides the repair's bleachers and zone, which the table shows, and when a service puts a bleacher on a Completed repair, the person is asked which of the bleacher's open damage reports, reported before the repair ended, to close.";
+
+  it("has the Repair Costs & Vendors row right after Repairs & Maintenance", () => {
+    expect(costs).toBeDefined();
+    expect(PERMISSIONS.indexOf(costs!)).toBe(PERMISSIONS.indexOf(maintenance!) + 1);
+    expect(costs?.category).toBe("Day to Day Operations");
+  });
+
+  it("is custom for the administrator and the maintainer, read for the other two that open the page, none for the rest", () => {
+    for (const role of ["admin", "maintainer"] as WebRole[]) {
+      expect(costs?.roles[role].level, role).toBe("custom");
+    }
+    for (const role of ["account_manager", "viewer"] as WebRole[]) {
+      expect(costs?.roles[role].level, role).toBe("read");
+    }
+    for (const role of ["developer", "driver", "accountant"] as WebRole[]) {
+      expect(costs?.roles[role].level, role).toBe("none");
+    }
+  });
+
+  it("says every role that opens the page sees all of it, and what an administrator and a maintainer can change", () => {
+    expect(costs?.description).toMatch(/Every role that opens the Repairs page sees all of it/);
+    expect(costs?.description).toContain(WRITES_SENTENCE);
+    expect(costs?.description).not.toMatch(/The page only reads for now/);
+    expect(costs?.description).not.toMatch(/The status is the one thing the page changes/);
+    expect(costs?.roles.account_manager.note).toMatch(/not only the ones they created/);
+  });
+
+  // docs/specs/repairs-05-toolbar.md §5 (D61): the Vendor filter lists every vendor.
+  it("says the Vendor filter lists every vendor, and tells the viewer so", () => {
+    expect(costs?.description).toMatch(
+      /Every role that opens the Repairs page sees all of it\. The Vendor filter lists every vendor, not only the ones that have repairs\. /,
+    );
+    expect(costs?.roles.viewer.note).toMatch(
+      /^Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter\./,
+    );
+    expect(costs?.roles.viewer.level).toBe("read");
+  });
+
+  // docs/specs/repairs-06-expanded-row.md §5: the expanded row, the service window and the damage
+  // report window show data every one of the four roles already reads, so only the description
+  // grows; the notes of the roles do not change.
+  it("describes the open repair, the service window and the damage report, before the last sentence", () => {
+    expect(costs?.description).toMatch(
+      /A repair opens in place to show its services, one row for each bleacher and category with its amounts\. /,
+    );
+    expect(costs?.description).toMatch(
+      /A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved\. /,
+    );
+    expect(costs?.description).toMatch(
+      /have repairs\. A repair opens in place[\s\S]*delete them, in the repair window\. A service also decides[\s\S]*ended, to close\.$/,
+    );
+  });
+
+  // docs/specs/repairs-07-repair-window.md §5: the repair window shows data the four roles already
+  // read; only the files are not for every role, because the database does not give them to a viewer.
+  it("describes the repair window, with its files, right before the last sentence", () => {
+    expect(costs?.description).toContain(
+      `whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. ${DASHBOARD_WINDOW_SENTENCE} ${WRITES_SENTENCE}`,
+    );
+    expect(costs?.description?.endsWith(`${WRITES_SENTENCE} ${LINKS_SENTENCE}`)).toBe(true);
+  });
+
+  it("tells every role that opens the page about the repair window, and the viewer about the files", () => {
+    expect(costs?.roles.admin.note).toMatch(
+      /^Sees every column and the total cost strip, and opens the repair window with its files\./,
+    );
+    expect(costs?.roles.account_manager.note).toMatch(
+      /^Sees every column and the total cost strip, for every repair and not only the ones they created, and opens the repair window with its files\./,
+    );
+    expect(costs?.roles.viewer.note).toMatch(
+      /^Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter\. Opens the repair window but does not see its files\./,
+    );
+    expect(costs?.roles.maintainer.note).toMatch(
+      /^Sees every column and the total cost strip, vendors included, and opens the repair window with its files\./,
+    );
+  });
+
+  // docs/specs/repairs-08-status.md §5 (D110, D121): the administrator and the maintainer change the
+  // status; the account manager and the viewer see a label. The levels stay as they were.
+  it("tells the administrator and the maintainer that they change the status and edit the repair", () => {
+    expect(costs?.roles.admin.note).toBe(
+      "Sees every column and the total cost strip, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; edits the amounts through the services, while the total is calculated and cannot be typed in. Adds files to a repair and deletes them in the repair window.",
+    );
+    expect(costs?.roles.maintainer.note).toBe(
+      "Sees every column and the total cost strip, vendors included, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; edits the amounts through the services, while the total is calculated and cannot be typed in. Adds files to a repair and deletes them in the repair window.",
+    );
+  });
+
+  it("tells the account manager and the viewer that the status is a label", () => {
+    expect(costs?.roles.account_manager.note).toBe(
+      "Sees every column and the total cost strip, for every repair and not only the ones they created, and opens the repair window with its files. The status is a label; it cannot be changed here. The files can be opened, not added or deleted.",
+    );
+    expect(costs?.roles.viewer.note).toBe(
+      "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter. Opens the repair window but does not see its files. The status is a label; it cannot be changed here.",
+    );
+  });
+
+  it("changes only the level of the administrator and the maintainer (D166)", () => {
+    expect(costs?.roles.admin.level).toBe("custom");
+    expect(costs?.roles.maintainer.level).toBe("custom");
+    expect(costs?.roles.account_manager.level).toBe("read");
+    expect(costs?.roles.viewer.level).toBe("read");
+  });
+
+  it("leaves the notes of the roles that do not open the page as they were", () => {
+    expect(costs?.roles.developer.note).toMatch(/Developers do not have access to repairs/);
+    expect(costs?.roles.driver.note).toBe("Drivers only have access to the Driver Mobile App.");
+  });
+
+  // docs/specs/repairs-09a-repair-writes.md §5 (D124, D146): the old row says what an administrator
+  // and a maintainer do on the Repairs page, and what is still left to the Dashboard.
+  it("tells the old row that the Repairs page adds, edits, deletes and restores repairs", () => {
+    expect(maintenance?.description).toContain(
+      "On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. They also add, edit and delete the services of a repair, from its open row, from its window and from the service window; a deleted service cannot be brought back. A service also keeps the repair's list of bleachers and its zone: the first service on a bleacher adds the bleacher to the repair, removing the last one takes it off, the zone is set from the first bleacher that has one, and a bleacher in another zone is refused. The first service on a bleacher also links the bleacher's open damage reports to the repair; on a Completed repair the person is asked which of the ones reported before the repair ended to close, and the ones not chosen stay open and unlinked. They also add files to a repair and delete them, in its window. On the Dashboard the same window opens from the bar of a repair, from \"+ Create\" and from the maintenance icon of a cell: an administrator and a maintainer add and change repairs there, and everyone else who opens the Dashboard only reads them.",
+    );
+    expect(maintenance?.description).not.toMatch(/until the repair window can edit/);
+    expect(maintenance?.description).not.toMatch(/only lists repairs/);
+  });
+
+  it("tells the administrator, the account manager, the viewer and the maintainer what they do on the page", () => {
+    expect(maintenance?.roles.admin.note).toMatch(
+      /Changes the status of any repair from the Repairs page\. On the Repairs page adds, edits, deletes and restores repairs, and adds, edits and deletes their services, which also set the repair's bleachers, zone and damage report links, and adds and deletes their files\.$/,
+    );
+    expect(maintenance?.roles.account_manager.note).toBe(
+      "Can view every repair and its services, on the Repairs page and on the Dashboard, whoever created it, but cannot add, edit, delete or restore one, change its status, its services or its files.",
+    );
+    expect(maintenance?.roles.account_manager.note).not.toMatch(/status menu/);
+    expect(maintenance?.roles.viewer.note).toMatch(/Sees the status but cannot change it\.$/);
+    expect(maintenance?.roles.maintainer.note).toBe(
+      'Can create, edit, delete, and restore any repair, including its services, bleachers and files, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
+    );
+  });
+
+  // docs/specs/repairs-09b2-bleachers-zone-reports.md §5 (D188): the sentences say what a service does
+  // to the repair around it; no level changes in either row.
+  it("tells the matrix that a service keeps the repair's bleachers and zone and links damage reports (D188)", () => {
+    expect(maintenance?.description).toContain(
+      "A service also keeps the repair's list of bleachers and its zone",
+    );
+    expect(maintenance?.description).toContain(
+      "on a Completed repair the person is asked which of the ones reported before the repair ended to close",
+    );
+    expect(maintenance?.description).not.toMatch(
+      /does not change the repair's list of bleachers yet/,
+    );
+    expect(costs?.description).toContain(LINKS_SENTENCE);
+    expect(maintenance?.roles.admin.note).toContain(
+      "which also set the repair's bleachers, zone and damage report links",
+    );
+    expect(maintenance?.roles.maintainer.note).toContain(
+      "(which also set the repair's bleachers, zone and damage report links)",
+    );
+    expect(maintenance?.roles.admin.note).not.toMatch(/not yet their bleachers/);
+  });
+
+  it("leaves the note of the viewer, and the notes of the costs row, as they were (D188)", () => {
+    expect(maintenance?.roles.viewer.note).toMatch(/Sees the status but cannot change it\.$/);
+    expect(costs?.roles.admin.note).toMatch(
+      /while the total is calculated and cannot be typed in\. Adds files to a repair and deletes them in the repair window\.$/,
+    );
+  });
+
+  // docs/specs/repairs-09b3-files.md §5 (D205): the files are added and deleted by the same two
+  // roles; the sentences say so and the levels do not change.
+  it("tells the matrix that an administrator and a maintainer add and delete files, and that nobody else does (D205)", () => {
+    expect(maintenance?.description).toContain(
+      "They also add files to a repair and delete them, in its window.",
+    );
+    expect(maintenance?.description).not.toContain(
+      "The Dashboard form still edits a repair's bleachers and its files on its own.",
+    );
+    expect(maintenance?.description).not.toMatch(/files are still edited from the Dashboard/);
+    expect(maintenance?.roles.admin.note).toMatch(/and adds and deletes their files\.$/);
+    expect(maintenance?.roles.maintainer.note).toContain("add and delete their files");
+    expect(maintenance?.roles.account_manager.note).toMatch(/or its files\.$/);
+    expect(maintenance?.roles.admin.note).not.toMatch(/not yet their files/);
+    expect(maintenance?.roles.maintainer.note).not.toMatch(/the Dashboard for their files/);
+
+    expect(costs?.description).toContain(
+      "An administrator and a maintainer also add files to a repair and delete them, in the repair window.",
+    );
+    expect(costs?.description).not.toMatch(/the files cannot be edited yet/);
+    expect(costs?.roles.admin.note).toMatch(
+      /Adds files to a repair and deletes them in the repair window\.$/,
+    );
+    expect(costs?.roles.maintainer.note).toMatch(
+      /Adds files to a repair and deletes them in the repair window\.$/,
+    );
+    expect(costs?.roles.account_manager.note).toMatch(
+      /The files can be opened, not added or deleted\.$/,
+    );
+    expect(costs?.roles.viewer.note).not.toMatch(/add files|Adds files/);
+  });
+
+  it("leaves the level of every role of the old row as it was, except the account manager's (D219)", () => {
+    expect(maintenance?.roles.admin.level).toBe("full");
+    expect(maintenance?.roles.account_manager.level).toBe("read");
+    expect(maintenance?.roles.viewer.level).toBe("read");
+    expect(maintenance?.roles.maintainer.level).toBe("full");
+  });
+});
+
+// docs/specs/repairs-11-dashboard.md §5 (D214 to D220, D235): the maintenance flow of the Dashboard
+// moves to the repair window, an account manager only reads, a maintainer creates from "+ Create"
+// and from a cell, nobody reassigns an owner, and a manager opens a repair from a damage report.
+describe("the Dashboard uses the repair window (spec 11)", () => {
+  const find = (label: string) => PERMISSIONS.find((p) => p.label === label);
+  const maintenance = find("Repairs & Maintenance");
+  const cells = find("Dashboard Cells");
+  const reports = find("Damage Reports");
+
+  it("says a maintainer adds a repair from the Dashboard and an account manager only reads (D215, D219)", () => {
+    expect(maintenance?.roles.account_manager.level).toBe("read");
+    expect(maintenance?.roles.account_manager.note).toMatch(/on the Dashboard/);
+    expect(maintenance?.roles.account_manager.note).not.toMatch(
+      /only edit or delete ones they created/,
+    );
+    expect(maintenance?.roles.maintainer.note).toMatch(
+      /Also adds a repair from the Dashboard, with "\+ Create" and with the maintenance icon of a cell\.$/,
+    );
+    expect(maintenance?.roles.maintainer.note).not.toMatch(
+      /the Dashboard form can still change them/,
+    );
+  });
+
+  it("no longer says an administrator reassigns maintenance events between account managers (D220)", () => {
+    expect(maintenance?.roles.admin.note).not.toMatch(/reassign/i);
+    expect(maintenance?.roles.admin.level).toBe("full");
+  });
+
+  it("takes maintenance events off the account manager's cell note and gives the maintainer the icon (D218)", () => {
+    expect(cells?.roles.account_manager.note).toContain(
+      "and work trackers and sub-rentals from a cell, but can edit or delete only those cells",
+    );
+    expect(cells?.roles.account_manager.note).not.toMatch(/maintenance events/);
+    expect(cells?.roles.maintainer.note).toContain(
+      "They can create a repair from a cell with the maintenance icon, but not events, work trackers or sub-rentals.",
+    );
+    expect(cells?.roles.maintainer.note).toMatch(/wrote themselves/);
+    expect(cells?.roles.maintainer.level).toBe("custom");
+    expect(cells?.roles.account_manager.level).toBe("custom");
+  });
+
+  it("tells the matrix who creates a repair from a damage report (D217, D235)", () => {
+    const sentence =
+      "Can create a repair from an open report; when the repair is Completed the person is asked whether to close the report.";
+    expect(reports?.roles.admin.note).toMatch(/regardless of who created it\. Can create a repair/);
+    expect(reports?.roles.admin.note?.endsWith(sentence)).toBe(true);
+    expect(reports?.roles.maintainer.note?.endsWith(sentence)).toBe(true);
+    expect(
+      reports?.roles.account_manager.note?.endsWith("Cannot create a repair from a report."),
+    ).toBe(true);
+    expect(reports?.roles.viewer.note).not.toMatch(/repair/);
+  });
+
+  it("leaves the levels of the damage reports row as they were", () => {
+    expect(reports?.roles.admin.level).toBe("full");
+    expect(reports?.roles.account_manager.level).toBe("custom");
+    expect(reports?.roles.viewer.level).toBe("read");
+    expect(reports?.roles.maintainer.level).toBe("full");
+  });
+});

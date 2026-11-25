@@ -395,7 +395,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "should be able to create, update, delete, and edit any cells, regardless of who is assigned to bleacher. ",
       ),
       account_manager: custom(
-        "Account managers can freely create notes on cells, and work trackers, maintenance events and sub-rentals from a cell, but can edit or delete only those cells that were created in the bleacher field assigned to them. They are able to view All cells regardless of the event owner.",
+        "Account managers can freely create notes on cells, and work trackers and sub-rentals from a cell, but can edit or delete only those cells that were created in the bleacher field assigned to them. They are able to view All cells regardless of the event owner.",
       ),
       developer: none(
         "Unable to even access the pages where they can see cells, and developer is only meant to work on the developer roadmap.",
@@ -405,7 +405,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: custom(
-        "Maintainers can add a note to any empty cell, and edit or delete only the notes they wrote themselves. Notes written by anyone else, or written before this rule existed, are read-only for them. They cannot create events, work trackers, maintenance or sub-rentals from a cell.",
+        "Maintainers can add a note to any empty cell, and edit or delete only the notes they wrote themselves. Notes written by anyone else, or written before this rule existed, are read-only for them. They can create a repair from a cell with the maintenance icon, but not events, work trackers or sub-rentals.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -605,24 +605,71 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Repairs & Maintenance",
     description:
-      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard.",
+      "Creating and managing maintenance events for taking bleachers in for repair or scheduled maintenance. This applies to the Repairs page and the Dashboard. On the Repairs page an administrator or a maintainer adds a repair, edits its vendor, invoice number, status, currency, repair days and notes in its window, changes its status from the pill in a row, deletes it, and shows and restores deleted ones. They also add, edit and delete the services of a repair, from its open row, from its window and from the service window; a deleted service cannot be brought back. A service also keeps the repair's list of bleachers and its zone: the first service on a bleacher adds the bleacher to the repair, removing the last one takes it off, the zone is set from the first bleacher that has one, and a bleacher in another zone is refused. The first service on a bleacher also links the bleacher's open damage reports to the repair; on a Completed repair the person is asked which of the ones reported before the repair ended to close, and the ones not chosen stay open and unlinked. They also add files to a repair and delete them, in its window. On the Dashboard the same window opens from the bar of a repair, from \"+ Create\" and from the maintenance icon of a cell: an administrator and a maintainer add and change repairs there, and everyone else who opens the Dashboard only reads them.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can create, edit, and delete any repair or maintenance event regardless of who created it. Can reassign maintenance events between account managers.",
+        "Can create, edit, and delete any repair or maintenance event regardless of who created it. Changes the status of any repair from the Repairs page. On the Repairs page adds, edits, deletes and restores repairs, and adds, edits and deletes their services, which also set the repair's bleachers, zone and damage report links, and adds and deletes their files.",
       ),
-      account_manager: custom(
-        "Can create new repair and maintenance events, but can only edit or delete ones they created themselves. Can view all maintenance events regardless of the creator.",
+      account_manager: read(
+        "Can view every repair and its services, on the Repairs page and on the Dashboard, whoever created it, but cannot add, edit, delete or restore one, change its status, its services or its files.",
       ),
       developer: none(
         "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
       ),
       viewer: read(
-        "Can view all repair and maintenance events and their details but cannot create, edit, or delete any.",
+        "Can view all repair and maintenance events and their details but cannot create, edit, or delete any. Sees the status but cannot change it.",
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: full(
-        "Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page.",
+        'Can create, edit, delete, and restore any repair, including its services, bleachers and files, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
+      ),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  // docs/specs/repairs-04-table.md §5: what the Repairs page shows. Editing comes with later specs.
+  // docs/specs/repairs-05-toolbar.md §5: the Vendor filter lists every vendor (D61).
+  // docs/specs/repairs-06-expanded-row.md §5: the open repair, the service window and the damage
+  // report window show data the four roles already read.
+  // docs/specs/repairs-07-repair-window.md §5: the repair window shows the same data, and its files
+  // only to the roles the database lets read them (not the viewer).
+  // docs/specs/repairs-08-status.md §5: an administrator and a maintainer change the status from the
+  // pill; the account manager and the viewer see a label. The levels do not change.
+  // docs/specs/repairs-09a-repair-writes.md §5: the same two roles add and edit a repair in its window,
+  // delete it and restore it; the account manager and the viewer only read. The levels do not change.
+  // docs/specs/repairs-09b1-services.md §5: the same two roles add, edit and delete the services of a
+  // repair, which carry the amounts; their level in "Repair Costs & Vendors" becomes custom (D166).
+  // docs/specs/repairs-09b2-bleachers-zone-reports.md §5: those services also keep the repair's
+  // bleachers, zone and damage report links; no level changes (D188).
+  // docs/specs/repairs-09b3-files.md §5: the same two roles add files to a repair and delete them in its
+  // window; an account manager only opens them and a viewer does not see them; no level changes (D205).
+  // docs/specs/repairs-11-dashboard.md §5: the Dashboard opens the same window from a bar, from "+ Create"
+  // and from the maintenance icon of a cell; an account manager only reads (level `read` in the row above,
+  // D219), a maintainer also adds a repair there (D210, D218), nobody reassigns an owner (D220), and a
+  // manager opens a repair from a damage report (D217; the rows "Dashboard Cells" and "Damage Reports").
+  // The account manager's read-only rule is enforced by the page only; row level security still allows
+  // the write. Confirmed by the user at preflight 1.27.0 (spec repairs-09a §5).
+  {
+    label: "Repair Costs & Vendors",
+    description:
+      "What the Repairs page shows about each repair: its bleachers, zone and repair days, the status, the vendor and the invoice number, the amounts for Labor, Parts, Tax and Freight and the total, and the day the driver reported the damage. A strip above the table adds up the total cost of the tab, in Canadian and US dollars, not converted. Every role that opens the Repairs page sees all of it. The Vendor filter lists every vendor, not only the ones that have repairs. A repair opens in place to show its services, one row for each bleacher and category with its amounts. A service opens in a window with the bleacher's number, model number, type and zone, and with the damage reports it came from: who reported the damage, the damage levels, the note, the photos and whether it was resolved. A button at the end of each row opens the repair in a window of its own, with the vendor and its address, the invoice number, the status, the repair days, the zone, the bleachers, the notes, the day the damage was reported, its services with their totals and, for an administrator, an account manager and a maintainer, its files. The same window opens from the bar of a repair on the Dashboard. An administrator and a maintainer can add a repair and, in the repair window, change its vendor, invoice number, status, currency, repair days and notes; the status can also be changed from the pill in a row. Moving a repair into Completed records the moment it was completed and asks which of the open damage reports linked to the repair to close; the closed ones leave the drivers' phones, and the ones not chosen stay open and are unlinked from the repair; moving it out of Completed clears that moment and leaves the reports closed. The amounts are edited through the services: an administrator and a maintainer add, change and delete a service, with its bleacher, category, severity, description and its four amounts, and the total of the repair follows a moment later, when the server has added the services up. The total cannot be typed in. An administrator and a maintainer also add files to a repair and delete them, in the repair window. A service also decides the repair's bleachers and zone, which the table shows, and when a service puts a bleacher on a Completed repair, the person is asked which of the bleacher's open damage reports, reported before the repair ended, to close.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: custom(
+        "Sees every column and the total cost strip, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; edits the amounts through the services, while the total is calculated and cannot be typed in. Adds files to a repair and deletes them in the repair window.",
+      ),
+      account_manager: read(
+        "Sees every column and the total cost strip, for every repair and not only the ones they created, and opens the repair window with its files. The status is a label; it cannot be changed here. The files can be opened, not added or deleted.",
+      ),
+      developer: none(
+        "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
+      ),
+      viewer: read(
+        "Sees every column and the total cost strip, vendors included, and the name of every vendor in the Vendor filter. Opens the repair window but does not see its files. The status is a label; it cannot be changed here.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: custom(
+        "Sees every column and the total cost strip, vendors included, and opens the repair window with its files. Changes the status from the pill, adds repairs, and edits their vendor, invoice number, currency, days and notes in the window; edits the amounts through the services, while the total is calculated and cannot be typed in. Adds files to a repair and deletes them in the repair window.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -634,10 +681,10 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can create, view, edit, and delete any damage report regardless of who created it.",
+        "Can create, view, edit, and delete any damage report regardless of who created it. Can create a repair from an open report; when the repair is Completed the person is asked whether to close the report.",
       ),
       account_manager: custom(
-        "Can create new damage reports and view all existing ones. Can only edit or delete damage reports they created themselves.",
+        "Can create new damage reports and view all existing ones. Can only edit or delete damage reports they created themselves. Cannot create a repair from a report.",
       ),
       developer: none(
         "Developers do not have access to damage report data. This role is limited to the product roadmap.",
@@ -649,7 +696,7 @@ export const PERMISSIONS: PermissionEntry[] = [
         "Can create damage reports through the mobile app when they notice damage to a bleacher. Can view their own submitted reports but cannot edit or delete them once submitted.",
       ),
       maintainer: full(
-        "Can create, view, edit, delete, and restore any damage report and its photos, regardless of who created it. Can see acknowledgements but not add them.",
+        "Can create, view, edit, delete, and restore any damage report and its photos, regardless of who created it. Can see acknowledgements but not add them. Can create a repair from an open report; when the repair is Completed the person is asked whether to close the report.",
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
