@@ -1,4 +1,5 @@
 import type { WebRole } from "./logic/determineAccess";
+import { pathMatches } from "./logic/pathMatches";
 
 type RoleConfig = {
   allowedPaths: string[];
@@ -23,6 +24,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/inspections",
       "/annual-inspections",
       "/repairs",
+      "/dashboard-analytics",
       "/work-trackers",
       "/all-work-trackers",
       "/scorecard",
@@ -105,6 +107,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/inspections",
       "/annual-inspections",
       "/repairs",
+      "/dashboard-analytics",
       "/work-trackers",
       "/all-work-trackers",
       "/scorecard",
@@ -131,11 +134,15 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     // with it, defaultRedirect lands them there, the same as every other role that has one.
     // /roadmap/backlog (not all of /roadmap): they file and edit backlog tickets, reached from the
     // header's "Request a Feature". The sprint boards stay out of reach — nothing of them syncs.
+    // /dashboard-analytics: the Dashboard & Analytics page of maintenance figures, which this role
+    // is made for (docs/specs/dashboard-analytics-02-access-shell.md). Paths match by whole
+    // segment (pathMatches), so /dashboard does not open it.
     allowedPaths: [
       "/dashboard",
       "/annual-inspections",
       "/damage-reports",
       "/repairs",
+      "/dashboard-analytics",
       "/permissions",
       "/blocked-emails",
       "/changelog",
@@ -208,9 +215,10 @@ export function mergeRoleConfigs(roles: WebRole[]): MergedAccessConfig {
 
 /**
  * Whether these roles may open `pathname`, matched the way `useAccessRedirect` matches it (by
- * path prefix). For UI that links somewhere: a link whose destination would bounce the user
+ * path segment: the address equals an allowed path or continues it after a slash, see
+ * `pathMatches`). For UI that links somewhere: a link whose destination would bounce the user
  * straight back out is a button that does nothing, so it is not shown.
  */
 export function canAccessPath(roles: WebRole[], pathname: string): boolean {
-  return mergeRoleConfigs(roles).allowedPaths.some((p) => pathname.startsWith(p));
+  return mergeRoleConfigs(roles).allowedPaths.some((p) => pathMatches(p, pathname));
 }

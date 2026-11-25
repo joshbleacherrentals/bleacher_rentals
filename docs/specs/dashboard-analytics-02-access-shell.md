@@ -1,7 +1,7 @@
 # Dashboard & Analytics 02: access and the empty page
 
-Status: **DRAFT 2026-11-25, awaiting "Approved"** (3 decisions of the user in this spec, D29 to
-D31; 0 open decisions; nothing built, nothing committed). Build order: **02 of 5**. Needs:
+Status: **APPROVED and IMPLEMENTED 2026-11-25** (3 decisions of the user in this spec, D29 to
+D31; 0 open decisions; built, not committed). Build order: **02 of 5**. Needs:
 [dashboard-analytics-01-design.md](dashboard-analytics-01-design.md) (approved 2026-11-25). Needed
 by: 05, which fills the empty page this spec makes. Specs 03 and 04 do not need it and it does not
 need them. Branch: `q4-sprint4-maintenance-dashboard`.

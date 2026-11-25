@@ -119,6 +119,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
       // inspections list; an account manager owns everything here except the annual inspections.
       // Without per-child roles the dropdown is all-or-nothing, and both would
       // be shown links that bounce them straight back out.
+      // Dashboard & Analytics comes first: the maintenance figures of the whole fleet, for the
+      // roles that read them (docs/specs/dashboard-analytics-02-access-shell.md D3, D29).
+      {
+        label: "Dashboard & Analytics",
+        href: "/dashboard-analytics",
+        roles: ["admin", "viewer", "maintainer"],
+      },
       {
         label: "Damage Reports",
         href: "/damage-reports",

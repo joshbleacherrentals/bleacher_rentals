@@ -1387,3 +1387,57 @@ describe("the Dashboard uses the repair window (spec 11)", () => {
     expect(reports?.roles.maintainer.level).toBe("full");
   });
 });
+
+// docs/specs/dashboard-analytics-02-access-shell.md §2.5 and §5 (D31): the row of the Dashboard &
+// Analytics page, in the group Scorecards, read for the three roles that open it.
+describe("the Dashboard & Analytics row (dashboard-analytics spec 02)", () => {
+  const row = PERMISSIONS.find((p) => p.label === "Dashboard & Analytics");
+
+  it("exists, once, in the group Scorecards, right after Driver Scorecard", () => {
+    expect(PERMISSIONS.filter((p) => p.label === "Dashboard & Analytics")).toHaveLength(1);
+    expect(row?.category).toBe("Scorecards");
+    const index = PERMISSIONS.findIndex((p) => p.label === "Dashboard & Analytics");
+    expect(PERMISSIONS[index - 1]?.label).toBe("Driver Scorecard");
+  });
+
+  it("describes the page, in US dollars, as read-only", () => {
+    expect(row?.description).toBe(
+      "The Dashboard & Analytics page, in the Quality Assurance menu: the maintenance spend, open repairs, budget and cost breakdowns of the whole fleet, in US dollars. It only shows figures; nothing on it can be changed.",
+    );
+  });
+
+  it("is read for an administrator, a viewer and a maintainer", () => {
+    expect(row?.roles.admin.level).toBe("read");
+    expect(row?.roles.viewer.level).toBe("read");
+    expect(row?.roles.maintainer.level).toBe("read");
+    expect(row?.roles.admin.note).toBe(
+      "Opens the page and reads it. Nothing on it can be changed.",
+    );
+    expect(row?.roles.viewer.note).toBe(
+      "Opens the page and reads it. Nothing on it can be changed.",
+    );
+    expect(row?.roles.maintainer.note).toBe(
+      "Opens the page and reads it, with the same figures as an administrator. Nothing on it can be changed.",
+    );
+  });
+
+  it("is none for an account manager, a developer, a driver and an accountant", () => {
+    for (const role of ["account_manager", "developer", "driver", "accountant"] as const) {
+      expect(row?.roles[role].level, role).toBe("none");
+    }
+    expect(row?.roles.account_manager.note).toBe(
+      "Account managers do not have this page; it is hidden from them. They still read every repair on the Repairs page.",
+    );
+    expect(row?.roles.developer.note).toBe(
+      "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
+    );
+    expect(row?.roles.driver.note).toBe("Drivers only have access to the Driver Mobile App.");
+    expect(row?.roles.accountant.note).toContain("Everything else on the web dashboard is hidden");
+  });
+
+  it("is in the maintainer's role description, before the line about quotes", () => {
+    expect(ROLE_DESCRIPTIONS.maintainer).toContain(
+      "Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
+    );
+  });
+});

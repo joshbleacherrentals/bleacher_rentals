@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { CountBadge } from "@/components/CountBadge";
+import { pathMatches } from "@/features/userAccess/logic/pathMatches";
 
 type DropdownChild = {
   label: string;
@@ -36,7 +37,7 @@ function Badge({ count, label }: { count: number; label: string }) {
 
 export const SideNavDropdown = ({ label, icon: Icon, children, badges }: SideNavDropdownProps) => {
   const pathname = usePathname();
-  const isAnyChildSelected = children.some((child) => pathname.startsWith(child.href));
+  const isAnyChildSelected = children.some((child) => pathMatches(child.href, pathname));
   const [isOpen, setIsOpen] = useState(isAnyChildSelected);
   const collapsedCount = children.reduce((sum, child) => sum + (badges?.[child.href] ?? 0), 0);
 
@@ -68,7 +69,7 @@ export const SideNavDropdown = ({ label, icon: Icon, children, badges }: SideNav
       {isOpen && (
         <div className="ml-6 min-w-0">
           {children.map((child) => {
-            const isSelected = pathname.startsWith(child.href);
+            const isSelected = pathMatches(child.href, pathname);
             return (
               <Link
                 key={child.href}

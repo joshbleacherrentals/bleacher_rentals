@@ -268,10 +268,161 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
   });
 });
 
+// docs/specs/dashboard-analytics-02-access-shell.md §2.1, §2.2 and §5: /dashboard-analytics is the
+// page of an administrator, a viewer and a maintainer, and the path rule compares a whole segment.
+describe("the Dashboard & Analytics page", () => {
+  const page = "/dashboard-analytics";
+
+  it("is open to an administrator, a viewer and a maintainer, also by a nested address", () => {
+    for (const role of ["admin", "viewer", "maintainer"] as const) {
+      expect(canAccessPath([role], page), role).toBe(true);
+      expect(canAccessPath([role], `${page}/anything`), role).toBe(true);
+      expect(mergeRoleConfigs([role]).allowedPaths, role).toContain(page);
+    }
+  });
+
+  it("is closed to an account manager, a developer, an accountant and a driver", () => {
+    for (const role of ["account_manager", "developer", "accountant", "driver"] as const) {
+      expect(canAccessPath([role], page), role).toBe(false);
+      expect(canAccessPath([role], `${page}/anything`), role).toBe(false);
+      expect(mergeRoleConfigs([role]).allowedPaths, role).not.toContain(page);
+    }
+  });
+
+  it("is kept by an administrator who is also a driver", () => {
+    expect(canAccessPath(["admin", "driver"], page)).toBe(true);
+  });
+
+  it("is opened by a role of a person who has several, and by no other combination", () => {
+    expect(canAccessPath(["account_manager", "maintainer"], page)).toBe(true);
+    expect(canAccessPath(["account_manager", "accountant"], page)).toBe(false);
+  });
+
+  it("does not open for an account manager through /dashboard, which they still have", () => {
+    expect(canAccessPath(["account_manager"], "/dashboard")).toBe(true);
+    expect(canAccessPath(["account_manager"], "/dashboard/anything")).toBe(true);
+    expect(canAccessPath(["account_manager"], page)).toBe(false);
+  });
+
+  it("sits right after /repairs in the lists of the three roles", () => {
+    for (const role of ["admin", "viewer", "maintainer"] as const) {
+      const { allowedPaths } = mergeRoleConfigs([role]);
+      expect(allowedPaths.indexOf(page), role).toBe(allowedPaths.indexOf("/repairs") + 1);
+    }
+  });
+
+  it("keeps the landing page of every role", () => {
+    expect(mergeRoleConfigs(["admin"]).defaultRedirect).toBe("/dashboard");
+    expect(mergeRoleConfigs(["viewer"]).defaultRedirect).toBe("/dashboard");
+    expect(mergeRoleConfigs(["maintainer"]).defaultRedirect).toBe("/dashboard");
+  });
+});
+
+describe("canAccessPath — the segment rule (docs/specs/dashboard-analytics-02-access-shell.md D2)", () => {
+  it("lets a maintainer open /roadmap/backlog and a ticket under it, and not /roadmap", () => {
+    expect(canAccessPath(["maintainer"], "/roadmap/backlog")).toBe(true);
+    expect(canAccessPath(["maintainer"], "/roadmap/backlog/1")).toBe(true);
+    expect(canAccessPath(["maintainer"], "/roadmap")).toBe(false);
+  });
+
+  it("still opens a nested address and an address with a trailing slash", () => {
+    expect(canAccessPath(["admin"], "/repairs/")).toBe(true);
+    expect(canAccessPath(["account_manager"], "/work-trackers/2026-09-21/abc")).toBe(true);
+  });
+
+  // The routes of src/app (2026-11-25), with a dynamic segment filled in. The segment rule must
+  // give every role the same answer as the old prefix rule on each of them, so that no role loses
+  // or gains a page it has today.
+  const ROUTES = [
+    "/accountant",
+    "/accountant/invoice",
+    "/all-work-trackers",
+    "/annual-inspections",
+    "/annual-inspections/abc",
+    "/assets",
+    "/assets/bleachers",
+    "/assets/documents",
+    "/assets/other-assets",
+    "/blocked-emails",
+    "/changelog",
+    "/companies",
+    "/companies/abc",
+    "/contacts",
+    "/contacts/abc",
+    "/damage-reports",
+    "/dashboard",
+    "/dev-tools/allowed-emails",
+    "/dev-tools/damage-photos",
+    "/dev-tools/performance",
+    "/dev-tools/python-health",
+    "/dev-tools/qbo-get-sales-tax",
+    "/dev-tools/stripe-checkout",
+    "/dev-tools/sync-health",
+    "/driver-calendar",
+    "/driver-satisfaction",
+    "/driver-scorecard",
+    "/event-dashboard",
+    "/inspection-questions",
+    "/inspections",
+    "/inspections/abc",
+    "/leaderboard",
+    "/messages/external",
+    "/messages/internal",
+    "/messages/internal/abc",
+    "/old-dashboard",
+    "/permissions",
+    "/pricing-matrix",
+    "/pricing-matrix/new",
+    "/qbo-quote-types",
+    "/quickbooks",
+    "/quote/abc",
+    "/quotes-bookings",
+    "/quotes-bookings/new",
+    "/quotes-bookings/abc",
+    "/quotes-bookings/abc/edit",
+    "/repairs",
+    "/roadmap",
+    "/roadmap/backlog",
+    "/roadmap/backlog/1",
+    "/sales-offices",
+    "/scorecard",
+    "/storage-locations",
+    "/stripe-connections",
+    "/team",
+    "/team/new",
+    "/team/new/maintainer",
+    "/team/abc/edit/driver",
+    "/terms-and-conditions",
+    "/terms-and-conditions/create",
+    "/work-tracker-types",
+    "/work-trackers",
+    "/work-trackers/2026-09-21/abc",
+    "/zones",
+  ];
+
+  it("gives every role the same answer as the old prefix rule on every route that exists", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "developer",
+      "viewer",
+      "maintainer",
+      "accountant",
+      "driver",
+    ] as const) {
+      const { allowedPaths } = mergeRoleConfigs([role]);
+      for (const route of ROUTES) {
+        const oldAnswer = allowedPaths.some((p) => route.startsWith(p));
+        expect(canAccessPath([role], route), `${role} ${route}`).toBe(oldAnswer);
+      }
+    }
+  });
+});
+
 describe("canAccessPath — a link is shown only if its destination is reachable", () => {
   const driverProfile = "/team/00000000-0000-0000-0000-000000000000/edit/driver";
 
-  it("matches the way the redirect guard matches: by path prefix", () => {
+  it("matches the way the redirect guard matches: by path segment", () => {
     expect(canAccessPath(["account_manager"], driverProfile)).toBe(true);
     expect(canAccessPath(["account_manager"], "/work-trackers/2026-09-21/abc")).toBe(true);
   });

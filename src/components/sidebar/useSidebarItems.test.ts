@@ -122,6 +122,7 @@ describe("useSidebarItems", () => {
     expect(qa!.type).toBe("dropdown");
     const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
     expect(children.map((c) => c.href)).toEqual([
+      "/dashboard-analytics",
       "/damage-reports",
       "/annual-inspections",
       "/repairs",
@@ -149,6 +150,7 @@ describe("useSidebarItems", () => {
       const qa = useSidebarItems([role]).find((i) => i.key === "quality-assurance");
       const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
       expect(children.map((c) => c.href)).toEqual([
+        "/dashboard-analytics",
         "/damage-reports",
         "/inspections",
         "/annual-inspections",
@@ -163,11 +165,55 @@ describe("useSidebarItems", () => {
     );
     const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
     expect(children.map((c) => c.href)).toEqual([
+      "/dashboard-analytics",
       "/damage-reports",
       "/inspections",
       "/annual-inspections",
       "/repairs",
     ]);
+  });
+
+  // ═══ Dashboard & Analytics (docs/specs/dashboard-analytics-02-access-shell.md §2.3, D3, D29) ═══
+
+  const qualityAssuranceChildren = (roles: Parameters<typeof useSidebarItems>[0]) => {
+    const qa = useSidebarItems(roles).find((i) => i.key === "quality-assurance");
+    if (!qa || qa.type !== "dropdown") return undefined;
+    return qa.children;
+  };
+
+  it("the first child of Quality Assurance is Dashboard & Analytics for an administrator, a viewer and a maintainer", () => {
+    for (const role of ["admin", "viewer", "maintainer"] as const) {
+      const first = qualityAssuranceChildren([role])![0];
+      expect(first, role).toEqual({
+        label: "Dashboard & Analytics",
+        href: "/dashboard-analytics",
+        roles: ["admin", "viewer", "maintainer"],
+      });
+    }
+  });
+
+  it("an account manager's Quality Assurance does not contain Dashboard & Analytics", () => {
+    const children = qualityAssuranceChildren(["account_manager"])!;
+    expect(children.map((c) => c.label)).not.toContain("Dashboard & Analytics");
+    expect(children.map((c) => c.href)).not.toContain("/dashboard-analytics");
+  });
+
+  it("an administrator's Quality Assurance reads: Dashboard & Analytics, Damage Reports, Inspections, Annual Inspections, Repairs", () => {
+    expect(qualityAssuranceChildren(["admin"])!.map((c) => c.label)).toEqual([
+      "Dashboard & Analytics",
+      "Damage Reports",
+      "Inspections",
+      "Annual Inspections",
+      "Repairs",
+    ]);
+  });
+
+  it("no other role is offered Dashboard & Analytics, and no other part of the sidebar has it", () => {
+    for (const role of ["developer", "accountant", "driver"] as const) {
+      expect(JSON.stringify(useSidebarItems([role])), role).not.toContain("/dashboard-analytics");
+    }
+    const keys = useSidebarItems(["admin"]).map((i) => i.key);
+    expect(keys).not.toContain("dashboard-analytics");
   });
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══

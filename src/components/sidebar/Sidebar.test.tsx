@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // query and permissions store, so what is under test includes who it is built for.
 
 const mocks = vi.hoisted(() => ({
+  pathname: "/dashboard",
   roles: ["accountant"] as string[],
   rows: [] as unknown[],
   trackers: 0,
@@ -19,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
+vi.mock("next/navigation", () => ({ usePathname: () => mocks.pathname }));
 vi.mock("@/features/userAccess/client", () => ({
   useUserAccess: () => ({ status: "active", roles: mocks.roles }),
 }));
@@ -154,5 +155,66 @@ describe("Sidebar: the QuickBooks invoice count", () => {
     expect(linkTo(html, "/work-trackers")).toContain('data-testid="sidebar-attention-badge"');
     expect(linkTo(html, "/work-trackers")).not.toContain(BADGE);
     expect(linkTo(html, "/accountant")).not.toContain("sidebar-attention-badge");
+  });
+});
+
+// docs/specs/dashboard-analytics-02-access-shell.md §2.1, §2.3 and §5: the highlight of an item
+// follows the same segment rule as the access check, so /dashboard-analytics lights up its own
+// child and not the Dashboard button.
+describe("Sidebar: the highlight of Dashboard & Analytics", () => {
+  beforeEach(() => {
+    mocks.rows = [];
+    mocks.trackers = 0;
+    mocks.pathname = "/dashboard";
+    signInAs("admin");
+  });
+
+  // The selected items carry "font-medium"; the others only have a hover colour.
+  const isLit = (anchor: string | undefined) => anchor?.includes("font-medium") ?? false;
+
+  it("on /dashboard-analytics the new child is selected, its dropdown is open and the Dashboard button is not", () => {
+    mocks.pathname = "/dashboard-analytics";
+
+    const html = draw();
+
+    expect(linkTo(html, "/dashboard-analytics")).toBeDefined();
+    expect(isLit(linkTo(html, "/dashboard-analytics"))).toBe(true);
+    expect(linkTo(html, "/dashboard")).toBeDefined();
+    expect(isLit(linkTo(html, "/dashboard"))).toBe(false);
+  });
+
+  it("on /dashboard the Dashboard button is selected and the new child is not", () => {
+    mocks.pathname = "/dashboard";
+
+    const html = draw();
+
+    expect(isLit(linkTo(html, "/dashboard"))).toBe(true);
+    expect(html).not.toContain('href="/dashboard-analytics"');
+  });
+
+  it("on a nested /dashboard/anything the Dashboard button stays selected", () => {
+    mocks.pathname = "/dashboard/anything";
+
+    expect(isLit(linkTo(draw(), "/dashboard"))).toBe(true);
+  });
+
+  it("on a nested /dashboard-analytics/anything the new child is selected and the Dashboard button is not", () => {
+    mocks.pathname = "/dashboard-analytics/anything";
+
+    const html = draw();
+
+    expect(isLit(linkTo(html, "/dashboard-analytics"))).toBe(true);
+    expect(isLit(linkTo(html, "/dashboard"))).toBe(false);
+  });
+
+  it("is offered to a viewer and a maintainer, and not to an account manager", () => {
+    mocks.pathname = "/dashboard-analytics";
+
+    for (const role of ["viewer", "maintainer"]) {
+      signInAs(role);
+      expect(linkTo(draw(), "/dashboard-analytics"), role).toBeDefined();
+    }
+    signInAs("account_manager");
+    expect(linkTo(draw(), "/dashboard-analytics")).toBeUndefined();
   });
 });

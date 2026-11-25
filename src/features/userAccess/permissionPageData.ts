@@ -34,7 +34,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
   accountant:
     "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Everything else on the web dashboard is hidden from this role.",
 };
@@ -1065,6 +1065,29 @@ export const PERMISSIONS: PermissionEntry[] = [
       viewer: read("Can view all driver scorecard data but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  // docs/specs/dashboard-analytics-02-access-shell.md §2.5 (D31): who opens /dashboard-analytics. The
+  // page is empty until spec 05, which rewrites this description once it shows figures.
+  {
+    label: "Dashboard & Analytics",
+    description:
+      "The Dashboard & Analytics page, in the Quality Assurance menu: the maintenance spend, open repairs, budget and cost breakdowns of the whole fleet, in US dollars. It only shows figures; nothing on it can be changed.",
+    category: "Scorecards",
+    roles: {
+      admin: read("Opens the page and reads it. Nothing on it can be changed."),
+      account_manager: none(
+        "Account managers do not have this page; it is hidden from them. They still read every repair on the Repairs page.",
+      ),
+      developer: none(
+        "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
+      ),
+      viewer: read("Opens the page and reads it. Nothing on it can be changed."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: read(
+        "Opens the page and reads it, with the same figures as an administrator. Nothing on it can be changed.",
+      ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
