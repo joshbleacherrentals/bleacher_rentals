@@ -89,6 +89,8 @@ const BleachersCols = {
   nvis_pdf_path: column.text,
   zone_uuid: column.text,
   storage_location_uuid: column.text,
+  model_number: column.text,
+  asset_value_cents: column.integer,
 } satisfies PowerSyncColsFor<"Bleachers">;
 const Bleachers = new Table(BleachersCols, {
   indexes: {
@@ -605,8 +607,18 @@ const VendorsCols = {
   logo_url: column.text,
   ein: column.text,
   hst: column.text,
+  address_uuid: column.text,
+  phone: column.text,
+  contact_name: column.text,
+  contact_email: column.text,
+  does_trailer_repair: column.integer,
+  does_aluminum_welding: column.integer,
+  does_mobile_repair: column.integer,
+  is_parts_supplier: column.integer,
+  status: column.text,
+  notes: column.text,
 } satisfies PowerSyncColsFor<"Vendors">;
-const Vendors = new Table(VendorsCols);
+const Vendors = new Table(VendorsCols, { indexes: { address_uuid: ["address_uuid"] } });
 
 const BleacherUsersCols = {
   created_at: column.text,
@@ -744,9 +756,69 @@ const MaintenanceEventsCols = {
   created_by_user_uuid: column.text,
   created_at: column.text,
   deleted: column.integer,
+  vendor_uuid: column.text,
+  invoice_number: column.text,
+  status: column.text,
+  completed_at: column.text,
+  currency: column.text,
+  zone_uuid: column.text,
 } satisfies PowerSyncColsFor<"MaintenanceEvents">;
 const MaintenanceEvents = new Table(MaintenanceEventsCols, {
-  indexes: { address_uuid: ["address_uuid"], created_by_user_uuid: ["created_by_user_uuid"] },
+  indexes: {
+    address_uuid: ["address_uuid"],
+    created_by_user_uuid: ["created_by_user_uuid"],
+    vendor_uuid: ["vendor_uuid"],
+    zone_uuid: ["zone_uuid"],
+  },
+});
+
+const MaintenanceLineItemsCols = {
+  created_at: column.text,
+  maintenance_event_uuid: column.text,
+  bleacher_uuid: column.text,
+  damage_category_uuid: column.text,
+  severity: column.text,
+  description: column.text,
+  labor_cents: column.integer,
+  parts_cents: column.integer,
+  tax_cents: column.integer,
+  freight_cents: column.integer,
+  deleted: column.integer,
+} satisfies PowerSyncColsFor<"MaintenanceLineItems">;
+const MaintenanceLineItems = new Table(MaintenanceLineItemsCols, {
+  indexes: {
+    maintenance_event_uuid: ["maintenance_event_uuid"],
+    bleacher_uuid: ["bleacher_uuid"],
+    damage_category_uuid: ["damage_category_uuid"],
+  },
+});
+
+const MaintenanceBudgetsCols = {
+  created_at: column.text,
+  year: column.integer,
+  currency: column.text,
+  amount_cents: column.integer,
+} satisfies PowerSyncColsFor<"MaintenanceBudgets">;
+const MaintenanceBudgets = new Table(MaintenanceBudgetsCols);
+
+const DamageCategoriesCols = {
+  created_at: column.text,
+  name: column.text,
+  is_active: column.integer,
+} satisfies PowerSyncColsFor<"DamageCategories">;
+const DamageCategories = new Table(DamageCategoriesCols);
+
+const DamageReportCategoriesCols = {
+  created_at: column.text,
+  damage_report_uuid: column.text,
+  damage_category_uuid: column.text,
+  report_resolved_at: column.text,
+} satisfies PowerSyncColsFor<"DamageReportCategories">;
+const DamageReportCategories = new Table(DamageReportCategoriesCols, {
+  indexes: {
+    damage_report_uuid: ["damage_report_uuid"],
+    damage_category_uuid: ["damage_category_uuid"],
+  },
 });
 
 const BleacherMaintEventsCols = {
@@ -1446,8 +1518,12 @@ export const AppSchema = new Schema({
   DamageReports,
   DamageReportPhotos,
   DamageReportAcknowledgements,
+  DamageCategories,
+  DamageReportCategories,
   InspectionQuestions,
   MaintenanceEvents,
+  MaintenanceLineItems,
+  MaintenanceBudgets,
   BleacherMaintEvents,
   ScorecardTargets,
   Users,
@@ -1545,6 +1621,10 @@ export type AccountantsRecord = PowerSyncDB["Accountants"];
 export type DamageReportsRecord = PowerSyncDB["DamageReports"];
 export type DamageReportPhotosRecord = PowerSyncDB["DamageReportPhotos"];
 export type MaintenanceEventsRecord = PowerSyncDB["MaintenanceEvents"];
+export type MaintenanceLineItemsRecord = PowerSyncDB["MaintenanceLineItems"];
+export type MaintenanceBudgetsRecord = PowerSyncDB["MaintenanceBudgets"];
+export type DamageCategoriesRecord = PowerSyncDB["DamageCategories"];
+export type DamageReportCategoriesRecord = PowerSyncDB["DamageReportCategories"];
 export type SubrentalEventsRecord = PowerSyncDB["SubrentalEvents"];
 export type StorageLocationsRecord = PowerSyncDB["StorageLocations"];
 export type BleacherMaintEventsRecord = PowerSyncDB["BleacherMaintEvents"];

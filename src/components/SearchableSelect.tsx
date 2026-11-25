@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,15 @@ export type SearchableSelectOption = {
   searchValue?: string;
 };
 
+/**
+ * The dialog a select sits in, or null when it sits on a page. Radix measures the room for an open list
+ * against the screen only, unless it is given a boundary, so a list inside a dialog has to be told where
+ * the dialog ends.
+ */
+export function dialogOf(trigger: Pick<Element, "closest"> | null): Element | null {
+  return trigger?.closest('[role="dialog"], [role="alertdialog"]') ?? null;
+}
+
 type SearchableSelectProps = {
   options: SearchableSelectOption[];
   selected: string | null;
@@ -35,6 +44,8 @@ type SearchableSelectProps = {
   emptyMessage?: string;
   disabled?: boolean;
   className?: string;
+  /** Classes for the open list, e.g. a layer above the dialog the select sits in. */
+  popoverClassName?: string;
   /**
    * Pinned action rendered as the last row of the list — e.g. "+ Add new contact".
    * Deliberately outside the filtered group so it stays reachable when the search
@@ -62,14 +73,23 @@ export function SearchableSelect({
   emptyMessage = "No results found.",
   disabled = false,
   className,
+  popoverClassName,
   footerItem,
   fallbackLabel = null,
   onSearchChange,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [boundary, setBoundary] = useState<Element | null>(null);
 
   const selectedOption = options.find((o) => o.value === selected);
   const triggerLabel = selectedOption?.label ?? fallbackLabel;
+
+  const handleOpenChange = (next: boolean) => {
+    // Found when the list opens, not on render: the dialog is an ancestor and does not change.
+    if (next) setBoundary(dialogOf(triggerRef.current));
+    setOpen(next);
+  };
 
   const handleSelect = (value: string) => {
     onSelect(value === selected ? null : value);
@@ -77,9 +97,10 @@ export function SearchableSelect({
   };
 
   return (
-    <Popover open={open} onOpenChange={disabled ? undefined : setOpen} modal>
+    <Popover open={open} onOpenChange={disabled ? undefined : handleOpenChange} modal>
       <PopoverTrigger asChild>
         <Button
+          ref={triggerRef}
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -116,8 +137,23 @@ export function SearchableSelect({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command>
+      {/*
+        The list is not drawn in a portal, so inside a dialog the dialog clips it. Radix measures the
+        room that is left against the screen only, so the dialog is given as the boundary
+        (`collisionBoundary`); the room it then measures into `--radix-popover-content-available-height`
+        caps the content, which is a flex column, so the search box stays and the list shrinks and
+        scrolls instead of running past the edge of the dialog.
+      */}
+      <PopoverContent
+        className={cn(
+          "flex max-h-(--radix-popover-content-available-height) w-[--radix-popover-trigger-width] flex-col p-0",
+          popoverClassName,
+        )}
+        align="start"
+        collisionBoundary={boundary ?? undefined}
+        collisionPadding={8}
+      >
+        <Command className="min-h-0">
           <CommandInput placeholder={searchPlaceholder} onValueChange={onSearchChange} />
           <CommandList>
             <CommandEmpty>{emptyMessage}</CommandEmpty>

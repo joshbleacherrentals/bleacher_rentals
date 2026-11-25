@@ -1,7 +1,6 @@
 import { db } from "@/components/providers/SystemProvider";
 import { expect, typedGetAll } from "@/lib/powersync/typedQuery";
 import { useCurrentEventStore } from "../state/useCurrentEventStore";
-import { useMaintenanceEventStore } from "@/features/maintenanceEvents/state/useMaintenanceEventStore";
 import type { LostReason } from "@/features/quotesAndBookings/utils/lostReason";
 
 type EventWithAddress = {
@@ -132,11 +131,6 @@ export async function loadEventForModal(
       bleacherTypeUuid,
       quantity,
     }));
-
-    // Only one dashboard form can be open at a time — close the maintenance form.
-    if (target === "dashboard") {
-      useMaintenanceEventStore.getState().resetForm();
-    }
 
     // Load all event data into the store and open modal
     const store = useCurrentEventStore.getState();

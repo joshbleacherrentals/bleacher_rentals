@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repairs - Service window</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+button{font-family:inherit}
+.rp-h{font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#6b7280;white-space:nowrap}
+.rp-bchip{display:inline-block;padding:2px 8px;border-radius:4px;background:#f3f4f6;color:#10365a;font-size:12px;line-height:16px;font-weight:600}
+.rp-cchip{display:inline-block;padding:1px 8px;border:1px solid #d1d5db;border-radius:999px;background:#ffffff;color:#374151;font-size:12px;line-height:18px;white-space:nowrap}
+.rp-link{border:0;background:none;padding:0;font-size:14px;line-height:20px;color:#1d62a3;text-decoration:underline;text-decoration-color:rgba(29,98,163,.35);text-underline-offset:3px;cursor:pointer}
+.rp-link:hover{text-decoration-color:#1d62a3}
+.f-in{display:block;width:100%;height:36px;box-sizing:border-box;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;font-family:inherit;font-size:14px;line-height:20px;color:#111827}
+.f-combo{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:36px;box-sizing:border-box;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;font-size:14px;line-height:20px;text-align:left;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;box-sizing:border-box;border-radius:6px;font-size:14px;line-height:20px;font-weight:600;text-decoration:none;cursor:pointer}
+.btn-primary{border:0;background:#10365a;color:#ffffff;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)}
+.btn-plain{border:1px solid #d1d5db;background:#ffffff;color:#374151}
+.btn-danger{border:1px solid #b23c36;background:#ffffff;color:#a8403a}
+.btn-open{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;color:#10365a;font-size:13px;font-weight:600;text-decoration:none}
+.x-close{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#6b7280;text-decoration:none}
+.x-close:hover{background:#f3f4f6}
+</style>
+</helmet>
+<div style="min-height: 920px; box-sizing: border-box; padding: 56px 24px; background: rgba(15,42,68,0.55); font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; color: #111827;">
+
+<div role="dialog" aria-modal="true" aria-labelledby="svc-title" style="width: 760px; max-width: 100%; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(15,42,68,0.12), 0 24px 64px -16px rgba(15,42,68,0.24);">
+
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px 16px 24px;">
+<div>
+<div class="rp-h">{{ eyebrow }}</div>
+<h2 id="svc-title" style="margin: 2px 0 0 0; font-size: 20px; line-height: 28px; font-weight: 600; color: #10365a;">{{ title }}</h2>
+</div>
+<a href="{{ closeHref }}" aria-label="Close" class="x-close">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+</a>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 24px; box-sizing: border-box; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; background: #f9fafb; font-size: 14px; line-height: 20px;">
+<span class="rp-h">Repair</span>
+<span style="font-weight: 500;">Dallas Trailer Repair</span>
+<span aria-hidden="true" style="color: #9ca3af;">·</span>
+<span style="font-variant-numeric: tabular-nums;">DTR-2377</span>
+<span style="display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; background: #dcede2; color: #2f6b4c; font-size: 13px; font-weight: 500;">Completed</span>
+<span class="rp-cchip">USD</span>
+<sc-if value="{{ isView }}" hint-placeholder-val="{{ true }}">
+<a href="InvoiceModal.dc.html" class="btn-open" style="margin-left: auto;">
+Open repair
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg>
+</a>
+</sc-if>
+</div>
+
+<sc-if value="{{ isView }}" hint-placeholder-val="{{ true }}">
+<div style="padding: 20px 24px 8px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 264px; column-gap: 24px; align-items: start;">
+
+<dl style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 16px; column-gap: 12px; font-size: 14px; line-height: 20px;">
+<dt class="rp-h" style="padding-top: 2px;">Bleacher</dt>
+<dd style="margin: 0;"><span class="rp-bchip">#26</span></dd>
+<dt class="rp-h" style="padding-top: 2px;">Category</dt>
+<dd style="margin: 0;"><span class="rp-cchip">Welding</span></dd>
+<dt class="rp-h" style="padding-top: 2px;">Severity</dt>
+<dd style="margin: 0;"><span style="display: inline-block; padding: 1px 8px; border-radius: 999px; background: #fbf0da; color: #7d5a1c; font-size: 12px; line-height: 18px; font-weight: 500;">Minor</span></dd>
+<dt class="rp-h" style="padding-top: 2px;">Reported</dt>
+<dd style="margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;">
+<span style="font-variant-numeric: tabular-nums;">2026-09-17</span>
+<button type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font-size: 13px; line-height: 20px; font-weight: 500; color: #a8403a; cursor: pointer;">
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b23c36" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+View Damage Report
+</button>
+</dd>
+<dt class="rp-h" style="padding-top: 2px;">Description</dt>
+<dd style="margin: 0; color: #374151;">Needed spindles rewelded</dd>
+</dl>
+
+<div style="padding: 16px; border-radius: 8px; background: #f9fafb; font-size: 14px; line-height: 20px;">
+<div style="display: flex; justify-content: space-between; padding: 4px 0;"><span style="color: #6b7280;">Labor</span><span style="font-variant-numeric: tabular-nums;">{{ v.labor }}</span></div>
+<div style="display: flex; justify-content: space-between; padding: 4px 0;"><span style="color: #6b7280;">Parts</span><span style="font-variant-numeric: tabular-nums;">{{ v.parts }}</span></div>
+<div style="display: flex; justify-content: space-between; padding: 4px 0;"><span style="color: #6b7280;">Tax</span><span style="font-variant-numeric: tabular-nums;">{{ v.tax }}</span></div>
+<div style="display: flex; justify-content: space-between; padding: 4px 0;"><span style="color: #6b7280;">Freight</span><span style="font-variant-numeric: tabular-nums;">{{ v.freight }}</span></div>
+<div style="display: flex; justify-content: space-between; margin-top: 8px; padding: 10px 0 0 0; border-top: 1px solid #d1d5db; font-weight: 600;"><span>Total</span><span style="font-variant-numeric: tabular-nums;">{{ v.total }}</span></div>
+</div>
+
+</div>
+
+<div style="margin: 16px 24px 24px 24px; padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 8px;">
+<div class="rp-h">Bleacher</div>
+<div style="margin-top: 8px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; font-size: 14px; line-height: 20px;">
+<div><div style="font-size: 12px; line-height: 16px; color: #6b7280;">Number</div><div style="font-weight: 500;">#26</div></div>
+<div><div style="font-size: 12px; line-height: 16px; color: #6b7280;">Model number</div><div style="font-weight: 500;">TSP15-450</div></div>
+<div><div style="font-size: 12px; line-height: 16px; color: #6b7280;">Type</div><div style="font-weight: 500;">4 Row</div></div>
+<div><div style="font-size: 12px; line-height: 16px; color: #6b7280;">Zone</div><div style="font-weight: 500;">Zone 3</div></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+<div style="padding: 20px 24px 24px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 264px; column-gap: 24px; align-items: start;">
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<div>
+<label class="rp-h" for="svc-bleacher" style="display: block; margin-bottom: 6px;">Bleacher</label>
+<button id="svc-bleacher" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" class="f-combo" style="color: {{ f.bleacherColor }};">
+<span>{{ f.bleacher }}</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;">
+<div>
+<label class="rp-h" for="svc-cat" style="display: block; margin-bottom: 6px;">Category</label>
+<button id="svc-cat" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" class="f-combo" style="color: {{ f.categoryColor }};">
+<span>{{ f.category }}</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+</div>
+<div>
+<label class="rp-h" for="svc-sev" style="display: block; margin-bottom: 6px;">Severity</label>
+<button id="svc-sev" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" class="f-combo" style="color: {{ f.severityColor }};">
+<span>{{ f.severity }}</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+</div>
+</div>
+<div>
+<label class="rp-h" for="svc-desc" style="display: block; margin-bottom: 6px;">Description</label>
+<textarea id="svc-desc" rows="3" readonly placeholder="What is wrong, or what was done" value="{{ f.desc }}" style="display: block; width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #ffffff; resize: none; font-family: inherit; font-size: 14px; line-height: 20px; color: #111827;"></textarea>
+</div>
+<sc-if value="{{ isEdit }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 13px; line-height: 20px; color: #6b7280;">
+<span class="rp-h">Reported</span>
+<span style="font-variant-numeric: tabular-nums; color: #374151;">2026-09-17</span>
+<span>found from the driver's damage report, not edited here</span>
+</div>
+</sc-if>
+</div>
+
+<div style="padding: 16px; border-radius: 8px; background: #f9fafb;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div>
+<label class="rp-h" for="svc-labor" style="display: block; margin-bottom: 4px;">Labor</label>
+<div style="position: relative;"><span aria-hidden="true" style="position: absolute; left: 12px; top: 8px; font-size: 14px; color: #6b7280;">$</span><input id="svc-labor" type="text" inputmode="decimal" readonly placeholder="0.00" value="{{ f.labor }}" class="f-in" style="padding-left: 26px; text-align: right; font-variant-numeric: tabular-nums;"></div>
+</div>
+<div>
+<label class="rp-h" for="svc-parts" style="display: block; margin-bottom: 4px;">Parts</label>
+<div style="position: relative;"><span aria-hidden="true" style="position: absolute; left: 12px; top: 8px; font-size: 14px; color: #6b7280;">$</span><input id="svc-parts" type="text" inputmode="decimal" readonly placeholder="0.00" value="{{ f.parts }}" class="f-in" style="padding-left: 26px; text-align: right; font-variant-numeric: tabular-nums;"></div>
+</div>
+<div>
+<label class="rp-h" for="svc-tax" style="display: block; margin-bottom: 4px;">Tax</label>
+<div style="position: relative;"><span aria-hidden="true" style="position: absolute; left: 12px; top: 8px; font-size: 14px; color: #6b7280;">$</span><input id="svc-tax" type="text" inputmode="decimal" readonly placeholder="0.00" value="{{ f.tax }}" class="f-in" style="padding-left: 26px; text-align: right; font-variant-numeric: tabular-nums;"></div>
+</div>
+<div>
+<label class="rp-h" for="svc-freight" style="display: block; margin-bottom: 4px;">Freight</label>
+<div style="position: relative;"><span aria-hidden="true" style="position: absolute; left: 12px; top: 8px; font-size: 14px; color: #6b7280;">$</span><input id="svc-freight" type="text" inputmode="decimal" readonly placeholder="0.00" value="{{ f.freight }}" class="f-in" style="padding-left: 26px; text-align: right; font-variant-numeric: tabular-nums;"></div>
+</div>
+</div>
+<div style="display: flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid #d1d5db; font-size: 14px; line-height: 20px; font-weight: 600;"><span>Total</span><span style="font-variant-numeric: tabular-nums;">{{ f.total }}</span></div>
+</div>
+
+</div>
+</sc-if>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid #e5e7eb; background: #ffffff;">
+<div>
+<sc-if value="{{ isView }}" hint-placeholder-val="{{ true }}">
+<button type="button" class="btn btn-danger">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+Delete
+</button>
+</sc-if>
+</div>
+<div style="display: flex; align-items: center; gap: 8px;">
+<sc-if value="{{ isView }}" hint-placeholder-val="{{ true }}">
+<a href="ServiceModalEdit.dc.html" class="btn btn-primary">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+Edit
+</a>
+</sc-if>
+<sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+<a href="{{ closeHref }}" class="btn btn-plain">Cancel</a>
+<a href="{{ closeHref }}" class="btn btn-primary">{{ saveLabel }}</a>
+</sc-if>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"view","options":["view","edit","new"]},"$preview":{"width":1440,"height":920}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props || {};
+    const mode = P.mode === 'edit' || P.mode === 'new' ? P.mode : 'view';
+    const isNew = mode === 'new';
+    const isEdit = mode === 'edit';
+    const isView = mode === 'view';
+
+    // One sample service: bleacher 26, welding, from invoice DTR-2377 (made-up amounts).
+    const view = { labor: '$1,260.00', parts: '$348.60', tax: '$34.55', freight: '$0.00', total: '$1,643.15' };
+    const form = isNew
+      ? { bleacher: 'Select a bleacher', bleacherColor: '#9ca3af', category: 'Select a category', categoryColor: '#9ca3af', severity: 'Select severity', severityColor: '#9ca3af', desc: '', labor: '', parts: '', tax: '', freight: '', total: '$0.00' }
+      : { bleacher: '#26', bleacherColor: '#111827', category: 'Welding', categoryColor: '#111827', severity: 'Minor', severityColor: '#111827', desc: 'Needed spindles rewelded', labor: '1,260.00', parts: '348.60', tax: '34.55', freight: '0.00', total: '$1,643.15' };
+
+    return {
+      isView: isView,
+      isEdit: isEdit,
+      isForm: !isView,
+      eyebrow: isNew ? 'New service' : isEdit ? 'Edit service' : 'Service',
+      title: isNew ? 'Add service' : 'Welding · Bleacher #26',
+      closeHref: isEdit ? 'ServiceModal.dc.html' : 'Main.dc.html',
+      saveLabel: isNew ? 'Add service' : 'Save',
+      v: view,
+      f: form,
+    };
+  }
+}
+</script>
+</body>
+</html>

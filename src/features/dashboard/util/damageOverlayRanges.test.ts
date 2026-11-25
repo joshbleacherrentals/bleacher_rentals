@@ -84,8 +84,9 @@ describe("computeDamageOverlayRanges", () => {
     expect(ranges).toEqual([]);
   });
 
-  it("still draws a report that maintenance auto-resolved, up to the repair day", () => {
-    // createMaintenanceEvent stamps resolved_at + maintenance_event_uuid on the report.
+  it("still draws a report that a repair resolved, up to the repair day", () => {
+    // A repair that is Completed (or made Completed) closes the report and keeps its link
+    // (docs/specs/repairs-09b2-bleachers-zone-reports.md D181).
     const ranges = computeDamageOverlayRanges(
       [report({ resolvedAt: "2025-03-16T11:00:00Z", maintenanceEventUuid: "me-1" })],
       [maintenance("2025-03-16", "me-1")],
