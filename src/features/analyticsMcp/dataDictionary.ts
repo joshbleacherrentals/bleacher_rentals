@@ -418,6 +418,31 @@ export const DATA_DICTIONARY: DataDictionary = {
   Vehicles: { purpose: "Drivers' tow vehicles." },
   AutoWorkTrackerSettings: { purpose: "Settings of the auto work-tracker planner (one row)." },
   RouteCache: { purpose: "Internal: cached Google road distances between points for the planner." },
+  AutoWorkTrackerRuns: {
+    purpose:
+      "One run of the auto work-tracker planner (Create work trackers): zone, week, version, settings, totals.",
+    columns: {
+      auto_work_tracker_id: "The '<zone>|<week start>' key the run stamped on its WorkTrackers.",
+      settings: "JSON: the planner settings the run used.",
+      result: "JSON: the run's totals (created, unplaced, road-time sources...).",
+      discarded_at: "Set when the run's drafts were bulk deleted, e.g. to try other settings.",
+    },
+  },
+  AutoWorkTrackerRunTrips: {
+    purpose:
+      "Each work tracker a planner run created, as the planner wrote it. Compare with WorkTrackers to see what dispatch changed.",
+    columns: {
+      work_tracker_uuid:
+        "The WorkTrackers row it created (no foreign key: a missing tracker means it was deleted).",
+      snapshot:
+        "JSON: { tracker: WorkTrackers columns, lineItems: WorkTrackerLineItems rows } as created.",
+    },
+  },
+  AutoWorkTrackerFeedback: {
+    purpose:
+      "Why someone edited or deleted a planner-made work tracker, or discarded a run, in their own words.",
+    columns: { kind: "edit, delete or discard." },
+  },
 
   // --- Fleet ---
   Bleachers: {

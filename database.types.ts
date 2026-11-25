@@ -139,6 +139,90 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"AutoWorkTrackerFeedback": {
+                  Row: {
+                    "created_at": string,"created_by_user_uuid": string | null,"id": string,"kind": string,"reason": string,"run_trip_uuid": string | null,"run_uuid": string | null,"work_tracker_uuid": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by_user_uuid"?: string | null,"id"?: string,"kind": string,"reason": string,"run_trip_uuid"?: string | null,"run_uuid"?: string | null,"work_tracker_uuid"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by_user_uuid"?: string | null,"id"?: string,"kind"?: string,"reason"?: string,"run_trip_uuid"?: string | null,"run_uuid"?: string | null,"work_tracker_uuid"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerFeedback_created_by_user_uuid_fkey"
+      columns: ["created_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerFeedback_run_trip_uuid_fkey"
+      columns: ["run_trip_uuid"]
+isOneToOne: false
+      referencedRelation: "AutoWorkTrackerRunTrips"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerFeedback_run_uuid_fkey"
+      columns: ["run_uuid"]
+isOneToOne: false
+      referencedRelation: "AutoWorkTrackerRuns"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"AutoWorkTrackerRuns": {
+                  Row: {
+                    "app_version": string | null,"auto_work_tracker_id": string,"commit_sha": string | null,"created_at": string,"created_by_user_uuid": string | null,"discarded_at": string | null,"discarded_by_user_uuid": string | null,"id": string,"result": Json | null,"settings": Json | null,"trips_created": number,"week_start": string,"zone_uuid": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "app_version"?: string | null,"auto_work_tracker_id": string,"commit_sha"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"discarded_at"?: string | null,"discarded_by_user_uuid"?: string | null,"id"?: string,"result"?: Json | null,"settings"?: Json | null,"trips_created"?: number,"week_start": string,"zone_uuid"?: string | null
+                  }
+                  Update: {
+                    "app_version"?: string | null,"auto_work_tracker_id"?: string,"commit_sha"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"discarded_at"?: string | null,"discarded_by_user_uuid"?: string | null,"id"?: string,"result"?: Json | null,"settings"?: Json | null,"trips_created"?: number,"week_start"?: string,"zone_uuid"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerRuns_created_by_user_uuid_fkey"
+      columns: ["created_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerRuns_discarded_by_user_uuid_fkey"
+      columns: ["discarded_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerRuns_zone_uuid_fkey"
+      columns: ["zone_uuid"]
+isOneToOne: false
+      referencedRelation: "Zones"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"AutoWorkTrackerRunTrips": {
+                  Row: {
+                    "created_at": string,"id": string,"run_uuid": string,"snapshot": NonNullable<Json>,"work_tracker_uuid": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"run_uuid": string,"snapshot": NonNullable<Json>,"work_tracker_uuid": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"run_uuid"?: string,"snapshot"?: NonNullable<Json>,"work_tracker_uuid"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerRunTrips_run_uuid_fkey"
+      columns: ["run_uuid"]
+isOneToOne: false
+      referencedRelation: "AutoWorkTrackerRuns"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"AutoWorkTrackerSettings": {
                   Row: {
                     "day_start_hour": number | null,"employee_priority": string | null,"employee_priority_minutes": number | null,"id": string,"max_day_minutes": number | null,"objective": string | null,"search_seconds": number | null,"setup_minutes": number | null,"teardown_minutes": number | null,"updated_at": string | null,"updated_by_user_uuid": string | null

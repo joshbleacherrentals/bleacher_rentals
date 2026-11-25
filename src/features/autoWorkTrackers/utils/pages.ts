@@ -32,6 +32,10 @@ export const AUTO_WORK_TRACKERS_SECTIONS: AutoWorkTrackersSection[] = [
       { slug: "driver-data", label: "Driver Data" },
     ],
   },
+  {
+    label: "Model",
+    pages: [{ slug: "model-runs", label: "Runs" }],
+  },
 ];
 
 export const AUTO_WORK_TRACKERS_PAGES: AutoWorkTrackersPage[] = [

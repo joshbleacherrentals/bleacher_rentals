@@ -18,7 +18,8 @@ import { withoutDuplicates } from "./duplicates";
 import { loadPlanningInputs } from "./loadInputs";
 import { pairKey, type Pair, type RoadLeg } from "./roadTimes";
 import { callSolve, type SolveResponse } from "./solveContract";
-import { planStatements } from "./writePlan";
+import { planRows, rowStatements } from "./writePlan";
+import { runStatements } from "./runLog";
 import { resolveSettings, type PlannerSettings, type SettingsRow } from "./settings";
 import { settingsQuery } from "../db/settings";
 
@@ -116,6 +117,8 @@ export async function planWeek(input: {
   weekStart: string;
   tz: string;
   supabase: SupabaseClient<Database>;
+  /** Who pressed Create (Users.id), recorded on the run. */
+  userUuid: string | null;
 }): Promise<PlanWeekResult> {
   if (running) throw new Error("Work trackers are already being created.");
   running = true;
@@ -176,16 +179,10 @@ export async function planWeek(input: {
       })),
       ...siteWork,
     ];
-    await typedExecuteBatch(
-      planStatements(
-        keep,
-        lines,
-        inputs.tripTypeUuid,
-        autoWorkTrackerKey(input.zoneId, input.weekStart),
-      ),
-    );
+    const autoKey = autoWorkTrackerKey(input.zoneId, input.weekStart);
+    const rows = planRows(keep, lines, inputs.tripTypeUuid, autoKey);
 
-    return {
+    const result: PlanWeekResult = {
       created: keep.length,
       driverDays: new Set(keep.map((p) => `${p.driverUuid}|${p.date}`)).size,
       bleachers: new Set(keep.map((p) => p.trip.bleacherUuid)).size,
@@ -197,6 +194,26 @@ export async function planWeek(input: {
       teardowns: siteWork.filter((l) => l.type === "teardown").length,
       settings,
     };
+
+    // The run and a snapshot of every tracker it creates, in the same batch as the trackers, so the
+    // log can never disagree with what was written.
+    const { settings: used, ...totals } = result;
+    const log = runStatements(
+      {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        createdByUserUuid: input.userUuid,
+        zoneUuid: input.zoneId,
+        weekStart: input.weekStart,
+        autoKey,
+        settings: used,
+        result: totals,
+      },
+      rows,
+    );
+    await typedExecuteBatch([log.run, ...rowStatements(rows), ...log.trips]);
+
+    return result;
   } finally {
     running = false;
   }

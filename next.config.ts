@@ -9,7 +9,12 @@ const { version } = JSON.parse(readFileSync(path.join(process.cwd(), "package.js
 };
 
 const nextConfig: NextConfig = {
-  env: { NEXT_PUBLIC_APP_VERSION: version },
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+    // The commit a build came from, so an Auto Work Trackers run records the code it ran on.
+    // Vercel sets VERCEL_GIT_COMMIT_SHA at build time; empty locally.
+    NEXT_PUBLIC_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "",
+  },
   images: {
     disableStaticImages: true,
   },

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
+import { useCurrentUser } from "@/hooks/db/useCurrentUser";
 import { planWeek, type PlanWeekResult } from "../planner/planWeek";
 import { summarizeUnassigned } from "../utils/unassignedSummary";
 import { describeSettings } from "../planner/settings";
@@ -26,6 +27,7 @@ export function GenerateWorkTrackersButton({
   const [result, setResult] = useState<PlanWeekResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const supabase = useClerkSupabaseClient();
+  const { data: me } = useCurrentUser();
 
   const handleClick = async () => {
     if (!supabase) return;
@@ -39,6 +41,7 @@ export function GenerateWorkTrackersButton({
           weekStart,
           tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
           supabase,
+          userUuid: me?.[0]?.id ?? null,
         }),
       );
     } catch (e) {
