@@ -1,7 +1,8 @@
 # Dashboard & Analytics page: plan
 
 Status: **APPROVED 2026-11-25** (0 open decisions in the plan; every spec of the series asks its
-own questions before it is written). Page: `/dashboard-analytics`.
+own questions before it is written). Spec 01 (the design) is approved; specs 02 to 05 are written
+and await "Approved" (§2). Page: `/dashboard-analytics`.
 Branch: `q4-sprint4-maintenance-dashboard`.
 
 ## 0. The feature in brief (the same in the plan and in every spec)
@@ -179,6 +180,17 @@ USD at the rate of its Repair from day. **Bleachers:** D13.
 Five are planned. Each is its own logic, its own "Approved" and its own commit. A page spec is
 written only after the design is approved, and only after its questions are answered. Under each
 spec is what it must settle; these are questions, not decisions.
+
+**State (2026-11-25).** Spec 01 is approved (D25 to D28). Specs 02 to 05 were written after the
+user answered their questions, and each awaits "Approved":
+
+- **02:** `dashboard-analytics-02-access-shell.md`, decisions D29 to D31.
+- **03:** `dashboard-analytics-03-converter.md`, decisions D32 to D35.
+- **04:** `dashboard-analytics-04-data-numbers.md`, decisions D36 to D40.
+- **05:** `dashboard-analytics-05-page.md`, decisions D41 and D42.
+
+The questions listed under each spec below are the ones that were asked; the answers are the
+decisions of that spec.
 
 - **01, the design:** `dashboard-analytics-01-design.md` and the boards in
   `docs/design/dashboard-analytics/`. No app code.

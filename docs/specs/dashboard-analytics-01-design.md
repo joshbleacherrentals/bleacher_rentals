@@ -1,8 +1,8 @@
 # Dashboard & Analytics 01: the design of the page
 
-Status: **DRAFT 2026-11-25, awaiting "Approved"** (design only, nothing to build, uncommitted; 0 open
-decisions). Build order: **01 of 5**. Needs: [dashboard-analytics-plan.md](dashboard-analytics-plan.md)
-(approved). Needed by: 02 to 05. Branch: `q4-sprint4-maintenance-dashboard`.
+Status: **APPROVED 2026-11-25** (design only, nothing to build; 0 open decisions). Build order:
+**01 of 5**. Needs: [dashboard-analytics-plan.md](dashboard-analytics-plan.md) (approved). Needed
+by: 02 to 05. Branch: `q4-sprint4-maintenance-dashboard`.
 Scope: **the design only**. No app code, no tests, no permissions row. The deliverable is the canvas
 in `docs/design/dashboard-analytics/` and this text.
 
