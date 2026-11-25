@@ -68,9 +68,10 @@ function toISODate(value: string | null | undefined): string | null {
  * - a report resolved with no maintenance event ends on its resolution day;
  * - otherwise it runs to the last visible column.
  *
- * Resolved reports still draw: `createMaintenanceEvent` stamps `resolved_at` on every
- * open report of the bleacher, so skipping them would erase the strip at the exact
- * moment the repair that bounds it is scheduled.
+ * Resolved reports still draw: a repair that is Completed closes the reports it holds and keeps
+ * their link (docs/specs/repairs-09b2-bleachers-zone-reports.md D181), so skipping them would erase
+ * the strip at the exact moment the repair that bounds it is finished. An open report that a repair
+ * only holds (it is linked at the repair's first service) draws the same way, up to the repair day.
  *
  * Reports created after the window, and damage already closed before the window opens,
  * produce no range. Overlapping ranges are resolved by the caller (major wins over minor).

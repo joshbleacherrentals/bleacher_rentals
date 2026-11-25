@@ -99,15 +99,6 @@ export class EventsUtil {
         selectedStatus?: string;
         goodshuffleUrl?: string | null;
       } | null;
-      // Optional injection of a currently selected maintenance event to preview
-      selectedMaintenance?: {
-        maintenanceEventUuid?: string | null;
-        bleacherUuids: string[];
-        eventStart: string;
-        eventEnd: string;
-        eventName?: string;
-        address?: string;
-      } | null;
       // Optional injection of a currently selected subrental event to preview
       selectedSubrental?: {
         subrentalEventUuid?: string | null;
@@ -128,17 +119,6 @@ export class EventsUtil {
     const selectedStartCol =
       selectedStartISO != null ? dateToIndex.get(selectedStartISO) : undefined;
     const selectedEndCol = selectedEndISO != null ? dateToIndex.get(selectedEndISO) : undefined;
-
-    const selMaint = opts?.selectedMaintenance;
-    const selMaintStartISO = selMaint?.eventStart
-      ? DateTime.fromISO(selMaint.eventStart).toISODate()
-      : null;
-    const selMaintEndISO = selMaint?.eventEnd
-      ? DateTime.fromISO(selMaint.eventEnd).toISODate()
-      : null;
-    const selMaintStartCol =
-      selMaintStartISO != null ? dateToIndex.get(selMaintStartISO) : undefined;
-    const selMaintEndCol = selMaintEndISO != null ? dateToIndex.get(selMaintEndISO) : undefined;
 
     const selRental = opts?.selectedSubrental;
     const selRentalStartISO = selRental?.eventStart
@@ -204,13 +184,6 @@ export class EventsUtil {
 
       // Add maintenance events as spans
       for (const me of bleacher.maintenanceEvents ?? []) {
-        // If editing an existing maintenance event, exclude its persisted spans
-        if (
-          selMaint?.maintenanceEventUuid != null &&
-          me.maintenanceEventUuid === selMaint.maintenanceEventUuid
-        ) {
-          continue;
-        }
         const startISO = DateTime.fromISO(me.eventStart).toISODate();
         const endISO = DateTime.fromISO(me.eventEnd).toISODate();
         if (!startISO || !endISO) continue;
@@ -293,30 +266,6 @@ export class EventsUtil {
           isSelected: true,
         } as any; // BleacherEvent compatible
         spans.push({ start: selectedStartCol, end: selectedEndCol, ev, rowIndex });
-      }
-
-      // Inject a synthetic maintenance preview span
-      if (
-        selMaint &&
-        Array.isArray(selMaint.bleacherUuids) &&
-        selMaint.bleacherUuids.includes(bleacher.bleacherUuid) &&
-        selMaintStartCol !== undefined &&
-        selMaintEndCol !== undefined
-      ) {
-        const ev = {
-          eventUuid: selMaint.maintenanceEventUuid ?? "-1",
-          bleacherEventUuid: "-1",
-          eventName: selMaint.eventName || "Maintenance / Repair",
-          address: selMaint.address || "",
-          eventStart: selMaint.eventStart,
-          eventEnd: selMaint.eventEnd,
-          hslHue: null,
-          booked: true,
-          goodshuffleUrl: null,
-          isMaintenance: true,
-          isSelected: true,
-        } as any;
-        spans.push({ start: selMaintStartCol, end: selMaintEndCol, ev, rowIndex });
       }
 
       // Inject a synthetic subrental preview span

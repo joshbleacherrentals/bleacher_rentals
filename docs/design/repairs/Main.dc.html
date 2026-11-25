@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repairs - Open tab</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+button{font-family:inherit}
+.rp-th{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:0;font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#6b7280;cursor:pointer;white-space:nowrap}
+.rp-th:hover{color:#1f2937}
+.rp-h{font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#6b7280;white-space:nowrap}
+.rp-row{background:#ffffff;cursor:pointer}
+.rp-row:hover{background:#f9fafb}
+.rp-row-open,.rp-row-open:hover{background:#f1f6fc}
+.rp-bchip{display:inline-block;padding:2px 8px;border-radius:4px;background:#f3f4f6;color:#10365a;font-size:12px;line-height:16px;font-weight:600}
+.rp-cchip{display:inline-block;padding:1px 8px;border:1px solid #d1d5db;border-radius:999px;background:#ffffff;color:#374151;font-size:12px;line-height:18px;white-space:nowrap}
+.rp-link{border:0;background:none;padding:0;font-size:14px;line-height:20px;color:#1d62a3;text-decoration:underline;text-decoration-color:rgba(29,98,163,.35);text-underline-offset:3px;cursor:pointer}
+.rp-link:hover{text-decoration-color:#1d62a3}
+.rp-iconbtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;color:#374151;text-decoration:none}
+.rp-iconbtn:hover{background:#f3f4f6}
+.rp-svc:hover{background:#f9fafb}
+.rp-addbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;color:#10365a;font-size:13px;font-weight:600;text-decoration:none}
+.rp-addbtn:hover{background:#f3f4f6}
+.rp-opt:hover{background:#f3f4f6}
+</style>
+</helmet>
+<div style="max-width: 1440px; margin: 0 auto; padding: 24px; box-sizing: border-box; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; color: #111827; background: #ffffff;">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-bottom: 16px;">
+<div>
+<h1 style="margin: 0; font-size: 24px; line-height: 32px; font-weight: 700; color: #10365a;">Repairs</h1>
+<p style="margin: 0; font-size: 14px; line-height: 20px; color: #6b7280;">All maintenance and repair events across the fleet</p>
+</div>
+<a href="InvoiceModalNew.dc.html" style="display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; box-sizing: border-box; border-radius: 6px; background: #10365a; color: #ffffff; font-size: 14px; line-height: 20px; font-weight: 600; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+New repair
+</a>
+</div>
+
+<div role="group" aria-label="Total cost of the repairs in this tab" style="display: flex; flex-wrap: wrap; align-items: stretch; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff;">
+<div style="padding: 12px 24px; min-width: 170px;">
+<div class="rp-h">Total cost · CAD</div>
+<div style="font-size: 22px; line-height: 30px; font-weight: 600; color: #10365a; font-variant-numeric: tabular-nums;">{{ stripCad }}</div>
+</div>
+<div aria-hidden="true" style="width: 1px; background: #e5e7eb;"></div>
+<div style="padding: 12px 24px; min-width: 170px;">
+<div class="rp-h">Total cost · USD</div>
+<div style="font-size: 22px; line-height: 30px; font-weight: 600; color: #10365a; font-variant-numeric: tabular-nums;">{{ stripUsd }}</div>
+</div>
+<div style="flex: 1 1 240px; display: flex; align-items: center; justify-content: flex-end; padding: 12px 24px; font-size: 13px; line-height: 18px; color: #6b7280; text-align: right;">{{ stripCaption }}</div>
+</div>
+
+<div role="tablist" aria-label="Repairs" style="display: inline-flex; align-items: center; height: 36px; padding: 3px; box-sizing: border-box; border-radius: 8px; background: #f4f4f5; width: fit-content; margin-top: 16px;">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+<button type="button" role="tab" aria-selected="{{ t.selected }}" onClick="{{ t.onClick }}" style="display: inline-flex; align-items: center; height: 29px; padding: 4px 12px; border: 1px solid transparent; border-radius: 6px; background: {{ t.bg }}; box-shadow: {{ t.shadow }}; color: #18181b; font-size: 14px; line-height: 20px; font-weight: 500; white-space: nowrap; cursor: pointer;">{{ t.label }}</button>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px;">
+<div style="position: relative; width: 300px; max-width: 100%;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 10px;"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input type="search" aria-label="Search repairs" placeholder="Search invoice #, vendor, notes" style="display: block; width: 100%; height: 36px; box-sizing: border-box; padding: 0 12px 0 36px; border: 1px solid #d1d5db; border-radius: 6px; background: #ffffff; font-family: inherit; font-size: 14px; color: #111827;">
+</div>
+<sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+<div style="position: relative;">
+<button type="button" aria-haspopup="true" aria-expanded="{{ f.open }}" onClick="{{ f.toggle }}" style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px 0 12px; box-sizing: border-box; border: 1px solid {{ f.btnBorder }}; border-radius: 6px; background: {{ f.btnBg }}; color: {{ f.btnInk }}; font-size: 14px; line-height: 20px; font-weight: 500; cursor: pointer;">
+{{ f.label }}
+<sc-if value="{{ f.hasSel }}" hint-placeholder-val="{{ false }}">
+<span style="display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 10px; background: #1d62a3; color: #ffffff; font-size: 12px; font-weight: 600;">{{ f.count }}</span>
+</sc-if>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+<sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+<div role="group" aria-label="{{ f.label }} filter" style="position: absolute; top: 42px; left: 0; z-index: 50; width: 272px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; box-shadow: 0 8px 24px rgba(15,42,68,0.14), 0 2px 6px rgba(15,42,68,0.08);">
+<div style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
+<input type="search" aria-label="Search in {{ f.label }}" placeholder="Search" style="display: block; width: 100%; height: 32px; box-sizing: border-box; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 14px; color: #111827;">
+</div>
+<div style="max-height: 264px; overflow-y: auto; padding: 4px;">
+<sc-for list="{{ f.options }}" as="o" hint-placeholder-count="6">
+<button type="button" role="menuitemcheckbox" aria-checked="{{ o.checked }}" onClick="{{ o.toggle }}" class="rp-opt" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; font-size: 14px; line-height: 20px; color: #111827; text-align: left; cursor: pointer;">
+<span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; box-sizing: border-box; border: 1px solid {{ o.boxBorder }}; border-radius: 4px; background: {{ o.boxBg }};">
+<sc-if value="{{ o.checked }}" hint-placeholder-val="{{ false }}">
+<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+</sc-if>
+</span>
+<span style="min-width: 0;">{{ o.label }}</span>
+</button>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-top: 1px solid #e5e7eb;">
+<button type="button" onClick="{{ f.clear }}" style="border: 0; background: none; padding: 4px 0; font-size: 13px; font-weight: 500; color: #1d62a3; cursor: pointer;">Clear</button>
+</div>
+</div>
+</sc-if>
+</div>
+</sc-for>
+<button type="button" aria-pressed="false" style="display: inline-flex; align-items: center; gap: 6px; height: 36px; margin-left: auto; padding: 0 12px; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 6px; background: #ffffff; color: #6b7280; font-size: 14px; line-height: 20px; font-weight: 500; cursor: pointer;">
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+Show Deleted
+</button>
+</div>
+
+<div style="margin-top: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff; overflow-x: auto;">
+<div role="table" aria-label="Repairs" style="min-width: 2554px; font-size: 14px; line-height: 20px;">
+
+<div role="row" style="display: grid; grid-template-columns: 176px 124px 124px 124px 84px 100px 190px 220px 160px 200px 132px 100px 100px 92px 92px 112px 116px 72px; column-gap: 12px; align-items: center; min-height: 44px; background: #f9fafb;">
+<div role="columnheader" class="rp-h" style="position: sticky; left: 0; z-index: 2; background: #f9fafb; align-self: stretch; display: flex; align-items: center; padding-left: 16px;">Bleachers</div>
+<div role="columnheader"><button type="button" class="rp-th">Reported<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader"><button type="button" class="rp-th">Repair from<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader"><button type="button" class="rp-th">Repair to<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader"><button type="button" class="rp-th">Zone<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader" class="rp-h">Severity</div>
+<div role="columnheader" class="rp-h">Categories</div>
+<div role="columnheader"><button type="button" class="rp-th">Notes<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader"><button type="button" class="rp-th">Status<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader"><button type="button" class="rp-th">Vendor<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader"><button type="button" class="rp-th">Invoice #<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader" style="justify-self: end;"><button type="button" class="rp-th">Labor<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader" style="justify-self: end;"><button type="button" class="rp-th">Parts<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader" style="justify-self: end;"><button type="button" class="rp-th">Tax<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader" style="justify-self: end;"><button type="button" class="rp-th">Freight<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader" style="justify-self: end;"><button type="button" class="rp-th">Total<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader"><button type="button" class="rp-th">Completed<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></div>
+<div role="columnheader" style="position: sticky; right: 0; z-index: 2; background: #f9fafb; align-self: stretch;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">Actions</span></div>
+</div>
+
+<sc-for list="{{ rows }}" as="row" hint-placeholder-count="6">
+<div role="rowgroup" style="border-top: 1px solid #e5e7eb; min-width: 2554px;">
+
+<div role="row" class="{{ row.cls }}" onClick="{{ row.toggle }}" style="display: grid; grid-template-columns: 176px 124px 124px 124px 84px 100px 190px 220px 160px 200px 132px 100px 100px 92px 92px 112px 116px 72px; column-gap: 12px; align-items: center; min-height: 64px;">
+
+<div role="cell" style="position: sticky; left: 0; z-index: 2; background: inherit; align-self: stretch; display: flex; align-items: flex-start; gap: 6px; padding: 14px 0 14px 12px;">
+<button type="button" aria-expanded="{{ row.open }}" aria-label="{{ row.toggleLabel }}" onClick="{{ row.toggle }}" style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-top: -1px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #6b7280; cursor: pointer;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: {{ row.chevron }};"><path d="m9 18 6-6-6-6"></path></svg>
+</button>
+<div style="display: flex; flex-wrap: wrap; gap: 4px; min-width: 0;">
+<sc-for list="{{ row.bleachers }}" as="b" hint-placeholder-count="2">
+<span class="rp-bchip">{{ b.label }}</span>
+</sc-for>
+</div>
+</div>
+
+<div role="cell" style="white-space: nowrap; font-variant-numeric: tabular-nums;">
+<sc-if value="{{ row.hasReported }}" hint-placeholder-val="{{ true }}">
+<button type="button" class="rp-link" title="Open damage report" onClick="{{ row.stop }}">{{ row.reported }}</button><span style="margin-left: 6px; font-size: 12px; color: #6b7280;">{{ row.reportedMore }}</span>
+</sc-if>
+<sc-if value="{{ row.noReported }}" hint-placeholder-val="{{ false }}">
+<span style="color: #9ca3af;">—</span>
+</sc-if>
+</div>
+
+<div role="cell" style="white-space: nowrap; font-variant-numeric: tabular-nums;">{{ row.from }}</div>
+<div role="cell" style="white-space: nowrap; font-variant-numeric: tabular-nums;">{{ row.to }}</div>
+<div role="cell" style="white-space: nowrap;">{{ row.zone }}</div>
+
+<div role="cell" style="display: flex; flex-wrap: wrap; gap: 4px;">
+<sc-for list="{{ row.sev }}" as="v" hint-placeholder-count="1">
+<span style="display: inline-block; padding: 1px 8px; border-radius: 999px; background: {{ v.bg }}; color: {{ v.ink }}; font-size: 12px; line-height: 18px; font-weight: 500;">{{ v.label }}</span>
+</sc-for>
+</div>
+
+<div role="cell" style="display: flex; flex-wrap: wrap; gap: 4px;">
+<sc-for list="{{ row.cats }}" as="c" hint-placeholder-count="2">
+<span class="rp-cchip">{{ c.label }}</span>
+</sc-for>
+</div>
+
+<div role="cell" title="{{ row.notes }}" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4b5563;">{{ row.notes }}</div>
+
+<div role="cell" style="position: relative;">
+<button type="button" aria-haspopup="menu" aria-expanded="{{ row.menuOpen }}" aria-label="{{ row.statusLabel }}" onClick="{{ row.toggleMenu }}" style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 12px; box-sizing: border-box; border: 0; border-radius: 999px; background: {{ row.status.bg }}; color: {{ row.status.ink }}; font-size: 13px; line-height: 20px; font-weight: 500; white-space: nowrap; cursor: pointer;">
+{{ row.status.label }}
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+<sc-if value="{{ row.menuOpen }}" hint-placeholder-val="{{ false }}">
+<div role="menu" aria-label="Change status" style="position: absolute; top: 34px; left: 0; z-index: 50; width: 200px; box-sizing: border-box; padding: 4px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; box-shadow: 0 8px 24px rgba(15,42,68,0.14), 0 2px 6px rgba(15,42,68,0.08); cursor: default;">
+<sc-for list="{{ row.statusOptions }}" as="o" hint-placeholder-count="6">
+<button type="button" role="menuitemradio" aria-checked="{{ o.current }}" onClick="{{ o.pick }}" class="rp-opt" style="display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 8px; border: 0; border-radius: 6px; background: {{ o.bg }}; font-size: 14px; line-height: 20px; color: #111827; text-align: left; cursor: pointer;">
+<span aria-hidden="true" style="flex: none; width: 8px; height: 8px; border-radius: 4px; background: {{ o.dot }};"></span>
+<span style="flex: 1 1 auto;">{{ o.label }}</span>
+<sc-if value="{{ o.current }}" hint-placeholder-val="{{ false }}">
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10365a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+</sc-if>
+</button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<div role="cell" title="{{ row.vendor.t }}" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: {{ row.vendor.c }};">{{ row.vendor.t }}</div>
+<div role="cell" style="white-space: nowrap; font-variant-numeric: tabular-nums; color: {{ row.invoice.c }};">{{ row.invoice.t }}</div>
+<div role="cell" style="text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: {{ row.labor.c }};">{{ row.labor.t }}</div>
+<div role="cell" style="text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: {{ row.parts.c }};">{{ row.parts.t }}</div>
+<div role="cell" style="text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: {{ row.tax.c }};">{{ row.tax.t }}</div>
+<div role="cell" style="text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: {{ row.freight.c }};">{{ row.freight.t }}</div>
+<div role="cell" style="text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; color: {{ row.total.c }};">{{ row.total.t }}</div>
+<div role="cell" style="white-space: nowrap; font-variant-numeric: tabular-nums; color: {{ row.completed.c }};">{{ row.completed.t }}</div>
+
+<div role="cell" style="position: sticky; right: 0; z-index: 2; background: inherit; align-self: stretch; display: flex; align-items: center; justify-content: flex-end; padding: 0 16px 0 8px;">
+<a href="InvoiceModal.dc.html" aria-label="{{ row.openLabel }}" title="Open repair" class="rp-iconbtn">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+</a>
+</div>
+
+</div>
+
+<sc-if value="{{ row.open }}" hint-placeholder-val="{{ false }}">
+<div style="position: sticky; left: 0; width: 1360px; box-sizing: border-box; padding: 4px 16px 16px 16px;">
+<div style="border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; overflow: hidden; box-shadow: 0 1px 2px rgba(15,42,68,0.05);">
+<div role="row" style="display: grid; grid-template-columns: 84px 148px 96px 124px minmax(220px, 1fr) 100px 100px 88px 88px 112px 20px; column-gap: 12px; align-items: center; min-height: 36px; padding: 0 16px; background: #f9fafb;">
+<div role="columnheader" class="rp-h">Bleacher</div>
+<div role="columnheader" class="rp-h">Category</div>
+<div role="columnheader" class="rp-h">Severity</div>
+<div role="columnheader" class="rp-h">Reported</div>
+<div role="columnheader" class="rp-h">Description</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Labor</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Parts</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Tax</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Freight</div>
+<div role="columnheader" class="rp-h" style="text-align: right;">Total</div>
+<div role="columnheader"></div>
+</div>
+<sc-for list="{{ row.services }}" as="s" hint-placeholder-count="2">
+<a href="ServiceModal.dc.html" aria-label="{{ s.label }}" class="rp-svc" style="display: grid; grid-template-columns: 84px 148px 96px 124px minmax(220px, 1fr) 100px 100px 88px 88px 112px 20px; column-gap: 12px; align-items: center; min-height: 48px; padding: 8px 16px; box-sizing: border-box; border-top: 1px solid #e5e7eb; color: #111827; text-decoration: none; background: #ffffff;">
+<div role="cell"><span class="rp-bchip">{{ s.bleacher }}</span></div>
+<div role="cell"><span class="rp-cchip">{{ s.cat }}</span></div>
+<div role="cell"><span style="display: inline-block; padding: 1px 8px; border-radius: 999px; background: {{ s.sev.bg }}; color: {{ s.sev.ink }}; font-size: 12px; line-height: 18px; font-weight: 500;">{{ s.sev.label }}</span></div>
+<div role="cell" style="white-space: nowrap; font-variant-numeric: tabular-nums; color: {{ s.rep.c }};">{{ s.rep.t }}</div>
+<div role="cell" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4b5563;">{{ s.desc }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums; color: {{ s.labor.c }};">{{ s.labor.t }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums; color: {{ s.parts.c }};">{{ s.parts.t }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums; color: {{ s.tax.c }};">{{ s.tax.t }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums; color: {{ s.freight.c }};">{{ s.freight.t }}</div>
+<div role="cell" style="text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: {{ s.total.c }};">{{ s.total.t }}</div>
+<div role="cell" style="display: flex; justify-content: flex-end; color: #9ca3af;"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></div>
+</a>
+</sc-for>
+</div>
+<div style="margin-top: 12px;">
+<a href="ServiceModalNew.dc.html" class="rp-addbtn">
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+Add service
+</a>
+</div>
+</div>
+</sc-if>
+
+</div>
+</sc-for>
+
+<sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="position: sticky; left: 0; width: 1360px; box-sizing: border-box; padding: 56px 16px; text-align: center; color: #9ca3af; border-top: 1px solid #e5e7eb;">
+<svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; margin: 0 auto 8px auto;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+No repairs found.
+</div>
+</sc-if>
+
+</div>
+</div>
+
+<nav aria-label="Pagination" style="margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; line-height: 20px; color: #4b5563;">
+<select aria-label="Rows per page" style="height: 32px; padding: 0 8px; border: 1px solid #d1d5db; border-radius: 4px; background: #ffffff; font-family: inherit; font-size: 14px; color: #374151;">
+<option>25 per page</option>
+<option>50 per page</option>
+<option>100 per page</option>
+</select>
+<span>{{ pagerText }}</span>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tab":{"editor":"enum","default":"open","options":["open","completed"]},"expandedId":{"editor":"text","default":"jj5"},"statusMenuId":{"editor":"text","default":"none"},"filterOpen":{"editor":"text","default":"none"},"preselect":{"editor":"text","default":""},"empty":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1280}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: null, expanded: null, menu: null, filterOpen: null, sel: null, status: {} };
+  }
+
+  renderVals() {
+    const P = this.props || {};
+    const S = this.state;
+
+    // Starting state comes from the props (the other boards set them); a click then moves to the component's own state.
+    const tab = S.tab === null ? (P.tab === 'completed' ? 'completed' : 'open') : S.tab;
+    const exId = P.expandedId === undefined ? 'jj5' : P.expandedId;
+    const expanded = S.expanded === null ? (exId && exId !== 'none' ? { [exId]: true } : {}) : S.expanded;
+    const menu = S.menu === null ? (P.statusMenuId && P.statusMenuId !== 'none' ? P.statusMenuId : '') : S.menu;
+    const filterOpen = S.filterOpen === null ? (P.filterOpen && P.filterOpen !== 'none' ? P.filterOpen : '') : S.filterOpen;
+    let sel0 = {};
+    if (P.preselect) {
+      const i = String(P.preselect).indexOf(':');
+      if (i > 0) sel0[String(P.preselect).slice(0, i)] = String(P.preselect).slice(i + 1).split(',');
+    }
+    const sel = S.sel === null ? sel0 : S.sel;
+    const empty = !!P.empty;
+
+    const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
+
+    const STATUS = {
+      inbound: { label: 'Inbound', bg: '#dce9f7', ink: '#1a5892' },
+      triaged: { label: 'Triaged', bg: '#ece8fa', ink: '#563b9c' },
+      waiting_repair: { label: 'Waiting repair', bg: '#fbf0da', ink: '#7d5a1c' },
+      in_repair: { label: 'In repair', bg: '#fde6d2', ink: '#93440d' },
+      confirm_repair: { label: 'Confirm repair', bg: '#d6eeee', ink: '#1b6464' },
+      completed: { label: 'Completed', bg: '#dcede2', ink: '#2f6b4c' },
+    };
+    const ORDER = ['inbound', 'triaged', 'waiting_repair', 'in_repair', 'confirm_repair', 'completed'];
+    const SEV = {
+      Major: { label: 'Major', bg: '#fbe7e5', ink: '#a8403a' },
+      Minor: { label: 'Minor', bg: '#fbf0da', ink: '#7d5a1c' },
+      Routine: { label: 'Routine', bg: '#eef1f6', ink: '#4f6178' },
+    };
+
+    // Made-up sample rows that follow the maintenance log of the spreadsheet. A null amount is "not known yet".
+    const N = null;
+    const OPEN = [
+      { id: 'in1', vendor: N, invoice: N, status: 'inbound', from: '2026-11-17', to: '2026-11-19', zone: 'Zone 3', cur: 'USD', completed: N, notes: 'Cracked tire reported by the driver',
+        services: [{ b: 52, cat: 'Tires', sev: 'Minor', rep: '2026-11-16', desc: 'Cracked tire, needs replacement', l: N, p: N, t: N, f: N }] },
+      { id: 'in2', vendor: N, invoice: N, status: 'inbound', from: '2026-11-17', to: '2026-11-20', zone: 'Zone 2', cur: 'USD', completed: N, notes: 'Front jacks will not lower on two units',
+        services: [
+          { b: 27, cat: 'Jacks', sev: 'Minor', rep: '2026-11-15', desc: 'Front jack stuck', l: N, p: N, t: N, f: N },
+          { b: 34, cat: 'Jacks', sev: 'Minor', rep: '2026-11-15', desc: 'Front jack stuck', l: N, p: N, t: N, f: N },
+        ] },
+      { id: 'tri1', vendor: 'Kaypark', invoice: 'KP-209428', status: 'triaged', from: '2026-10-13', to: '2026-10-24', zone: 'Zone 2', cur: 'USD', completed: N, notes: "Ordered replacement plank for unit - shipping to Matt's",
+        services: [{ b: 40, cat: 'Seating', sev: 'Major', rep: '2026-10-12', desc: 'Tractor ran into bench seat', l: 0, p: 620, t: 110.07, f: 603 }] },
+      { id: 'wait1', vendor: 'BR Simcoe Shop', invoice: N, status: 'waiting_repair', from: '2026-09-17', to: '2026-09-30', zone: 'Zone 1', cur: 'CAD', completed: N, notes: 'Spoke to Dave regarding the unit - he will be fixing it',
+        services: [{ b: 9, cat: 'Welding', sev: 'Major', rep: '2026-09-16', desc: 'Back bar, tail side, weld broke and needs repair', l: N, p: N, t: N, f: N }] },
+      { id: 'rep1', vendor: 'Suncoast Fleet Services', invoice: N, status: 'in_repair', from: '2026-10-08', to: '2026-10-22', zone: 'Zone 2', cur: 'USD', completed: N, notes: "Chain wasn't disconnected - bent holder and seat board",
+        services: [{ b: 69, cat: 'Welding', sev: 'Major', rep: '2026-10-07', desc: "Chain wasn't disconnected - bent holder and seat board", l: N, p: N, t: N, f: N }] },
+      { id: 'jj5', vendor: 'Jessie James Sales & Enterprises', invoice: 'JJ-5', status: 'confirm_repair', from: '2026-09-04', to: '2026-10-13', zone: 'Zone 3', cur: 'USD', completed: N, notes: 'Replaced battery, hydraulic lines and fittings',
+        services: [
+          { b: 59, cat: 'Batteries', sev: 'Minor', rep: '2026-09-03', desc: 'Needed replacement battery', l: N, p: 259.99, t: 0, f: N },
+          { b: 51, cat: 'Hydraulics', sev: 'Minor', rep: '2026-09-26', desc: 'Needed replacement hydraulic lines and fittings', l: 380, p: 148.74, t: 0, f: N },
+          { b: 26, cat: 'Hydraulics', sev: 'Minor', rep: '2026-10-12', desc: 'Needed replacement hydraulic lines and fittings', l: N, p: 151.75, t: 0, f: N },
+        ] },
+    ];
+    const DONE = [
+      { id: 'cp', vendor: 'Caprock Tire', invoice: 'CP-47247', status: 'completed', from: '2026-10-27', to: '2026-10-27', zone: 'Zone 3', cur: 'USD', completed: '2026-10-27', notes: 'Replaced cracked tire',
+        services: [{ b: 17, cat: 'Tires', sev: 'Minor', rep: '2026-10-27', desc: 'Replaced cracked tire', l: 15, p: 116, t: 7.83, f: 0 }] },
+      { id: 'dta', vendor: 'Danielsville Tire and Automotive', invoice: 'DTA-1', status: 'completed', from: '2026-10-23', to: '2026-10-23', zone: 'Zone 2', cur: 'USD', completed: '2026-10-23', notes: 'Replaced all brakes (drum and assembly), mounted a new tire, replaced the battery and all grease fittings',
+        services: [
+          { b: 34, cat: 'Hauling', sev: 'Major', rep: '2026-10-23', desc: 'Brakes were worn', l: 415, p: 1619, t: 0, f: 0 },
+          { b: 34, cat: 'Tires', sev: 'Major', rep: '2026-10-23', desc: 'Tire had a bolt in it, needed to be replaced', l: 25, p: 170.63, t: 0, f: 0 },
+          { b: 34, cat: 'Batteries', sev: 'Minor', rep: '2026-10-23', desc: 'Replaced battery', l: 0, p: 226, t: 0, f: 0 },
+        ] },
+      { id: 'amz', vendor: 'Amazon', invoice: '111-2167669-6281035', status: 'completed', from: '2026-10-19', to: '2026-10-19', zone: 'Zone 2', cur: 'USD', completed: '2026-10-19', notes: 'Replacing jacks',
+        services: [{ b: 27, cat: 'Jacks', sev: 'Minor', rep: '2026-10-19', desc: 'Multiple units need jacks, two sent to test on unit 27', l: 0, p: 246.98, t: 22.22, f: N }] },
+      { id: 'ol', vendor: 'Outlaw Maintenance & Repair', invoice: 'OL-1482', status: 'completed', from: '2026-09-15', to: '2026-10-05', zone: 'Zone 1', cur: 'CAD', completed: '2026-10-05', notes: 'Welded spindles and repaired handrail',
+        services: [{ b: 88, cat: 'Welding', sev: 'Major', rep: '2026-09-14', desc: 'Entire handrail came apart', l: 1275, p: 22, t: 0, f: 65 }] },
+      { id: 'kp17', vendor: 'Kaypark', invoice: 'KP-209317', status: 'completed', from: '2026-09-16', to: '2026-10-02', zone: 'Zone 3', cur: 'USD', completed: '2026-10-02', notes: "Ordered replacement handrails, shipped to Garreth's",
+        services: [{ b: 17, cat: 'Seating', sev: 'Major', rep: '2026-09-15', desc: 'Needed replacement handrails', l: 0, p: 314, t: 48.94, f: 279 }] },
+      { id: 'dtr', vendor: 'Dallas Trailer Repair', invoice: 'DTR-2377', status: 'completed', from: '2026-09-18', to: '2026-09-29', zone: 'Zone 3', cur: 'USD', completed: '2026-09-29', notes: 'Welded new spindle in place and replaced jack',
+        services: [
+          { b: 26, cat: 'Welding', sev: 'Minor', rep: '2026-09-17', desc: 'Needed spindles rewelded', l: 1260, p: 348.6, t: 34.55, f: 0 },
+          { b: 26, cat: 'Jacks', sev: 'Minor', rep: '2026-09-17', desc: 'Needed replacement jack', l: 0, p: 70.44, t: 0, f: 0 },
+        ] },
+    ];
+
+    const money = (n, cur) => (n === null ? '—' : (cur === 'CAD' ? 'C$' : '$') + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
+    const sumOf = (xs) => { const v = xs.filter((x) => x !== null); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
+    const cell = (t) => ({ t: t, c: t === '—' ? '#9ca3af' : '#111827' });
+    const lineTotal = (s) => sumOf([s.l, s.p, s.t, s.f]);
+
+    const FILTERS = [
+      { key: 'Bleacher', options: ['#9', '#17', '#26', '#27', '#34', '#40', '#51', '#52', '#59', '#69', '#88'] },
+      { key: 'Zone', options: ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4', 'Zone 5'] },
+      { key: 'Vendor', options: ['Amazon', 'BR Simcoe Shop', 'Caprock Tire', 'Dallas Trailer Repair', 'Danielsville Tire and Automotive', 'Jessie James Sales & Enterprises', 'Kaypark', 'Outlaw Maintenance & Repair', 'Suncoast Fleet Services'] },
+      { key: 'Category', options: ['Tires', 'Wiring', 'Jacks', 'Hydraulics', 'Welding', 'Batteries', 'Seating', 'Hauling', 'Unassigned'] },
+    ];
+
+    const pick = (k) => sel[k] || [];
+    const passes = (m) => {
+      const bl = pick('Bleacher');
+      if (bl.length && !m.services.some((s) => bl.indexOf('#' + s.b) > -1)) return false;
+      const zn = pick('Zone');
+      if (zn.length && zn.indexOf(m.zone) < 0) return false;
+      const vn = pick('Vendor');
+      if (vn.length && (!m.vendor || vn.indexOf(m.vendor) < 0)) return false;
+      const ct = pick('Category');
+      if (ct.length && !m.services.some((s) => ct.indexOf(s.cat) > -1)) return false;
+      return true;
+    };
+
+    const source = empty ? [] : (tab === 'completed' ? DONE : OPEN).filter(passes);
+
+    const view = (m) => {
+      const st = S.status[m.id] || m.status;
+      const meta = STATUS[st];
+      const sv = m.services;
+      const isOpen = !!expanded[m.id];
+      const bl = Array.from(new Set(sv.map((s) => s.b))).sort((a, b) => a - b);
+      const dates = Array.from(new Set(sv.map((s) => s.rep).filter(Boolean))).sort();
+      const sevs = ['Major', 'Minor', 'Routine'].filter((v) => sv.some((s) => s.sev === v));
+      const cats = Array.from(new Set(sv.map((s) => s.cat)));
+      const col = (k) => sumOf(sv.map((s) => s[k]));
+      const idLabel = m.invoice ? 'repair ' + m.invoice : 'repair of bleacher ' + bl.map((b) => '#' + b).join(', ');
+      return {
+        id: m.id,
+        cls: isOpen ? 'rp-row rp-row-open' : 'rp-row',
+        open: isOpen,
+        chevron: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+        toggleLabel: (isOpen ? 'Collapse ' : 'Expand ') + idLabel,
+        toggle: (e) => { stop(e); this.setState({ expanded: Object.assign({}, expanded, { [m.id]: !isOpen }) }); },
+        stop: stop,
+        openLabel: 'Open ' + idLabel,
+        statusLabel: 'Status ' + meta.label + '. Change status of ' + idLabel,
+        bleachers: bl.map((b) => ({ label: '#' + b })),
+        hasReported: dates.length > 0,
+        noReported: dates.length === 0,
+        reported: dates.length ? dates[0] : '',
+        reportedMore: dates.length > 1 ? '+' + (dates.length - 1) : '',
+        from: m.from,
+        to: m.to,
+        zone: m.zone,
+        sev: sevs.map((v) => SEV[v]),
+        cats: cats.map((c) => ({ label: c })),
+        notes: m.notes,
+        status: meta,
+        menuOpen: menu === m.id,
+        toggleMenu: (e) => { stop(e); this.setState({ menu: menu === m.id ? '' : m.id }); },
+        statusOptions: ORDER.map((k) => ({
+          label: STATUS[k].label,
+          dot: STATUS[k].ink,
+          current: k === st,
+          bg: k === st ? '#f3f4f6' : '#ffffff',
+          pick: (e) => { stop(e); this.setState({ status: Object.assign({}, S.status, { [m.id]: k }), menu: '' }); },
+        })),
+        vendor: cell(m.vendor || '—'),
+        invoice: cell(m.invoice || '—'),
+        labor: cell(money(col('l'), m.cur)),
+        parts: cell(money(col('p'), m.cur)),
+        tax: cell(money(col('t'), m.cur)),
+        freight: cell(money(col('f'), m.cur)),
+        total: cell(money(sumOf(sv.map(lineTotal)), m.cur)),
+        completed: cell(m.completed || '—'),
+        services: sv.map((s) => ({
+          label: 'Open service: bleacher ' + s.b + ', ' + s.cat,
+          bleacher: '#' + s.b,
+          cat: s.cat,
+          sev: SEV[s.sev],
+          rep: cell(s.rep || '—'),
+          desc: s.desc,
+          labor: cell(money(s.l, m.cur)),
+          parts: cell(money(s.p, m.cur)),
+          tax: cell(money(s.t, m.cur)),
+          freight: cell(money(s.f, m.cur)),
+          total: cell(money(lineTotal(s), m.cur)),
+        })),
+      };
+    };
+
+    const sumCur = (cur) => source.filter((m) => m.cur === cur).reduce((a, m) => a + (sumOf(m.services.map(lineTotal)) || 0), 0);
+    const n = source.length;
+
+    return {
+      tabs: [['open', 'Open'], ['completed', 'Completed']].map((p) => ({
+        label: p[1],
+        selected: tab === p[0],
+        bg: tab === p[0] ? '#ffffff' : 'transparent',
+        shadow: tab === p[0] ? '0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1)' : 'none',
+        onClick: () => this.setState({ tab: p[0], expanded: {}, menu: '' }),
+      })),
+      stripCad: money(sumCur('CAD'), 'CAD'),
+      stripUsd: money(sumCur('USD'), 'USD'),
+      stripCaption: (tab === 'open' ? 'Open repairs' : 'Completed repairs') + ' that match the filters',
+      filters: FILTERS.map((f) => {
+        const picked = pick(f.key);
+        const isOpen = filterOpen === f.key;
+        return {
+          label: f.key,
+          open: isOpen,
+          hasSel: picked.length > 0,
+          count: String(picked.length),
+          btnBg: picked.length ? '#eef4fb' : '#ffffff',
+          btnBorder: picked.length ? '#1d62a3' : '#d1d5db',
+          btnInk: picked.length ? '#10365a' : '#374151',
+          toggle: () => this.setState({ filterOpen: isOpen ? '' : f.key }),
+          clear: () => this.setState({ sel: Object.assign({}, sel, { [f.key]: [] }) }),
+          options: f.options.map((o) => {
+            const on = picked.indexOf(o) > -1;
+            return {
+              label: o,
+              checked: on,
+              boxBg: on ? '#1d62a3' : '#ffffff',
+              boxBorder: on ? '#1d62a3' : '#9ca3af',
+              toggle: () => this.setState({ sel: Object.assign({}, sel, { [f.key]: on ? picked.filter((x) => x !== o) : picked.concat([o]) }) }),
+            };
+          }),
+        };
+      }),
+      rows: source.map(view),
+      isEmpty: n === 0,
+      pagerText: n === 0 ? '0 of 0' : '1–' + n + ' of ' + n,
+    };
+  }
+}
+</script>
+</body>
+</html>

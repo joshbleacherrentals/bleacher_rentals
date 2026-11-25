@@ -1,0 +1,37 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-18T12:00:00Z" },
+  "title": "Repairs page design",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 1280, "title": "1 · Open tab", "expand": "fill", "is_interactive": true },
+    "Completed.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 1280, "title": "2 · Completed tab", "expand": "fill", "is_interactive": true },
+    "StatusMenu.dc.html": { "x": 0, "y": 1400, "w": 1440, "h": 960, "title": "3 · Status menu open", "expand": "fill", "is_interactive": true },
+    "FilterMenu.dc.html": { "x": 1520, "y": 1400, "w": 1440, "h": 960, "title": "4 · Category filter open", "expand": "fill", "is_interactive": true },
+    "Empty.dc.html": { "x": 0, "y": 2480, "w": 1440, "h": 640, "title": "5 · No repairs found", "expand": "fill", "is_interactive": true },
+    "ServiceModal.dc.html": { "x": 0, "y": 3240, "w": 1440, "h": 920, "title": "6 · Service (view)", "expand": "fill", "is_interactive": true },
+    "ServiceModalEdit.dc.html": { "x": 1520, "y": 3240, "w": 1440, "h": 920, "title": "7 · Service (edit)", "expand": "fill", "is_interactive": true },
+    "ServiceModalNew.dc.html": { "x": 0, "y": 4280, "w": 1440, "h": 920, "title": "8 · Add service", "expand": "fill", "is_interactive": true },
+    "InvoiceModal.dc.html": { "x": 0, "y": 5320, "w": 1440, "h": 1480, "title": "9 · Repair (view)", "expand": "fill", "is_interactive": true },
+    "InvoiceModalEdit.dc.html": { "x": 1520, "y": 5320, "w": 1440, "h": 1480, "title": "10 · Repair (edit)", "expand": "fill", "is_interactive": true },
+    "InvoiceModalNew.dc.html": { "x": 0, "y": 6920, "w": 1440, "h": 1240, "title": "11 · New repair", "expand": "fill", "is_interactive": true }
+  },
+  "order": [
+    "Main.dc.html",
+    "Completed.dc.html",
+    "StatusMenu.dc.html",
+    "FilterMenu.dc.html",
+    "Empty.dc.html",
+    "ServiceModal.dc.html",
+    "ServiceModalEdit.dc.html",
+    "ServiceModalNew.dc.html",
+    "InvoiceModal.dc.html",
+    "InvoiceModalEdit.dc.html",
+    "InvoiceModalNew.dc.html"
+  ],
+  "notes": {
+    "title": { "x": 0, "y": -260, "text": "Repairs page", "kind": "title1", "maxW": 2960 }
+  },
+  "designSystems": []
+}

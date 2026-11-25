@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-// docs/specs/dashboard-events-read-only.md §3.2 and §7. A click on an empty cell no longer offers
-// "Create Event"; Work Tracker, Maintenance and Create Sub-Rental stay, for admin and account
-// manager only. Everything around the popup is replaced: this only reads what it draws.
+// docs/specs/dashboard-events-read-only.md §3.2 and §7, and docs/specs/repairs-11-dashboard.md §2.1
+// and §7 (D215, D218, D231). A click on an empty cell no longer offers "Create Event". Work Tracker
+// and Create Sub-Rental are for an admin and an account manager; Maintenance (it opens the New
+// repair window) is for an admin and a maintainer, on every cell. Everything around the popup is
+// replaced: this only reads what it draws.
 
 const mocks = vi.hoisted(() => ({
   perms: {
@@ -55,9 +57,6 @@ vi.mock("@/features/workTrackers/util/createWorkTrackerDraft", () => ({
   buildWorkTrackerDraft: vi.fn(),
   checkWorkTrackerOpenAccess: vi.fn(),
 }));
-vi.mock("@/features/maintenanceEvents/state/useMaintenanceEventStore", () => ({
-  useMaintenanceEventStore: { getState: () => ({}) },
-}));
 vi.mock("@/features/subrentals/state/useSubrentalEventStore", () => ({
   useSubrentalEventStore: { getState: () => ({}) },
 }));
@@ -86,18 +85,28 @@ describe("CellEditor toolbar", () => {
     expect(html).not.toContain("Create Event");
   });
 
-  it("offers the same three to an account manager", () => {
+  it("offers Work Tracker and Create Sub-Rental to an account manager, and no Maintenance (D215, D218)", () => {
     mocks.perms = { ...mocks.perms, isAdmin: false, isAccountManager: true };
     const html = render();
 
     expect(html).toContain('aria-label="Work Tracker"');
-    expect(html).toContain('aria-label="Maintenance"');
     expect(html).toContain('aria-label="Create Sub-Rental"');
+    expect(html).not.toContain('aria-label="Maintenance"');
     expect(html).not.toContain("Create Event");
   });
 
-  it("offers none of them to a viewer or maintainer", () => {
-    mocks.perms = { ...mocks.perms, isAdmin: false, isAccountManager: false };
+  it("offers Maintenance and nothing else to a maintainer, on a cell with someone else's note (D218, D231)", () => {
+    mocks.perms = { ...mocks.perms, isAdmin: false, isAccountManager: false, isMaintainer: true };
+    const html = render();
+
+    expect(html).toContain('aria-label="Maintenance"');
+    expect(html).not.toContain('aria-label="Work Tracker"');
+    expect(html).not.toContain('aria-label="Create Sub-Rental"');
+    expect(html).not.toContain("Create Event");
+  });
+
+  it("offers none of them to a viewer", () => {
+    mocks.perms = { ...mocks.perms, isAdmin: false, isAccountManager: false, isMaintainer: false };
     const html = render();
 
     expect(html).not.toContain('aria-label="Work Tracker"');

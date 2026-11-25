@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildRemoveFixedMarkUpdate,
+  canCreateRepairForReport,
   buildResolveWithoutMaintenanceUpdate,
   canResolveWithoutMaintenance,
   describeFixedMark,
@@ -86,5 +87,37 @@ describe("what the panel says", () => {
 
     expect(text).toContain("Fixed by a driver");
     expect(text).not.toContain("null");
+  });
+});
+
+/**
+ * docs/specs/repairs-11-dashboard.md §2.5 and §7 (D217, D235): "Create Maintenance to Resolve" opens
+ * the New repair window. It is drawn for an administrator and a maintainer, for a report that is not
+ * resolved and not yet linked to a repair.
+ */
+describe("when Create Maintenance to Resolve is offered", () => {
+  const open = { resolved_at: null, maintenance_event_uuid: null };
+
+  it("is offered to a manager on a report that is open and not linked", () => {
+    expect(canCreateRepairForReport(open, true)).toBe(true);
+  });
+
+  it("is not offered to anyone who is not a manager", () => {
+    expect(canCreateRepairForReport(open, false)).toBe(false);
+  });
+
+  it("is not offered on a resolved report", () => {
+    expect(
+      canCreateRepairForReport(
+        { resolved_at: "2026-11-01T10:00:00Z", maintenance_event_uuid: null },
+        true,
+      ),
+    ).toBe(false);
+  });
+
+  it("is not offered on a report that is already linked to a repair, even an open one (D235)", () => {
+    expect(
+      canCreateRepairForReport({ resolved_at: null, maintenance_event_uuid: "m-1" }, true),
+    ).toBe(false);
   });
 });

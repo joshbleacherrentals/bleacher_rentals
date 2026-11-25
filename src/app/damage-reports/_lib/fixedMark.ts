@@ -36,6 +36,19 @@ export function canResolveWithoutMaintenance(report: FixedMarkRow): boolean {
 }
 
 /**
+ * Whether to draw `Create Maintenance to Resolve`, which opens the New repair window with the bleacher
+ * of the report (docs/specs/repairs-11-dashboard.md §2.5, D217, D235): a manager (an administrator or a
+ * maintainer), a report that is not resolved and is not yet linked to a repair. A report already linked
+ * is taken by no new repair (09b2 D179), so the button would do nothing for it.
+ */
+export function canCreateRepairForReport(
+  report: { resolved_at: string | null; maintenance_event_uuid: string | null },
+  canManage: boolean,
+): boolean {
+  return canManage && !report.resolved_at && !report.maintenance_event_uuid;
+}
+
+/**
  * The update behind that button. `maintenance_event_uuid` is deliberately
  * untouched: there was no repair job, and inventing one would put a phantom
  * entry in the bleacher's maintenance history.
