@@ -2,7 +2,7 @@
  * Turns the week's planning inputs into the Python solver's request, and keeps what is needed to
  * read its answer back. Business rules live here, not in Python: which days a trip may happen,
  * which driver-days exist, and every place-to-place drive (Google's road time where known, else an
- * estimate, else a cautious unknown). Pure.
+ * estimate, else a cautious unknown), and the hour on site for each teardown and setup. Pure.
  */
 
 import { DateTime } from "luxon";
@@ -18,6 +18,7 @@ import {
   type RoadLeg,
 } from "./roadTimes";
 import type { SolveRequest } from "./solveContract";
+import { SETUP_MINUTES, TEARDOWN_MINUTES, siteWorkFor } from "../utils/siteWork";
 
 export const MAX_DAY_MINUTES = 12 * 60;
 export const SEARCH_SECONDS = 3;
@@ -26,7 +27,7 @@ export type UnplacedReason =
   | "no_window" // the bleacher is never free between the events (back to back)
   | "outside_week" // its free days all fall outside the week
   | "no_free_driver_day" // no driver had room on those days
-  | "too_long_for_a_day"; // even alone, home → pickup → drop-off → home is over 12 hours
+  | "too_long_for_a_day"; // even alone, home → pickup → drop-off → home (with setup/teardown) is over 12 hours
 
 export type PlanTrip = NeededTrip & { pickup: Point | null; dropoff: Point | null };
 export type PlanDriver = { driverUuid: string; home: Point | null };
@@ -168,6 +169,8 @@ export function buildSolve(input: {
         pickup: tripPlaces[k].pickup,
         dropoff: tripPlaces[k].dropoff,
         vehicles: vehicles.filter((v) => p.days.includes(v.day)).map((v) => v.id),
+        pickup_minutes: siteWorkFor(trips[k]).teardown ? TEARDOWN_MINUTES : 0,
+        dropoff_minutes: siteWorkFor(trips[k]).setup ? SETUP_MINUTES : 0,
       })),
       max_day_minutes: MAX_DAY_MINUTES,
       search_seconds: input.searchSeconds ?? SEARCH_SECONDS,

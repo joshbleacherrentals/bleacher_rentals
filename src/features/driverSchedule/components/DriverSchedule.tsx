@@ -22,12 +22,15 @@ const hourLabel = (h: number) =>
 function Span({ span }: { span: ScheduleSpan }) {
   const haul = span.kind === "haul";
   const width = span.end - span.start;
+  const look = haul
+    ? "bg-blue-600 px-1 text-white"
+    : span.kind === "site"
+      ? "border border-amber-500 bg-amber-300"
+      : "border border-gray-400 bg-gray-300";
   return (
     <AppTooltip content={<span className="text-xs">{span.title}</span>}>
       <div
-        className={`absolute top-2 bottom-2 overflow-hidden rounded-sm text-[11px] leading-[1.6rem] whitespace-nowrap ${
-          haul ? "bg-blue-600 px-1 text-white" : "border border-gray-400 bg-gray-300"
-        }`}
+        className={`absolute top-2 bottom-2 overflow-hidden rounded-sm text-[11px] leading-[1.6rem] whitespace-nowrap ${look}`}
         style={{
           left: pct(span.start),
           width: pct(width),
@@ -140,6 +143,10 @@ export function DriverSchedule({
         <span className="flex items-center gap-1">
           <span className="inline-block h-3 w-6 rounded-sm border border-gray-400 bg-gray-300" />{" "}
           Deadhead (from home, between trips, home)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-3 w-6 rounded-sm border border-amber-500 bg-amber-300" />{" "}
+          Teardown / setup (an hour on site)
         </span>
         <span className="flex items-center gap-1">
           <span

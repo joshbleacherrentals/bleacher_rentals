@@ -16,6 +16,7 @@ const trip = (over: Partial<PlanTrip> = {}): PlanTrip => ({
   toStreet: "B",
   fromAddressUuid: "a",
   toAddressUuid: "b",
+  pickupAtEvent: true,
   fromEventUuid: "e1",
   toEventUuid: "e2",
   availableFrom: "2026-09-15",
@@ -63,12 +64,30 @@ describe("buildSolve", () => {
     });
     expect(built.vehicles.map((v) => v.id)).toEqual(["d1|2026-09-15"]);
     expect(built.request.trips).toEqual([
-      { id: "0", pickup: 1, dropoff: 2, vehicles: ["d1|2026-09-15"] },
+      {
+        id: "0",
+        pickup: 1,
+        dropoff: 2,
+        vehicles: ["d1|2026-09-15"],
+        pickup_minutes: 60, // teardown at the event it leaves
+        dropoff_minutes: 60, // setup at the next one
+      },
     ]);
     expect(built.request.minutes[1][2]).toBe(15);
     expect(built.request.costs[1][2]).toBe(15_000);
     expect(built.request.minutes[0][1]).toBe(estimateLeg(HOME, A).minutes);
     expect(built.leg(1, 2)).toEqual({ meters: 15_000, minutes: 15 });
+  });
+
+  it("asks for no teardown time when the bleacher is not picked up from the event", () => {
+    const built = buildSolve({
+      trips: [trip({ pickupAtEvent: false })],
+      drivers: [{ driverUuid: "d1", home: HOME }],
+      blocked: new Set(),
+      weekStart: WEEK,
+      roadLegs,
+    });
+    expect(built.request.trips[0]).toMatchObject({ pickup_minutes: 0, dropoff_minutes: 60 });
   });
 
   it("treats a place with no coordinates as unknown: cautious on the clock, stored as null", () => {

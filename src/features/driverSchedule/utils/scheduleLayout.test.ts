@@ -23,6 +23,8 @@ const tracker = (over: Partial<ScheduleTracker>): ScheduleTracker => ({
   haulMinutes: null,
   deadheadInMinutes: null,
   returnHomeMinutes: null,
+  teardownMinutes: 0,
+  setupMinutes: 0,
   bleacherNumber: 12,
   pickupLabel: "Fair",
   dropoffLabel: "Rodeo",
@@ -72,6 +74,33 @@ describe("layoutSchedule", () => {
     ]);
     expect(days[0].trips).toBe(2);
     expect(days[0].driveMinutes).toBe(60 + 120 + 30 + 90 + 45);
+  });
+
+  it("paints the teardown before the haul and the setup after it, and does not count them as driving", () => {
+    const [monday] = layoutSchedule(
+      [
+        tracker({
+          plannedPickupAt: at(WEEK, "08:00"), // arrives; tears down until 9
+          plannedDropoffAt: at(WEEK, "10:30"), // arrives; sets up until 11:30
+          haulMinutes: 90,
+          deadheadInMinutes: 60,
+          returnHomeMinutes: 30,
+          teardownMinutes: 60,
+          setupMinutes: 60,
+        }),
+      ],
+      WEEK,
+    );
+    expect(monday.spans.map((s) => [s.kind, s.start, s.end])).toEqual([
+      ["deadhead", 7 * 60, 8 * 60],
+      ["site", 8 * 60, 9 * 60],
+      ["haul", 9 * 60, 10 * 60 + 30],
+      ["site", 10 * 60 + 30, 11 * 60 + 30],
+      ["deadhead", 11 * 60 + 30, 12 * 60],
+    ]);
+    expect(monday.spans[1].title).toContain("Teardown");
+    expect(monday.spans[3].title).toContain("Setup");
+    expect(monday.driveMinutes).toBe(60 + 90 + 30);
   });
 
   it("places trips with no planned times from the start of the day, as early as they can be", () => {

@@ -24,6 +24,8 @@ export function driverScheduleQuery(userUuid: string, weekStart: string, weekEnd
       "w.drive_minutes as drive_minutes",
       "w.deadhead_in_drive_minutes as deadhead_in_drive_minutes",
       "w.return_home_drive_minutes as return_home_drive_minutes",
+      "w.setup_required as setup_required",
+      "w.teardown_required as teardown_required",
       "b.bleacher_number as bleacher_number",
       "pa.street as pickup_street",
       "da.street as dropoff_street",

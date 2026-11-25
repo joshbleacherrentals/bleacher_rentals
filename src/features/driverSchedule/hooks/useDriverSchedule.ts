@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { SETUP_MINUTES, TEARDOWN_MINUTES } from "@/features/autoWorkTrackers/utils/siteWork";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { timestampToDate } from "@/features/autoWorkTrackers/utils/discoverTrips";
 import { weekEndOf } from "@/features/autoWorkTrackers/utils/week";
@@ -27,6 +28,8 @@ type Row = {
   drive_minutes: number | null;
   deadhead_in_drive_minutes: number | null;
   return_home_drive_minutes: number | null;
+  setup_required: number | null;
+  teardown_required: number | null;
   bleacher_number: number | null;
   pickup_street: string | null;
   dropoff_street: string | null;
@@ -83,6 +86,8 @@ export function useDriverSchedule(
           haulMinutes: r.drive_minutes,
           deadheadInMinutes: r.deadhead_in_drive_minutes,
           returnHomeMinutes: r.return_home_drive_minutes,
+          teardownMinutes: r.teardown_required ? TEARDOWN_MINUTES : 0,
+          setupMinutes: r.setup_required ? SETUP_MINUTES : 0,
           bleacherNumber: r.bleacher_number,
           pickupLabel: r.pickup_street,
           dropoffLabel: r.dropoff_street,

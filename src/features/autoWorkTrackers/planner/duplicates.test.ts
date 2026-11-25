@@ -10,6 +10,7 @@ const trip = (bleacherUuid: string): PlanTrip => ({
   toStreet: "2371 Merrittville Highway",
   fromAddressUuid: "a",
   toAddressUuid: "ev-b",
+  pickupAtEvent: true,
   fromEventUuid: "e1",
   toEventUuid: "e2",
   availableFrom: "2026-09-13",

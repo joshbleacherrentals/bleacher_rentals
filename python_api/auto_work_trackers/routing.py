@@ -6,7 +6,8 @@ answer into work trackers.
 Rules (constraints):
 - A trip goes on one of the vehicles it allows (its days, a driver free that day).
 - One bleacher at a time: a trip's pickup is followed by its own drop-off.
-- A vehicle's day, leaving home to getting back, is at most `max_day_minutes`.
+- A vehicle's day, leaving home to getting back, is at most `max_day_minutes`. Time on site at a
+  pickup or drop-off (`pickup_minutes` / `dropoff_minutes`) counts towards it.
 
 Objective: place as many trips as possible (a trip left out costs far more than any route), then
 the least total cost. Haul cost is fixed by the trips, so in effect the deadhead gets smaller:
@@ -64,7 +65,9 @@ def solve(req: SolveRequest) -> SolveResponse:
             v
             for v in on
             if minutes[req.vehicles[v].home][trip.pickup]
+            + trip.pickup_minutes
             + minutes[trip.pickup][trip.dropoff]
+            + trip.dropoff_minutes
             + minutes[trip.dropoff][req.vehicles[v].home]
             <= limit
         ]
@@ -83,11 +86,14 @@ def solve(req: SolveRequest) -> SolveResponse:
     for v in req.vehicles:
         place_of += [v.home, v.home]
     trip_of_node: dict[int, int] = {}
+    on_site: dict[int, int] = {}  # node -> minutes spent there before driving on
     pickup_node: dict[int, int] = {}
     delivery_node: dict[int, int] = {}
     for k in sorted(allowed):
         pickup_node[k], delivery_node[k] = len(place_of), len(place_of) + 1
         trip_of_node[pickup_node[k]] = trip_of_node[delivery_node[k]] = k
+        on_site[pickup_node[k]] = req.trips[k].pickup_minutes
+        on_site[delivery_node[k]] = req.trips[k].dropoff_minutes
         place_of += [req.trips[k].pickup, req.trips[k].dropoff]
     n_nodes = len(place_of)
     depot = 2 * n_vehicles
@@ -105,8 +111,10 @@ def solve(req: SolveRequest) -> SolveResponse:
         lambda a, b: between(costs, manager.IndexToNode(a), manager.IndexToNode(b))
     )
     routing.SetArcCostEvaluatorOfAllVehicles(cost_cb)
+    # Time from a node to the next: the time on site there, then the drive.
     time_cb = routing.RegisterTransitCallback(
-        lambda a, b: between(minutes, manager.IndexToNode(a), manager.IndexToNode(b))
+        lambda a, b: on_site.get(manager.IndexToNode(a), 0)
+        + between(minutes, manager.IndexToNode(a), manager.IndexToNode(b))
     )
     routing.AddDimension(time_cb, 0, limit, True, "Time")
     clock = routing.GetDimensionOrDie("Time")

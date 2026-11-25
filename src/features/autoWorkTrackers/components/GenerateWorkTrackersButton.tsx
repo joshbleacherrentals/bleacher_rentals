@@ -9,7 +9,8 @@ import { summarizeUnassigned } from "../utils/unassignedSummary";
 
 /**
  * Creates the work trackers the chosen zone needs in the chosen week (planWeek): each with its
- * driver, day, order in the day, suggested times, road distances and its Hauling line item.
+ * driver, day, order in the day, suggested times, road distances, and its Hauling, Setup and
+ * Teardown line items.
  */
 export function GenerateWorkTrackersButton({
   zoneId,
@@ -74,7 +75,9 @@ export function GenerateWorkTrackersButton({
           <p className="text-xs text-gray-500" data-testid="generate-work-trackers-travel">
             Road times: {result.road.google + result.road.cached} from Google ({result.road.cached}{" "}
             cached){result.road.estimated > 0 && `, ${result.road.estimated} estimated`}. Hauling
-            pay added to {result.withHauling} of {result.created}.
+            pay added to {result.withHauling} of {result.created}, plus {result.setups} setup
+            {result.setups === 1 ? "" : "s"} and {result.teardowns} teardown
+            {result.teardowns === 1 ? "" : "s"}.
           </p>
           {result.unplaced.length > 0 && (
             <p className="text-amber-700" data-testid="generate-work-trackers-unassigned">

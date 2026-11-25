@@ -17,12 +17,16 @@ class SolveVehicle(BaseModel):
 
 class SolveTrip(BaseModel):
     """One bleacher move: pick up at `pickup`, drop off at `dropoff` (place indices), on one of
-    `vehicles` (vehicle ids allowed to take it)."""
+    `vehicles` (vehicle ids allowed to take it). `pickup_minutes` / `dropoff_minutes` are the time
+    spent on site at each end before driving on (e.g. a teardown, a setup); they count towards the
+    day."""
 
     id: str
     pickup: int
     dropoff: int
     vehicles: list[str]
+    pickup_minutes: int = Field(default=0, ge=0)
+    dropoff_minutes: int = Field(default=0, ge=0)
 
 
 class SolveRequest(BaseModel):
@@ -36,8 +40,8 @@ class SolveRequest(BaseModel):
 
 class SolveStop(BaseModel):
     trip: str
-    pickup_minute: int  # minutes after the vehicle leaves home
-    dropoff_minute: int
+    pickup_minute: int  # arrival at the pickup, in minutes after the vehicle leaves home
+    dropoff_minute: int  # arrival at the drop-off
 
 
 class SolveRoute(BaseModel):

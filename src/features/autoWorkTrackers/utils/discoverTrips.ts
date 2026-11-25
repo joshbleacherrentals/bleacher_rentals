@@ -64,6 +64,11 @@ export type NeededTrip = {
   fromAddressUuid: string | null;
   /** Where it is dropped off: the next event's address. */
   toAddressUuid: string | null;
+  /**
+   * True when the pickup is the event the bleacher is leaving (so it is torn down there); false
+   * when an earlier work tracker has already moved it somewhere else.
+   */
+  pickupAtEvent: boolean;
   /** The event the bleacher is leaving. */
   fromEventUuid: string;
   /** The event it has to reach. */
@@ -142,6 +147,7 @@ function tripsForBleacher(
     // currently is moves it on to its drop-off. Places match by address row, coordinates or, last,
     // street text (samePlace), so a re-picked address still matches its older copies.
     let position: Place = stopPlace(from);
+    let moved = false;
     const inWindow = bleacher.trips
       .filter((t) => t.date !== null && t.date >= availableFrom && t.date <= mustArriveBy)
       .sort((x, y) => x.date!.localeCompare(y.date!));
@@ -159,7 +165,10 @@ function tripsForBleacher(
         latitude: trip.pickupLatitude,
         longitude: trip.pickupLongitude,
       };
-      if (samePlace(pickup, position)) position = dropoff;
+      if (samePlace(pickup, position)) {
+        position = dropoff;
+        moved = true;
+      }
     }
 
     if (samePlace(position, target)) continue;
@@ -171,6 +180,7 @@ function tripsForBleacher(
       toStreet: to.street ?? "",
       fromAddressUuid: position.addressUuid ?? null,
       toAddressUuid: to.addressUuid ?? null,
+      pickupAtEvent: !moved,
       fromEventUuid: from.eventUuid,
       toEventUuid: to.eventUuid,
       availableFrom,
