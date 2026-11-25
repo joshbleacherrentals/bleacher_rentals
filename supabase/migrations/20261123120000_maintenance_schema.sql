@@ -424,5 +424,3 @@ alter policy rbac_insert on public."Vendors"
 
 alter policy rbac_update on public."Vendors"
   using (public.get_user_roles() && '{admin,account_manager,accountant,maintainer}'::text[]);
-
--- Harmless test edit: the CI migrations check should flag this file as modified.
