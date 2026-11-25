@@ -11,6 +11,9 @@ import { Mark, RequirementCell } from "./RequirementCell";
 import { useCanFixZoneData } from "../hooks/useCanFixZoneData";
 import { AddressFixModal } from "./AddressFixModal";
 import { DriverLinksMenu } from "./DriverLinksMenu";
+import { DriverNameWithKind } from "./DriverNameWithKind";
+import { useDriverKinds } from "../hooks/useDriverKinds";
+import type { DriverKind } from "../utils/driverKind";
 import { useDriverUserUuids } from "../hooks/useDriverUserUuids";
 import { setDriverExcluded } from "../db/setDriverExcluded";
 import { GRID_LINES as LINES } from "./DriverWeekGrid";
@@ -35,11 +38,13 @@ function ExcludedDrivers({
   drivers,
   canFix,
   userUuids,
+  kinds,
   weekStart,
 }: {
   drivers: DriverData[];
   canFix: boolean;
   userUuids: Map<string, string>;
+  kinds: Map<string, DriverKind>;
   weekStart: string;
 }) {
   return (
@@ -60,7 +65,7 @@ function ExcludedDrivers({
               data-testid="driver-data-excluded-row"
             >
               <span className="flex flex-1 items-center gap-2 font-medium text-gray-700">
-                {driver.driverName}
+                <DriverNameWithKind name={driver.driverName} kind={kinds.get(driver.driverUuid)} />
                 <DriverLinksMenu
                   userUuid={userUuids.get(driver.driverUuid)}
                   weekStart={weekStart}
@@ -90,6 +95,7 @@ export function DriverDataTab() {
   const { zoneId, weekStart } = useZoneWeekParams();
   const { drivers, isLoading } = useChecks().driverData;
   const userUuids = useDriverUserUuids(zoneId);
+  const kinds = useDriverKinds(zoneId);
   const canFix = useCanFixZoneData(zoneId);
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
   const editing: DriverData | null = drivers.find((d) => d.driverUuid === editingUuid) ?? null;
@@ -139,7 +145,7 @@ export function DriverDataTab() {
             <div key={driver.driverUuid} className="contents" data-testid="driver-data-row">
               <div className={`flex min-h-12 items-center gap-2 px-2 text-sm font-medium ${LINES}`}>
                 <Mark ok={driver.ok} label={driver.ok ? "Ready" : "Missing data"} />
-                {driver.driverName}
+                <DriverNameWithKind name={driver.driverName} kind={kinds.get(driver.driverUuid)} />
                 <DriverLinksMenu
                   userUuid={userUuids.get(driver.driverUuid)}
                   weekStart={weekStart}
@@ -181,6 +187,7 @@ export function DriverDataTab() {
         drivers={excluded}
         canFix={canFix}
         userUuids={userUuids}
+        kinds={kinds}
         weekStart={weekStart}
       />
 
