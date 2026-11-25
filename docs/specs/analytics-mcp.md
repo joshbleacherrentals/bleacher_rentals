@@ -327,3 +327,32 @@ Added 2026-11-25 at the user's request ("we need a trigger in the development cy
   migrations, and reports the rules checked or changed.
 
 No further CI gate: whether a rule is still true needs reading, and a gate would be rubber-stamped.
+
+## 12. Bleacher GPS locations (v1.2, 2026-11-25)
+
+Built at the user's request ("do current and historical"); the user waived the spec-first step ("no need
+for the spec either just send her"), so this section records what was built.
+
+- **Source:** Linxup **v2** (`LINXUP_API_HOST` + `LINXUP_API_TOKEN`, already used by the bleacher location
+  modal). The v3 Pull API (`api.linxup.com/pullapi`) needs a separate API key that we do not have; the v2
+  token is refused there (403/401, checked 2026-11-25).
+  - Current: `GET /ibis/rest/api/v2/locations` → every tracker's last report (`imei`, `latitude`,
+    `longitude`, `date` epoch ms, `speed`).
+  - History: `POST /ibis/rest/api/v2/stops` `{ fromDate, toDate }` (epoch ms, **at most 48 hours**) → every
+    tracker's stops (`imei`, lat/lng, `beginDate`, `endDate`, street/city/state, geofence). It ignores a
+    device filter and includes stops that began before `fromDate`; a stop still in progress is not listed.
+- **Join:** `Bleachers.linxup_device_id` holds the IMEI; read through `analytics_ro` (non-deleted bleachers).
+  A tracker on several bleachers is reported as shared, never guessed.
+- **Tools** (both `readOnlyHint`, `openWorldHint`):
+  - `bleacher_locations { bleacher_numbers?: number[] }` → `{ as_of, bleachers: [{ bleacher_number, tracker,
+shares_tracker_with, latitude, longitude, reported_at, minutes_since_report, speed, note }] }`.
+  - `bleacher_location_history { bleacher_numbers (1–20), from, to }` — ISO 8601, at most 7 days, cut into
+    48-hour Linxup calls run in parallel → per bleacher, its stops overlapping the window (oldest first,
+    de-duplicated) and its current position, plus a `how_to_read` note (no stops = probably parked since).
+- **Log:** each call writes `McpQueryLog` with `tool` = the tool name and the arguments JSON in `sql`
+  (migration `20261125200000_mcp_query_log_location_tools.sql` widens the CHECK).
+- **Errors:** Linxup's own message is shown (it names no host or token); missing env → "The Linxup GPS
+  connection is not configured."; each Linxup call times out after 8 s (Vercel Hobby limit is 10 s).
+- **Permissions:** same people as the connector (D2). `permissionPageData.ts` now says GPS positions are
+  included, drivers too.
+- **Tests:** `logic/bleacherLocations.test.ts`, `server/linxup.test.ts`, handler tests for both tools.

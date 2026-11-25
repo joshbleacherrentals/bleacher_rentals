@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import type { McpDeps } from "./handleMcpRequest";
+import { createLinxupClient } from "./linxup";
 import { publicOrigin } from "./oauthMetadata";
 import { getAnalyticsPool } from "./pool";
 
@@ -31,6 +32,9 @@ export function buildMcpDeps(req: Request): McpDeps {
     },
 
     pool: getAnalyticsPool(),
+
+    // The same Linxup credentials the app's bleacher location modal uses (§12).
+    linxup: createLinxupClient(process.env.LINXUP_API_HOST, process.env.LINXUP_API_TOKEN),
 
     // The service role writes the log: the analytics database role cannot.
     writeLog: async (entry) => {

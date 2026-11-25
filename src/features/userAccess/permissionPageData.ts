@@ -1221,7 +1221,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Ask Claude About Our Data",
     description:
-      "A connector that lets you ask Claude questions about our data, such as how many bookings were signed last month. Claude runs read-only database queries and answers; nothing can be changed. Add it in Claude under Settings → Connectors → Add custom connector, with the address your administrator gives you, and sign in with your usual login. It works for every account that is not deactivated. Every question is logged: who asked, and which query ran.",
+      "A connector that lets you ask Claude questions about our data, such as how many bookings were signed last month. Claude runs read-only database queries and answers; nothing can be changed. Add it in Claude under Settings → Connectors → Add custom connector, with the address your administrator gives you, and sign in with your usual login. It works for every account that is not deactivated. Claude can also ask Linxup where bleachers are now and where they stood over a past week, from their GPS trackers. Every question is logged: who asked, and which query or which bleachers and dates.",
     category: "Data Access",
     roles: {
       admin: read(ANALYTICS_DATA_NOTE),
@@ -1231,7 +1231,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       developer: read(ANALYTICS_DATA_NOTE),
       viewer: read(ANALYTICS_DATA_NOTE),
       driver: read(
-        "Works for any driver whose account is not deactivated, although drivers cannot open the web dashboard: the connector is separate from the app. Claude can read every table in the database, except the QuickBooks connection and the connector's own log. It cannot change anything.",
+        "Works for any driver whose account is not deactivated, although drivers cannot open the web dashboard: the connector is separate from the app. Claude can read every table in the database, except the QuickBooks connection and the connector's own log, and the live and past GPS positions of every bleacher. It cannot change anything.",
       ),
       maintainer: read(ANALYTICS_DATA_NOTE),
       accountant: read(ANALYTICS_DATA_NOTE),

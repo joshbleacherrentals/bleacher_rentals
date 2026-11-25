@@ -161,6 +161,11 @@ export const BUSINESS_RULES: BusinessRule[] = [
     rule: "A bleacher's current annual inspection is its newest BleacherAnnualInspections row by created_at. From next_due_on: none = unscheduled, past = overdue, ≤ 7 days = critical, ≤ 30 days = warning, else ok.",
     source: "src/features/annualInspections/logic/inspectionStatus.ts",
   },
+  {
+    topic: "Bleacher GPS locations",
+    rule: "Positions are not in the database. Use the bleacher_locations tool (now) and bleacher_location_history (past, up to 7 days per call); both read the Linxup GPS tracker whose IMEI is in Bleachers.linxup_device_id. A bleacher with no linxup_device_id has no GPS. To name the place, compare the coordinates with Addresses.latitude / longitude of events, venues or StorageLocations.",
+    source: "src/features/analyticsMcp/server/locationTools.ts",
+  },
 
   // --- People ---
   {
@@ -427,7 +432,8 @@ export const DATA_DICTIONARY: DataDictionary = {
       winter_account_manager_uuid: "Legacy, unused.",
       summer_home_base_uuid: "Legacy label.",
       winter_home_base_uuid: "Legacy label.",
-      linxup_device_id: "GPS tracker id (not unique).",
+      linxup_device_id:
+        "IMEI of the Linxup GPS tracker (not unique). Positions come from the bleacher_locations tools.",
       trailer_length_in: "Inches; replaces trailer_length (feet).",
       trailer_height_in: "Inches; replaces height_folded_ft.",
     },
