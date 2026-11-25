@@ -4,7 +4,8 @@
  * needs is in the request, and it never reads the database or the network.
  */
 
-export type SolveVehicle = { id: string; home: number };
+/** A driver-day. `trip_cost` is added to the cost for each trip it takes (in the units of `costs`). */
+export type SolveVehicle = { id: string; home: number; trip_cost: number };
 export type SolveTrip = {
   id: string;
   pickup: number;
@@ -18,7 +19,7 @@ export type SolveTrip = {
 export type SolveRequest = {
   /** Drive minutes from place i to place j. */
   minutes: number[][];
-  /** What to minimise from place i to place j (metres). */
+  /** What to minimise from place i to place j (metres, or seconds when planning for time). */
   costs: number[][];
   vehicles: SolveVehicle[];
   trips: SolveTrip[];

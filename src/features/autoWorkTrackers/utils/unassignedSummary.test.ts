@@ -15,7 +15,7 @@ describe("summarizeUnassigned", () => {
 
   it("says when a trip is too long for one day", () => {
     expect(summarizeUnassigned([u("too_long_for_a_day")])).toBe(
-      "1 trip not created: over 12 hours with the drive there and back (1).",
+      "1 trip not created: longer than the longest day, with the drive there and back (1).",
     );
   });
 

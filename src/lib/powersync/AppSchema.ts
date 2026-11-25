@@ -598,6 +598,21 @@ const ScorecardTargets = new Table(ScorecardTargetsCols, {
   indexes: { account_manager_uuid: ["account_manager_uuid"] },
 });
 
+// The Auto Work Trackers model's settings: one row (id 'global'); null = the app's default.
+const AutoWorkTrackerSettingsCols = {
+  objective: column.text,
+  employee_priority: column.text,
+  employee_priority_minutes: column.integer,
+  max_day_minutes: column.integer,
+  setup_minutes: column.integer,
+  teardown_minutes: column.integer,
+  day_start_hour: column.integer,
+  search_seconds: column.integer,
+  updated_at: column.text,
+  updated_by_user_uuid: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerSettings">;
+const AutoWorkTrackerSettings = new Table(AutoWorkTrackerSettingsCols);
+
 const VendorsCols = {
   created_at: column.text,
   qbo_vendor_id: column.text,
@@ -1491,6 +1506,7 @@ const DriverSurveyResponses = new Table(DriverSurveyResponsesCols, {
 
 export const AppSchema = new Schema({
   Addresses,
+  AutoWorkTrackerSettings,
   Venues,
   AccountManagers,
   AccountManagerZones,

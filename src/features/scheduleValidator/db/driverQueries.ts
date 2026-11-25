@@ -97,6 +97,7 @@ export function driverDataQuery(zoneId: string) {
       "u.last_name as last_name",
       "d.address_uuid as address_uuid",
       "d.exclude_from_auto_work_trackers as exclude_from_auto_work_trackers",
+      "d.vendor_uuid as vendor_uuid",
       "a.street as street",
       "a.city as city",
       "a.state_province as state_province",

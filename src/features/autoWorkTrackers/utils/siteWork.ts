@@ -3,10 +3,6 @@ import {
   type DraftWorkTrackerLineItem,
 } from "@/features/workTrackers/db/workTrackerLineItems";
 
-/** Every setup and every teardown takes an hour, whoever does it. */
-export const SETUP_MINUTES = 60;
-export const TEARDOWN_MINUTES = 60;
-
 export type SiteWork = { teardown: boolean; setup: boolean };
 
 /**

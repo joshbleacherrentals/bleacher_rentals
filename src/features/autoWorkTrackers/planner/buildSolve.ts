@@ -8,6 +8,7 @@
 import { DateTime } from "luxon";
 import type { NeededTrip } from "../utils/discoverTrips";
 import {
+  AVERAGE_SPEED_KMH,
   UNKNOWN_COST_M,
   UNKNOWN_MINUTES,
   estimateLeg,
@@ -18,27 +19,55 @@ import {
   type RoadLeg,
 } from "./roadTimes";
 import type { SolveRequest } from "./solveContract";
-import { SETUP_MINUTES, TEARDOWN_MINUTES, siteWorkFor } from "../utils/siteWork";
+import { siteWorkFor } from "../utils/siteWork";
+import { DEFAULT_SETTINGS, type PlannerSettings } from "./settings";
 
-export const MAX_DAY_MINUTES = 12 * 60;
-export const SEARCH_SECONDS = 3;
+/**
+ * A contractor's trip cost with "Employees first": above any difference a route can make, so a
+ * contractor only takes a trip no employee can fit, and below the solver's cost of leaving a trip
+ * out (1,000,000,000), so the trip is still done.
+ */
+export const EMPLOYEES_FIRST_COST = 100_000_000;
+
+/**
+ * What a contractor taking a trip costs the solver, in the units of its costs (metres for the
+ * distance objective, seconds for time): nothing when employees come first is off; the minutes of
+ * extra driving an employee may do instead (as metres at the average speed when planning for
+ * distance) with Prefer employees; EMPLOYEES_FIRST_COST with Employees first.
+ */
+export function contractorTripCost(s: PlannerSettings): number {
+  if (s.employeePriority === "off") return 0;
+  if (s.employeePriority === "first") return EMPLOYEES_FIRST_COST;
+  return s.objective === "time"
+    ? s.employeePriorityMinutes * 60
+    : Math.round((s.employeePriorityMinutes / 60) * AVERAGE_SPEED_KMH * 1000);
+}
 
 export type UnplacedReason =
   | "no_window" // the bleacher is never free between the events (back to back)
   | "outside_week" // its free days all fall outside the week
   | "no_free_driver_day" // no driver had room on those days
-  | "too_long_for_a_day"; // even alone, home → pickup → drop-off → home (with setup/teardown) is over 12 hours
+  | "too_long_for_a_day"; // even alone, home → pickup → drop-off → home (with setup/teardown) is over the longest day
 
 export type PlanTrip = NeededTrip & { pickup: Point | null; dropoff: Point | null };
-export type PlanDriver = { driverUuid: string; home: Point | null };
+/** A driver the model may use; a contractor is paid through a vendor, an employee is not. */
+export type PlanDriver = { driverUuid: string; home: Point | null; contractor: boolean };
 
 /** One drive as stored on a work tracker: metres and minutes, null when not known. */
 export type LegValues = { meters: number | null; minutes: number | null };
 
-export type PlanVehicle = { id: string; driverUuid: string; day: string; place: number };
+export type PlanVehicle = {
+  id: string;
+  driverUuid: string;
+  day: string;
+  place: number;
+  contractor: boolean;
+};
 
 export type BuiltSolve = {
   request: SolveRequest;
+  /** The hour each driver-day starts, for the suggested times. */
+  dayStartHour: number;
   vehicles: PlanVehicle[];
   /** By solver trip id (its index in `trips`). */
   trips: PlanTrip[];
@@ -92,8 +121,11 @@ export function buildSolve(input: {
   blocked: Set<string>;
   weekStart: string;
   roadLegs: Map<string, RoadLeg>;
-  searchSeconds?: number;
+  /** The Advanced settings (resolveSettings); the defaults when not given. */
+  settings?: PlannerSettings;
 }): BuiltSolve {
+  const settings = input.settings ?? DEFAULT_SETTINGS;
+  const byTime = settings.objective === "time";
   // Places: one per distinct known point; each unknown point is a place of its own.
   const places: (Point | null)[] = [];
   const known = new Map<string, number>();
@@ -125,7 +157,13 @@ export function buildSolve(input: {
     const home = placeOf(d.home);
     for (const day of wantedDays) {
       if (input.blocked.has(`${d.driverUuid}|${day}`)) continue;
-      vehicles.push({ id: `${d.driverUuid}|${day}`, driverUuid: d.driverUuid, day, place: home });
+      vehicles.push({
+        id: `${d.driverUuid}|${day}`,
+        driverUuid: d.driverUuid,
+        day,
+        place: home,
+        contractor: d.contractor,
+      });
     }
   }
 
@@ -140,10 +178,15 @@ export function buildSolve(input: {
     const road = input.roadLegs.get(pairKey(a, b));
     if (road?.found && road.meters != null && road.seconds != null) {
       const minutes = Math.round(road.seconds / 60);
-      return { meters: road.meters, minutes, clock: minutes, cost: road.meters };
+      return {
+        meters: road.meters,
+        minutes,
+        clock: minutes,
+        cost: byTime ? road.seconds : road.meters,
+      };
     }
     const est = estimateLeg(a, b);
-    return { ...est, clock: est.minutes, cost: est.meters };
+    return { ...est, clock: est.minutes, cost: byTime ? est.minutes * 60 : est.meters };
   };
 
   const n = places.length;
@@ -163,18 +206,23 @@ export function buildSolve(input: {
     request: {
       minutes,
       costs,
-      vehicles: vehicles.map((v) => ({ id: v.id, home: v.place })),
+      vehicles: vehicles.map((v) => ({
+        id: v.id,
+        home: v.place,
+        trip_cost: v.contractor ? contractorTripCost(settings) : 0,
+      })),
       trips: planned.map((p, k) => ({
         id: String(k),
         pickup: tripPlaces[k].pickup,
         dropoff: tripPlaces[k].dropoff,
         vehicles: vehicles.filter((v) => p.days.includes(v.day)).map((v) => v.id),
-        pickup_minutes: siteWorkFor(trips[k]).teardown ? TEARDOWN_MINUTES : 0,
-        dropoff_minutes: siteWorkFor(trips[k]).setup ? SETUP_MINUTES : 0,
+        pickup_minutes: siteWorkFor(trips[k]).teardown ? settings.teardownMinutes : 0,
+        dropoff_minutes: siteWorkFor(trips[k]).setup ? settings.setupMinutes : 0,
       })),
-      max_day_minutes: MAX_DAY_MINUTES,
-      search_seconds: input.searchSeconds ?? SEARCH_SECONDS,
+      max_day_minutes: settings.maxDayMinutes,
+      search_seconds: settings.searchSeconds,
     },
+    dayStartHour: settings.dayStartHour,
     vehicles,
     trips,
     tripPlaces,

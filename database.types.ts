@@ -139,6 +139,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"AutoWorkTrackerSettings": {
+                  Row: {
+                    "day_start_hour": number | null,"employee_priority": string | null,"employee_priority_minutes": number | null,"id": string,"max_day_minutes": number | null,"objective": string | null,"search_seconds": number | null,"setup_minutes": number | null,"teardown_minutes": number | null,"updated_at": string | null,"updated_by_user_uuid": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "day_start_hour"?: number | null,"employee_priority"?: string | null,"employee_priority_minutes"?: number | null,"id"?: string,"max_day_minutes"?: number | null,"objective"?: string | null,"search_seconds"?: number | null,"setup_minutes"?: number | null,"teardown_minutes"?: number | null,"updated_at"?: string | null,"updated_by_user_uuid"?: string | null
+                  }
+                  Update: {
+                    "day_start_hour"?: number | null,"employee_priority"?: string | null,"employee_priority_minutes"?: number | null,"id"?: string,"max_day_minutes"?: number | null,"objective"?: string | null,"search_seconds"?: number | null,"setup_minutes"?: number | null,"teardown_minutes"?: number | null,"updated_at"?: string | null,"updated_by_user_uuid"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerSettings_updated_by_user_uuid_fkey"
+      columns: ["updated_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"BleacherAnnualInspections": {
                   Row: {
                     "bleacher_uuid": string,"created_at": string,"created_by": string | null,"document_path": string | null,"id": string,"inspected_on": string | null,"next_due_on": string,"notes": string | null

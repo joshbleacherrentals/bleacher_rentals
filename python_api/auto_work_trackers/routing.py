@@ -10,7 +10,8 @@ Rules (constraints):
   pickup or drop-off (`pickup_minutes` / `dropoff_minutes`) counts towards it.
 
 Objective: place as many trips as possible (a trip left out costs far more than any route), then
-the least total cost. Haul cost is fixed by the trips, so in effect the deadhead gets smaller:
+the least total cost: the costs of the legs driven, plus each vehicle's `trip_cost` for every trip
+it takes. Haul cost is fixed by the trips, so in effect the deadhead gets smaller:
 trips are chained when the next pickup is near the last drop-off.
 
 OR-Tools routing: every vehicle starts and ends at its home; each trip is a pickup and a delivery
@@ -107,10 +108,17 @@ def solve(req: SolveRequest) -> SolveResponse:
         n_nodes, n_vehicles, [2 * v for v in range(n_vehicles)], [2 * v + 1 for v in range(n_vehicles)]
     )
     routing = pywrapcp.RoutingModel(manager)
-    cost_cb = routing.RegisterTransitCallback(
-        lambda a, b: between(costs, manager.IndexToNode(a), manager.IndexToNode(b))
-    )
-    routing.SetArcCostEvaluatorOfAllVehicles(cost_cb)
+    # The leg's cost, plus the vehicle's trip cost when the leg leaves a pickup (once per trip).
+    pickups = set(pickup_node.values())
+    cost_cbs: dict[int, int] = {}
+    for v, vehicle in enumerate(req.vehicles):
+        extra = vehicle.trip_cost
+        if extra not in cost_cbs:
+            cost_cbs[extra] = routing.RegisterTransitCallback(
+                lambda a, b, extra=extra: between(costs, manager.IndexToNode(a), manager.IndexToNode(b))
+                + (extra if manager.IndexToNode(a) in pickups else 0)
+            )
+        routing.SetArcCostEvaluatorOfVehicle(cost_cbs[extra], v)
     # Time from a node to the next: the time on site there, then the drive.
     time_cb = routing.RegisterTransitCallback(
         lambda a, b: on_site.get(manager.IndexToNode(a), 0)

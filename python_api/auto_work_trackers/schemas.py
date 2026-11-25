@@ -9,10 +9,12 @@ from pydantic import BaseModel, Field
 
 
 class SolveVehicle(BaseModel):
-    """One driver-day: a route that starts and ends at `home` (a place index)."""
+    """One driver-day: a route that starts and ends at `home` (a place index). `trip_cost` is added
+    to the cost for each trip it takes (in the units of `costs`), so it is used only when worth it."""
 
     id: str
     home: int
+    trip_cost: int = Field(default=0, ge=0)
 
 
 class SolveTrip(BaseModel):
@@ -31,7 +33,7 @@ class SolveTrip(BaseModel):
 
 class SolveRequest(BaseModel):
     minutes: list[list[int]] = Field(description="Drive minutes from place i to place j.")
-    costs: list[list[int]] = Field(description="What to minimise from place i to place j (metres).")
+    costs: list[list[int]] = Field(description="What to minimise from place i to place j (e.g. metres or seconds).")
     vehicles: list[SolveVehicle]
     trips: list[SolveTrip]
     max_day_minutes: int = 12 * 60

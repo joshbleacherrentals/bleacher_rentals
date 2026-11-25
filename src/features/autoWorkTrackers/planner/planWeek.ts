@@ -19,6 +19,8 @@ import { loadPlanningInputs } from "./loadInputs";
 import { pairKey, type Pair, type RoadLeg } from "./roadTimes";
 import { callSolve, type SolveResponse } from "./solveContract";
 import { planStatements } from "./writePlan";
+import { resolveSettings, type PlannerSettings, type SettingsRow } from "./settings";
+import { settingsQuery } from "../db/settings";
 
 export type PlanWeekResult = {
   created: number;
@@ -34,6 +36,8 @@ export type PlanWeekResult = {
   /** Setup and Teardown line items added (an hour each, at the driver's rate). */
   setups: number;
   teardowns: number;
+  /** The Advanced settings the run planned with. */
+  settings: PlannerSettings;
 };
 
 /** Road times for the pairs, from the server (RouteCache, then Google). Missing pairs are estimated. */
@@ -116,7 +120,11 @@ export async function planWeek(input: {
   if (running) throw new Error("Work trackers are already being created.");
   running = true;
   try {
-    const inputs = await loadPlanningInputs(input.zoneId, input.weekStart);
+    const [inputs, settingsRows] = await Promise.all([
+      loadPlanningInputs(input.zoneId, input.weekStart),
+      typedGetAll(settingsQuery(), expect<SettingsRow>()),
+    ]);
+    const settings = resolveSettings(settingsRows[0] ?? null);
     const pairs = pairsToLookUp(inputs.drivers, inputs.trips);
     const road = await fetchRoadTimes(pairs);
     const answered = pairs.filter(([a, b]) => road.legs.get(pairKey(a, b))?.found).length;
@@ -127,6 +135,7 @@ export async function planWeek(input: {
       blocked: inputs.blocked,
       weekStart: input.weekStart,
       roadLegs: road.legs,
+      settings,
     });
     const response: SolveResponse =
       built.request.trips.length > 0
@@ -186,6 +195,7 @@ export async function planWeek(input: {
       withHauling: hauling.length,
       setups: siteWork.filter((l) => l.type === "setup").length,
       teardowns: siteWork.filter((l) => l.type === "teardown").length,
+      settings,
     };
   } finally {
     running = false;

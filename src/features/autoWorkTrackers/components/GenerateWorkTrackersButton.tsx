@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
 import { planWeek, type PlanWeekResult } from "../planner/planWeek";
 import { summarizeUnassigned } from "../utils/unassignedSummary";
+import { describeSettings } from "../planner/settings";
 
 /**
  * Creates the work trackers the chosen zone needs in the chosen week (planWeek): each with its
@@ -78,6 +79,9 @@ export function GenerateWorkTrackersButton({
             pay added to {result.withHauling} of {result.created}, plus {result.setups} setup
             {result.setups === 1 ? "" : "s"} and {result.teardowns} teardown
             {result.teardowns === 1 ? "" : "s"}.
+          </p>
+          <p className="text-xs text-gray-500" data-testid="generate-work-trackers-settings">
+            Settings: {describeSettings(result.settings)}.
           </p>
           {result.unplaced.length > 0 && (
             <p className="text-amber-700" data-testid="generate-work-trackers-unassigned">

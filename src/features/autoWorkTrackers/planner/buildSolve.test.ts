@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { DateTime } from "luxon";
-import { allowedDays, buildSolve, pairsToLookUp, type PlanTrip } from "./buildSolve";
+import {
+  EMPLOYEES_FIRST_COST,
+  allowedDays,
+  buildSolve,
+  contractorTripCost,
+  pairsToLookUp,
+  type PlanTrip,
+} from "./buildSolve";
+import { DEFAULT_SETTINGS, type PlannerSettings } from "./settings";
 import { readSolve } from "./fromSolve";
 import { UNKNOWN_MINUTES, estimateLeg, pairKey, type Point } from "./roadTimes";
 
@@ -42,8 +50,8 @@ describe("allowedDays", () => {
 
 describe("pairsToLookUp", () => {
   it("asks for home → pickup, drop-off → pickup, drop-off → home and the haul", () => {
-    const keys = pairsToLookUp([{ driverUuid: "d1", home: HOME }], [trip()]).map(([a, b]) =>
-      pairKey(a, b),
+    const keys = pairsToLookUp([{ driverUuid: "d1", home: HOME, contractor: false }], [trip()]).map(
+      ([a, b]) => pairKey(a, b),
     );
     expect(new Set(keys)).toEqual(
       new Set([pairKey(HOME, A), pairKey(B, A), pairKey(B, HOME), pairKey(A, B)]),
@@ -57,7 +65,7 @@ describe("buildSolve", () => {
   it("makes a driver-day per free day, uses Google's time where known and estimates the rest", () => {
     const built = buildSolve({
       trips: [trip()],
-      drivers: [{ driverUuid: "d1", home: HOME }],
+      drivers: [{ driverUuid: "d1", home: HOME, contractor: false }],
       blocked: new Set(["d1|2026-09-16"]),
       weekStart: WEEK,
       roadLegs,
@@ -82,7 +90,7 @@ describe("buildSolve", () => {
   it("asks for no teardown time when the bleacher is not picked up from the event", () => {
     const built = buildSolve({
       trips: [trip({ pickupAtEvent: false })],
-      drivers: [{ driverUuid: "d1", home: HOME }],
+      drivers: [{ driverUuid: "d1", home: HOME, contractor: false }],
       blocked: new Set(),
       weekStart: WEEK,
       roadLegs,
@@ -93,7 +101,7 @@ describe("buildSolve", () => {
   it("treats a place with no coordinates as unknown: cautious on the clock, stored as null", () => {
     const built = buildSolve({
       trips: [trip({ pickup: null })],
-      drivers: [{ driverUuid: "d1", home: HOME }],
+      drivers: [{ driverUuid: "d1", home: HOME, contractor: false }],
       blocked: new Set(),
       weekStart: WEEK,
       roadLegs,
@@ -106,7 +114,7 @@ describe("buildSolve", () => {
   it("does not send trips with no free day to the solver", () => {
     const built = buildSolve({
       trips: [trip({ earliestDay: "2026-09-16", latestDay: "2026-09-15" })],
-      drivers: [{ driverUuid: "d1", home: HOME }],
+      drivers: [{ driverUuid: "d1", home: HOME, contractor: false }],
       blocked: new Set(),
       weekStart: WEEK,
       roadLegs,
@@ -122,7 +130,7 @@ describe("readSolve", () => {
     const D: Point = [43.4, -80.0];
     const built = buildSolve({
       trips: [trip(), trip({ bleacherUuid: "b2", pickup: C, dropoff: D })],
-      drivers: [{ driverUuid: "d1", home: HOME }],
+      drivers: [{ driverUuid: "d1", home: HOME, contractor: false }],
       blocked: new Set(["d1|2026-09-16"]),
       weekStart: WEEK,
       roadLegs: new Map(),
@@ -165,7 +173,7 @@ describe("readSolve", () => {
   it("names why the solver left trips out", () => {
     const built = buildSolve({
       trips: [trip()],
-      drivers: [{ driverUuid: "d1", home: HOME }],
+      drivers: [{ driverUuid: "d1", home: HOME, contractor: false }],
       blocked: new Set(),
       weekStart: WEEK,
       roadLegs: new Map(),
@@ -176,5 +184,55 @@ describe("readSolve", () => {
       "UTC",
     );
     expect(read.unplaced.map((u) => u.reason)).toEqual(["no_free_driver_day"]);
+  });
+});
+
+describe("settings in the solver request", () => {
+  const roadLegs = new Map([[pairKey(A, B), { found: true, meters: 15_000, seconds: 900 }]]);
+  const drivers = [
+    { driverUuid: "emp", home: HOME, contractor: false },
+    { driverUuid: "con", home: HOME, contractor: true },
+  ];
+  const build = (settings: Partial<PlannerSettings>) =>
+    buildSolve({
+      trips: [trip()],
+      drivers,
+      blocked: new Set(),
+      weekStart: WEEK,
+      roadLegs,
+      settings: { ...DEFAULT_SETTINGS, ...settings },
+    });
+
+  it("charges only contractors a trip cost", () => {
+    const { request } = build({ employeePriority: "prefer", employeePriorityMinutes: 60 });
+    const cost = Object.fromEntries(request.vehicles.map((v) => [v.id.split("|")[0], v.trip_cost]));
+    expect(cost.emp).toBe(0);
+    expect(cost.con).toBe(80_000); // an hour at 80 km/h, in metres
+  });
+
+  it("prices the preference in the objective's units, and Off and Employees first as set", () => {
+    const s = { ...DEFAULT_SETTINGS, employeePriorityMinutes: 30 };
+    expect(contractorTripCost({ ...s, employeePriority: "prefer", objective: "time" })).toBe(1800);
+    expect(contractorTripCost({ ...s, employeePriority: "off" })).toBe(0);
+    expect(contractorTripCost({ ...s, employeePriority: "first" })).toBe(EMPLOYEES_FIRST_COST);
+  });
+
+  it("minimises seconds instead of metres when planning for time", () => {
+    expect(build({ objective: "time" }).request.costs[1][2]).toBe(15 * 60);
+    expect(build({ objective: "distance" }).request.costs[1][2]).toBe(15_000);
+  });
+
+  it("passes the day length, search time, on-site minutes and start hour on", () => {
+    const built = build({
+      maxDayMinutes: 600,
+      searchSeconds: 5,
+      setupMinutes: 30,
+      teardownMinutes: 45,
+      dayStartHour: 6,
+    });
+    expect(built.request.max_day_minutes).toBe(600);
+    expect(built.request.search_seconds).toBe(5);
+    expect(built.request.trips[0]).toMatchObject({ pickup_minutes: 45, dropoff_minutes: 30 });
+    expect(built.dayStartHour).toBe(6);
   });
 });

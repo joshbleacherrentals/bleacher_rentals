@@ -6,7 +6,7 @@ const REASON_TEXT: Record<UnplacedReason, string> = {
   no_window: "events are back to back",
   outside_week: "no free day in this week",
   no_free_driver_day: "no driver had room on those days",
-  too_long_for_a_day: "over 12 hours with the drive there and back",
+  too_long_for_a_day: "longer than the longest day, with the drive there and back",
 };
 
 /**

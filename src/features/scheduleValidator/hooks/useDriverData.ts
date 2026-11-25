@@ -11,6 +11,7 @@ type Row = {
   last_name: string | null;
   address_uuid: string | null;
   exclude_from_auto_work_trackers: number | null;
+  vendor_uuid: string | null;
   street: string | null;
   city: string | null;
   state_province: string | null;
