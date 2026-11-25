@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { handleMcpRequest, type McpDeps } from "./handleMcpRequest";
 import { STATUSES } from "@/features/manageTeam/constants";
 import type { PoolLike } from "./runReadOnlyQuery";
+import { LinxupError, type LinxupClient } from "./linxup";
 import type { McpQueryLogEntry } from "../types";
 
 const METADATA = "https://app.test/.well-known/oauth-protected-resource";
@@ -31,6 +32,7 @@ function makeDeps(over: Partial<McpDeps> = {}): McpDeps {
     getIdentity: async () => ({ clerkUserId: "clerk_1" }),
     findUser: async () => ({ id: "u1", status_uuid: STATUSES.active }),
     pool: { connect } as unknown as PoolLike,
+    linxup: null,
     writeLog,
     resourceMetadataUrl: METADATA,
     ...over,
@@ -120,8 +122,31 @@ describe("handleMcpRequest — the tools", () => {
     expect(res.status).toBe(200);
     const { result } = await res.json();
     const names = result.tools.map((t: { name: string }) => t.name).sort();
-    expect(names).toEqual(["describe_schema", "query"]);
+    expect(names).toEqual([
+      "bleacher_location_history",
+      "bleacher_locations",
+      "describe_schema",
+      "query",
+    ]);
     for (const t of result.tools) expect(t.annotations?.readOnlyHint).toBe(true);
+  });
+
+  it("puts the rules most often got wrong in the instructions (§11 D9)", async () => {
+    const res = await handleMcpRequest(
+      rpc("initialize", {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" },
+      }),
+      makeDeps(),
+    );
+    expect(res.status).toBe(200);
+    const { result } = await res.json();
+    expect(result.instructions).toContain("_cents");
+    expect(result.instructions).toMatch(/CAD and USD/);
+    expect(result.instructions).toContain("deleted = false");
+    expect(result.instructions).toContain("America/Toronto");
+    expect(result.instructions).toContain("WorkTrackers.pay_cents");
   });
 
   it("query returns columns, rows, count and truncated, and logs the call", async () => {
@@ -221,5 +246,97 @@ describe("handleMcpRequest — the tools", () => {
     expect(JSON.parse(result.content[0].text).rowCount).toBe(1);
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
+  });
+});
+
+describe("handleMcpRequest — bleacher location tools (§12)", () => {
+  const NOW_ISO = new Date().toISOString();
+  const fakeLinxup = (over: Partial<LinxupClient> = {}): LinxupClient => ({
+    currentPositions: vi.fn(async () => [
+      { imei: "111", latitude: 27.9, longitude: -82.4, date: Date.now(), speed: 0, status: null },
+    ]),
+    stops: vi.fn(async () => [
+      {
+        imei: "111",
+        latitude: 27.8,
+        longitude: -82.5,
+        beginDate: Date.now() - 3_600_000,
+        endDate: Date.now() - 60_000,
+        street: "1 Main St",
+        city: "Tampa",
+        stateCode: "FL",
+        geofenceName: null,
+      },
+    ]),
+    ...over,
+  });
+  const bleacherRows = () => {
+    fetchRows = [
+      { bleacher_number: 42, linxup_device_id: "111" },
+      { bleacher_number: 7, linxup_device_id: null },
+    ];
+    fields = [{ name: "bleacher_number" }, { name: "linxup_device_id" }];
+  };
+
+  it("bleacher_locations returns each bleacher's position and logs the arguments", async () => {
+    bleacherRows();
+    const deps = makeDeps({ linxup: fakeLinxup() });
+    const result = await callTool(deps, "bleacher_locations", { bleacher_numbers: [42] });
+    expect(result.isError).toBeFalsy();
+    const body = JSON.parse(result.content[0].text);
+    expect(body.bleachers).toHaveLength(1);
+    expect(body.bleachers[0]).toMatchObject({ bleacher_number: 42, latitude: 27.9 });
+    expect(writeLog.mock.calls[0][0]).toMatchObject({
+      tool: "bleacher_locations",
+      sql: '{"bleacher_numbers":[42]}',
+      row_count: 1,
+      error: null,
+    });
+  });
+
+  it("bleacher_location_history returns the stops in the window and the current position", async () => {
+    bleacherRows();
+    const linxup = fakeLinxup();
+    const from = new Date(Date.now() - 6 * 3_600_000).toISOString();
+    const result = await callTool(makeDeps({ linxup }), "bleacher_location_history", {
+      bleacher_numbers: [42],
+      from,
+      to: NOW_ISO,
+    });
+    expect(result.isError).toBeFalsy();
+    const body = JSON.parse(result.content[0].text);
+    expect(body.bleachers[0].stops[0]).toMatchObject({ address: "1 Main St, Tampa, FL" });
+    expect(body.bleachers[0].current.latitude).toBe(27.9);
+    expect(linxup.stops).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a window longer than 7 days, and logs it", async () => {
+    const result = await callTool(makeDeps({ linxup: fakeLinxup() }), "bleacher_location_history", {
+      bleacher_numbers: [42],
+      from: "2026-01-01T00:00:00Z",
+      to: "2026-01-20T00:00:00Z",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/at most 7 days/);
+    expect(writeLog.mock.calls[0][0].error).toMatch(/at most 7 days/);
+  });
+
+  it("says Linxup is not configured when it is missing, and logs it", async () => {
+    const result = await callTool(makeDeps(), "bleacher_locations", {});
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Linxup GPS connection is not configured/);
+    expect(writeLog.mock.calls[0][0]).toMatchObject({ tool: "bleacher_locations" });
+  });
+
+  it("shows Linxup's own error message", async () => {
+    bleacherRows();
+    const linxup = fakeLinxup({
+      currentPositions: vi.fn(async () => {
+        throw new LinxupError("Linxup answered HTTP 401.");
+      }),
+    });
+    const result = await callTool(makeDeps({ linxup }), "bleacher_locations", {});
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe("Linxup answered HTTP 401.");
   });
 });

@@ -9,6 +9,7 @@ import { summaryTone } from "../utils/checkSummaries";
 import { useChecks, type CheckStatus } from "./ChecksProvider";
 import { GenerateWorkTrackersButton } from "./GenerateWorkTrackersButton";
 import { ModelTrackersPanel } from "./ModelTrackersPanel";
+import { AdvancedSettingsButton } from "./AdvancedSettingsButton";
 import { ZoneWeekPicker } from "./ZoneWeekPicker";
 
 export const SIDEBAR_WIDTH = 288; // px — Tailwind's w-72
@@ -121,6 +122,7 @@ export function AutoWorkTrackersSidebar({
           />
           <GenerateWorkTrackersButton zoneId={zoneId} weekStart={weekStart} fullWidth />
           <ModelTrackersPanel zoneId={zoneId} weekStart={weekStart} />
+          <AdvancedSettingsButton />
 
           <nav aria-label="Auto Work Trackers pages" className="border-t border-gray-200 pt-3">
             {/* The home page stands on its own above the headings, like a home link. */}

@@ -46,6 +46,7 @@ export async function loadPlanningInputs(
         last_name: string | null;
         address_uuid: string | null;
         exclude_from_auto_work_trackers: number | null;
+        vendor_uuid: string | null;
         street: string | null;
         city: string | null;
         state_province: string | null;
@@ -130,7 +131,11 @@ export async function loadPlanningInputs(
     })),
     drivers: driverRows
       .filter((d) => d.exclude_from_auto_work_trackers !== 1)
-      .map((d) => ({ driverUuid: d.driver_uuid, home: point(d.latitude, d.longitude) })),
+      .map((d) => ({
+        driverUuid: d.driver_uuid,
+        home: point(d.latitude, d.longitude),
+        contractor: d.vendor_uuid != null,
+      })),
     blocked,
     tripTypeUuid: tripTypes[0]?.id ?? null,
     existing: trackers.flatMap((t) =>

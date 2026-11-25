@@ -314,6 +314,42 @@ describe("uploadData", () => {
   });
 });
 
+describe("uploadData — JSON columns", () => {
+  it("uploads a JSON column as a value, not a quoted string, on insert and update", async () => {
+    const sent: unknown[] = [];
+    client.from.mockImplementation(() => ({
+      upsert: (record: unknown) => {
+        sent.push(record);
+        return Promise.resolve({ error: null });
+      },
+      update: (data: unknown) => {
+        sent.push(data);
+        return { eq: () => Promise.resolve({ error: null }) };
+      },
+      delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+    }));
+    const { database } = databaseWith([
+      {
+        op: UpdateType.PUT,
+        table: "AutoWorkTrackerRunTrips",
+        id: "rt1",
+        opData: { snapshot: '{"tracker":{"id":"w1"}}' },
+      },
+      {
+        op: UpdateType.PATCH,
+        table: "AutoWorkTrackerRuns",
+        id: "r1",
+        opData: { result: '{"a":1}' },
+      },
+    ]);
+    await new BackendConnector(null).uploadData(database as never);
+    expect(sent).toEqual([
+      { snapshot: { tracker: { id: "w1" } }, id: "rt1" },
+      { result: { a: 1 } },
+    ]);
+  });
+});
+
 describe("joinTables", () => {
   it("lists each table once, sorted", () => {
     expect(joinTables(["b", "a", "b", "a"])).toBe("a,b");

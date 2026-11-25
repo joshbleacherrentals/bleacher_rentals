@@ -1,4 +1,5 @@
 import { SignedInSessionResource } from "@clerk/types";
+import { withJsonColumns } from "./jsonColumns";
 import {
   AbstractPowerSyncDatabase,
   CrudEntry,
@@ -131,11 +132,11 @@ export class BackendConnector implements PowerSyncBackendConnector {
         switch (op.op) {
           case UpdateType.PUT:
             // eslint-disable-next-line no-case-declarations
-            const record = { ...op.opData, id: op.id };
+            const record = { ...withJsonColumns(op.table, op.opData), id: op.id };
             result = await table.upsert(record);
             break;
           case UpdateType.PATCH:
-            result = await table.update(op.opData).eq("id", op.id);
+            result = await table.update(withJsonColumns(op.table, op.opData)).eq("id", op.id);
             break;
           case UpdateType.DELETE:
             result = await table.delete().eq("id", op.id);

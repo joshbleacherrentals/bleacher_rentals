@@ -1,7 +1,8 @@
 /**
  * A driver's week as a 7-day × 24-hour grid: each work tracker painted as spans on its day, the
- * deadhead in (from home or the previous drop-off), the haul (pickup to drop-off) and, after the
- * day's last trip, the drive home. Each span is as wide as its drive time.
+ * deadhead in (from home or the previous drop-off), the teardown at the pickup, the haul (pickup to
+ * drop-off), the setup at the drop-off and, after the day's last trip, the drive home. Each span is
+ * as wide as its drive time (or its time on site).
  *
  * Where a span sits: the tracker's planned pickup/drop-off times when it has them (firm). Without
  * them it is an estimate: the day's trips placed one after another from DAY_START, as early as they
@@ -27,12 +28,15 @@ export type ScheduleTracker = {
   haulMinutes: number | null;
   deadheadInMinutes: number | null;
   returnHomeMinutes: number | null;
+  /** Time on site at the pickup (a teardown) and at the drop-off (a setup); 0 for none. */
+  teardownMinutes: number;
+  setupMinutes: number;
   bleacherNumber: number | null;
   pickupLabel: string | null;
   dropoffLabel: string | null;
 };
 
-export type SpanKind = "deadhead" | "haul";
+export type SpanKind = "deadhead" | "haul" | "site";
 
 export type ScheduleSpan = {
   trackerId: string;
@@ -118,9 +122,12 @@ export function layoutSchedule(trackers: ScheduleTracker[], weekStart: string): 
       const fromPrevious = !!t.previousId && ids.has(t.previousId);
       const deadIn =
         t.deadheadInMinutes ?? (estimated ? (fromPrevious ? 0 : DEFAULT_DEADHEAD_MINUTES) : 0);
+      // The planned pickup is the arrival there; the haul starts after the teardown.
       const start = pickup ? pickup.minutes : cursor + deadIn;
-      const haul = t.haulMinutes ?? (pickup && dropoff ? dropoff.minutes - pickup.minutes : null);
-      const end = dropoff && pickup ? dropoff.minutes : start + (haul ?? DEFAULT_HAUL_MINUTES);
+      const haulStart = start + t.teardownMinutes;
+      const haul = t.haulMinutes ?? (pickup && dropoff ? dropoff.minutes - haulStart : null);
+      const end = dropoff && pickup ? dropoff.minutes : haulStart + (haul ?? DEFAULT_HAUL_MINUTES);
+      const leave = end + t.setupMinutes;
       const returns = !followed.has(t.id);
       const home = returns
         ? (t.returnHomeMinutes ?? (estimated ? DEFAULT_DEADHEAD_MINUTES : 0))
@@ -148,11 +155,13 @@ export function layoutSchedule(trackers: ScheduleTracker[], weekStart: string): 
         start,
         fromPrevious ? "Deadhead from last drop-off" : "Deadhead from home",
       );
-      add("haul", start, end, "Haul");
-      add("deadhead", end, end + home, "Deadhead home");
+      add("site", start, haulStart, "Teardown");
+      add("haul", haulStart, end, "Haul");
+      add("site", end, leave, "Setup");
+      add("deadhead", leave, leave + home, "Deadhead home");
 
-      driveMinutes += deadIn + (end - start) + home;
-      cursor = end + home;
+      driveMinutes += deadIn + (end - haulStart) + home;
+      cursor = leave + home;
     }
     return { date, spans, trips: list.length, driveMinutes };
   });

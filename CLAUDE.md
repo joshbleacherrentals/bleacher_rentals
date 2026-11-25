@@ -84,6 +84,31 @@ that was never verified.
 
 ---
 
+## Data dictionary — update it with the meaning
+
+Staff ask Claude questions about our data through the analytics MCP, and Claude
+answers from
+[`src/features/analyticsMcp/dataDictionary.ts`](src/features/analyticsMcp/dataDictionary.ts):
+what each table and non-obvious column means, plus business rules (statuses,
+revenue, tax, currency, pay, which rows to exclude). If the file is wrong, staff
+get confident wrong numbers.
+
+**Whenever a change alters what data means or how the app computes or filters a
+number, update `dataDictionary.ts` in the same commit.** Typical triggers: a new
+status or enum value, a column that is deprecated or replaced, a new soft-delete
+column, a changed formula (scorecard, AR, pay), a new place that stores money or
+currency.
+
+Three checks back this up:
+
+- A new table without an entry breaks `npm run tc`.
+- A new or dropped column fails `dataDictionary.columns.test.ts`. Add a note if its
+  meaning is not obvious from its name, then accept it with
+  `npx vitest run src/features/analyticsMcp/dataDictionary.columns.test.ts -u`.
+- `/preflight` lists the rules whose `source` files a PR touched, to re-read.
+
+---
+
 ## Spec-Driven Development (SDD)
 
 Before writing any code or tests for a **large feature**:

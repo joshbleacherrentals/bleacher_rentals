@@ -97,6 +97,7 @@ export function driverDataQuery(zoneId: string) {
       "u.last_name as last_name",
       "d.address_uuid as address_uuid",
       "d.exclude_from_auto_work_trackers as exclude_from_auto_work_trackers",
+      "d.vendor_uuid as vendor_uuid",
       "a.street as street",
       "a.city as city",
       "a.state_province as state_province",
@@ -123,6 +124,23 @@ export function managesZoneQuery(accountManagerUuid: string, zoneId: string) {
 }
 
 /** Each driver in the zone's user (the Users row their other pages are keyed by). */
+/**
+ * Whether each of the zone's drivers is an employee or a contractor: a contractor is paid through a
+ * vendor (Drivers.vendor_uuid), an employee has none. The vendor's name when it is synced.
+ */
+export function driverKindsQuery(zoneId: string) {
+  return db
+    .selectFrom("Drivers as d")
+    .leftJoin("Vendors as v", "v.id", "d.vendor_uuid")
+    .select([
+      "d.id as driver_uuid",
+      "d.vendor_uuid as vendor_uuid",
+      "v.display_name as vendor_name",
+    ])
+    .where("d.id", "in", driverUuidsInZone(zoneId))
+    .compile();
+}
+
 export function driverUserUuidsQuery(zoneId: string) {
   return db
     .selectFrom("Drivers as d")

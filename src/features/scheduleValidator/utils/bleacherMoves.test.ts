@@ -21,6 +21,7 @@ const needed: NeededTrip = {
   toStreet: "2 Oak Ave",
   fromAddressUuid: "addr-full",
   toAddressUuid: "addr-no-coords",
+  pickupAtEvent: true,
   fromEventUuid: "e1",
   toEventUuid: "e2",
   availableFrom: "2026-09-15",

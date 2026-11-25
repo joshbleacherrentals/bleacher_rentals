@@ -11,6 +11,7 @@ import {
   driverDataQuery,
   managesZoneQuery,
   driverUserUuidsQuery,
+  driverKindsQuery,
   driverUnavailabilityQuery,
   driverWorkloadQuery,
 } from "./driverQueries";
@@ -71,5 +72,13 @@ describe("driverUserUuidsQuery", () => {
     const compiled = driverUserUuidsQuery("zone-1");
     expect(compiled.sql).toContain('"d"."user_uuid"');
     expect(compiled.sql).toMatch(ZONE_FILTER);
+  });
+});
+
+describe("driverKindsQuery", () => {
+  it("reads each zone driver's vendor, and its name when synced", () => {
+    const { sql } = driverKindsQuery("zone-1");
+    expect(sql).toContain('"d"."vendor_uuid"');
+    expect(sql).toContain('left join "Vendors" as "v"');
   });
 });

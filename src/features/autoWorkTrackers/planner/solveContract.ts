@@ -4,13 +4,22 @@
  * needs is in the request, and it never reads the database or the network.
  */
 
-export type SolveVehicle = { id: string; home: number };
-export type SolveTrip = { id: string; pickup: number; dropoff: number; vehicles: string[] };
+/** A driver-day. `trip_cost` is added to the cost for each trip it takes (in the units of `costs`). */
+export type SolveVehicle = { id: string; home: number; trip_cost: number };
+export type SolveTrip = {
+  id: string;
+  pickup: number;
+  dropoff: number;
+  vehicles: string[];
+  /** Time on site at each end before driving on (a teardown, a setup); counts towards the day. */
+  pickup_minutes: number;
+  dropoff_minutes: number;
+};
 
 export type SolveRequest = {
   /** Drive minutes from place i to place j. */
   minutes: number[][];
-  /** What to minimise from place i to place j (metres). */
+  /** What to minimise from place i to place j (metres, or seconds when planning for time). */
   costs: number[][];
   vehicles: SolveVehicle[];
   trips: SolveTrip[];
@@ -18,6 +27,7 @@ export type SolveRequest = {
   search_seconds: number;
 };
 
+/** Arrival at the pickup and at the drop-off, in minutes after the vehicle leaves home. */
 export type SolveStop = { trip: string; pickup_minute: number; dropoff_minute: number };
 export type SolveRoute = { vehicle: string; stops: SolveStop[] };
 export type SolveUnplacedReason = "no_vehicle" | "too_long_for_a_day" | "no_room";

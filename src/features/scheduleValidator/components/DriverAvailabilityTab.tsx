@@ -7,6 +7,8 @@ import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeek
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import { useDriverUserUuids } from "../hooks/useDriverUserUuids";
 import { DriverLinksMenu } from "./DriverLinksMenu";
+import { DriverNameWithKind } from "./DriverNameWithKind";
+import { useDriverKinds } from "../hooks/useDriverKinds";
 import type { AvailabilityDay } from "../utils/driverAvailability";
 import { DriverWeekGrid, GRID_LINES } from "./DriverWeekGrid";
 
@@ -58,6 +60,7 @@ export function DriverAvailabilityTab() {
   const [weekStart] = useSelectedWeek();
   const { zoneId } = useZoneWeekParams();
   const userUuids = useDriverUserUuids(zoneId);
+  const kinds = useDriverKinds(zoneId);
   const { drivers, isLoading } = useChecks().driverAvailability;
 
   if (!zoneId) {
@@ -75,6 +78,9 @@ export function DriverAvailabilityTab() {
   return (
     <DriverWeekGrid
       weekStart={weekStart}
+      renderDriverName={(driver) => (
+        <DriverNameWithKind name={driver.driverName} kind={kinds.get(driver.driverUuid)} />
+      )}
       renderDriverActions={(driver) => (
         <DriverLinksMenu
           userUuid={userUuids.get(driver.driverUuid)}

@@ -110,6 +110,7 @@ describe("discoverTrips: a move between two events", () => {
         toStreet: "2 Oak Ave",
         fromAddressUuid: null,
         toAddressUuid: null,
+        pickupAtEvent: true,
         fromEventUuid: "a",
         toEventUuid: "b",
         availableFrom: "2026-11-10",
@@ -235,6 +236,7 @@ describe("discoverTrips: work trackers that already exist", () => {
     expect(result[0]).toMatchObject({
       fromStreet: "9 Depot Dr",
       toStreet: "2 Oak Ave",
+      pickupAtEvent: false, // picked up from the depot, not the event: no teardown
       fromEventUuid: "a",
       toEventUuid: "b",
     });

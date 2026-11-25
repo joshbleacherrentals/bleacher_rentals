@@ -57,6 +57,41 @@ def test_a_lone_trip_goes_to_the_driver_who_drives_less():
     assert [r.vehicle for r in res.routes] == ["near"]
 
 
+def test_a_trip_cost_sends_the_trip_to_the_other_vehicle_unless_it_saves_more():
+    # Costs are minutes × 1000: "near" costs 40,000 for the trip, "far" 380,000 (340,000 more).
+    trip = SolveTrip(id="t", pickup=2, dropoff=3, vehicles=["near", "far"])
+    near = SolveVehicle(id="near", home=0, trip_cost=1_000_000)  # more than the 340,000 it saves
+    far = SolveVehicle(id="far", home=1)
+    assert [r.vehicle for r in solve(request([trip], [near, far])).routes] == ["far"]
+    cheaper = near.model_copy(update={"trip_cost": 300_000})  # less than the 340,000 it saves
+    assert [r.vehicle for r in solve(request([trip], [cheaper, far])).routes] == ["near"]
+
+
+def test_a_trip_cost_never_leaves_a_trip_out():
+    trip = SolveTrip(id="t", pickup=2, dropoff=3, vehicles=["c"])
+    res = solve(request([trip], [SolveVehicle(id="c", home=0, trip_cost=100_000_000)]))
+    assert [r.vehicle for r in res.routes] == ["c"] and res.unplaced == []
+
+
+def test_time_on_site_comes_before_driving_on():
+    # home(0) -10-> A(2): 60 on site -10-> X(3): arrives at 80.
+    trip = SolveTrip(id="t", pickup=2, dropoff=3, vehicles=["d1|mon"], pickup_minutes=60, dropoff_minutes=60)
+    (route,) = solve(request([trip], [V1])).routes
+    (stop,) = route.stops
+    assert stop.pickup_minute == 10 and stop.dropoff_minute == 80
+
+
+def test_time_on_site_counts_towards_the_day():
+    # Alone: 10 + 60 + 10 + 60 + 20 home = 160 minutes.
+    trip = SolveTrip(id="t", pickup=2, dropoff=3, vehicles=["d1|mon"], pickup_minutes=60, dropoff_minutes=60)
+    assert [u.reason for u in solve(request([trip], [V1], max_day_minutes=159)).unplaced] == [TOO_LONG_FOR_A_DAY]
+    assert solve(request([trip], [V1], max_day_minutes=160)).unplaced == []
+    # Two of them chained: 10 + 60 + 10 + 60 + 10 back to A + 60 + 10 + 60 + 20 = 300.
+    two = [trip, trip.model_copy(update={"id": "t2"})]
+    assert [u.reason for u in solve(request(two, [V1], max_day_minutes=299)).unplaced] == [NO_ROOM]
+    assert solve(request(two, [V1], max_day_minutes=300)).unplaced == []
+
+
 def test_the_endpoint_answers_and_refuses_a_bad_request():
     app = FastAPI()
     app.include_router(router)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useAutoWorkTrackerSettings } from "@/features/autoWorkTrackers/hooks/useAutoWorkTrackerSettings";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { timestampToDate } from "@/features/autoWorkTrackers/utils/discoverTrips";
 import { weekEndOf } from "@/features/autoWorkTrackers/utils/week";
@@ -27,6 +28,8 @@ type Row = {
   drive_minutes: number | null;
   deadhead_in_drive_minutes: number | null;
   return_home_drive_minutes: number | null;
+  setup_required: number | null;
+  teardown_required: number | null;
   bleacher_number: number | null;
   pickup_street: string | null;
   dropoff_street: string | null;
@@ -62,6 +65,8 @@ export function useDriverSchedule(
     [userUuid, weekStart, weekEnd],
   );
   const { data, isLoading } = useTypedQuery(compiled, expect<Row>());
+  // Setup and teardown times as the Auto Work Trackers settings have them (defaults when not synced).
+  const { settings } = useAutoWorkTrackerSettings();
 
   const nameCompiled = useMemo(() => driverNameQuery(userUuid), [userUuid]);
   const { data: names } = useTypedQuery(
@@ -83,6 +88,8 @@ export function useDriverSchedule(
           haulMinutes: r.drive_minutes,
           deadheadInMinutes: r.deadhead_in_drive_minutes,
           returnHomeMinutes: r.return_home_drive_minutes,
+          teardownMinutes: r.teardown_required ? settings.teardownMinutes : 0,
+          setupMinutes: r.setup_required ? settings.setupMinutes : 0,
           bleacherNumber: r.bleacher_number,
           pickupLabel: r.pickup_street,
           dropoffLabel: r.dropoff_street,
@@ -90,7 +97,7 @@ export function useDriverSchedule(
       ];
     });
     return layoutSchedule(trackers, weekStart);
-  }, [data, weekStart]);
+  }, [data, weekStart, settings.setupMinutes, settings.teardownMinutes]);
 
   const routesByDay = useMemo(() => {
     const byDay = new Map<string, MapTracker[]>();

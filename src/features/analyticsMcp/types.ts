@@ -22,7 +22,8 @@ export type AccessDecision =
 export type McpQueryLogEntry = {
   user_id: string | null;
   clerk_user_id: string;
-  tool: "query" | "describe_schema" | "access";
+  tool: "query" | "describe_schema" | "access" | "bleacher_locations" | "bleacher_location_history";
+  /** The query text; for a location tool, its arguments as JSON (§12). */
   sql: string | null;
   row_count: number | null;
   truncated: boolean;

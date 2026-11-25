@@ -12,11 +12,12 @@ import {
 } from "./pages";
 
 describe("auto work trackers pages", () => {
-  it("groups the pages under Events, Bleachers and Drivers", () => {
+  it("groups the pages under Events, Bleachers, Drivers and Model", () => {
     expect(AUTO_WORK_TRACKERS_SECTIONS.map((s) => [s.label, s.pages.map((p) => p.slug)])).toEqual([
       ["Events", ["event-fulfilment", "event-bleacher-requirements", "event-data"]],
       ["Bleachers", ["overbooked-bleachers", "bleacher-data"]],
       ["Drivers", ["driver-workload", "driver-availability", "driver-data"]],
+      ["Model", ["model-runs"]],
     ]);
   });
 

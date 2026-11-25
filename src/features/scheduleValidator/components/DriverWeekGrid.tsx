@@ -20,6 +20,7 @@ export function DriverWeekGrid<R extends DriverRow>({
   renderDay,
   renderDriverStatus,
   renderDriverActions,
+  renderDriverName,
   testId,
 }: {
   weekStart: string;
@@ -28,6 +29,8 @@ export function DriverWeekGrid<R extends DriverRow>({
   renderDriverStatus?: (driver: R) => ReactNode;
   /** Shown at the end of the driver's name cell, e.g. the driver's links menu. */
   renderDriverActions?: (driver: R) => ReactNode;
+  /** Draws the driver's name, e.g. with a line under it; the plain name by default. */
+  renderDriverName?: (driver: R) => ReactNode;
   testId?: string;
 }) {
   return (
@@ -56,7 +59,7 @@ export function DriverWeekGrid<R extends DriverRow>({
             className={`flex min-h-12 items-center gap-2 px-2 text-sm font-medium ${GRID_LINES}`}
           >
             {renderDriverStatus?.(driver)}
-            {driver.driverName}
+            {renderDriverName ? renderDriverName(driver) : driver.driverName}
             {renderDriverActions?.(driver)}
           </div>
           {driver.days.map((day) => (

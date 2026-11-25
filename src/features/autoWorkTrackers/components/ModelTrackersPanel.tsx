@@ -13,7 +13,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { expect, typedExecuteBatch, useTypedQuery } from "@/lib/powersync/typedQuery";
+import { expect, typedExecuteBatch, typedGetAll, useTypedQuery } from "@/lib/powersync/typedQuery";
+import { useCurrentUser } from "@/hooks/db/useCurrentUser";
+import { discardRunsStatement, feedbackStatement, openRunsQuery } from "../db/runFeedback";
 import { useUserAccess } from "@/features/userAccess/hooks/useUserAccess";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToastNoThrow } from "@/components/toasts/ErrorToast";
@@ -35,11 +37,19 @@ export function ModelTrackersPanel({ zoneId, weekStart }: { zoneId: string; week
   );
   const { data } = useTypedQuery(
     compiled,
-    expect<{ id: string; auto_work_tracker_id: string | null; status: string | null }>(),
+    expect<{
+      id: string;
+      auto_work_tracker_id: string | null;
+      status: string | null;
+      created_at: string | null;
+    }>(),
   );
   const counts = countModelTrackers(data ?? [], key);
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reason, setReason] = useState("");
+  const { data: me } = useCurrentUser();
+  const myUuid = me?.[0]?.id ?? null;
 
   if (!zoneId) return null;
 
@@ -47,7 +57,26 @@ export function ModelTrackersPanel({ zoneId, weekStart }: { zoneId: string; week
     setDeleting(true);
     try {
       const n = counts.modelDrafts;
-      await typedExecuteBatch(deleteModelDraftsStatements(key));
+      // The run is thrown away too: marked discarded (left out of the analysis of dispatch's edits),
+      // with the reason, when one was given.
+      const now = new Date().toISOString();
+      const runs = await typedGetAll(openRunsQuery(key), expect<{ id: string }>());
+      const feedback = runs.flatMap((r) => {
+        const stmt = feedbackStatement({
+          kind: "discard",
+          reason,
+          runUuid: r.id,
+          userUuid: myUuid,
+          now,
+        });
+        return stmt ? [stmt] : [];
+      });
+      await typedExecuteBatch([
+        ...deleteModelDraftsStatements(key),
+        discardRunsStatement(key, myUuid, now),
+        ...feedback,
+      ]);
+      setReason("");
       createSuccessToast([
         `Deleted ${n} draft work tracker${n === 1 ? "" : "s"} made by the model`,
       ]);
@@ -103,6 +132,23 @@ export function ModelTrackersPanel({ zoneId, weekStart }: { zoneId: string; week
               be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">
+              Why are you deleting them?{" "}
+              <span className="font-normal text-gray-500">(optional)</span>
+            </span>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Trying Employees first, too many contractor trips"
+              className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+              data-testid="discard-reason"
+            />
+            <span className="text-xs text-gray-500">
+              Helps us make the model better. The run is kept in the log as discarded.
+            </span>
+          </label>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction

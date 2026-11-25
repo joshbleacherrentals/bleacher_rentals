@@ -598,6 +598,64 @@ const ScorecardTargets = new Table(ScorecardTargetsCols, {
   indexes: { account_manager_uuid: ["account_manager_uuid"] },
 });
 
+// The Auto Work Trackers model's settings: one row (id 'global'); null = the app's default.
+const AutoWorkTrackerSettingsCols = {
+  objective: column.text,
+  employee_priority: column.text,
+  employee_priority_minutes: column.integer,
+  max_day_minutes: column.integer,
+  setup_minutes: column.integer,
+  teardown_minutes: column.integer,
+  day_start_hour: column.integer,
+  search_seconds: column.integer,
+  updated_at: column.text,
+  updated_by_user_uuid: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerSettings">;
+const AutoWorkTrackerSettings = new Table(AutoWorkTrackerSettingsCols);
+
+// The Auto Work Trackers run log: each Create run, each trip it planned (snapshot JSON as text),
+// and the optional reasons people give for changing them.
+const AutoWorkTrackerRunsCols = {
+  created_at: column.text,
+  created_by_user_uuid: column.text,
+  zone_uuid: column.text,
+  week_start: column.text,
+  auto_work_tracker_id: column.text,
+  app_version: column.text,
+  commit_sha: column.text,
+  settings: column.text,
+  result: column.text,
+  trips_created: column.integer,
+  discarded_at: column.text,
+  discarded_by_user_uuid: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerRuns">;
+const AutoWorkTrackerRuns = new Table(AutoWorkTrackerRunsCols, {
+  indexes: { auto_work_tracker_id: ["auto_work_tracker_id"] },
+});
+
+const AutoWorkTrackerRunTripsCols = {
+  created_at: column.text,
+  run_uuid: column.text,
+  work_tracker_uuid: column.text,
+  snapshot: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerRunTrips">;
+const AutoWorkTrackerRunTrips = new Table(AutoWorkTrackerRunTripsCols, {
+  indexes: { run_uuid: ["run_uuid"], work_tracker_uuid: ["work_tracker_uuid"] },
+});
+
+const AutoWorkTrackerFeedbackCols = {
+  created_at: column.text,
+  created_by_user_uuid: column.text,
+  run_uuid: column.text,
+  run_trip_uuid: column.text,
+  work_tracker_uuid: column.text,
+  kind: column.text,
+  reason: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerFeedback">;
+const AutoWorkTrackerFeedback = new Table(AutoWorkTrackerFeedbackCols, {
+  indexes: { run_uuid: ["run_uuid"] },
+});
+
 const VendorsCols = {
   created_at: column.text,
   qbo_vendor_id: column.text,
@@ -1491,6 +1549,10 @@ const DriverSurveyResponses = new Table(DriverSurveyResponsesCols, {
 
 export const AppSchema = new Schema({
   Addresses,
+  AutoWorkTrackerSettings,
+  AutoWorkTrackerRuns,
+  AutoWorkTrackerRunTrips,
+  AutoWorkTrackerFeedback,
   Venues,
   AccountManagers,
   AccountManagerZones,

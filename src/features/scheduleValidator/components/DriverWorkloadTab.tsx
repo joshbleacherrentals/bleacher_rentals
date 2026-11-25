@@ -5,6 +5,8 @@ import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeek
 import { useSelectedWeek } from "../hooks/useSelectedWeek";
 import { useDriverUserUuids } from "../hooks/useDriverUserUuids";
 import { DriverLinksMenu } from "./DriverLinksMenu";
+import { DriverNameWithKind } from "./DriverNameWithKind";
+import { useDriverKinds } from "../hooks/useDriverKinds";
 import { Truck } from "lucide-react";
 import { AppTooltip } from "@/components/AppTooltip";
 import {
@@ -85,6 +87,7 @@ export function DriverWorkloadTab() {
   const [weekStart] = useSelectedWeek();
   const { zoneId } = useZoneWeekParams();
   const userUuids = useDriverUserUuids(zoneId);
+  const kinds = useDriverKinds(zoneId);
   const { drivers, isLoading } = useChecks().driverWorkload;
 
   if (!zoneId) {
@@ -100,6 +103,9 @@ export function DriverWorkloadTab() {
   return (
     <DriverWeekGrid
       weekStart={weekStart}
+      renderDriverName={(driver) => (
+        <DriverNameWithKind name={driver.driverName} kind={kinds.get(driver.driverUuid)} />
+      )}
       renderDriverActions={(driver) => (
         <DriverLinksMenu
           userUuid={userUuids.get(driver.driverUuid)}

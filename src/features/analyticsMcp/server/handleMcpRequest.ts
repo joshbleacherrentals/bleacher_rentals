@@ -6,7 +6,10 @@ import { capResult } from "../logic/capResult";
 import { isUserAllowed } from "../logic/isUserAllowed";
 import { prepareSql } from "../logic/prepareSql";
 import type { McpQueryLogEntry } from "../types";
+import { MAX_HISTORY_BLEACHERS, MAX_HISTORY_DAYS } from "../logic/bleacherLocations";
 import { describeSchema } from "./describeSchema";
+import { LinxupError, type LinxupClient } from "./linxup";
+import { currentLocationsTool, locationHistoryTool, type ToolOutcome } from "./locationTools";
 import { runReadOnlyQuery, type PoolLike } from "./runReadOnlyQuery";
 
 export type McpDeps = {
@@ -15,19 +18,29 @@ export type McpDeps = {
   findUser: (clerkUserId: string) => Promise<{ id: string; status_uuid: string | null } | null>;
   /** null when ANALYTICS_DATABASE_URL is not set. */
   pool: PoolLike | null;
+  /** The Linxup GPS API (§12); null when LINXUP_API_HOST or LINXUP_API_TOKEN is not set. */
+  linxup: LinxupClient | null;
   writeLog: (entry: McpQueryLogEntry) => Promise<void>;
   resourceMetadataUrl: string;
 };
 
 const NOT_CONFIGURED = "The analytics database is not configured.";
 const UNAVAILABLE = "The analytics database is unavailable right now. Try again in a minute.";
+const LINXUP_NOT_CONFIGURED = "The Linxup GPS connection is not configured.";
 
 const INSTRUCTIONS = [
   "Read-only access to the Bleacher Rentals database (Postgres).",
-  "Call describe_schema first to see the tables, columns and foreign keys.",
+  "Call describe_schema first: it gives the rules for reading the data the way the app does, then the tables, columns and foreign keys.",
   `Table names are PascalCase and must be double-quoted, e.g. select count(*) from "Events".`,
   `A query returns at most ${MAX_ROWS} rows and runs for at most 15 seconds: aggregate in SQL (count, sum, group by) instead of fetching rows.`,
   "Only one SELECT statement per call. Nothing can be changed.",
+  "For where bleachers are now or were on a past date, use bleacher_locations and bleacher_location_history (live GPS from Linxup), not SQL.",
+  // docs/specs/analytics-mcp.md §11 D9: the rules most often got wrong, in context before any call.
+  "Key rules: money columns ending in _cents are cents, and Events.contract_revenue_cents includes tax;",
+  "never add CAD and USD amounts together (an event's currency is on EventLineItems.currency);",
+  "exclude soft-deleted rows (deleted = false, or deleted_at is null);",
+  "timestamps are UTC, and the app counts days in America/Toronto;",
+  "driver pay is WorkTrackers.pay_cents.",
 ].join(" ");
 
 const text = (t: string, isError = false) => ({
@@ -115,7 +128,7 @@ export async function handleMcpRequest(req: Request, deps: McpDeps): Promise<Res
     "describe_schema",
     {
       description:
-        "Lists every table, its columns with types, and the foreign keys. Call this first, before writing a query.",
+        "Explains how the app reads the data (status meanings, revenue, pay, currency, dates), then lists every table with its purpose, its columns with types and notes, and the foreign keys. Call this first, before writing a query.",
       annotations: { readOnlyHint: true },
     },
     async () => {
@@ -179,6 +192,79 @@ export async function handleMcpRequest(req: Request, deps: McpDeps): Promise<Res
         return text(shown, true);
       }
     },
+  );
+
+  // §12: both location tools need the database (bleachers) and Linxup (positions). The arguments
+  // go in the log's sql column, so the log shows which bleachers and when.
+  const runLocationTool = async (
+    tool: "bleacher_locations" | "bleacher_location_history",
+    args: unknown,
+    run: (pool: PoolLike, linxup: LinxupClient) => Promise<ToolOutcome>,
+  ) => {
+    const started = Date.now();
+    const argsText = JSON.stringify(args ?? {});
+    const missing = !deps.pool ? NOT_CONFIGURED : !deps.linxup ? LINXUP_NOT_CONFIGURED : null;
+    if (missing) {
+      await log(entry({ tool, sql: argsText, error: missing }));
+      return text(missing, true);
+    }
+    try {
+      const outcome = await run(deps.pool!, deps.linxup!);
+      if (!outcome.ok) {
+        await log(entry({ tool, sql: argsText, error: outcome.error }));
+        return text(outcome.error, true);
+      }
+      await log(
+        entry({ tool, sql: argsText, row_count: outcome.count, duration_ms: Date.now() - started }),
+      );
+      return text(JSON.stringify(outcome.body));
+    } catch (e) {
+      // A Linxup message names no host or token, so Claude may see it.
+      const { shown, logged } =
+        e instanceof LinxupError ? { shown: e.message, logged: e.message } : describeError(e);
+      await log(entry({ tool, sql: argsText, error: logged, duration_ms: Date.now() - started }));
+      return text(shown, true);
+    }
+  };
+
+  const bleacherNumbers = z.array(z.number().int().positive());
+
+  server.registerTool(
+    "bleacher_locations",
+    {
+      description:
+        "Where bleachers are right now, from their Linxup GPS trackers: latitude, longitude, when the tracker last reported, and speed. Leave bleacher_numbers out for the whole fleet. To say which event, venue or yard a bleacher is at, compare with Addresses.latitude / longitude (e.g. of the events running today).",
+      inputSchema: {
+        bleacher_numbers: bleacherNumbers
+          .optional()
+          .describe("Bleachers.bleacher_number values; omit for every bleacher."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async (args) =>
+      runLocationTool("bleacher_locations", args, (pool, linxup) =>
+        currentLocationsTool(pool, linxup, args),
+      ),
+  );
+
+  server.registerTool(
+    "bleacher_location_history",
+    {
+      description: `Where bleachers were over a past window (at most ${MAX_HISTORY_DAYS} days), from their Linxup GPS trackers: the places each one stood still, with times and street address, plus its current position. For "where was #42 on July 4" ask for that day.`,
+      inputSchema: {
+        bleacher_numbers: bleacherNumbers
+          .min(1)
+          .max(MAX_HISTORY_BLEACHERS)
+          .describe(`1 to ${MAX_HISTORY_BLEACHERS} Bleachers.bleacher_number values.`),
+        from: z.string().describe("Start, ISO 8601 with offset, e.g. 2026-07-04T00:00:00-04:00."),
+        to: z.string().describe("End, ISO 8601 with offset."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async (args) =>
+      runLocationTool("bleacher_location_history", args, (pool, linxup) =>
+        locationHistoryTool(pool, linxup, args),
+      ),
   );
 
   const transport = new WebStandardStreamableHTTPServerTransport({

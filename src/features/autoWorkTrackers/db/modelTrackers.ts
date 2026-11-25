@@ -12,7 +12,12 @@ export function weekTrackersQuery(zoneId: string, weekStart: string, key: string
   return db
     .selectFrom("WorkTrackers as w")
     .leftJoin("Bleachers as b", "b.id", "w.bleacher_uuid")
-    .select(["w.id as id", "w.auto_work_tracker_id as auto_work_tracker_id", "w.status as status"])
+    .select([
+      "w.id as id",
+      "w.auto_work_tracker_id as auto_work_tracker_id",
+      "w.status as status",
+      "w.created_at as created_at",
+    ])
     .where((eb) =>
       eb.or([
         eb("w.auto_work_tracker_id", "=", key),
