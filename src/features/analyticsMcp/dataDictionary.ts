@@ -129,6 +129,11 @@ export const BUSINESS_RULES: BusinessRule[] = [
     source: "src/features/scheduleValidator/utils/driverKind.ts",
   },
   {
+    topic: "Auto planner accuracy",
+    rule: "Each click of Create work trackers is one AutoWorkTrackerRuns row (settings, totals, app_version, commit_sha). Leave out runs with discarded_at set: those were thrown away to try other settings. Each AutoWorkTrackerRunTrips row is a tracker the run created, with snapshot = its values and line items as the planner wrote them. Judge a trip by its WorkTrackers row now: missing = dispatch deleted it; auto_work_tracker_id still set = untouched; otherwise edited — compare each snapshot->'tracker' field with the row (timestamps as instants; ignore status and auto_work_tracker_id). Reasons people gave are in AutoWorkTrackerFeedback (kind edit, delete or discard), optional and free text.",
+    source: "src/features/autoWorkTrackers/utils/runReview.ts",
+  },
+  {
     topic: "Distances and times",
     rule: "WorkTrackers.distance_meters / drive_minutes = the loaded haul, pickup to dropoff (miles = m / 1609.34). deadhead_in_* = empty drive to the pickup (from home or the previous trip); return_home_* = empty drive home after the day's last trip. Each driven km belongs to one tracker. These come from Google; the deadhead/return columns are only filled by the auto planner.",
     source: "supabase/migrations/20261125120000_auto_work_trackers_model_fields.sql",
