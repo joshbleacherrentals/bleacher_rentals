@@ -622,7 +622,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: full(
-        'Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
+        'Can create, edit, delete, and restore any repair, including its services, bleachers and files, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -647,6 +647,8 @@ export const PERMISSIONS: PermissionEntry[] = [
   // and from the maintenance icon of a cell; an account manager only reads (level `read` in the row above,
   // D219), a maintainer also adds a repair there (D210, D218), nobody reassigns an owner (D220), and a
   // manager opens a repair from a damage report (D217; the rows "Dashboard Cells" and "Damage Reports").
+  // The account manager's read-only rule is enforced by the page only; row level security still allows
+  // the write. Confirmed by the user at preflight 1.27.0 (spec repairs-09a §5).
   {
     label: "Repair Costs & Vendors",
     description:

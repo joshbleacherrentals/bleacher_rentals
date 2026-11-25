@@ -415,9 +415,10 @@ SELECT set_config('request.jwt.claims', json_build_object('sub', 'clerk_at_maint
 SELECT is(
   public.test_rows_affected(format('UPDATE public."Drivers" SET pay_rate_cents = 1 WHERE id = %L', :'driver_target')),
   0, 'a maintainer still cannot update a driver');
-SELECT throws_ok(
-  'INSERT INTO public."Vendors" (display_name) VALUES (''AT intruder'')',
-  '42501', NULL, 'a maintainer still cannot create a vendor');
+-- Maintenance 01 (D19) lets a maintainer read, add and edit vendors.
+SELECT lives_ok(
+  'INSERT INTO public."Vendors" (display_name) VALUES (''AT maintainer vendor'')',
+  'a maintainer can create a vendor (maintenance-01 D19)');
 SELECT throws_ok(
   format('INSERT INTO public."DriverPayRanges" (driver_uuid, min_value, rate) VALUES (%L, 300, 1)', :'driver_target'),
   '42501', NULL, 'a maintainer still cannot add a pay tier');
