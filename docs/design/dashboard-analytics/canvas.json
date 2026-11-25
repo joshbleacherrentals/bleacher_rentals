@@ -1,0 +1,33 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-25T20:00:00Z" },
+  "title": "Dashboard & Analytics design",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 3000, "title": "1 · 2026", "expand": "fill", "is_interactive": true },
+    "AllTime.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 3000, "title": "2 · All time", "expand": "fill", "is_interactive": true },
+    "YearMenu.dc.html": { "x": 0, "y": 3120, "w": 1440, "h": 3000, "title": "3 · Period menu open", "expand": "fill", "is_interactive": true },
+    "OverBudget.dc.html": { "x": 1520, "y": 3120, "w": 1440, "h": 3000, "title": "4 · Over budget", "expand": "fill", "is_interactive": true },
+    "NoBudget.dc.html": { "x": 0, "y": 6240, "w": 1440, "h": 3000, "title": "5 · Budget not set", "expand": "fill", "is_interactive": true },
+    "NoModels.dc.html": { "x": 1520, "y": 6240, "w": 1440, "h": 3000, "title": "6 · No model numbers yet", "expand": "fill", "is_interactive": true },
+    "NoRate.dc.html": { "x": 0, "y": 9360, "w": 1440, "h": 3000, "title": "7 · No exchange rate", "expand": "fill", "is_interactive": true },
+    "EmptyYear.dc.html": { "x": 1520, "y": 9360, "w": 1440, "h": 2700, "title": "8 · No repairs in the year", "expand": "fill", "is_interactive": true },
+    "Loading.dc.html": { "x": 0, "y": 12480, "w": 1440, "h": 1500, "title": "9 · Loading", "expand": "fill", "is_interactive": true }
+  },
+  "order": [
+    "Main.dc.html",
+    "AllTime.dc.html",
+    "YearMenu.dc.html",
+    "OverBudget.dc.html",
+    "NoBudget.dc.html",
+    "NoModels.dc.html",
+    "NoRate.dc.html",
+    "EmptyYear.dc.html",
+    "Loading.dc.html"
+  ],
+  "notes": {
+    "title": { "x": 0, "y": -260, "text": "Dashboard & Analytics page", "kind": "title1", "maxW": 2960 }
+  },
+  "designSystems": []
+}
