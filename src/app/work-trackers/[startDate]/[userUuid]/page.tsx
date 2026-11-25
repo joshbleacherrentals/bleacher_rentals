@@ -8,7 +8,8 @@ import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { useState } from "react";
 import { Tables } from "../../../../../database.types";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
-import { Send } from "lucide-react";
+import { CalendarRange, Send } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { WORKTRACKER_STATUS_COLORS } from "@/features/workTrackers/constants";
 import {
@@ -187,6 +188,12 @@ export default function WorkTrackersForUserPage() {
           className="bg-darkBlue text-white hover:bg-lightBlue cursor-pointer"
         >
           {isLoading ? getRandomLoadingMessage() : "Download PDF"}
+        </Button>
+        <Button size="sm" variant="outline" asChild className="cursor-pointer">
+          <Link href={`/work-trackers/${startDate}/${userUuid}/schedule`}>
+            <CalendarRange />
+            Schedule
+          </Link>
         </Button>
         {canReleaseAll && (
           <Button

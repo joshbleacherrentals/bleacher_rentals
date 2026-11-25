@@ -146,6 +146,8 @@ export function planWorkTrackerSave(input: WorkTrackerSaveInput): WorkTrackerSav
     distance_meters: workTracker.distance_meters,
     drive_minutes: workTracker.drive_minutes,
     project_number: workTracker.project_number,
+    // Saved by a person: no longer the Auto Work Trackers model's, so its bulk delete keeps it.
+    auto_work_tracker_id: null,
   };
 
   const wasInsert = workTracker.id === NEW_WORK_TRACKER_ID;
