@@ -502,6 +502,8 @@ const WorkTrackersCols = {
   deadhead_in_drive_minutes: column.integer,
   return_home_distance_meters: column.integer,
   return_home_drive_minutes: column.integer,
+  // "<zone uuid>|<week start>" when the Auto Work Trackers model made it; cleared on a modal save.
+  auto_work_tracker_id: column.text,
   build_work_tracker_history: column.text,
   is_work_tracker_finished: column.integer,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
@@ -512,6 +514,7 @@ const WorkTrackers = new Table(WorkTrackersCols, {
     bleacher_uuid: ["bleacher_uuid"],
     driver_uuid: ["driver_uuid"],
     previous_work_tracker_uuid: ["previous_work_tracker_uuid"],
+    auto_work_tracker_id: ["auto_work_tracker_id"],
     user_uuid: ["user_uuid"],
     pre_inspection_uuid: ["pre_inspection_uuid"],
     post_inspection_uuid: ["post_inspection_uuid"],

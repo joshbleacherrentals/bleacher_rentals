@@ -8,6 +8,7 @@ import { AUTO_WORK_TRACKERS_SECTIONS, HOME_PAGE, pageHref } from "../utils/pages
 import { summaryTone } from "../utils/checkSummaries";
 import { useChecks, type CheckStatus } from "./ChecksProvider";
 import { GenerateWorkTrackersButton } from "./GenerateWorkTrackersButton";
+import { ModelTrackersPanel } from "./ModelTrackersPanel";
 import { ZoneWeekPicker } from "./ZoneWeekPicker";
 
 export const SIDEBAR_WIDTH = 288; // px — Tailwind's w-72
@@ -46,7 +47,8 @@ function CheckBadge({ status }: { status: CheckStatus }) {
 
 /**
  * The pinned left-hand panel of Auto Work Trackers, styled like the Quotes & Bookings filters: the
- * zone and week, the Create work trackers button for them, and the pages grouped under a heading
+ * zone and week, the Create work trackers button for them with the model's tracker counts (and its
+ * bulk delete), and the pages grouped under a heading
  * per kind of check. Each heading folds; the one holding the open page stays open.
  */
 export function AutoWorkTrackersSidebar({
@@ -118,6 +120,7 @@ export function AutoWorkTrackersSidebar({
             stacked
           />
           <GenerateWorkTrackersButton zoneId={zoneId} weekStart={weekStart} fullWidth />
+          <ModelTrackersPanel zoneId={zoneId} weekStart={weekStart} />
 
           <nav aria-label="Auto Work Trackers pages" className="border-t border-gray-200 pt-3">
             {/* The home page stands on its own above the headings, like a home link. */}

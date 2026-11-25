@@ -51,6 +51,20 @@ comment on column public."WorkTrackers".return_home_distance_meters is
 comment on column public."WorkTrackers".return_home_drive_minutes is
   'This drop-off to the driver''s home; only on the last trip of the day.';
 
+-- 2b. WorkTrackers.auto_work_tracker_id: which zone and week the Auto Work Trackers model created
+--     the tracker for ("<zone uuid>|<YYYY-MM-DD week start>"); null for trackers made by hand. The
+--     page uses it to count the model's trackers and to delete its drafts in bulk. Saving the
+--     tracker in the work tracker modal clears it, so a tracker someone has touched is kept.
+
+alter table public."WorkTrackers"
+  add column if not exists auto_work_tracker_id text;
+
+create index if not exists work_trackers_auto_work_tracker_id_idx
+  on public."WorkTrackers" (auto_work_tracker_id);
+
+comment on column public."WorkTrackers".auto_work_tracker_id is
+  'Zone and week ("<zone uuid>|<week start>") the Auto Work Trackers model created this for. Null: made or edited by hand.';
+
 -- 3. RouteCache: real road distances and drive times from Google (Routes API, Compute Route Matrix,
 --    traffic-unaware, avoiding tolls), kept so planning runs only ask Google for pairs they have
 --    not seen in the last 30 days. Keyed by the two points rounded to 5 decimals (about a metre).

@@ -43,6 +43,7 @@ describe("planStatements", () => {
     [planned("w1", null, false), planned("w2", "w1", true)],
     [{ workTrackerId: "w1", unitAmtCents: 3060, description: "15.0KM × $2.04/KM = $30.60" }],
     "trip-type",
+    "zone-1|2026-09-14",
     () => "line-1",
     "2026-11-22T00:00:00.000Z",
   );
@@ -70,6 +71,13 @@ describe("planStatements", () => {
     expect([column(0, "work_tracker_type_uuid"), column(1, "work_tracker_type_uuid")]).toEqual([
       "trip-type",
       "trip-type",
+    ]);
+  });
+
+  it("stamps every tracker with the zone and week it was planned for", () => {
+    expect([column(0, "auto_work_tracker_id"), column(1, "auto_work_tracker_id")]).toEqual([
+      "zone-1|2026-09-14",
+      "zone-1|2026-09-14",
     ]);
   });
 

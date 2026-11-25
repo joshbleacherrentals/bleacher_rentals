@@ -5,6 +5,7 @@ import { expect, typedExecuteBatch, typedGetAll } from "@/lib/powersync/typedQue
 import { fetchDriverPaymentData } from "@/app/team/_lib/db";
 import type { DriverPaymentData } from "@/features/workTrackers/util";
 import { planHaulingLines } from "../utils/haulingLineItems";
+import { autoWorkTrackerKey } from "../utils/autoWorkTrackerKey";
 import { buildSolve, pairsToLookUp, type UnplacedReason } from "./buildSolve";
 import { readSolve } from "./fromSolve";
 import { withoutDuplicates } from "./duplicates";
@@ -120,7 +121,14 @@ export async function planWeek(input: {
       })),
       pay,
     );
-    await typedExecuteBatch(planStatements(keep, lines, inputs.tripTypeUuid));
+    await typedExecuteBatch(
+      planStatements(
+        keep,
+        lines,
+        inputs.tripTypeUuid,
+        autoWorkTrackerKey(input.zoneId, input.weekStart),
+      ),
+    );
 
     return {
       created: keep.length,
