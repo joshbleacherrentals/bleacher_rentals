@@ -1,7 +1,7 @@
 # Dashboard & Analytics 05: the page
 
-Status: **DRAFT 2026-11-25, awaiting "Approved"** (2 decisions of the user in this spec, D41 and
-D42; 0 open decisions; nothing built, nothing committed). Build order: **05 of 5**. Needs:
+Status: **APPROVED and IMPLEMENTED 2026-11-26** (2 decisions of the user in this spec, D41 and
+D42; 0 open decisions; built). Build order: **05 of 5**. Needs:
 [dashboard-analytics-01-design.md](dashboard-analytics-01-design.md) (the canvas, approved
 2026-11-25), [dashboard-analytics-02-access-shell.md](dashboard-analytics-02-access-shell.md) (the
 route and the empty page this spec fills),
@@ -414,9 +414,14 @@ viewer and maintainer, `none` for the rest).
 - **`chartScale.test.ts`:** the step rule on the examples (a greatest column of $11,206.35 gives
   the step 5000 and the ticks 0, 5000, 10000, 15000; $480 gives 500 steps up to $500; $900,000 uses
   the step 100000), a zero maximum, and `formatTick` (`$0`, `$500`, `$2.5k`, `$15k`).
-- **`DashboardAnalyticsPage.test.tsx`** (React Testing Library, `useAnalyticsData`,
-  `useCadUsdRates` and the timezone store mocked, `buildAnalytics` real over an
-  `analyticsFixture`): the title and the line under it; the five cards with their captions
+- **`DashboardAnalyticsPage.test.tsx`, `AnalyticsPageContent.test.tsx`, `PeriodDropdown.test.tsx`
+  and `CategorySpendChart.test.tsx`** (rendered to text with `renderToStaticMarkup`, as every
+  component test of this project: it has no React Testing Library and no DOM environment, and the
+  user ruled out new packages on 2026-11-26. The page test mocks `useAnalyticsData`,
+  `useCadUsdRates` and the timezone store; the body test takes the period as a prop, with
+  `buildAnalytics` real over a hand-worked fleet (`analyticsPageFixture`); the dropdown and
+  Recharts are replaced by stand-ins that print their props. Opening the list and choosing a year
+  is covered by e2e S7): the title and the line under it; the five cards with their captions
   (the sample of spec 01: 141 of 144, the Range line, the five statuses, a budget line); All time
   changes the captions ("All-time spend across", "Budgets of all years") and keeps Bleachers
   Ready; the dropdown lists the years newest first and All time, the chosen one is ticked, a
@@ -471,6 +476,8 @@ Changed:
 
 - `components/DashboardAnalyticsPage.tsx` (spec 02's shell is filled).
 - `src/features/userAccess/permissionPageData.ts` and `permissionPageData.test.ts` (§5).
+- `e2e/dashboardAnalyticsAccess.{admin,viewer,maintainer}.spec.ts` (S1, S2, S4 of spec 02 said the
+  page holds only its title; that is no longer true, so the three lines that said so are gone).
 
 Not changed: the database, `AppSchema.ts`, the sync rules (spec 04), the access rule and the
 sidebar (spec 02), the Repairs page.

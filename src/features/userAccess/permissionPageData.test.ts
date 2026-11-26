@@ -1389,8 +1389,9 @@ describe("the Dashboard uses the repair window (spec 11)", () => {
 });
 
 // docs/specs/dashboard-analytics-02-access-shell.md §2.5 and §5 (D31): the row of the Dashboard &
-// Analytics page, in the group Scorecards, read for the three roles that open it.
-describe("the Dashboard & Analytics row (dashboard-analytics spec 02)", () => {
+// Analytics page, in the group Scorecards, read for the three roles that open it. Spec 05 §5
+// rewrites its description and the notes of the three roles now that the page shows figures.
+describe("the Dashboard & Analytics row (dashboard-analytics specs 02 and 05)", () => {
   const row = PERMISSIONS.find((p) => p.label === "Dashboard & Analytics");
 
   it("exists, once, in the group Scorecards, right after Driver Scorecard", () => {
@@ -1402,23 +1403,40 @@ describe("the Dashboard & Analytics row (dashboard-analytics spec 02)", () => {
 
   it("describes the page, in US dollars, as read-only", () => {
     expect(row?.description).toBe(
-      "The Dashboard & Analytics page, in the Quality Assurance menu: the maintenance spend, open repairs, budget and cost breakdowns of the whole fleet, in US dollars. It only shows figures; nothing on it can be changed.",
+      "The Dashboard & Analytics page, in the Quality Assurance menu. It adds up what the fleet's repairs cost, in US dollars (a repair paid in Canadian dollars is converted at the exchange rate of the day it starts), for a year or for all time: the total spend, the share of bleachers that are not in an open repair, the average spend per bleacher, the open repairs by status and how much of the yearly budget is used; the cost by operating zone, by bleacher model and by damage category, with a chart; and the six vendors with the most labor and parts spend. Everything on the page is read only.",
     );
   });
 
-  it("is read for an administrator, a viewer and a maintainer", () => {
+  it("names every block of the page and says it is read only", () => {
+    const description = row?.description ?? "";
+    for (const part of [
+      "in US dollars",
+      "converted at the exchange rate",
+      "total spend",
+      "average spend per bleacher",
+      "open repairs by status",
+      "yearly budget",
+      "operating zone",
+      "bleacher model",
+      "damage category",
+      "with a chart",
+      "six vendors",
+      "labor and parts",
+      "read only",
+    ]) {
+      expect(description, part).toContain(part);
+    }
+  });
+
+  it("is read for an administrator, a viewer and a maintainer, with the same note", () => {
     expect(row?.roles.admin.level).toBe("read");
     expect(row?.roles.viewer.level).toBe("read");
     expect(row?.roles.maintainer.level).toBe("read");
-    expect(row?.roles.admin.note).toBe(
-      "Opens the page and reads it. Nothing on it can be changed.",
-    );
-    expect(row?.roles.viewer.note).toBe(
-      "Opens the page and reads it. Nothing on it can be changed.",
-    );
-    expect(row?.roles.maintainer.note).toBe(
-      "Opens the page and reads it, with the same figures as an administrator. Nothing on it can be changed.",
-    );
+    const note =
+      "Opens the page and reads every figure on it, vendors and budget included. Nothing on it can be changed.";
+    expect(row?.roles.admin.note).toBe(note);
+    expect(row?.roles.viewer.note).toBe(note);
+    expect(row?.roles.maintainer.note).toBe(note);
   });
 
   it("is none for an account manager, a developer, a driver and an accountant", () => {

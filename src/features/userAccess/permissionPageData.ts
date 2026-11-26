@@ -72,6 +72,11 @@ const MAINTAINER_NO_ACCESS_NOTE =
 const ACCOUNTANT_NO_ACCESS_NOTE =
   "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
 
+// docs/specs/dashboard-analytics-05-page.md §5: the same note for the three roles that open the
+// Dashboard & Analytics page.
+const DASHBOARD_ANALYTICS_READ_NOTE =
+  "Opens the page and reads every figure on it, vendors and budget included. Nothing on it can be changed.";
+
 // docs/specs/analytics-mcp.md §1 D2: the connector is open to every account that is not deactivated,
 // whatever its role, and it reads the whole database (no per-role or per-owner limit).
 const ANALYTICS_DATA_NOTE =
@@ -1068,26 +1073,25 @@ export const PERMISSIONS: PermissionEntry[] = [
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
-  // docs/specs/dashboard-analytics-02-access-shell.md §2.5 (D31): who opens /dashboard-analytics. The
-  // page is empty until spec 05, which rewrites this description once it shows figures.
+  // docs/specs/dashboard-analytics-02-access-shell.md §2.5 (D31): who opens /dashboard-analytics.
+  // docs/specs/dashboard-analytics-05-page.md §5: the description and the notes of the three roles
+  // that open it, written once the page shows figures.
   {
     label: "Dashboard & Analytics",
     description:
-      "The Dashboard & Analytics page, in the Quality Assurance menu: the maintenance spend, open repairs, budget and cost breakdowns of the whole fleet, in US dollars. It only shows figures; nothing on it can be changed.",
+      "The Dashboard & Analytics page, in the Quality Assurance menu. It adds up what the fleet's repairs cost, in US dollars (a repair paid in Canadian dollars is converted at the exchange rate of the day it starts), for a year or for all time: the total spend, the share of bleachers that are not in an open repair, the average spend per bleacher, the open repairs by status and how much of the yearly budget is used; the cost by operating zone, by bleacher model and by damage category, with a chart; and the six vendors with the most labor and parts spend. Everything on the page is read only.",
     category: "Scorecards",
     roles: {
-      admin: read("Opens the page and reads it. Nothing on it can be changed."),
+      admin: read(DASHBOARD_ANALYTICS_READ_NOTE),
       account_manager: none(
         "Account managers do not have this page; it is hidden from them. They still read every repair on the Repairs page.",
       ),
       developer: none(
         "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
       ),
-      viewer: read("Opens the page and reads it. Nothing on it can be changed."),
+      viewer: read(DASHBOARD_ANALYTICS_READ_NOTE),
       driver: none("Drivers only have access to the Driver Mobile App."),
-      maintainer: read(
-        "Opens the page and reads it, with the same figures as an administrator. Nothing on it can be changed.",
-      ),
+      maintainer: read(DASHBOARD_ANALYTICS_READ_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },

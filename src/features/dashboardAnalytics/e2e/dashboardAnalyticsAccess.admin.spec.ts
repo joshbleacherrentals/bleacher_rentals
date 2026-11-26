@@ -1,9 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 
 /**
- * The Dashboard & Analytics page as an administrator sees it: the page opens and shows its title and
- * nothing else, the item is the first one in the Quality Assurance dropdown, and the Dashboard button
- * is not lit on it. Written, not run (project rule).
+ * The Dashboard & Analytics page as an administrator sees it: the page opens and shows its title,
+ * the item is the first one in the Quality Assurance dropdown, and the Dashboard button is not lit
+ * on it. Written, not run (project rule).
+ * What the page shows is tested in dashboardAnalytics.admin.spec.ts (spec 05).
  * Spec: docs/specs/dashboard-analytics-02-access-shell.md §5 (S1, S5).
  */
 
@@ -20,17 +21,13 @@ const dashboardButton = (page: Page) =>
   sidebar(page).getByRole("link", { name: "Dashboard", exact: true });
 
 test.describe("Dashboard & Analytics access (administrator)", () => {
-  test("S1: opens the page, sees the title and nothing under it, and the item is first in Quality Assurance", async ({
+  test("S1: opens the page, sees the title, and the item is first in Quality Assurance", async ({
     page,
   }) => {
     await page.goto("/dashboard-analytics");
 
     const heading = page.getByRole("heading", { name: TITLE });
     await expect(heading).toBeVisible({ timeout: 60_000 });
-    // Nothing under the title: no subtitle in its block, no period dropdown, no table.
-    await expect(heading.locator("xpath=..")).toHaveText(TITLE);
-    await expect(page.getByRole("combobox")).toHaveCount(0);
-    await expect(page.getByRole("table")).toHaveCount(0);
 
     // The dropdown is open on its own page, with the new item first and lit.
     await expect(qualityAssuranceLinks(page).first()).toHaveText(TITLE);
