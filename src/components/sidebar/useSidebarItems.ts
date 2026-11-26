@@ -33,6 +33,7 @@ import {
   Tags,
   Terminal,
   CalendarClock,
+  Store,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -210,6 +211,15 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     href: "/contacts",
     activePrefixes: ["/companies"],
     icon: BookUser,
+  },
+  // docs/specs/vendors-page.md D8: the Vendors page, right after Companies & Contacts. Every role
+  // that opens it lists the key below; a developer does not.
+  {
+    type: "button",
+    key: "vendors",
+    label: "Vendors",
+    href: "/vendors",
+    icon: Store,
   },
   {
     type: "button",
@@ -393,6 +403,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "vendors",
     "blocked-emails",
     "sales-offices",
     "team",
@@ -412,6 +423,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "vendors",
     "blocked-emails",
     "sales-offices",
     "team",
@@ -428,6 +440,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
   viewer: [
     "dashboard",
     "quotes-bookings",
+    "vendors",
     "blocked-emails",
     "sales-offices",
     "team",
@@ -440,7 +453,14 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "documentation",
   ],
   driver: [],
-  maintainer: ["dashboard", "quality-assurance", "documentation", "assets", "blocked-emails"],
+  maintainer: [
+    "dashboard",
+    "quality-assurance",
+    "documentation",
+    "assets",
+    "vendors",
+    "blocked-emails",
+  ],
   // docs/specs/accountant-address-book.md: Companies & Contacts, after Messages (ALL_ITEMS sets the order).
   // docs/specs/accountant-team.md: Team, after Quotes & Bookings.
   // docs/specs/qbo-invoice-12a-quote-types-page.md: Configuration, which holds only Quote Types for them.
@@ -451,6 +471,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "work-trackers",
     "messages",
     "companies-contacts",
+    "vendors",
     "blocked-emails",
     "configuration",
     "documentation",

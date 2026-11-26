@@ -49,6 +49,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/quote",
       "/companies",
       "/contacts",
+      "/vendors",
       "/messages",
       "/stripe-connections",
       "/automatic-emails",
@@ -81,6 +82,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/quote",
       "/companies",
       "/contacts",
+      "/vendors",
       "/messages",
       "/blocked-emails",
       "/changelog",
@@ -123,6 +125,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/permissions",
       "/companies",
       "/contacts",
+      "/vendors",
       "/blocked-emails",
       "/changelog",
     ],
@@ -139,12 +142,15 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
     // /dashboard-analytics: the Dashboard & Analytics page of maintenance figures, which this role
     // is made for (docs/specs/dashboard-analytics-02-access-shell.md). Paths match by whole
     // segment (pathMatches), so /dashboard does not open it.
+    // /vendors: the Vendors page, where they list, add and edit the repair and driver vendors
+    // (docs/specs/vendors-page.md D4, D5).
     allowedPaths: [
       "/dashboard",
       "/annual-inspections",
       "/damage-reports",
       "/repairs",
       "/dashboard-analytics",
+      "/vendors",
       "/permissions",
       "/blocked-emails",
       "/changelog",
@@ -180,6 +186,7 @@ const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
       "/messages",
       "/companies",
       "/contacts",
+      "/vendors",
       "/team",
       "/qbo-quote-types",
       "/quote",

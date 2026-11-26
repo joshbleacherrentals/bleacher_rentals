@@ -89,7 +89,7 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     // follows /messages. docs/specs/accountant-team.md §6: /team follows it.
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: /qbo-quote-types follows /team.
     // docs/specs/accountant-collections-16-customer-page-view.md §3: /quote follows
-    // /qbo-quote-types.
+    // /qbo-quote-types. docs/specs/vendors-page.md §4.5: /vendors follows /contacts.
     expect(config.allowedPaths).toEqual([
       "/accountant",
       "/quotes-bookings",
@@ -97,6 +97,7 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
       "/messages",
       "/companies",
       "/contacts",
+      "/vendors",
       "/team",
       "/qbo-quote-types",
       "/quote",
@@ -337,6 +338,50 @@ describe("the Dashboard & Analytics page", () => {
     expect(mergeRoleConfigs(["admin"]).defaultRedirect).toBe("/dashboard");
     expect(mergeRoleConfigs(["viewer"]).defaultRedirect).toBe("/dashboard");
     expect(mergeRoleConfigs(["maintainer"]).defaultRedirect).toBe("/dashboard");
+  });
+});
+
+// docs/specs/vendors-page.md D4, D8 and §4.5: /vendors is the page of every role but a developer
+// (and a driver, who has no web pages), and the path rule compares a whole segment.
+describe("the Vendors page", () => {
+  const page = "/vendors";
+  const roles = ["admin", "account_manager", "viewer", "maintainer", "accountant"] as const;
+
+  it("is open to an administrator, an account manager, a viewer, a maintainer and an accountant", () => {
+    for (const role of roles) {
+      expect(canAccessPath([role], page), role).toBe(true);
+      expect(canAccessPath([role], `${page}/anything`), role).toBe(true);
+      expect(mergeRoleConfigs([role]).allowedPaths, role).toContain(page);
+    }
+  });
+
+  it("is closed to a developer and a driver", () => {
+    for (const role of ["developer", "driver"] as const) {
+      expect(canAccessPath([role], page), role).toBe(false);
+      expect(mergeRoleConfigs([role]).allowedPaths, role).not.toContain(page);
+    }
+  });
+
+  it("is open to a developer who holds one of the five roles too", () => {
+    expect(canAccessPath(["developer", "accountant"], page)).toBe(true);
+    expect(canAccessPath(["admin", "driver"], page)).toBe(true);
+  });
+
+  it("does not open a longer address that merely starts with it", () => {
+    expect(canAccessPath(["viewer"], "/vendors-x")).toBe(false);
+    expect(canAccessPath(["viewer"], "/vendorsx")).toBe(false);
+  });
+
+  it("keeps the landing page of every role", () => {
+    expect(mergeRoleConfigs(["admin"]).defaultRedirect).toBe("/dashboard");
+    expect(mergeRoleConfigs(["maintainer"]).defaultRedirect).toBe("/dashboard");
+    // The accountant has no /dashboard, so the first path decides: /accountant stays first.
+    expect(mergeRoleConfigs(["accountant"]).defaultRedirect).toBe("/accountant");
+  });
+
+  it("comes right after /contacts in the accountant's list", () => {
+    const { allowedPaths } = mergeRoleConfigs(["accountant"]);
+    expect(allowedPaths.indexOf(page)).toBe(allowedPaths.indexOf("/contacts") + 1);
   });
 });
 

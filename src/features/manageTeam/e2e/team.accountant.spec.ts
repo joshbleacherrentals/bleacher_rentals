@@ -218,6 +218,8 @@ test.describe("Team (accountant)", () => {
     await page.getByText("Please Assign a Vendor.").click();
     await page.getByRole("button", { name: /Create New Vendor Company/ }).click();
 
+    // docs/specs/vendors-page.md D10: the window of the driver page starts on Driver.
+    await expect(page.locator("#vendorType")).toHaveValue("driver");
     await page.locator("#displayName").fill(`${PREFIX} vendor`);
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText(/created successfully/)).toBeVisible({ timeout: 30_000 });

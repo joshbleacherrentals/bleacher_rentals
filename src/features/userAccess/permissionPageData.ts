@@ -34,9 +34,9 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. Also has the Vendors page, where they add and edit vendors. Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Also has the Vendors page, where they add, edit, delete and restore vendors. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -62,7 +62,7 @@ const custom = (note: string): PermissionAccess => ({ level: "custom", note });
 const none = (note?: string): PermissionAccess => ({ level: "none", note });
 
 const MAINTAINER_NO_ACCESS_NOTE =
-  "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard. Everything else in the web app is hidden from them entirely.";
+  "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard and the Vendors page. Everything else in the web app is hidden from them entirely.";
 
 // docs/specs/accountant-role.md, accountant-work-trackers.md, accountant-quotes-02 and -04: the
 // Accountant has the Work Trackers pages, the driver payment window, the Accountant page and
@@ -70,7 +70,7 @@ const MAINTAINER_NO_ACCESS_NOTE =
 // docs/specs/accountant-team.md adds the Team page; docs/specs/accountant-audit-01-tab.md adds the
 // Audit tab of the Accountant page. It has nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, the Vendors page, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
 
 // docs/specs/dashboard-analytics-05-page.md §5: the same note for the three roles that open the
 // Dashboard & Analytics page.
@@ -437,6 +437,35 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: full(
         "Can create, edit and delete any company, contact or venue — the same as an account manager, including the Quote Language. The page has no Venues tab: a venue is added or edited from the Default Venue field of a contact. Delete hides the record; nothing is removed from the database.",
+      ),
+    },
+  },
+  // docs/specs/vendors-page.md §5: the Vendors page and the vendor window. Every role but the developer
+  // opens the page; admin, account manager, maintainer and accountant add, edit, delete and restore.
+  {
+    label: "Vendors",
+    description:
+      "This applies to the Vendors page, and to the vendor window, which also opens from a driver's profile on the Team page. The page lists every vendor company with its type (Driver for the companies that employ our drivers, Repairs for repair and parts companies), status, services, contact and location, with a search, a filter for the type, a filter for the status and a switch that shows the deleted vendors instead. A vendor's window holds its name, type, status, QuickBooks connection and vendor, address, contact, services, tax numbers, notes and logo. Delete only hides a vendor, and Restore brings it back; drivers keep the vendor they were given.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Opens the page and reads every vendor. Adds a vendor, edits any field of it including its type, deletes it and restores a deleted one.",
+      ),
+      account_manager: full(
+        "Adds, edits, deletes and restores any vendor, with its QuickBooks connection and vendor. Vendors do not belong to a zone, so this is not limited to the drivers an account manager looks after.",
+      ),
+      developer: none(
+        "The Vendors page is hidden from this role. Developers are limited to the product roadmap and the Dev Tools.",
+      ),
+      viewer: read(
+        "Opens the page, searches and filters it, can show the deleted vendors, and opens any vendor in a window that cannot be changed and has no QuickBooks section. Cannot add, edit, delete or restore: those buttons are hidden, and the database refuses a write from a viewer too.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: full(
+        "Adds, edits, deletes and restores any vendor, and can change the address of a vendor, which they otherwise could do only for the address of a repair. Reads the list of QuickBooks connections to link a vendor, but only an administrator can change a connection.",
+      ),
+      accountant: full(
+        "Adds, edits, deletes and restores any vendor, with its QuickBooks connection and vendor. They also do this from a driver's profile on the Team page.",
       ),
     },
   },
@@ -1030,7 +1059,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: custom(
-        "Sees every team member in the list but opens only drivers. On a driver they can change the payment info (currency, unit, tax, rates and tiers, deadhead, setup, teardown), the vendor company and the driver type, and can read the zones, phone, home address, vehicle and documents without changing them. They can also create, edit and delete vendor companies (a deleted vendor is hidden, not removed), including the QuickBooks connection and QuickBooks vendor it is linked to. They cannot change a driver's name, zones or roles, and cannot open anyone who is not a driver. Roles add up: someone who is also an account manager can also add a driver to their own zones.",
+        "Sees every team member in the list but opens only drivers. On a driver they can change the payment info (currency, unit, tax, rates and tiers, deadhead, setup, teardown), the vendor company and the driver type, and can read the zones, phone, home address, vehicle and documents without changing them. They can also create, edit and delete vendor companies (a deleted vendor is hidden, not removed), including the QuickBooks connection and QuickBooks vendor it is linked to. They cannot change a driver's name, zones or roles, and cannot open anyone who is not a driver. Roles add up: someone who is also an account manager can also add a driver to their own zones. The vendor window also holds a vendor's type, address, contact, services, status and notes, and the same vendors are managed on the Vendors page.",
       ),
     },
   },

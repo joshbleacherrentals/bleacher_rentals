@@ -675,6 +675,7 @@ const VendorsCols = {
   is_parts_supplier: column.integer,
   status: column.text,
   notes: column.text,
+  type: column.text,
 } satisfies PowerSyncColsFor<"Vendors">;
 const Vendors = new Table(VendorsCols, { indexes: { address_uuid: ["address_uuid"] } });
 

@@ -29,7 +29,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Blocked Emails, Edit Team Members, and Quote Types", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Vendors, Blocked Emails, Edit Team Members, and Quote Types", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -54,6 +54,7 @@ describe("permission matrix", () => {
         "Quote Types",
         "Record a Payment",
         "Send Emails",
+        "Vendors",
         "Work Trackers",
       ]);
     });
@@ -1456,6 +1457,52 @@ describe("the Dashboard & Analytics row (dashboard-analytics specs 02 and 05)", 
   it("is in the maintainer's role description, before the line about quotes", () => {
     expect(ROLE_DESCRIPTIONS.maintainer).toContain(
       "Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
+    );
+  });
+});
+
+// docs/specs/vendors-page.md §5 (D4, D5, D6): the Vendors page is open to every role but a developer;
+// admin, account manager, maintainer and accountant add, edit, delete and restore; a viewer reads.
+describe("Vendors", () => {
+  const row = PERMISSIONS.find((p) => p.label === "Vendors");
+
+  it("is a row that answers for every role", () => {
+    expect(row).toBeDefined();
+    expect(Object.keys(row!.roles).sort()).toEqual(Object.keys(ROLE_LABELS).sort());
+  });
+
+  it("is full for the four roles that manage vendors", () => {
+    for (const role of ["admin", "account_manager", "maintainer", "accountant"] as const) {
+      expect(row?.roles[role].level, role).toBe("full");
+    }
+  });
+
+  it("is read for a viewer, who opens a window that cannot be changed", () => {
+    expect(row?.roles.viewer.level).toBe("read");
+    expect(row?.roles.viewer.note).toMatch(/cannot be changed/i);
+  });
+
+  it("is hidden from a developer and a driver", () => {
+    expect(row?.roles.developer.level).toBe("none");
+    expect(row?.roles.driver.level).toBe("none");
+  });
+
+  it("names the vendor type in words an account manager can read", () => {
+    expect(row?.description).toMatch(/Driver for the companies that employ our drivers/);
+    expect(row?.description).toMatch(/Repairs for repair and parts companies/);
+  });
+
+  it("is named in the descriptions of the maintainer and the accountant, so 'everything else is hidden' stays true", () => {
+    expect(ROLE_DESCRIPTIONS.maintainer).toContain("Vendors page");
+    expect(ROLE_DESCRIPTIONS.accountant).toContain("Vendors page");
+    const costs = PERMISSIONS.find((p) => p.label === "Dashboard & Analytics");
+    expect(costs?.roles.maintainer.level).toBe("read");
+  });
+
+  it("is said in the accountant's note on Edit Team Members, which still manages vendors from a driver", () => {
+    const team = PERMISSIONS.find((p) => p.label === "Edit Team Members");
+    expect(team?.roles.accountant.note).toContain(
+      "the same vendors are managed on the Vendors page",
     );
   });
 });

@@ -920,6 +920,7 @@ Vendors.phone
 Vendors.qbo_connection_uuid
 Vendors.qbo_vendor_id
 Vendors.status
+Vendors.type
 Venues.address_uuid
 Venues.created_at
 Venues.created_by_user_uuid

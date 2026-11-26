@@ -34,8 +34,50 @@ describe("useSidebarItems", () => {
         expect.objectContaining({ key: "blocked-emails", href: "/blocked-emails" }),
       );
     }
+    // Vendors sits between them (docs/specs/vendors-page.md D8), so Blocked Emails follows Vendors.
     const keys = useSidebarItems(["admin"]).map((i) => i.key);
-    expect(keys.indexOf("blocked-emails")).toBe(keys.indexOf("companies-contacts") + 1);
+    expect(keys.indexOf("blocked-emails")).toBe(keys.indexOf("vendors") + 1);
+  });
+
+  // ═══ Vendors (docs/specs/vendors-page.md D4, D8) ═══
+
+  it("every role but the developer and the driver finds Vendors as a top-level button", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "maintainer",
+      "accountant",
+    ] as const) {
+      expect(useSidebarItems([role]), role).toContainEqual(
+        expect.objectContaining({
+          type: "button",
+          key: "vendors",
+          label: "Vendors",
+          href: "/vendors",
+        }),
+      );
+    }
+  });
+
+  it("a developer or a driver does not see Vendors", () => {
+    for (const role of ["developer", "driver"] as const) {
+      expect(
+        useSidebarItems([role]).map((i) => i.key),
+        role,
+      ).not.toContain("vendors");
+    }
+  });
+
+  it("a developer who is also an accountant sees Vendors", () => {
+    expect(useSidebarItems(["developer", "accountant"]).map((i) => i.key)).toContain("vendors");
+  });
+
+  it("Vendors comes right after Companies & Contacts", () => {
+    for (const role of ["admin", "account_manager", "accountant"] as const) {
+      const keys = useSidebarItems([role]).map((i) => i.key);
+      expect(keys.indexOf("vendors"), role).toBe(keys.indexOf("companies-contacts") + 1);
+    }
   });
 
   it("no one else gets the configuration section", () => {
@@ -250,7 +292,7 @@ describe("useSidebarItems", () => {
 
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, Blocked Emails, the Configuration section and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, Vendors, Blocked Emails, the Configuration section and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
@@ -259,6 +301,7 @@ describe("useSidebarItems", () => {
       "work-trackers",
       "messages",
       "companies-contacts",
+      "vendors",
       "blocked-emails",
       "configuration",
       "documentation",
@@ -299,11 +342,17 @@ describe("useSidebarItems", () => {
       "/companies",
     ]);
 
+    // docs/specs/vendors-page.md D8: Vendors, right after Companies & Contacts.
+    const vendors = items[6];
+    expect(vendors.type).toBe("button");
+    expect("label" in vendors && vendors.label).toBe("Vendors");
+    expect("href" in vendors && vendors.href).toBe("/vendors");
+
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: Configuration, with Quote Types only.
-    const configuration = items[7];
+    const configuration = items[8];
     expect(configuration.type).toBe("section");
 
-    const docs = items[8];
+    const docs = items[9];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",

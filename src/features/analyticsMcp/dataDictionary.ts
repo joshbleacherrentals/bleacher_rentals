@@ -522,6 +522,7 @@ export const DATA_DICTIONARY: DataDictionary = {
       "Supplier companies: repair shops, parts suppliers, and contractor drivers' companies.",
     columns: {
       status: "verified | caution | under_review | prospect | do_not_use; null on older rows.",
+      type: "driver = a company that employs our drivers (paid through QuickBooks bills); repairs = a repair or parts company. Every vendor has exactly one.",
     },
   },
 
