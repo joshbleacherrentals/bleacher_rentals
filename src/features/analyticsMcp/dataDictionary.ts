@@ -134,6 +134,11 @@ export const BUSINESS_RULES: BusinessRule[] = [
     source: "src/features/autoWorkTrackers/utils/runReview.ts",
   },
   {
+    topic: "Proof of delivery (GPS)",
+    rule: "DeliveryProofs has one row per completed work tracker checked against the hauled bleacher's Linxup GPS. 'Delivered and confirmed' = status 'verified'. Only 'not_found' means the GPS saw the bleacher elsewhere after the driver tapped Complete; 'no_gps' and 'waiting' mean there was no evidence either way, not a failed delivery. Trackers completed more than 7 days before the feature or the cron's last run have no row. Rows with final = false may still change.",
+    source: "src/features/deliveryProof/logic/verdict.ts",
+  },
+  {
     topic: "Distances and times",
     rule: "WorkTrackers.distance_meters / drive_minutes = the loaded haul, pickup to dropoff (miles = m / 1609.34). deadhead_in_* = empty drive to the pickup (from home or the previous trip); return_home_* = empty drive home after the day's last trip. Each driven km belongs to one tracker. These come from Google; the deadhead/return columns are only filled by the auto planner.",
     source: "supabase/migrations/20261125120000_auto_work_trackers_model_fields.sql",
@@ -441,6 +446,24 @@ export const DATA_DICTIONARY: DataDictionary = {
         "The WorkTrackers row it created (no foreign key: a missing tracker means it was deleted).",
       snapshot:
         "JSON: { tracker: WorkTrackers columns, lineItems: WorkTrackerLineItems rows } as created.",
+    },
+  },
+  DeliveryProofs: {
+    purpose:
+      "GPS proof of delivery: one row per completed work tracker, written by a daily cron from the bleacher's Linxup GPS.",
+    columns: {
+      status:
+        "verified (within 500 m of the drop-off after Complete), not_found (reported after Complete, never within 500 m), waiting (no report yet), no_gps (no tracker, or nothing before the next move / within 3 days), no_location (drop-off has no coordinates).",
+      final: "True once the check is over; false rows are checked again by the next run.",
+      bleacher_uuid: "The bleacher actually hauled (actual_bleacher_uuid, else bleacher_uuid).",
+      distance_meters: "From the drop-off to the closest GPS stop/position in the window.",
+      window_end:
+        "When the bleacher's next move began (end of the window); null if it had not moved.",
+      evidence_place:
+        "Where the GPS saw it: Linxup's geofence name, else the stop's street and city.",
+      evidence_until: "When that GPS stop ended; null if still there when checked.",
+      gps_last_report_at:
+        "The tracker's last report of any kind when checked; an old one means a dead or unplugged tracker.",
     },
   },
   AutoWorkTrackerFeedback: {

@@ -189,6 +189,27 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
     }
   });
 
+  it("keeps Work Trackers' planning tabs to administrators and account managers", () => {
+    for (const path of [
+      "/work-trackers/check/dashboard",
+      "/work-trackers/auto",
+      "/work-trackers/auto/model-runs",
+      "/work-trackers/proof",
+    ]) {
+      expect(canAccessPath(["admin"], path), path).toBe(true);
+      expect(canAccessPath(["account_manager"], path), path).toBe(true);
+      expect(canAccessPath(["viewer", "admin"], path), path).toBe(true);
+      for (const role of ["viewer", "accountant", "developer", "maintainer", "driver"] as const) {
+        expect(canAccessPath([role], path), `${role} ${path}`).toBe(false);
+      }
+    }
+    // Weeks stays open to the viewer and the accountant, including a week dated like a tab name.
+    for (const role of ["viewer", "accountant"] as const) {
+      expect(canAccessPath([role], "/work-trackers"), role).toBe(true);
+      expect(canAccessPath([role], "/work-trackers/2026-11-23/u1"), role).toBe(true);
+    }
+  });
+
   it("lets an admin and an account manager open Auto Work Trackers, and nobody else", () => {
     expect(canAccessPath(["admin"], "/auto-work-trackers")).toBe(true);
     expect(canAccessPath(["account_manager"], "/auto-work-trackers")).toBe(true);

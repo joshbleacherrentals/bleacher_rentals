@@ -45,6 +45,7 @@ describe("permission matrix", () => {
         "Edit Team Members",
         "Event Chat",
         "Events",
+        "GPS Proof of Delivery", // shown read-only on the work trackers they open
         "Payment History",
         "Pull Emails from Gmail",
         "QuickBooks Invoice (create and update)",

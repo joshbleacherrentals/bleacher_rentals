@@ -187,6 +187,11 @@ export function ChecksProvider({
 }
 
 /** The checks run by the surrounding ChecksProvider (the Auto Work Trackers shell). */
+/** The checks, or null outside a ChecksProvider (Proof of Delivery runs none). */
+export function useChecksOrNull(): Checks | null {
+  return useContext(ChecksContext);
+}
+
 export function useChecks(): Checks {
   const checks = useContext(ChecksContext);
   if (!checks) throw new Error("useChecks must be used inside ChecksProvider");

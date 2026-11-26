@@ -544,22 +544,45 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
-    label: "Auto Work Trackers",
+    label: "Plan Check & Auto Plan",
     description:
-      "The Auto Work Trackers page in the sidebar. Pick a zone and a week, and Create work trackers plans the trips the zone's bleachers need that week as draft Trip work trackers: a driver can do several trips a day, one bleacher at a time, up to 12 hours from leaving home to getting back (counting an hour for each setup and teardown), on days the bleacher is free and the driver is available, filling employees' days before contractors' (drivers paid through a vendor), then preferring the least driving. Each gets its driver, day, suggested times, road distances and drive times (Google, avoiding tolls), and Hauling, Setup and Teardown line items at the driver's rates. Running it again makes no duplicates. Advanced settings holds how it plans, for every zone: how strongly employees come before contractors, least distance or least drive time, the longest day, setup and teardown times, the hour the day starts, and the search time; each shows whether it is the default, and the next run uses them. The model's drafts for a zone and week can be deleted in one go; a tracker saved in the work tracker modal counts as hand-made and is kept. The other pages check the week before creating: the Dashboard (with a map of every driver's routes), event, bleacher and driver checks, and Driver Data, Event Data and Bleacher Data, where missing addresses can be fixed and a driver can be left out of the model. Every Create is recorded with what it planned (Model → Runs): who ran it, the version and settings, and for each trip whether it was kept, edited (and how) or deleted. Saving changes to, or deleting, a work tracker the model made asks why (optional), and so does deleting the model's drafts in bulk; the answers show on Runs. Apart from those fixes, the reasons and creating work trackers, the page only reads.",
+      "Two tabs of the Work Trackers page, beside Weeks: Plan Check and Auto Plan (they replace the old Auto Work Trackers page; its links still work). Plan Check shows how good a zone's week is, whoever made its work trackers, by hand or by the model: the Dashboard (with a map of every driver's routes), Event Fulfilment, Event Bleacher Requirements, Overbooked Bleachers, Driver Workload and Driver Availability. Auto Plan is the AI planner: pick a zone and a week, and Generate work trackers plans the trips the zone's bleachers need that week as draft Trip work trackers: a driver can do several trips a day, one bleacher at a time, up to 12 hours from leaving home to getting back (counting an hour for each setup and teardown), on days the bleacher is free and the driver is available, filling employees' days before contractors' (drivers paid through a vendor), then preferring the least driving. Each gets its driver, day, suggested times, road distances and drive times (Google, avoiding tolls), and Hauling, Setup and Teardown line items at the driver's rates. Running it again makes no duplicates. Advanced settings holds how it plans, for every zone: how strongly employees come before contractors, least distance or least drive time, the longest day, setup and teardown times, the hour the day starts, and the search time; each shows whether it is the default, and the next run uses them. The model's drafts for a zone and week can be deleted in one go; a tracker saved in the work tracker modal counts as hand-made and is kept. It shows each step while it runs, then what it made, with links to Plan Check and the run. Auto Plan's panel holds what the model needs: Model data → Driver Data, Event Data and Bleacher Data (each trip's pickup and drop-off address), where missing addresses can be fixed and a driver can be left out of the model; Advanced settings; Model → Runs; and the bulk delete of its drafts. Every Create is recorded with what it planned (Model → Runs): who ran it, the version and settings, and for each trip whether it was kept, edited (and how) or deleted. Saving changes to, or deleting, a work tracker the model made asks why (optional), and so does deleting the model's drafts in bulk; the answers show on Runs. Apart from those fixes, the reasons and creating work trackers, both tabs only read.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it. Can delete the drafts the model made for the selected zone and week in one go. Can change the Advanced settings, or reset any of them to its default. Sees every run on Model → Runs; bulk deleting the model's drafts marks that zone and week's runs discarded. Can fix the home address of any driver on Driver Data, and remove any driver from the model or add them back. Can fix the address of any event on Event Data, and any pickup or drop-off address on Bleacher Data.",
+        "Has both tabs, picks any zone and week, sees every page and check, and generates the draft work trackers for it. Can delete the drafts the model made for the selected zone and week in one go. Can change the Advanced settings, or reset any of them to its default. Sees every run on Model → Runs; bulk deleting the model's drafts marks that zone and week's runs discarded. Can fix the home address of any driver on Driver Data, and remove any driver from the model or add them back. Can fix the address of any event on Event Data, and any pickup or drop-off address on Bleacher Data.",
       ),
       account_manager: custom(
-        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it. Sees how many of the week's work trackers the model made, but cannot delete the model's drafts in bulk (administrators only for now). Can read the Advanced settings but not change them. Sees every run on Model → Runs, and is asked why (optionally) when changing or deleting a model-made work tracker, like an administrator. On Driver Data they can fix a driver's home address, and remove a driver from the model or add them back, only in a zone they manage, the same drivers they can edit on the Team page; in other zones the drivers are shown but cannot be changed. On Event Data and Bleacher Data they can fix an address only in a zone they manage, including events another account manager created; in other zones the addresses are shown but cannot be clicked.",
+        "Has both tabs, picks any zone and week, sees every page and check, and generates the draft work trackers for it. Sees how many of the week's work trackers the model made, but cannot delete the model's drafts in bulk (administrators only for now). Can read the Advanced settings but not change them. Sees every run on Model → Runs, and is asked why (optionally) when changing or deleting a model-made work tracker, like an administrator. On Driver Data they can fix a driver's home address, and remove a driver from the model or add them back, only in a zone they manage, the same drivers they can edit on the Team page; in other zones the drivers are shown but cannot be changed. On Event Data and Bleacher Data they can fix an address only in a zone they manage, including events another account manager created; in other zones the addresses are shown but cannot be clicked.",
       ),
-      developer: none("Does not have this page."),
-      viewer: none("Does not have this page."),
+      developer: none("Does not have these tabs."),
+      viewer: none("Opens Work Trackers for Weeks only: no Plan Check or Auto Plan tab."),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: none("Opens Work Trackers for Weeks only: no Plan Check or Auto Plan tab."),
+    },
+  },
+  {
+    label: "GPS Proof of Delivery",
+    description:
+      "Every day, each work tracker completed in the last week is checked against its bleacher's Linxup GPS: if the bleacher stood within 500 m of the drop-off after the driver tapped Complete (and before it was moved again), the work tracker's window shows 'Delivery confirmed by GPS' under its status, with when and how close. 'GPS did not see it at the drop-off' means the GPS reported from somewhere else; 'no data' means there was no GPS report to go on (no tracker on the bleacher, or none reported in time), which is not a failed delivery. Nobody enters or changes these: the daily check writes them. A driver's week on the Work Trackers page has a Proof of Delivery column, next to Pay: '✓ 120 m' when confirmed, '✗ 79 km · Main Yard' when GPS saw it elsewhere, or Waiting, No GPS, No location or Not checked yet, with the full line on hover. The Proof of Delivery tab of Work Trackers lists the selected zone and week's completed work trackers worst first (not found, no GPS, no location, waiting, not checked yet, verified), with a count per status that filters the list, and a row opens the work tracker. Check now runs the same check at once instead of waiting for the next day.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: custom(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. Has the Proof of Delivery tab and can press Check now.",
+      ),
+      account_manager: custom(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. Has the Proof of Delivery tab and can press Check now.",
+      ),
+      developer: none("Does not open work trackers."),
+      viewer: read(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. No Proof of Delivery tab.",
+      ),
+      driver: none("Not shown in the Driver Mobile App."),
+      maintainer: none("Does not open work trackers."),
+      accountant: read(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. No Proof of Delivery tab.",
+      ),
     },
   },
   {

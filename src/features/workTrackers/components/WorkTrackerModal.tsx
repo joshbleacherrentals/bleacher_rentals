@@ -88,6 +88,7 @@ import {
 } from "../util/workTrackerTypeDisplay";
 import { WorkTrackerTabsHeader } from "./WorkTrackerTabsHeader";
 import { WorkTrackerTimeField } from "./WorkTrackerTimeField";
+import { DeliveryProofLine } from "@/features/deliveryProof/components/DeliveryProofLine";
 import { ModelFeedbackDialog } from "@/features/autoWorkTrackers/components/ModelFeedbackDialog";
 import { useModelRunTrip } from "@/features/autoWorkTrackers/hooks/useModelRunTrip";
 import { feedbackStatement } from "@/features/autoWorkTrackers/db/runFeedback";
@@ -1142,6 +1143,9 @@ export default function WorkTrackerModal({
                             // }
                           />
                         </div>
+                        <DeliveryProofLine
+                          workTrackerId={workTracker?.id !== "-1" ? workTracker?.id : undefined}
+                        />
                         <label className={labelClassName}>Driver Notes</label>
                         <textarea
                           className="w-full text-sm border p-1 rounded bg-white"

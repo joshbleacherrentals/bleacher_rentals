@@ -8,9 +8,22 @@ type RoleConfig = {
 
 export type MergedAccessConfig = {
   allowedPaths: string[];
+  /** Paths under an allowed prefix that these roles still may not open (see RESTRICTED_PATHS). */
+  deniedPaths: string[];
   defaultRedirect: string;
   showSidebar: boolean;
 };
+
+/**
+ * Pages inside a prefix some roles have, kept to fewer roles. Work Trackers' planning tabs (Plan
+ * Check, Auto Plan, Proof of Delivery) sit under /work-trackers, which the viewer and the
+ * accountant open for Weeks, but only administrators and account managers plan.
+ */
+const RESTRICTED_PATHS: { prefix: string; roles: WebRole[] }[] = [
+  { prefix: "/work-trackers/check", roles: ["admin", "account_manager"] },
+  { prefix: "/work-trackers/auto", roles: ["admin", "account_manager"] },
+  { prefix: "/work-trackers/proof", roles: ["admin", "account_manager"] },
+];
 
 const ROLE_CONFIG: Record<WebRole, RoleConfig> = {
   admin: {
@@ -215,11 +228,23 @@ export function mergeRoleConfigs(roles: WebRole[]): MergedAccessConfig {
   }
 
   const allowedPaths = [...pathSet];
+  const deniedPaths = RESTRICTED_PATHS.filter(
+    (r) => !r.roles.some((role) => roles.includes(role)),
+  ).map((r) => r.prefix);
   const defaultRedirect = allowedPaths.includes("/dashboard")
     ? "/dashboard"
     : (allowedPaths[0] ?? "/");
 
-  return { allowedPaths, defaultRedirect, showSidebar };
+  return { allowedPaths, deniedPaths, defaultRedirect, showSidebar };
+}
+
+/**
+ * Whether a merged config lets its roles open `pathname`: under an allowed path and under no denied
+ * one, both by path segment (`pathMatches`). The one check for the redirect guard and for links.
+ */
+export function isPathAllowed(config: MergedAccessConfig, pathname: string): boolean {
+  if (config.deniedPaths.some((p) => pathMatches(p, pathname))) return false;
+  return config.allowedPaths.some((p) => pathMatches(p, pathname));
 }
 
 /**
@@ -229,5 +254,5 @@ export function mergeRoleConfigs(roles: WebRole[]): MergedAccessConfig {
  * straight back out is a button that does nothing, so it is not shown.
  */
 export function canAccessPath(roles: WebRole[], pathname: string): boolean {
-  return mergeRoleConfigs(roles).allowedPaths.some((p) => pathMatches(p, pathname));
+  return isPathAllowed(mergeRoleConfigs(roles), pathname);
 }
