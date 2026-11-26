@@ -1,7 +1,8 @@
 # Dashboard & Analytics 04: the data and the numbers
 
-Status: **DRAFT 2026-11-25, awaiting "Approved"** (5 decisions of the user in this spec, D36 to
-D40; 0 open decisions; nothing built, nothing committed). Build order: **04 of 5**. Needs:
+Status: **APPROVED and IMPLEMENTED 2026-11-26** (5 decisions of the user in this spec, D36 to
+D40; 0 open decisions; the sync rule is in `../br_powersync`, not committed there and not
+deployed). Build order: **04 of 5**. Needs:
 [dashboard-analytics-01-design.md](dashboard-analytics-01-design.md) (approved 2026-11-25) and
 [dashboard-analytics-03-converter.md](dashboard-analytics-03-converter.md) (the rate lookup).
 Needed by: 05, which shows these figures. It does not need spec 02. Branch:
