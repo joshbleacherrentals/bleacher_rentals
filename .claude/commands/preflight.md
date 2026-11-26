@@ -36,6 +36,26 @@ Do not take the client-side code as the answer. Write helpers here run against
 the local PowerSync database; row-level security in Postgres is what actually
 decides. Check `pg_policies` before concluding anything about who can write.
 
+## 2b. Data dictionary
+
+Staff ask Claude about our data through the analytics MCP, which answers from
+[`dataDictionary.ts`](src/features/analyticsMcp/dataDictionary.ts). A stale rule
+there gives them confident wrong numbers, and no test can tell that a formula
+changed.
+
+1. List the changed files (`gh pr diff $1 --name-only`).
+2. For every entry in `BUSINESS_RULES` whose `source` names one of those files,
+   re-read the rule against the new code. Still true → nothing. Not true → fix the
+   rule in this PR.
+3. For every new migration, check that a new status, enum value, money or
+   currency column, soft-delete column, or a column that replaces an old one is
+   described in `DATA_DICTIONARY`.
+4. Read the whole diff once more for a changed meaning that no `source` points at
+   (a new filter on a KPI, a new place revenue or pay is computed), and add or fix
+   the rule, with that file as its `source`.
+
+Report the rules you checked and any you changed, next to the permissions changes.
+
 ## 3. Ask, then write the answers down
 
 Where the intended behaviour is not obvious, **ask me** — grouped, not
@@ -108,8 +128,8 @@ it blindly.
 
 ## 6. Stop
 
-Show me both groups, the "not testing" list, any tests you wrote, and every
-permissions change. Ask whether it is right. **Run nothing.**
+Show me both groups, the "not testing" list, any tests you wrote, every
+permissions change, and the data dictionary rules you checked or changed. Ask whether it is right. **Run nothing.**
 
 When I have finished the testing myself, I sign it off with:
 

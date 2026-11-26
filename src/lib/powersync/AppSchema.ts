@@ -321,6 +321,8 @@ const DriversCols = {
   insurance_expires_on: column.text,
   license_expires_on: column.text,
   medical_card_expires_on: column.text,
+  /** 1 when the Auto Work Trackers model must never give this driver a trip (Driver Data). */
+  exclude_from_auto_work_trackers: column.integer,
   bucket_count: column.integer,
   sync_version: column.integer,
   bucket_count_reported_at: column.text,
@@ -494,6 +496,16 @@ const WorkTrackersCols = {
   status_changed_at: column.text,
   dropoff_event_uuid: column.text,
   pickup_event_uuid: column.text,
+  // A driver's day as a chain of trips (Auto Work Trackers). Null previous: starts from home.
+  previous_work_tracker_uuid: column.text,
+  planned_pickup_at: column.text,
+  planned_dropoff_at: column.text,
+  deadhead_in_distance_meters: column.integer,
+  deadhead_in_drive_minutes: column.integer,
+  return_home_distance_meters: column.integer,
+  return_home_drive_minutes: column.integer,
+  // "<zone uuid>|<week start>" when the Auto Work Trackers model made it; cleared on a modal save.
+  auto_work_tracker_id: column.text,
   build_work_tracker_history: column.text,
   is_work_tracker_finished: column.integer,
 } satisfies PowerSyncColsFor<"WorkTrackers">;
@@ -503,6 +515,8 @@ const WorkTrackers = new Table(WorkTrackersCols, {
     dropoff_address_uuid: ["dropoff_address_uuid"],
     bleacher_uuid: ["bleacher_uuid"],
     driver_uuid: ["driver_uuid"],
+    previous_work_tracker_uuid: ["previous_work_tracker_uuid"],
+    auto_work_tracker_id: ["auto_work_tracker_id"],
     user_uuid: ["user_uuid"],
     pre_inspection_uuid: ["pre_inspection_uuid"],
     post_inspection_uuid: ["post_inspection_uuid"],
@@ -582,6 +596,64 @@ const ScorecardTargetsCols = {
 } satisfies PowerSyncColsFor<"ScorecardTargets">;
 const ScorecardTargets = new Table(ScorecardTargetsCols, {
   indexes: { account_manager_uuid: ["account_manager_uuid"] },
+});
+
+// The Auto Work Trackers model's settings: one row (id 'global'); null = the app's default.
+const AutoWorkTrackerSettingsCols = {
+  objective: column.text,
+  employee_priority: column.text,
+  employee_priority_minutes: column.integer,
+  max_day_minutes: column.integer,
+  setup_minutes: column.integer,
+  teardown_minutes: column.integer,
+  day_start_hour: column.integer,
+  search_seconds: column.integer,
+  updated_at: column.text,
+  updated_by_user_uuid: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerSettings">;
+const AutoWorkTrackerSettings = new Table(AutoWorkTrackerSettingsCols);
+
+// The Auto Work Trackers run log: each Create run, each trip it planned (snapshot JSON as text),
+// and the optional reasons people give for changing them.
+const AutoWorkTrackerRunsCols = {
+  created_at: column.text,
+  created_by_user_uuid: column.text,
+  zone_uuid: column.text,
+  week_start: column.text,
+  auto_work_tracker_id: column.text,
+  app_version: column.text,
+  commit_sha: column.text,
+  settings: column.text,
+  result: column.text,
+  trips_created: column.integer,
+  discarded_at: column.text,
+  discarded_by_user_uuid: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerRuns">;
+const AutoWorkTrackerRuns = new Table(AutoWorkTrackerRunsCols, {
+  indexes: { auto_work_tracker_id: ["auto_work_tracker_id"] },
+});
+
+const AutoWorkTrackerRunTripsCols = {
+  created_at: column.text,
+  run_uuid: column.text,
+  work_tracker_uuid: column.text,
+  snapshot: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerRunTrips">;
+const AutoWorkTrackerRunTrips = new Table(AutoWorkTrackerRunTripsCols, {
+  indexes: { run_uuid: ["run_uuid"], work_tracker_uuid: ["work_tracker_uuid"] },
+});
+
+const AutoWorkTrackerFeedbackCols = {
+  created_at: column.text,
+  created_by_user_uuid: column.text,
+  run_uuid: column.text,
+  run_trip_uuid: column.text,
+  work_tracker_uuid: column.text,
+  kind: column.text,
+  reason: column.text,
+} satisfies PowerSyncColsFor<"AutoWorkTrackerFeedback">;
+const AutoWorkTrackerFeedback = new Table(AutoWorkTrackerFeedbackCols, {
+  indexes: { run_uuid: ["run_uuid"] },
 });
 
 const VendorsCols = {
@@ -1477,6 +1549,10 @@ const DriverSurveyResponses = new Table(DriverSurveyResponsesCols, {
 
 export const AppSchema = new Schema({
   Addresses,
+  AutoWorkTrackerSettings,
+  AutoWorkTrackerRuns,
+  AutoWorkTrackerRunTrips,
+  AutoWorkTrackerFeedback,
   Venues,
   AccountManagers,
   AccountManagerZones,

@@ -30,6 +30,26 @@ In short:
 - Exception: hitting Supabase directly is acceptable only when the data is too large to sync locally and online-only is acceptable.
 - Adding a new table — follow the checklist in POWERSYNC_ARCHITECTURE.md (migration → `npm run gtl` → `AppSchema.ts` → registries).
 
+## Python — pure solvers only
+
+Python (`python_api/`, FastAPI on Vercel) exists only for libraries TypeScript does not have — today
+**OR-Tools** for route planning. Everything else is TypeScript, so each rule lives once and is
+reused by the modal, the check pages and the planner.
+
+- A Python endpoint is a **pure function: JSON in, JSON out.** It never reads or writes the
+  database and never calls the network (no Supabase, no Google). It gets everything it needs in the
+  request.
+- **No business rules in Python.** Which trips are needed, which days and drivers are allowed, road
+  times, pay, line items, duplicates — all TypeScript. Python only does the maths it is given
+  (e.g. `python_api/auto_work_trackers/routing.py` places trips on driver-days from matrices).
+- **TypeScript prepares and writes:** read inputs (PowerSync, or a Next.js server route for secrets
+  and server-only data such as the Google key and `RouteCache`), call Python, then write the result
+  through PowerSync.
+- **One contract per endpoint:** the Pydantic models in `schemas.py` and their TypeScript mirror
+  (e.g. `src/features/autoWorkTrackers/planner/solveContract.ts`) change together.
+- If you are about to add a query, a network call or a business rule to Python, stop: it belongs in
+  TypeScript.
+
 ## PixiJS Grid — z-index
 
 Any work with grid borders/overlays must follow the z-index rules:
@@ -61,6 +81,31 @@ answer into the matrix so nobody has to ask twice.
 
 `/preflight` checks a PR against this file and fails the CI gate on a release
 that was never verified.
+
+---
+
+## Data dictionary — update it with the meaning
+
+Staff ask Claude questions about our data through the analytics MCP, and Claude
+answers from
+[`src/features/analyticsMcp/dataDictionary.ts`](src/features/analyticsMcp/dataDictionary.ts):
+what each table and non-obvious column means, plus business rules (statuses,
+revenue, tax, currency, pay, which rows to exclude). If the file is wrong, staff
+get confident wrong numbers.
+
+**Whenever a change alters what data means or how the app computes or filters a
+number, update `dataDictionary.ts` in the same commit.** Typical triggers: a new
+status or enum value, a column that is deprecated or replaced, a new soft-delete
+column, a changed formula (scorecard, AR, pay), a new place that stores money or
+currency.
+
+Three checks back this up:
+
+- A new table without an entry breaks `npm run tc`.
+- A new or dropped column fails `dataDictionary.columns.test.ts`. Add a note if its
+  meaning is not obvious from its name, then accept it with
+  `npx vitest run src/features/analyticsMcp/dataDictionary.columns.test.ts -u`.
+- `/preflight` lists the rules whose `source` files a PR touched, to re-read.
 
 ---
 

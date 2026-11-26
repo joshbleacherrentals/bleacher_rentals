@@ -88,6 +88,11 @@ import {
 } from "../util/workTrackerTypeDisplay";
 import { WorkTrackerTabsHeader } from "./WorkTrackerTabsHeader";
 import { WorkTrackerTimeField } from "./WorkTrackerTimeField";
+import { ModelFeedbackDialog } from "@/features/autoWorkTrackers/components/ModelFeedbackDialog";
+import { useModelRunTrip } from "@/features/autoWorkTrackers/hooks/useModelRunTrip";
+import { feedbackStatement } from "@/features/autoWorkTrackers/db/runFeedback";
+import { useCurrentUser } from "@/hooks/db/useCurrentUser";
+import { typedExecute } from "@/lib/powersync/typedQuery";
 
 type WorkTrackerModalProps = {
   selectedWorkTracker: Tables<"WorkTrackers"> | null;
@@ -263,6 +268,33 @@ export default function WorkTrackerModal({
   });
 
   const isNew = selectedWorkTracker?.id === "-1";
+  // A tracker the Auto Work Trackers model made (in a run not discarded): saving or deleting it asks
+  // why, optionally, so the model can learn from the change.
+  const modelRunTrip = useModelRunTrip(isNew ? null : selectedWorkTracker?.id);
+  const { data: currentUserRows } = useCurrentUser();
+  const [askWhy, setAskWhy] = useState<"edit" | "delete" | null>(null);
+  const askedWhyRef = useRef(false);
+  const whyRef = useRef("");
+  useEffect(() => {
+    askedWhyRef.current = false;
+    whyRef.current = "";
+  }, [selectedWorkTracker?.id]);
+  const recordWhy = async (kind: "edit" | "delete", workTrackerUuid: string) => {
+    const reason = whyRef.current;
+    whyRef.current = "";
+    askedWhyRef.current = false;
+    if (!modelRunTrip) return;
+    const stmt = feedbackStatement({
+      kind,
+      reason,
+      runUuid: modelRunTrip.runUuid,
+      runTripUuid: modelRunTrip.runTripUuid,
+      workTrackerUuid,
+      userUuid: currentUserRows?.[0]?.id ?? null,
+    });
+    // The reason is a nice-to-have: never let it fail the save or delete.
+    if (stmt) await typedExecute(stmt).catch((e) => console.error("[model feedback]", e));
+  };
 
   // One-time (non-reactive) read used only to seed `lineItems` when the modal opens —
   // after that, edits stay local until save. See `syncWorkTrackerLineItems`.
@@ -699,6 +731,7 @@ export default function WorkTrackerModal({
       // Line items are only held in memory until now — persist the current draft
       // list against the (possibly newly created) work tracker id.
       await syncWorkTrackerLineItems(savedWorkTrackerUuid, lineItems);
+      await recordWhy("edit", savedWorkTrackerUuid);
       setShowSaveConfirmModal(false);
       // Invalidate this specific work tracker's cache so re-opening shows fresh data
       await queryClient.invalidateQueries({ queryKey: ["workTracker", workTracker?.id] });
@@ -721,9 +754,19 @@ export default function WorkTrackerModal({
       return;
     }
 
+    // A model trip asks why instead; its dialog is the confirmation (performDelete runs after it).
+    if (modelRunTrip) {
+      setAskWhy("delete");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this work tracker?")) {
       return;
     }
+    await performDelete();
+  };
+
+  const performDelete = async () => {
+    if (!workTracker?.id) return;
 
     try {
       await deleteWorkTracker(workTracker.id, {
@@ -737,6 +780,7 @@ export default function WorkTrackerModal({
         dropoffCity: dropOffAddress?.city ?? dropoffAddress?.city ?? "",
         date: workTracker.date,
       });
+      await recordWhy("delete", workTracker.id);
       await queryClient.invalidateQueries({ queryKey: ["work-trackers"], refetchType: "active" });
       setSelectedWorkTracker(null);
       setSelectedBlock(null);
@@ -874,6 +918,11 @@ export default function WorkTrackerModal({
 
     if (fieldChangeType === "none" && !hasStatusChange && !lineItemsDirty) {
       createErrorToast(["No changes to save."]);
+      return;
+    }
+
+    if (modelRunTrip && !askedWhyRef.current) {
+      setAskWhy("edit");
       return;
     }
 
@@ -1534,6 +1583,23 @@ export default function WorkTrackerModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ModelFeedbackDialog
+        kind={askWhy}
+        onCancel={() => {
+          setAskWhy(null);
+          askedWhyRef.current = false;
+          whyRef.current = "";
+        }}
+        onContinue={(reason) => {
+          const kind = askWhy;
+          setAskWhy(null);
+          whyRef.current = reason;
+          askedWhyRef.current = true;
+          if (kind === "delete") void performDelete();
+          else handleSaveClick();
+        }}
+      />
 
       <Dialog
         open={showSaveConfirmModal}

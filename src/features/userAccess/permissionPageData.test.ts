@@ -1254,7 +1254,7 @@ describe("Repairs page rows", () => {
     expect(maintenance?.roles.account_manager.note).not.toMatch(/status menu/);
     expect(maintenance?.roles.viewer.note).toMatch(/Sees the status but cannot change it\.$/);
     expect(maintenance?.roles.maintainer.note).toBe(
-      'Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
+      'Can create, edit, delete, and restore any repair, including its services, bleachers and files, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
     );
   });
 

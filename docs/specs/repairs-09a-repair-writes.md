@@ -990,6 +990,11 @@ also let an account manager write (§1), and the matrix has said an account mana
 own repairs; this spec leaves the account manager out on the Repairs page and says so in the matrix.
 The levels do not change in either row (D146).
 
+**Confirmed at preflight 1.27.0 (user, 2026-11-25):** the account manager's read-only rule on
+repairs, services and files stays in the page only. Row level security keeps letting an account
+manager write `MaintenanceEvents`, `BleacherMaintEvents` and `MaintenanceLineItems`; no migration
+tightens it. Do not raise this again unless the rule itself changes.
+
 **Edits in the row "Repairs & Maintenance":**
 
 - The description: its last sentence, "For now the Repairs page lists repairs and, for an

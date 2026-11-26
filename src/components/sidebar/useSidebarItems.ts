@@ -32,6 +32,7 @@ import {
   MailX,
   Tags,
   Terminal,
+  CalendarClock,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -157,6 +158,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     label: "Work Trackers",
     href: "/work-trackers",
     icon: ClipboardList,
+  },
+  {
+    type: "button",
+    key: "auto-work-trackers",
+    label: "Auto Work Trackers",
+    href: "/auto-work-trackers",
+    icon: CalendarClock,
   },
   {
     type: "dropdown",
@@ -392,6 +400,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quality-assurance",
     "accountant",
     "work-trackers",
+    "auto-work-trackers",
     "scorecard",
     "leaderboard",
     "driver-calendar",
@@ -409,6 +418,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "assets",
     "quality-assurance",
     "work-trackers",
+    "auto-work-trackers",
     "scorecard",
     "leaderboard",
     "driver-calendar",

@@ -139,6 +139,110 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"AutoWorkTrackerFeedback": {
+                  Row: {
+                    "created_at": string,"created_by_user_uuid": string | null,"id": string,"kind": string,"reason": string,"run_trip_uuid": string | null,"run_uuid": string | null,"work_tracker_uuid": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by_user_uuid"?: string | null,"id"?: string,"kind": string,"reason": string,"run_trip_uuid"?: string | null,"run_uuid"?: string | null,"work_tracker_uuid"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by_user_uuid"?: string | null,"id"?: string,"kind"?: string,"reason"?: string,"run_trip_uuid"?: string | null,"run_uuid"?: string | null,"work_tracker_uuid"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerFeedback_created_by_user_uuid_fkey"
+      columns: ["created_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerFeedback_run_trip_uuid_fkey"
+      columns: ["run_trip_uuid"]
+isOneToOne: false
+      referencedRelation: "AutoWorkTrackerRunTrips"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerFeedback_run_uuid_fkey"
+      columns: ["run_uuid"]
+isOneToOne: false
+      referencedRelation: "AutoWorkTrackerRuns"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"AutoWorkTrackerRuns": {
+                  Row: {
+                    "app_version": string | null,"auto_work_tracker_id": string,"commit_sha": string | null,"created_at": string,"created_by_user_uuid": string | null,"discarded_at": string | null,"discarded_by_user_uuid": string | null,"id": string,"result": Json | null,"settings": Json | null,"trips_created": number,"week_start": string,"zone_uuid": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "app_version"?: string | null,"auto_work_tracker_id": string,"commit_sha"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"discarded_at"?: string | null,"discarded_by_user_uuid"?: string | null,"id"?: string,"result"?: Json | null,"settings"?: Json | null,"trips_created"?: number,"week_start": string,"zone_uuid"?: string | null
+                  }
+                  Update: {
+                    "app_version"?: string | null,"auto_work_tracker_id"?: string,"commit_sha"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"discarded_at"?: string | null,"discarded_by_user_uuid"?: string | null,"id"?: string,"result"?: Json | null,"settings"?: Json | null,"trips_created"?: number,"week_start"?: string,"zone_uuid"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerRuns_created_by_user_uuid_fkey"
+      columns: ["created_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerRuns_discarded_by_user_uuid_fkey"
+      columns: ["discarded_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AutoWorkTrackerRuns_zone_uuid_fkey"
+      columns: ["zone_uuid"]
+isOneToOne: false
+      referencedRelation: "Zones"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"AutoWorkTrackerRunTrips": {
+                  Row: {
+                    "created_at": string,"id": string,"run_uuid": string,"snapshot": NonNullable<Json>,"work_tracker_uuid": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"run_uuid": string,"snapshot": NonNullable<Json>,"work_tracker_uuid": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"run_uuid"?: string,"snapshot"?: NonNullable<Json>,"work_tracker_uuid"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerRunTrips_run_uuid_fkey"
+      columns: ["run_uuid"]
+isOneToOne: false
+      referencedRelation: "AutoWorkTrackerRuns"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"AutoWorkTrackerSettings": {
+                  Row: {
+                    "day_start_hour": number | null,"employee_priority": string | null,"employee_priority_minutes": number | null,"id": string,"max_day_minutes": number | null,"objective": string | null,"search_seconds": number | null,"setup_minutes": number | null,"teardown_minutes": number | null,"updated_at": string | null,"updated_by_user_uuid": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "day_start_hour"?: number | null,"employee_priority"?: string | null,"employee_priority_minutes"?: number | null,"id"?: string,"max_day_minutes"?: number | null,"objective"?: string | null,"search_seconds"?: number | null,"setup_minutes"?: number | null,"teardown_minutes"?: number | null,"updated_at"?: string | null,"updated_by_user_uuid"?: string | null
+                  }
+                  Update: {
+                    "day_start_hour"?: number | null,"employee_priority"?: string | null,"employee_priority_minutes"?: number | null,"id"?: string,"max_day_minutes"?: number | null,"objective"?: string | null,"search_seconds"?: number | null,"setup_minutes"?: number | null,"teardown_minutes"?: number | null,"updated_at"?: string | null,"updated_by_user_uuid"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AutoWorkTrackerSettings_updated_by_user_uuid_fkey"
+      columns: ["updated_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"BleacherAnnualInspections": {
                   Row: {
                     "bleacher_uuid": string,"created_at": string,"created_by": string | null,"document_path": string | null,"id": string,"inspected_on": string | null,"next_due_on": string,"notes": string | null
@@ -779,14 +883,14 @@ isOneToOne: false
                   ]
                 },"Drivers": {
                   Row: {
-                    "account_manager_uuid": string | null,"address_uuid": string | null,"app_platform": string | null,"app_version": string | null,"app_version_reported_at": string | null,"bucket_count": number | null,"bucket_count_reported_at": string | null,"created_at": string,"deadhead_cents": number,"id": string,"insurance_expires_on": string | null,"insurance_photo_path": string | null,"is_active": boolean,"license_expires_on": string | null,"license_photo_path": string | null,"medical_card_expires_on": string | null,"medical_card_photo_path": string | null,"pay_currency": Database["public"]['Enums']["pay_currency_type"],"pay_per_unit": Database["public"]['Enums']["pay_per_unit_type"],"pay_rate_cents": number,"phone_number": string | null,"setup_cents": number,"sync_version": number | null,"tax": number,"tax_dec": number,"teardown_cents": number,"user_uuid": string | null,"vehicle_uuid": string | null,"vendor_uuid": string | null
+                    "account_manager_uuid": string | null,"address_uuid": string | null,"app_platform": string | null,"app_version": string | null,"app_version_reported_at": string | null,"bucket_count": number | null,"bucket_count_reported_at": string | null,"created_at": string,"deadhead_cents": number,"exclude_from_auto_work_trackers": boolean,"id": string,"insurance_expires_on": string | null,"insurance_photo_path": string | null,"is_active": boolean,"license_expires_on": string | null,"license_photo_path": string | null,"medical_card_expires_on": string | null,"medical_card_photo_path": string | null,"pay_currency": Database["public"]['Enums']["pay_currency_type"],"pay_per_unit": Database["public"]['Enums']["pay_per_unit_type"],"pay_rate_cents": number,"phone_number": string | null,"setup_cents": number,"sync_version": number | null,"tax": number,"tax_dec": number,"teardown_cents": number,"user_uuid": string | null,"vehicle_uuid": string | null,"vendor_uuid": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "account_manager_uuid"?: string | null,"address_uuid"?: string | null,"app_platform"?: string | null,"app_version"?: string | null,"app_version_reported_at"?: string | null,"bucket_count"?: number | null,"bucket_count_reported_at"?: string | null,"created_at"?: string,"deadhead_cents"?: number,"id"?: string,"insurance_expires_on"?: string | null,"insurance_photo_path"?: string | null,"is_active"?: boolean,"license_expires_on"?: string | null,"license_photo_path"?: string | null,"medical_card_expires_on"?: string | null,"medical_card_photo_path"?: string | null,"pay_currency"?: Database["public"]['Enums']["pay_currency_type"],"pay_per_unit"?: Database["public"]['Enums']["pay_per_unit_type"],"pay_rate_cents"?: number,"phone_number"?: string | null,"setup_cents"?: number,"sync_version"?: number | null,"tax"?: number,"tax_dec"?: number,"teardown_cents"?: number,"user_uuid"?: string | null,"vehicle_uuid"?: string | null,"vendor_uuid"?: string | null
+                    "account_manager_uuid"?: string | null,"address_uuid"?: string | null,"app_platform"?: string | null,"app_version"?: string | null,"app_version_reported_at"?: string | null,"bucket_count"?: number | null,"bucket_count_reported_at"?: string | null,"created_at"?: string,"deadhead_cents"?: number,"exclude_from_auto_work_trackers"?: boolean,"id"?: string,"insurance_expires_on"?: string | null,"insurance_photo_path"?: string | null,"is_active"?: boolean,"license_expires_on"?: string | null,"license_photo_path"?: string | null,"medical_card_expires_on"?: string | null,"medical_card_photo_path"?: string | null,"pay_currency"?: Database["public"]['Enums']["pay_currency_type"],"pay_per_unit"?: Database["public"]['Enums']["pay_per_unit_type"],"pay_rate_cents"?: number,"phone_number"?: string | null,"setup_cents"?: number,"sync_version"?: number | null,"tax"?: number,"tax_dec"?: number,"teardown_cents"?: number,"user_uuid"?: string | null,"vehicle_uuid"?: string | null,"vendor_uuid"?: string | null
                   }
                   Update: {
-                    "account_manager_uuid"?: string | null,"address_uuid"?: string | null,"app_platform"?: string | null,"app_version"?: string | null,"app_version_reported_at"?: string | null,"bucket_count"?: number | null,"bucket_count_reported_at"?: string | null,"created_at"?: string,"deadhead_cents"?: number,"id"?: string,"insurance_expires_on"?: string | null,"insurance_photo_path"?: string | null,"is_active"?: boolean,"license_expires_on"?: string | null,"license_photo_path"?: string | null,"medical_card_expires_on"?: string | null,"medical_card_photo_path"?: string | null,"pay_currency"?: Database["public"]['Enums']["pay_currency_type"],"pay_per_unit"?: Database["public"]['Enums']["pay_per_unit_type"],"pay_rate_cents"?: number,"phone_number"?: string | null,"setup_cents"?: number,"sync_version"?: number | null,"tax"?: number,"tax_dec"?: number,"teardown_cents"?: number,"user_uuid"?: string | null,"vehicle_uuid"?: string | null,"vendor_uuid"?: string | null
+                    "account_manager_uuid"?: string | null,"address_uuid"?: string | null,"app_platform"?: string | null,"app_version"?: string | null,"app_version_reported_at"?: string | null,"bucket_count"?: number | null,"bucket_count_reported_at"?: string | null,"created_at"?: string,"deadhead_cents"?: number,"exclude_from_auto_work_trackers"?: boolean,"id"?: string,"insurance_expires_on"?: string | null,"insurance_photo_path"?: string | null,"is_active"?: boolean,"license_expires_on"?: string | null,"license_photo_path"?: string | null,"medical_card_expires_on"?: string | null,"medical_card_photo_path"?: string | null,"pay_currency"?: Database["public"]['Enums']["pay_currency_type"],"pay_per_unit"?: Database["public"]['Enums']["pay_per_unit_type"],"pay_rate_cents"?: number,"phone_number"?: string | null,"setup_cents"?: number,"sync_version"?: number | null,"tax"?: number,"tax_dec"?: number,"teardown_cents"?: number,"user_uuid"?: string | null,"vehicle_uuid"?: string | null,"vendor_uuid"?: string | null
                   }
                   Relationships: [
                     {
@@ -2109,6 +2213,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"RouteCache": {
+                  Row: {
+                    "distance_meters": number | null,"duration_seconds": number | null,"fetched_at": string,"found": boolean,"from_lat": number,"from_lng": number,"pair_key": string,"to_lat": number,"to_lng": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "distance_meters"?: number | null,"duration_seconds"?: number | null,"fetched_at"?: string,"found": boolean,"from_lat": number,"from_lng": number,"pair_key": string,"to_lat": number,"to_lng": number
+                  }
+                  Update: {
+                    "distance_meters"?: number | null,"duration_seconds"?: number | null,"fetched_at"?: string,"found"?: boolean,"from_lat"?: number,"from_lng"?: number,"pair_key"?: string,"to_lat"?: number,"to_lng"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"SalesOffices": {
                   Row: {
                     "address_uuid": string | null,"created_at": string,"created_by_user_uuid": string | null,"deleted": boolean,"id": string,"name": string,"payment_info": string | null,"phone": string | null,"quickbook_uuid": string,"stripe_connection_uuid": string | null
@@ -2495,14 +2613,14 @@ isOneToOne: false
                   ]
                 },"WorkTrackers": {
                   Row: {
-                    "abandoned_at": string | null,"accepted_at": string | null,"actual_bleacher_uuid": string | null,"bleacher_change_reason": string | null,"bleacher_uuid": string | null,"bol_number": string | null,"completed_at": string | null,"created_at": string,"created_by_user_uuid": string | null,"date": string | null,"declined_at": string | null,"distance_meters": number | null,"drive_minutes": number | null,"driver_uuid": string | null,"dropoff_address_uuid": string | null,"dropoff_event_uuid": string | null,"dropoff_instructions": string | null,"dropoff_poc": string | null,"dropoff_poc_contact_uuid": string | null,"dropoff_time": string | null,"dropoff_time_end": string | null,"dropoff_time_mode": Database["public"]['Enums']["work_tracker_time_mode"],"dropoff_time_start": string | null,"history_json": Json | null,"id": string,"internal_notes": string | null,"notes": string | null,"pay_cents": number | null,"pickup_address_uuid": string | null,"pickup_event_uuid": string | null,"pickup_instructions": string | null,"pickup_poc": string | null,"pickup_poc_contact_uuid": string | null,"pickup_time": string | null,"pickup_time_end": string | null,"pickup_time_mode": Database["public"]['Enums']["work_tracker_time_mode"],"pickup_time_start": string | null,"post_inspection_uuid": string | null,"pre_inspection_uuid": string | null,"project_number": string | null,"released_at": string | null,"setup_required": boolean,"started_at": string | null,"status": Database["public"]['Enums']["worktracker_status"],"status_changed_at": string | null,"teardown_required": boolean,"updated_at": string,"user_uuid": string | null,"work_tracker_type_uuid": string | null,"worktracker_group_uuid": string | null,"build_work_tracker_history": Json | null,"is_work_tracker_finished": boolean | null
+                    "abandoned_at": string | null,"accepted_at": string | null,"actual_bleacher_uuid": string | null,"auto_work_tracker_id": string | null,"bleacher_change_reason": string | null,"bleacher_uuid": string | null,"bol_number": string | null,"completed_at": string | null,"created_at": string,"created_by_user_uuid": string | null,"date": string | null,"deadhead_in_distance_meters": number | null,"deadhead_in_drive_minutes": number | null,"declined_at": string | null,"distance_meters": number | null,"drive_minutes": number | null,"driver_uuid": string | null,"dropoff_address_uuid": string | null,"dropoff_event_uuid": string | null,"dropoff_instructions": string | null,"dropoff_poc": string | null,"dropoff_poc_contact_uuid": string | null,"dropoff_time": string | null,"dropoff_time_end": string | null,"dropoff_time_mode": Database["public"]['Enums']["work_tracker_time_mode"],"dropoff_time_start": string | null,"history_json": Json | null,"id": string,"internal_notes": string | null,"notes": string | null,"pay_cents": number | null,"pickup_address_uuid": string | null,"pickup_event_uuid": string | null,"pickup_instructions": string | null,"pickup_poc": string | null,"pickup_poc_contact_uuid": string | null,"pickup_time": string | null,"pickup_time_end": string | null,"pickup_time_mode": Database["public"]['Enums']["work_tracker_time_mode"],"pickup_time_start": string | null,"planned_dropoff_at": string | null,"planned_pickup_at": string | null,"post_inspection_uuid": string | null,"pre_inspection_uuid": string | null,"previous_work_tracker_uuid": string | null,"project_number": string | null,"released_at": string | null,"return_home_distance_meters": number | null,"return_home_drive_minutes": number | null,"setup_required": boolean,"started_at": string | null,"status": Database["public"]['Enums']["worktracker_status"],"status_changed_at": string | null,"teardown_required": boolean,"updated_at": string,"user_uuid": string | null,"work_tracker_type_uuid": string | null,"worktracker_group_uuid": string | null,"build_work_tracker_history": Json | null,"is_work_tracker_finished": boolean | null
                   }
                   ComputedFields: "build_work_tracker_history" | "is_work_tracker_finished"
                   Insert: {
-                    "abandoned_at"?: string | null,"accepted_at"?: string | null,"actual_bleacher_uuid"?: string | null,"bleacher_change_reason"?: string | null,"bleacher_uuid"?: string | null,"bol_number"?: string | null,"completed_at"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"date"?: string | null,"declined_at"?: string | null,"distance_meters"?: number | null,"drive_minutes"?: number | null,"driver_uuid"?: string | null,"dropoff_address_uuid"?: string | null,"dropoff_event_uuid"?: string | null,"dropoff_instructions"?: string | null,"dropoff_poc"?: string | null,"dropoff_poc_contact_uuid"?: string | null,"dropoff_time"?: string | null,"dropoff_time_end"?: string | null,"dropoff_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"dropoff_time_start"?: string | null,"history_json"?: Json | null,"id"?: string,"internal_notes"?: string | null,"notes"?: string | null,"pay_cents"?: number | null,"pickup_address_uuid"?: string | null,"pickup_event_uuid"?: string | null,"pickup_instructions"?: string | null,"pickup_poc"?: string | null,"pickup_poc_contact_uuid"?: string | null,"pickup_time"?: string | null,"pickup_time_end"?: string | null,"pickup_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"pickup_time_start"?: string | null,"post_inspection_uuid"?: string | null,"pre_inspection_uuid"?: string | null,"project_number"?: string | null,"released_at"?: string | null,"setup_required"?: boolean,"started_at"?: string | null,"status"?: Database["public"]['Enums']["worktracker_status"],"status_changed_at"?: string | null,"teardown_required"?: boolean,"updated_at"?: string,"user_uuid"?: string | null,"work_tracker_type_uuid"?: string | null,"worktracker_group_uuid"?: string | null
+                    "abandoned_at"?: string | null,"accepted_at"?: string | null,"actual_bleacher_uuid"?: string | null,"auto_work_tracker_id"?: string | null,"bleacher_change_reason"?: string | null,"bleacher_uuid"?: string | null,"bol_number"?: string | null,"completed_at"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"date"?: string | null,"deadhead_in_distance_meters"?: number | null,"deadhead_in_drive_minutes"?: number | null,"declined_at"?: string | null,"distance_meters"?: number | null,"drive_minutes"?: number | null,"driver_uuid"?: string | null,"dropoff_address_uuid"?: string | null,"dropoff_event_uuid"?: string | null,"dropoff_instructions"?: string | null,"dropoff_poc"?: string | null,"dropoff_poc_contact_uuid"?: string | null,"dropoff_time"?: string | null,"dropoff_time_end"?: string | null,"dropoff_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"dropoff_time_start"?: string | null,"history_json"?: Json | null,"id"?: string,"internal_notes"?: string | null,"notes"?: string | null,"pay_cents"?: number | null,"pickup_address_uuid"?: string | null,"pickup_event_uuid"?: string | null,"pickup_instructions"?: string | null,"pickup_poc"?: string | null,"pickup_poc_contact_uuid"?: string | null,"pickup_time"?: string | null,"pickup_time_end"?: string | null,"pickup_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"pickup_time_start"?: string | null,"planned_dropoff_at"?: string | null,"planned_pickup_at"?: string | null,"post_inspection_uuid"?: string | null,"pre_inspection_uuid"?: string | null,"previous_work_tracker_uuid"?: string | null,"project_number"?: string | null,"released_at"?: string | null,"return_home_distance_meters"?: number | null,"return_home_drive_minutes"?: number | null,"setup_required"?: boolean,"started_at"?: string | null,"status"?: Database["public"]['Enums']["worktracker_status"],"status_changed_at"?: string | null,"teardown_required"?: boolean,"updated_at"?: string,"user_uuid"?: string | null,"work_tracker_type_uuid"?: string | null,"worktracker_group_uuid"?: string | null
                   }
                   Update: {
-                    "abandoned_at"?: string | null,"accepted_at"?: string | null,"actual_bleacher_uuid"?: string | null,"bleacher_change_reason"?: string | null,"bleacher_uuid"?: string | null,"bol_number"?: string | null,"completed_at"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"date"?: string | null,"declined_at"?: string | null,"distance_meters"?: number | null,"drive_minutes"?: number | null,"driver_uuid"?: string | null,"dropoff_address_uuid"?: string | null,"dropoff_event_uuid"?: string | null,"dropoff_instructions"?: string | null,"dropoff_poc"?: string | null,"dropoff_poc_contact_uuid"?: string | null,"dropoff_time"?: string | null,"dropoff_time_end"?: string | null,"dropoff_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"dropoff_time_start"?: string | null,"history_json"?: Json | null,"id"?: string,"internal_notes"?: string | null,"notes"?: string | null,"pay_cents"?: number | null,"pickup_address_uuid"?: string | null,"pickup_event_uuid"?: string | null,"pickup_instructions"?: string | null,"pickup_poc"?: string | null,"pickup_poc_contact_uuid"?: string | null,"pickup_time"?: string | null,"pickup_time_end"?: string | null,"pickup_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"pickup_time_start"?: string | null,"post_inspection_uuid"?: string | null,"pre_inspection_uuid"?: string | null,"project_number"?: string | null,"released_at"?: string | null,"setup_required"?: boolean,"started_at"?: string | null,"status"?: Database["public"]['Enums']["worktracker_status"],"status_changed_at"?: string | null,"teardown_required"?: boolean,"updated_at"?: string,"user_uuid"?: string | null,"work_tracker_type_uuid"?: string | null,"worktracker_group_uuid"?: string | null
+                    "abandoned_at"?: string | null,"accepted_at"?: string | null,"actual_bleacher_uuid"?: string | null,"auto_work_tracker_id"?: string | null,"bleacher_change_reason"?: string | null,"bleacher_uuid"?: string | null,"bol_number"?: string | null,"completed_at"?: string | null,"created_at"?: string,"created_by_user_uuid"?: string | null,"date"?: string | null,"deadhead_in_distance_meters"?: number | null,"deadhead_in_drive_minutes"?: number | null,"declined_at"?: string | null,"distance_meters"?: number | null,"drive_minutes"?: number | null,"driver_uuid"?: string | null,"dropoff_address_uuid"?: string | null,"dropoff_event_uuid"?: string | null,"dropoff_instructions"?: string | null,"dropoff_poc"?: string | null,"dropoff_poc_contact_uuid"?: string | null,"dropoff_time"?: string | null,"dropoff_time_end"?: string | null,"dropoff_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"dropoff_time_start"?: string | null,"history_json"?: Json | null,"id"?: string,"internal_notes"?: string | null,"notes"?: string | null,"pay_cents"?: number | null,"pickup_address_uuid"?: string | null,"pickup_event_uuid"?: string | null,"pickup_instructions"?: string | null,"pickup_poc"?: string | null,"pickup_poc_contact_uuid"?: string | null,"pickup_time"?: string | null,"pickup_time_end"?: string | null,"pickup_time_mode"?: Database["public"]['Enums']["work_tracker_time_mode"],"pickup_time_start"?: string | null,"planned_dropoff_at"?: string | null,"planned_pickup_at"?: string | null,"post_inspection_uuid"?: string | null,"pre_inspection_uuid"?: string | null,"previous_work_tracker_uuid"?: string | null,"project_number"?: string | null,"released_at"?: string | null,"return_home_distance_meters"?: number | null,"return_home_drive_minutes"?: number | null,"setup_required"?: boolean,"started_at"?: string | null,"status"?: Database["public"]['Enums']["worktracker_status"],"status_changed_at"?: string | null,"teardown_required"?: boolean,"updated_at"?: string,"user_uuid"?: string | null,"work_tracker_type_uuid"?: string | null,"worktracker_group_uuid"?: string | null
                   }
                   Relationships: [
                     {
@@ -2576,6 +2694,12 @@ isOneToOne: false
       columns: ["pre_inspection_uuid"]
 isOneToOne: false
       referencedRelation: "WorkTrackerInspections"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "WorkTrackers_previous_work_tracker_uuid_fkey"
+      columns: ["previous_work_tracker_uuid"]
+isOneToOne: false
+      referencedRelation: "WorkTrackers"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "WorkTrackers_user_uuid_fkey"

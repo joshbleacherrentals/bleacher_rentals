@@ -487,7 +487,8 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Work Trackers",
 
-    description: "This applies to the Work Trackers Page and the Dashboard.",
+    description:
+      "This applies to the Work Trackers Page and the Dashboard. A driver's week also has a Schedule button that shows that week as a grid, a row per day and the 24 hours across, with each trip's deadhead and haul drawn as long as their drive times and an hour for each teardown and setup it requires, and beside it a map of the selected day's route (click a day to choose it); it only reads, and is open to everyone who can open the driver's week.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
@@ -511,6 +512,25 @@ export const PERMISSIONS: PermissionEntry[] = [
       accountant: custom(
         "Opens the Work Trackers pages and sees every week, every driver (without having to switch on 'See All Drivers') and every trip in full, and can open any work tracker to read it. Cannot create, edit, delete or release work trackers — there is no Release All button for them. Has no Dashboard.",
       ),
+    },
+  },
+  {
+    label: "Auto Work Trackers",
+    description:
+      "The Auto Work Trackers page in the sidebar. Pick a zone and a week, and Create work trackers plans the trips the zone's bleachers need that week as draft Trip work trackers: a driver can do several trips a day, one bleacher at a time, up to 12 hours from leaving home to getting back (counting an hour for each setup and teardown), on days the bleacher is free and the driver is available, filling employees' days before contractors' (drivers paid through a vendor), then preferring the least driving. Each gets its driver, day, suggested times, road distances and drive times (Google, avoiding tolls), and Hauling, Setup and Teardown line items at the driver's rates. Running it again makes no duplicates. Advanced settings holds how it plans, for every zone: how strongly employees come before contractors, least distance or least drive time, the longest day, setup and teardown times, the hour the day starts, and the search time; each shows whether it is the default, and the next run uses them. The model's drafts for a zone and week can be deleted in one go; a tracker saved in the work tracker modal counts as hand-made and is kept. The other pages check the week before creating: the Dashboard (with a map of every driver's routes), event, bleacher and driver checks, and Driver Data, Event Data and Bleacher Data, where missing addresses can be fixed and a driver can be left out of the model. Every Create is recorded with what it planned (Model → Runs): who ran it, the version and settings, and for each trip whether it was kept, edited (and how) or deleted. Saving changes to, or deleting, a work tracker the model made asks why (optional), and so does deleting the model's drafts in bulk; the answers show on Runs. Apart from those fixes, the reasons and creating work trackers, the page only reads.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it. Can delete the drafts the model made for the selected zone and week in one go. Can change the Advanced settings, or reset any of them to its default. Sees every run on Model → Runs; bulk deleting the model's drafts marks that zone and week's runs discarded. Can fix the home address of any driver on Driver Data, and remove any driver from the model or add them back. Can fix the address of any event on Event Data, and any pickup or drop-off address on Bleacher Data.",
+      ),
+      account_manager: custom(
+        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it. Sees how many of the week's work trackers the model made, but cannot delete the model's drafts in bulk (administrators only for now). Can read the Advanced settings but not change them. Sees every run on Model → Runs, and is asked why (optionally) when changing or deleting a model-made work tracker, like an administrator. On Driver Data they can fix a driver's home address, and remove a driver from the model or add them back, only in a zone they manage, the same drivers they can edit on the Team page; in other zones the drivers are shown but cannot be changed. On Event Data and Bleacher Data they can fix an address only in a zone they manage, including events another account manager created; in other zones the addresses are shown but cannot be clicked.",
+      ),
+      developer: none("Does not have this page."),
+      viewer: none("Does not have this page."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },
   {
@@ -627,7 +647,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: full(
-        'Can create, edit, delete, and restore any repair or maintenance event, including its address, bleachers, and photos, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
+        'Can create, edit, delete, and restore any repair, including its services, bleachers and files, regardless of who created it. Uses the Repairs page to look repairs up, add them, edit their details, status and services (which also set the repair\'s bleachers, zone and damage report links), delete and restore them, and add and delete their files. Also adds a repair from the Dashboard, with "+ Create" and with the maintenance icon of a cell.',
       ),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
@@ -652,6 +672,8 @@ export const PERMISSIONS: PermissionEntry[] = [
   // and from the maintenance icon of a cell; an account manager only reads (level `read` in the row above,
   // D219), a maintainer also adds a repair there (D210, D218), nobody reassigns an owner (D220), and a
   // manager opens a repair from a damage report (D217; the rows "Dashboard Cells" and "Damage Reports").
+  // The account manager's read-only rule is enforced by the page only; row level security still allows
+  // the write. Confirmed by the user at preflight 1.27.0 (spec repairs-09a §5).
   {
     label: "Repair Costs & Vendors",
     description:
@@ -1226,7 +1248,7 @@ export const PERMISSIONS: PermissionEntry[] = [
   {
     label: "Ask Claude About Our Data",
     description:
-      "A connector that lets you ask Claude questions about our data, such as how many bookings were signed last month. Claude runs read-only database queries and answers; nothing can be changed. Add it in Claude under Settings → Connectors → Add custom connector, with the address your administrator gives you, and sign in with your usual login. It works for every account that is not deactivated. Every question is logged: who asked, and which query ran.",
+      "A connector that lets you ask Claude questions about our data, such as how many bookings were signed last month. Claude runs read-only database queries and answers; nothing can be changed. Add it in Claude under Settings → Connectors → Add custom connector, with the address your administrator gives you, and sign in with your usual login. It works for every account that is not deactivated. Claude can also ask Linxup where bleachers are now and where they stood over a past week, from their GPS trackers. Every question is logged: who asked, and which query or which bleachers and dates.",
     category: "Data Access",
     roles: {
       admin: read(ANALYTICS_DATA_NOTE),
@@ -1236,7 +1258,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       developer: read(ANALYTICS_DATA_NOTE),
       viewer: read(ANALYTICS_DATA_NOTE),
       driver: read(
-        "Works for any driver whose account is not deactivated, although drivers cannot open the web dashboard: the connector is separate from the app. Claude can read every table in the database, except the QuickBooks connection and the connector's own log. It cannot change anything.",
+        "Works for any driver whose account is not deactivated, although drivers cannot open the web dashboard: the connector is separate from the app. Claude can read every table in the database, except the QuickBooks connection and the connector's own log, and the live and past GPS positions of every bleacher. It cannot change anything.",
       ),
       maintainer: read(ANALYTICS_DATA_NOTE),
       accountant: read(ANALYTICS_DATA_NOTE),
