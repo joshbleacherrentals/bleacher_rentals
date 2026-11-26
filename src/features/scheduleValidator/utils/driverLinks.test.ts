@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { AREAS } from "@/features/autoWorkTrackers/utils/pages";
 import { driverLinks } from "./driverLinks";
 
 describe("driverLinks", () => {
   const links = driverLinks({
+    area: AREAS.check,
     userUuid: "u1",
     weekStart: "2026-09-14",
     zoneId: "z1",
@@ -14,7 +16,7 @@ describe("driverLinks", () => {
       {
         key: "schedule",
         label: "Open driver schedule",
-        href: "/auto-work-trackers/driver-schedule?zone=z1&week=2026-09-14&user=u1&from=driver-workload",
+        href: "/work-trackers/verify/driver-schedule?zone=z1&week=2026-09-14&user=u1&from=driver-workload",
         newTab: false,
       },
       { key: "profile", label: "Open driver profile", href: "/team/u1/edit/driver", newTab: true },

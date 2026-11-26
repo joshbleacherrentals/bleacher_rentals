@@ -4,57 +4,61 @@ import { sql } from "@powersync/kysely-driver";
 import { db } from "@/components/providers/SystemProvider";
 import { expect, useTypedQuery } from "@/lib/powersync/typedQuery";
 import { useMemo } from "react";
-
-type VendorRow = {
-  id: string;
-  display_name: string | null;
-  logo_url: string | null;
-  qbo_vendor_id: string | null;
-  qbo_connection_uuid: string | null;
-  is_active: number | null;
-  ein: string | null;
-  hst: string | null;
-};
+import { vendorRecordFromRow, type VendorOption, type VendorRow } from "../utils/vendorForm";
 
 type DriverCountRow = {
   vendor_uuid: string | null;
   count: string;
 };
 
-export type VendorOption = {
-  id: string;
-  displayName: string;
-  logoUrl: string | null;
-  qboVendorId: string | null;
-  qboConnectionUuid: string | null;
-  isActive: boolean;
-  driverCount: number;
-  ein: string | null;
-  hst: string | null;
-};
+export type { VendorOption } from "../utils/vendorForm";
 
 /**
- * Hook to fetch all vendors with driver counts using PowerSync
+ * Hook to fetch all vendors with driver counts using PowerSync.
+ *
+ * Each vendor comes whole (docs/specs/vendors-page.md §4.3): its type, contact, services, status
+ * and notes, and its address joined from `Addresses`. Ordered by `display_name`, as before; the
+ * Vendors page sorts again itself.
  */
 export function useVendors(includeInactive: boolean = false) {
   // Build vendor query
   const vendorQuery = useMemo(() => {
     let query = db
       .selectFrom("Vendors")
+      .leftJoin("Addresses", "Addresses.id", "Vendors.address_uuid")
       .select([
-        "id",
-        "display_name",
-        "logo_url",
-        "qbo_vendor_id",
-        "qbo_connection_uuid",
-        "is_active",
-        "ein",
-        "hst",
+        "Vendors.id",
+        "Vendors.display_name",
+        "Vendors.type",
+        "Vendors.logo_url",
+        "Vendors.qbo_vendor_id",
+        "Vendors.qbo_connection_uuid",
+        "Vendors.is_active",
+        "Vendors.ein",
+        "Vendors.hst",
+        "Vendors.status",
+        "Vendors.phone",
+        "Vendors.contact_name",
+        "Vendors.contact_email",
+        "Vendors.does_trailer_repair",
+        "Vendors.does_aluminum_welding",
+        "Vendors.does_mobile_repair",
+        "Vendors.is_parts_supplier",
+        "Vendors.notes",
+        "Vendors.address_uuid",
+        "Addresses.street as address_street",
+        "Addresses.city as address_city",
+        "Addresses.state_province as address_state_province",
+        "Addresses.zip_postal as address_zip_postal",
+        "Addresses.country as address_country",
+        "Addresses.latitude as address_latitude",
+        "Addresses.longitude as address_longitude",
+        "Addresses.place_id as address_place_id",
       ])
-      .orderBy("display_name", "asc");
+      .orderBy("Vendors.display_name", "asc");
 
     if (!includeInactive) {
-      query = query.where("is_active", "=", 1);
+      query = query.where("Vendors.is_active", "=", 1);
     }
 
     return query.compile();
@@ -87,15 +91,8 @@ export function useVendors(includeInactive: boolean = false) {
   // Combine vendors with their driver counts
   const vendorList: VendorOption[] = useMemo(() => {
     return vendors.map((v) => ({
-      id: v.id,
-      displayName: v.display_name || "Unknown Vendor",
-      logoUrl: v.logo_url,
-      qboVendorId: v.qbo_vendor_id,
-      qboConnectionUuid: v.qbo_connection_uuid,
-      isActive: v.is_active === 1,
+      ...vendorRecordFromRow(v),
       driverCount: driverCountMap.get(v.id) || 0,
-      ein: v.ein,
-      hst: v.hst,
     }));
   }, [vendors, driverCountMap]);
 

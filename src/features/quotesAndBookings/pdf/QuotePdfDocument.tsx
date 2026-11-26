@@ -1,4 +1,4 @@
-import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
+import { Page, Text, View, Link, Document, StyleSheet } from "@react-pdf/renderer";
 import { QuoteDocumentData } from "./quoteDocumentData";
 import { ContractPdfPages } from "./ContractPdfPages";
 import { isInvoiceStatus } from "../utils/isInvoiceStatus";
@@ -168,6 +168,27 @@ const styles = StyleSheet.create({
     color: DARK_BLUE,
     marginBottom: 8,
     marginTop: 12,
+  },
+
+  // Pay Invoice button — the green of the customer page's own "Pay Invoice" button
+  payButtonWrap: {
+    marginTop: 16,
+    marginBottom: 4,
+    alignItems: "flex-start",
+  },
+  payButton: {
+    backgroundColor: "#15803d",
+    borderRadius: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 28,
+    // A PDF Link underlines everything inside it unless told not to.
+    textDecoration: "none",
+  },
+  payButtonText: {
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
+    color: "#ffffff",
+    textDecoration: "none",
   },
 
   // Notes
@@ -372,6 +393,16 @@ export function QuotePdfDocument({ data }: { data: QuoteDocumentData }) {
             ))}
           </>
         )}
+
+        {/* Pay Invoice: opens the customer's page. A relative or empty address is a dead link in a
+            PDF, so without a full web address there is no button rather than one that does nothing. */}
+        {/^https?:\/\//.test(data.publicUrl) ? (
+          <View style={styles.payButtonWrap} wrap={false}>
+            <Link src={data.publicUrl} style={styles.payButton}>
+              <Text style={styles.payButtonText}>{s.payInvoiceCta}</Text>
+            </Link>
+          </View>
+        ) : null}
 
         {/* Notes */}
         {data.clientNotes ? (
