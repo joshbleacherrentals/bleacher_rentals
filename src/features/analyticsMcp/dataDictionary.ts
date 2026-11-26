@@ -135,8 +135,9 @@ export const BUSINESS_RULES: BusinessRule[] = [
   },
   {
     topic: "Proof of delivery (GPS)",
-    rule: "DeliveryProofs has one row per completed work tracker checked against the hauled bleacher's Linxup GPS. 'Delivered and confirmed' = status 'verified'. Only 'not_found' means the GPS saw the bleacher elsewhere after the driver tapped Complete; 'no_gps' and 'waiting' mean there was no evidence either way, not a failed delivery. Trackers completed more than 7 days before the feature or the cron's last run have no row. Rows with final = false may still change.",
-    source: "src/features/deliveryProof/logic/verdict.ts",
+    rule: "DeliveryProofs has one row per completed work tracker checked against the hauled bleacher's Linxup GPS. 'Delivered and confirmed' = status 'verified'. Only 'not_found' means the GPS saw the bleacher elsewhere after the driver tapped Complete; 'no_gps' and 'waiting' mean there was no evidence either way, not a failed delivery. Trackers completed more than 7 days before the feature or the cron's last run have no row. Rows with final = false may still change. The app's Proof of Delivery page (Work Trackers → Verify) also calls a work tracker 'overdue' when its date is before today and its status is not completed, cancelled, declined or abandoned; that is derived, not stored.",
+    source:
+      "src/features/deliveryProof/logic/verdict.ts, src/features/deliveryProof/logic/proofList.ts",
   },
   {
     topic: "Distances and times",
@@ -162,9 +163,14 @@ export const BUSINESS_RULES: BusinessRule[] = [
   },
   {
     topic: "Repairs",
-    rule: "MaintenanceEvents = one repair = one vendor invoice. status: inbound → triaged → waiting_repair → in_repair → confirm_repair → completed (completed_at stamped). cost_cents = the invoice total = sum of non-deleted MaintenanceLineItems labor + parts + tax + freight (kept by a trigger), in MaintenanceEvents.currency. zone_uuid = the zone the bleacher was in at event_start. MaintenanceBudgets = one budget per year and currency (no page compares it yet).",
+    rule: "MaintenanceEvents = one repair = one vendor invoice. status: inbound → triaged → waiting_repair → in_repair → confirm_repair → completed (completed_at stamped). cost_cents = the invoice total = sum of non-deleted MaintenanceLineItems labor + parts + tax + freight (kept by a trigger), in MaintenanceEvents.currency. zone_uuid = the zone the bleacher was in at event_start. MaintenanceBudgets = one budget per year and currency; Dashboard & Analytics compares the USD budget (see Repair spend).",
     source:
       "src/features/repairs/utils/repairStatus.ts, supabase/migrations/20261123120000_maintenance_schema.sql",
+  },
+  {
+    topic: "Repair spend (Dashboard & Analytics)",
+    rule: "The Dashboard & Analytics page reports repair money in USD. It counts non-deleted MaintenanceEvents and their non-deleted MaintenanceLineItems; a repair belongs to the year of its event_start. A CAD repair is converted at the CAD→USD rate (Frankfurter) of its event_start day, or the latest earlier day with a rate; a repair with no rate yet is left out. Open repairs = status not completed. 'Budget used' = the year's total spend ÷ the USD MaintenanceBudgets row for that year (CAD budgets are ignored; none set = no comparison).",
+    source: "src/features/dashboardAnalytics/utils/buildAnalytics.ts",
   },
   {
     topic: "Annual inspections",
