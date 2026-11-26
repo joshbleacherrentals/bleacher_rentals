@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronsLeft, CalendarClock, Check, House, Loader2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronsLeft,
+  ClipboardCheck,
+  Check,
+  House,
+  Loader2,
+  MapPinCheck,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AUTO_WORK_TRACKERS_SECTIONS, HOME_PAGE, pageHref } from "../utils/pages";
+import { pageHref, type Area, type AreaKey } from "../utils/pages";
 import { summaryTone } from "../utils/checkSummaries";
-import { useChecks, type CheckStatus } from "./ChecksProvider";
-import { GenerateWorkTrackersButton } from "./GenerateWorkTrackersButton";
+import { useChecksOrNull, type CheckStatus } from "./ChecksProvider";
 import { ModelTrackersPanel } from "./ModelTrackersPanel";
 import { AdvancedSettingsButton } from "./AdvancedSettingsButton";
 import { ZoneWeekPicker } from "./ZoneWeekPicker";
@@ -46,13 +54,20 @@ function CheckBadge({ status }: { status: CheckStatus }) {
   );
 }
 
+const AREA_ICON: Record<AreaKey, typeof Sparkles> = {
+  check: ClipboardCheck,
+  auto: Sparkles,
+  proof: MapPinCheck,
+};
+
 /**
- * The pinned left-hand panel of Auto Work Trackers, styled like the Quotes & Bookings filters: the
- * zone and week, the Create work trackers button for them with the model's tracker counts (and its
- * bulk delete), and the pages grouped under a heading
- * per kind of check. Each heading folds; the one holding the open page stays open.
+ * The pinned left-hand panel of a planning tab, styled like the Quotes & Bookings filters: the zone
+ * and week, then the tab's pages grouped under headings. Auto Plan adds the model's tracker counts
+ * (and their bulk delete) and Advanced settings. Each heading folds; the one holding the open page
+ * stays open.
  */
 export function AutoWorkTrackersSidebar({
+  area,
   isOpen,
   onToggle,
   activeSlug,
@@ -61,6 +76,7 @@ export function AutoWorkTrackersSidebar({
   onZoneChange,
   onWeekChange,
 }: {
+  area: Area;
   isOpen: boolean;
   onToggle: () => void;
   activeSlug: string | undefined;
@@ -70,7 +86,9 @@ export function AutoWorkTrackersSidebar({
   onWeekChange: (weekStart: string) => void;
 }) {
   const [folded, setFolded] = useState<Set<string>>(new Set());
-  const { statuses } = useChecks();
+  const statuses = useChecksOrNull()?.statuses ?? {};
+  const AreaIcon = AREA_ICON[area.key];
+  const home = area.home;
 
   const toggleSection = (label: string) =>
     setFolded((prev) => {
@@ -84,7 +102,7 @@ export function AutoWorkTrackersSidebar({
   // its full width and is clipped, so nothing reflows mid-animation.
   return (
     <aside
-      aria-label="Auto Work Trackers"
+      aria-label={area.label}
       aria-hidden={!isOpen}
       inert={!isOpen}
       style={{ width: isOpen ? SIDEBAR_WIDTH : 0 }}
@@ -96,8 +114,8 @@ export function AutoWorkTrackersSidebar({
       >
         <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-            <CalendarClock className="h-4 w-4" />
-            Auto Work Trackers
+            <AreaIcon className="h-4 w-4" />
+            {area.label}
           </div>
           <button
             type="button"
@@ -113,79 +131,88 @@ export function AutoWorkTrackersSidebar({
 
         <div className="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto p-3">
           <ZoneWeekPicker
-            idPrefix="auto-work-trackers"
+            idPrefix={`work-trackers-${area.key}`}
             zoneId={zoneId}
             weekStart={weekStart}
             onZoneChange={onZoneChange}
             onWeekChange={onWeekChange}
             stacked
           />
-          <GenerateWorkTrackersButton zoneId={zoneId} weekStart={weekStart} fullWidth />
-          <ModelTrackersPanel zoneId={zoneId} weekStart={weekStart} />
-          <AdvancedSettingsButton />
+          {area.key === "auto" && (
+            <>
+              <ModelTrackersPanel zoneId={zoneId} weekStart={weekStart} />
+              <AdvancedSettingsButton />
+            </>
+          )}
 
-          <nav aria-label="Auto Work Trackers pages" className="border-t border-gray-200 pt-3">
-            {/* The home page stands on its own above the headings, like a home link. */}
-            <Link
-              href={pageHref(HOME_PAGE, zoneId, weekStart)}
-              aria-current={activeSlug === HOME_PAGE.slug ? "page" : undefined}
-              className={cn(
-                "mb-3 flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold",
-                activeSlug === HOME_PAGE.slug
-                  ? "bg-darkBlue text-white"
-                  : "text-gray-800 hover:bg-gray-200",
-              )}
-            >
-              <House className="h-4 w-4 shrink-0" />
-              {HOME_PAGE.label}
-            </Link>
+          {area.sections.length > 0 && (
+            <nav aria-label={`${area.label} pages`} className="border-t border-gray-200 pt-3">
+              {/* The home page stands on its own above the headings, like a home link. */}
+              <Link
+                href={pageHref(area, home, zoneId, weekStart)}
+                aria-current={activeSlug === home.slug ? "page" : undefined}
+                className={cn(
+                  "mb-3 flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold",
+                  activeSlug === home.slug
+                    ? "bg-darkBlue text-white"
+                    : "text-gray-800 hover:bg-gray-200",
+                )}
+              >
+                {area.key === "auto" ? (
+                  <Sparkles className="h-4 w-4 shrink-0" />
+                ) : (
+                  <House className="h-4 w-4 shrink-0" />
+                )}
+                {home.label}
+              </Link>
 
-            {AUTO_WORK_TRACKERS_SECTIONS.map((section) => {
-              const holdsActive = section.pages.some((p) => p.slug === activeSlug);
-              const open = holdsActive || !folded.has(section.label);
-              return (
-                <div key={section.label} className="mb-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(section.label)}
-                    disabled={holdsActive}
-                    aria-expanded={open}
-                    className="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1 text-xs font-semibold tracking-wide text-gray-500 uppercase hover:bg-gray-200 disabled:cursor-default disabled:hover:bg-transparent"
-                  >
-                    {section.label}
-                    <ChevronDown
-                      className={cn("h-3.5 w-3.5 transition-transform", !open && "-rotate-90")}
-                    />
-                  </button>
-                  {open && (
-                    <ul className="mt-1 flex flex-col gap-0.5">
-                      {section.pages.map((page) => {
-                        const active = page.slug === activeSlug;
-                        const status = statuses[page.slug];
-                        return (
-                          <li key={page.slug}>
-                            <Link
-                              href={pageHref(page, zoneId, weekStart)}
-                              aria-current={active ? "page" : undefined}
-                              className={cn(
-                                "flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm",
-                                active
-                                  ? "bg-darkBlue font-medium text-white"
-                                  : "text-gray-700 hover:bg-gray-200",
-                              )}
-                            >
-                              <span className="truncate">{page.label}</span>
-                              {status && <CheckBadge status={status} />}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
+              {area.sections.map((section) => {
+                const holdsActive = section.pages.some((p) => p.slug === activeSlug);
+                const open = holdsActive || !folded.has(section.label);
+                return (
+                  <div key={section.label} className="mb-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(section.label)}
+                      disabled={holdsActive}
+                      aria-expanded={open}
+                      className="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1 text-xs font-semibold tracking-wide text-gray-500 uppercase hover:bg-gray-200 disabled:cursor-default disabled:hover:bg-transparent"
+                    >
+                      {section.label}
+                      <ChevronDown
+                        className={cn("h-3.5 w-3.5 transition-transform", !open && "-rotate-90")}
+                      />
+                    </button>
+                    {open && (
+                      <ul className="mt-1 flex flex-col gap-0.5">
+                        {section.pages.map((page) => {
+                          const active = page.slug === activeSlug;
+                          const status = statuses[page.slug];
+                          return (
+                            <li key={page.slug}>
+                              <Link
+                                href={pageHref(area, page, zoneId, weekStart)}
+                                aria-current={active ? "page" : undefined}
+                                className={cn(
+                                  "flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm",
+                                  active
+                                    ? "bg-darkBlue font-medium text-white"
+                                    : "text-gray-700 hover:bg-gray-200",
+                                )}
+                              >
+                                <span className="truncate">{page.label}</span>
+                                {status && <CheckBadge status={status} />}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </nav>
+          )}
         </div>
       </div>
     </aside>

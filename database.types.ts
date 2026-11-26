@@ -807,6 +807,32 @@ isOneToOne: true
       referencedColumns: ["id"]
     }
                   ]
+                },"DeliveryProofs": {
+                  Row: {
+                    "attempts": number,"bleacher_uuid": string | null,"checked_at": string,"distance_meters": number | null,"dropoff_latitude": number | null,"dropoff_longitude": number | null,"evidence_at": string | null,"evidence_kind": string | null,"evidence_latitude": number | null,"evidence_longitude": number | null,"evidence_place": string | null,"evidence_until": string | null,"final": boolean,"gps_last_report_at": string | null,"id": string,"imei": string | null,"status": string,"window_end": string | null,"work_tracker_uuid": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempts"?: number,"bleacher_uuid"?: string | null,"checked_at"?: string,"distance_meters"?: number | null,"dropoff_latitude"?: number | null,"dropoff_longitude"?: number | null,"evidence_at"?: string | null,"evidence_kind"?: string | null,"evidence_latitude"?: number | null,"evidence_longitude"?: number | null,"evidence_place"?: string | null,"evidence_until"?: string | null,"final"?: boolean,"gps_last_report_at"?: string | null,"id"?: string,"imei"?: string | null,"status": string,"window_end"?: string | null,"work_tracker_uuid": string
+                  }
+                  Update: {
+                    "attempts"?: number,"bleacher_uuid"?: string | null,"checked_at"?: string,"distance_meters"?: number | null,"dropoff_latitude"?: number | null,"dropoff_longitude"?: number | null,"evidence_at"?: string | null,"evidence_kind"?: string | null,"evidence_latitude"?: number | null,"evidence_longitude"?: number | null,"evidence_place"?: string | null,"evidence_until"?: string | null,"final"?: boolean,"gps_last_report_at"?: string | null,"id"?: string,"imei"?: string | null,"status"?: string,"window_end"?: string | null,"work_tracker_uuid"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "DeliveryProofs_bleacher_uuid_fkey"
+      columns: ["bleacher_uuid"]
+isOneToOne: false
+      referencedRelation: "Bleachers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "DeliveryProofs_work_tracker_uuid_fkey"
+      columns: ["work_tracker_uuid"]
+isOneToOne: true
+      referencedRelation: "WorkTrackers"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"DevAllowedEmails": {
                   Row: {
                     "created_at": string,"email": string,"id": string
