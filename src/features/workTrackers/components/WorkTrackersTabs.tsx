@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarDays, ClipboardCheck, MapPinCheck, Sparkles } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserAccess } from "@/features/userAccess/hooks/useUserAccess";
 import { canAccessPath } from "@/features/userAccess/accessConfig";
 import { AREAS, areaHref, locatePage } from "@/features/autoWorkTrackers/utils/pages";
 
 /**
- * The tabs across the top of Work Trackers: Weeks (paying and reading drivers' weeks), Plan Check,
- * Auto Plan and Proof of Delivery. The planning tabs carry the selected zone and week between
+ * The tabs across the top of Work Trackers: Weeks (paying and reading drivers' weeks), Verify,
+ * and Auto Generate. The planning tabs carry the selected zone and week between
  * them. Shown only to someone who can open a planning tab; everyone else just has Weeks.
  */
 export function WorkTrackersTabs() {
@@ -37,12 +37,6 @@ export function WorkTrackersTabs() {
       label: AREAS.auto.label,
       href: areaHref(AREAS.auto, zone, week),
       Icon: Sparkles,
-    },
-    {
-      key: "proof",
-      label: AREAS.proof.label,
-      href: areaHref(AREAS.proof, zone, week),
-      Icon: MapPinCheck,
     },
   ];
 

@@ -1,60 +1,37 @@
 import { db } from "@/components/providers/SystemProvider";
-import { weekEndOf } from "@/features/autoWorkTrackers/utils/week";
+import { driverUuidsInZone } from "@/features/scheduleValidator/db/driverQueries";
 
-/** One completed work tracker of the zone and week, with its GPS proof (null before the first check). */
-export type WeekProofRow = {
-  id: string;
+/** One work tracker of a zone driver's week, with its proof's status (null before any check). */
+export type DriverProofRow = {
+  driver_uuid: string | null;
   date: string | null;
-  completed_at: string | null;
-  bleacher_uuid: string | null;
-  bleacher_number: number | null;
-  driver_first: string | null;
-  driver_last: string | null;
-  dropoff_street: string | null;
-  dropoff_city: string | null;
-  status: string | null;
-  final: number | null;
-  checked_at: string | null;
-  evidence_at: string | null;
-  distance_meters: number | null;
-  evidence_place: string | null;
-  gps_last_report_at: string | null;
+  tracker_status: string | null;
+  proof_status: string | null;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 /**
- * The Delivery Proof page: the completed work trackers dated in the week on the zone's bleachers
- * (the same zone rule as the panel's tracker counts), each with its proof if it has one.
+ * The Proof of Delivery page: every work tracker dated in the week for the zone's drivers (the same
+ * drivers as Driver Workload), whatever its status, each with its GPS proof's status.
  */
-export function weekProofsQuery(zoneId: string, weekStart: string) {
+export function driverProofsQuery(zoneId: string, weekStart: string, weekEnd: string) {
   return db
     .selectFrom("WorkTrackers as w")
-    .innerJoin("Bleachers as b", "b.id", "w.bleacher_uuid")
-    .leftJoin("Drivers as d", "d.id", "w.driver_uuid")
-    .leftJoin("Users as u", "u.id", "d.user_uuid")
-    .leftJoin("Addresses as a", "a.id", "w.dropoff_address_uuid")
+    .innerJoin("Drivers as d", "d.id", "w.driver_uuid")
+    .innerJoin("Users as u", "u.id", "d.user_uuid")
     .leftJoin("DeliveryProofs as p", "p.work_tracker_uuid", "w.id")
     .select([
-      "w.id as id",
+      "w.driver_uuid as driver_uuid",
       "w.date as date",
-      "w.completed_at as completed_at",
-      "w.bleacher_uuid as bleacher_uuid",
-      "b.bleacher_number as bleacher_number",
-      "u.first_name as driver_first",
-      "u.last_name as driver_last",
-      "a.street as dropoff_street",
-      "a.city as dropoff_city",
-      "p.status as status",
-      "p.final as final",
-      "p.checked_at as checked_at",
-      "p.evidence_at as evidence_at",
-      "p.distance_meters as distance_meters",
-      "p.evidence_place as evidence_place",
-      "p.gps_last_report_at as gps_last_report_at",
+      "w.status as tracker_status",
+      "p.status as proof_status",
+      "u.first_name as first_name",
+      "u.last_name as last_name",
     ])
-    .where("b.zone_uuid", "=", zoneId)
     .where("w.date", ">=", weekStart)
-    .where("w.date", "<=", weekEndOf(weekStart))
-    .where("w.status", "=", "completed")
+    .where("w.date", "<=", weekEnd)
+    .where("w.driver_uuid", "in", driverUuidsInZone(zoneId))
     .compile();
 }
 

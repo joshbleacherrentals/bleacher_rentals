@@ -3,6 +3,7 @@ import { EventDashboardTab } from "@/features/eventDashboard/components/EventDas
 import { EventFulfilmentTab } from "./EventFulfilmentTab";
 import { ModelRunsTab } from "./ModelRunsTab";
 import { DriverSchedulePage } from "./DriverSchedulePage";
+import { DeliveryProofTab } from "@/features/deliveryProof/components/DeliveryProofTab";
 import { EventBleacherRequirementsTab } from "@/features/scheduleValidator/components/EventBleacherRequirementsTab";
 import { EventDataTab } from "@/features/scheduleValidator/components/EventDataTab";
 import { OverbookedBleachersTab } from "@/features/scheduleValidator/components/OverbookedBleachersTab";
@@ -12,7 +13,7 @@ import { DriverAvailabilityTab } from "@/features/scheduleValidator/components/D
 import { DriverDataTab } from "@/features/scheduleValidator/components/DriverDataTab";
 
 /**
- * The component behind each planning page slug. Plan Check and Auto Plan open the same component
+ * The component behind each planning page slug. Verify and Auto Generate open the same component
  * for the same slug, so a check exists once; which slugs a tab may open is in utils/pages.
  */
 export const PLANNING_PAGES: Record<string, ComponentType> = {
@@ -26,5 +27,6 @@ export const PLANNING_PAGES: Record<string, ComponentType> = {
   "driver-availability": DriverAvailabilityTab,
   "driver-data": DriverDataTab,
   "model-runs": ModelRunsTab,
+  "delivery-proof": DeliveryProofTab,
   "driver-schedule": DriverSchedulePage,
 };

@@ -2,7 +2,7 @@ import { Suspense, type ReactNode } from "react";
 import { WorkTrackersTabs } from "@/features/workTrackers/components/WorkTrackersTabs";
 
 /**
- * Work Trackers: the tabs across the top (Weeks, Plan Check, Auto Plan, Proof of Delivery), then
+ * Work Trackers: the tabs across the top (Weeks, Verify, Auto Generate), then
  * the open tab filling the rest of the height. Weeks keeps its own layout in (weeks).
  */
 export default function Layout({ children }: { children: ReactNode }) {

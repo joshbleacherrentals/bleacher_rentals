@@ -76,7 +76,7 @@ function Stat({ value, label }: { value: number; label: string }) {
 }
 
 /**
- * Auto Plan's landing page: the AI planner, front and centre. Pick a zone and week, press Generate,
+ * Auto Generate's landing page: the AI planner, front and centre. Pick a zone and week, press Generate,
  * and planWeek reads the events, finds every trip, gets road times, has the solver place the trips
  * on drivers' days and writes the draft work trackers with their line items. The steps show as they
  * run; the result links to the checks and the run.
@@ -106,7 +106,7 @@ export function AutoPlanLanding() {
     }
   };
 
-  // The checks live in Plan Check, the runs here in Auto Plan.
+  // The checks live in Verify, the runs here in Auto Generate.
   const href = (slug: string) => {
     const area = areaOfSlug(slug) ?? AREAS.auto;
     const page = areaPages(area).find((p) => p.slug === slug) ?? area.home;

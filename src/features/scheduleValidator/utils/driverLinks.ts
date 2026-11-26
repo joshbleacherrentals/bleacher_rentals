@@ -15,7 +15,7 @@ export function driverLinks({
   zoneId,
   fromSlug,
 }: {
-  /** The planning tab the menu is in (Plan Check or Auto Plan). */
+  /** The planning tab the menu is in (Verify or Auto Generate). */
   area: Area;
   userUuid: string;
   /** The Monday of the selected week, "YYYY-MM-DD". */

@@ -5,7 +5,7 @@ import { DriverSchedule } from "@/features/driverSchedule/components/DriverSched
 import { useZoneWeekParams } from "../hooks/useZoneWeekParams";
 import { AREAS, locatePage, scheduleBackHref } from "../utils/pages";
 
-/** One driver's week as a grid, opened from a driver's menu in Plan Check or Auto Plan. */
+/** One driver's week as a grid, opened from a driver's menu in Verify or Auto Generate. */
 export function DriverSchedulePage() {
   const searchParams = useSearchParams();
   const area = locatePage(usePathname())?.area ?? AREAS.check;

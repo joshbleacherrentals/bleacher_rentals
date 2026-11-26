@@ -15,14 +15,13 @@ export type MergedAccessConfig = {
 };
 
 /**
- * Pages inside a prefix some roles have, kept to fewer roles. Work Trackers' planning tabs (Plan
- * Check, Auto Plan, Proof of Delivery) sit under /work-trackers, which the viewer and the
- * accountant open for Weeks, but only administrators and account managers plan.
+ * Pages inside a prefix some roles have, kept to fewer roles. Work Trackers' planning tabs (Verify,
+ * with Proof of Delivery, and Auto Generate) sit under /work-trackers, which the
+ * viewer and the accountant open for Weeks, but only administrators and account managers plan.
  */
 const RESTRICTED_PATHS: { prefix: string; roles: WebRole[] }[] = [
-  { prefix: "/work-trackers/check", roles: ["admin", "account_manager"] },
-  { prefix: "/work-trackers/auto", roles: ["admin", "account_manager"] },
-  { prefix: "/work-trackers/proof", roles: ["admin", "account_manager"] },
+  { prefix: "/work-trackers/verify", roles: ["admin", "account_manager"] },
+  { prefix: "/work-trackers/auto-generate", roles: ["admin", "account_manager"] },
 ];
 
 const ROLE_CONFIG: Record<WebRole, RoleConfig> = {

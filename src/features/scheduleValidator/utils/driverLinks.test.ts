@@ -16,7 +16,7 @@ describe("driverLinks", () => {
       {
         key: "schedule",
         label: "Open driver schedule",
-        href: "/work-trackers/check/driver-schedule?zone=z1&week=2026-09-14&user=u1&from=driver-workload",
+        href: "/work-trackers/verify/driver-schedule?zone=z1&week=2026-09-14&user=u1&from=driver-workload",
         newTab: false,
       },
       { key: "profile", label: "Open driver profile", href: "/team/u1/edit/driver", newTab: true },

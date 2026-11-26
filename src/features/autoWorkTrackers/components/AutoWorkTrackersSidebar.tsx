@@ -9,7 +9,6 @@ import {
   Check,
   House,
   Loader2,
-  MapPinCheck,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,15 +53,41 @@ function CheckBadge({ status }: { status: CheckStatus }) {
   );
 }
 
+/** A page's name in the panel, with its tagline in small text under it. */
+function PageName({
+  label,
+  tagline,
+  active,
+}: {
+  label: string;
+  tagline: string | undefined;
+  active: boolean;
+}) {
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span className="truncate">{label}</span>
+      {tagline && (
+        <span
+          className={cn(
+            "text-[11px] leading-tight font-normal",
+            active ? "text-white/75" : "text-gray-500",
+          )}
+        >
+          {tagline}
+        </span>
+      )}
+    </span>
+  );
+}
+
 const AREA_ICON: Record<AreaKey, typeof Sparkles> = {
   check: ClipboardCheck,
   auto: Sparkles,
-  proof: MapPinCheck,
 };
 
 /**
  * The pinned left-hand panel of a planning tab, styled like the Quotes & Bookings filters: the zone
- * and week, then the tab's pages grouped under headings. Auto Plan adds the model's tracker counts
+ * and week, then the tab's pages grouped under headings. Auto Generate adds the model's tracker counts
  * (and their bulk delete) and Advanced settings. Each heading folds; the one holding the open page
  * stays open.
  */
@@ -163,26 +188,33 @@ export function AutoWorkTrackersSidebar({
                 ) : (
                   <House className="h-4 w-4 shrink-0" />
                 )}
-                {home.label}
+                <PageName
+                  label={home.label}
+                  tagline={home.tagline}
+                  active={activeSlug === home.slug}
+                />
               </Link>
 
               {area.sections.map((section) => {
                 const holdsActive = section.pages.some((p) => p.slug === activeSlug);
-                const open = holdsActive || !folded.has(section.label);
+                // A section with no label is a plain list: no heading, never folded.
+                const open = !section.label || holdsActive || !folded.has(section.label);
                 return (
-                  <div key={section.label} className="mb-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleSection(section.label)}
-                      disabled={holdsActive}
-                      aria-expanded={open}
-                      className="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1 text-xs font-semibold tracking-wide text-gray-500 uppercase hover:bg-gray-200 disabled:cursor-default disabled:hover:bg-transparent"
-                    >
-                      {section.label}
-                      <ChevronDown
-                        className={cn("h-3.5 w-3.5 transition-transform", !open && "-rotate-90")}
-                      />
-                    </button>
+                  <div key={section.label || "pages"} className="mb-2">
+                    {section.label && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.label)}
+                        disabled={holdsActive}
+                        aria-expanded={open}
+                        className="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1 text-xs font-semibold tracking-wide text-gray-500 uppercase hover:bg-gray-200 disabled:cursor-default disabled:hover:bg-transparent"
+                      >
+                        {section.label}
+                        <ChevronDown
+                          className={cn("h-3.5 w-3.5 transition-transform", !open && "-rotate-90")}
+                        />
+                      </button>
+                    )}
                     {open && (
                       <ul className="mt-1 flex flex-col gap-0.5">
                         {section.pages.map((page) => {
@@ -200,7 +232,11 @@ export function AutoWorkTrackersSidebar({
                                     : "text-gray-700 hover:bg-gray-200",
                                 )}
                               >
-                                <span className="truncate">{page.label}</span>
+                                <PageName
+                                  label={page.label}
+                                  tagline={page.tagline}
+                                  active={active}
+                                />
                                 {status && <CheckBadge status={status} />}
                               </Link>
                             </li>

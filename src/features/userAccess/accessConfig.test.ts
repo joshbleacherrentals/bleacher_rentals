@@ -191,10 +191,10 @@ describe("mergeRoleConfigs — the accountant role (Work Trackers and the Accoun
 
   it("keeps Work Trackers' planning tabs to administrators and account managers", () => {
     for (const path of [
-      "/work-trackers/check/dashboard",
-      "/work-trackers/auto",
-      "/work-trackers/auto/model-runs",
-      "/work-trackers/proof",
+      "/work-trackers/verify/dashboard",
+      "/work-trackers/auto-generate",
+      "/work-trackers/auto-generate/model-runs",
+      "/work-trackers/verify/delivery-proof",
     ]) {
       expect(canAccessPath(["admin"], path), path).toBe(true);
       expect(canAccessPath(["account_manager"], path), path).toBe(true);

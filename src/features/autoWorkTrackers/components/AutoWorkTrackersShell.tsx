@@ -11,11 +11,11 @@ import { AutoWorkTrackersSidebar } from "./AutoWorkTrackersSidebar";
 import { ChecksProvider } from "./ChecksProvider";
 
 /**
- * The frame of a planning tab (Plan Check, Auto Plan, Proof of Delivery): the folding side panel
+ * The frame of a planning tab (Verify, Auto Generate): the folding side panel
  * (zone, week and the tab's pages) on the left, and the open page on the right under its title. It
- * stays mounted as the page changes, so the zone, week and panel state carry across pages. Plan
- * Check and Auto Plan run every check once here (ChecksProvider), feeding both the panel's badges
- * and the open page. Auto Plan's landing page draws its own header.
+ * stays mounted as the page changes, so the zone, week and panel state carry across pages. Verify and
+ * Auto Generate run every check once here (ChecksProvider), feeding both the panel's badges
+ * and the open page. Auto Generate's landing page draws its own header.
  */
 export function AutoWorkTrackersShell({
   areaKey,
@@ -46,7 +46,7 @@ export function AutoWorkTrackersShell({
       />
 
       {/* min-w-0 lets this column shrink below its content, so wide pages scroll inside it. */}
-      {/* Auto Plan's landing fills the column edge to edge, so it gets no padding. */}
+      {/* Auto Generate's landing fills the column edge to edge, so it gets no padding. */}
       <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !ownHeader && "p-4")}>
         <div className={cn("flex items-start gap-2", ownHeader && "absolute top-4 left-4 z-10")}>
           {!sidebarOpen && (
@@ -63,7 +63,10 @@ export function AutoWorkTrackersShell({
           )}
           {!ownHeader && (
             <div className="flex-1">
-              <PageHeader title={activePage?.label ?? area.label} />
+              <PageHeader
+                title={activePage?.label ?? area.label}
+                subtitle={activePage?.description}
+              />
             </div>
           )}
         </div>
@@ -74,7 +77,6 @@ export function AutoWorkTrackersShell({
     </div>
   );
 
-  if (areaKey === "proof") return frame;
   return (
     <ChecksProvider zoneId={zoneId} weekStart={weekStart}>
       {frame}

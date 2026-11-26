@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { legacyAutoWorkTrackersHref } from "@/features/autoWorkTrackers/utils/pages";
 
 /**
- * Auto Work Trackers moved into Work Trackers (Plan Check, Auto Plan, Proof of Delivery). Old links
+ * Auto Work Trackers moved into Work Trackers (Verify, Auto Generate). Old links
  * and bookmarks land on the same page there, keeping the zone and week.
  */
 export default async function Page({
