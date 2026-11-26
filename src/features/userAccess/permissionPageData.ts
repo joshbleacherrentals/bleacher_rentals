@@ -449,7 +449,7 @@ export const PERMISSIONS: PermissionEntry[] = [
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Opens the page and reads every vendor. Adds a vendor, edits any field of it including its type, deletes it and restores a deleted one.",
+        "Opens the page and reads every vendor. Adds a vendor, edits any field of it including its type, deletes it and restores a deleted one. Can also add a vendor from the Vendor select of the Edit repair and New repair windows (+ Create vendor), and the new vendor is selected at once.",
       ),
       account_manager: full(
         "Adds, edits, deletes and restores any vendor, with its QuickBooks connection and vendor. Vendors do not belong to a zone, so this is not limited to the drivers an account manager looks after.",
@@ -462,7 +462,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: full(
-        "Adds, edits, deletes and restores any vendor, and can change the address of a vendor, which they otherwise could do only for the address of a repair. Reads the list of QuickBooks connections to link a vendor, but only an administrator can change a connection.",
+        "Adds, edits, deletes and restores any vendor, and can change the address of a vendor, which they otherwise could do only for the address of a repair. Reads the list of QuickBooks connections to link a vendor, but only an administrator can change a connection. Can also add a vendor from the Vendor select of the Edit repair and New repair windows (+ Create vendor), and the new vendor is selected at once.",
       ),
       accountant: full(
         "Adds, edits, deletes and restores any vendor, with its QuickBooks connection and vendor. They also do this from a driver's profile on the Team page.",

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { createSuccessToast } from "@/components/toasts/SuccessToast";
 import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { useClerkSupabaseClient } from "@/utils/supabase/useClerkSupabaseClient";
@@ -49,13 +50,18 @@ export function EditVendorModal({
   defaultType,
   existingVendor,
   readOnly,
+  initialName,
+  onCreated,
+  layerClassName,
 }: EditVendorModalProps) {
   const supabase = useClerkSupabaseClient();
   const mode = vendorWindowMode({ existingVendor, readOnly });
   const locked = mode === "read-only" || mode === "deleted";
   const showQuickBooks = mode !== "read-only";
 
-  const [values, setValues] = useState<VendorFormValues>(() => emptyVendorForm(defaultType));
+  const [values, setValues] = useState<VendorFormValues>(() =>
+    emptyVendorForm(defaultType, initialName),
+  );
   const [addressTouched, setAddressTouched] = useState(false);
   const [addressKey, setAddressKey] = useState(0);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -79,14 +85,14 @@ export function EditVendorModal({
       setLogoUrl(existingVendor.logoUrl);
       setLogoPreview(existingVendor.logoUrl);
     } else {
-      setValues(emptyVendorForm(defaultType));
+      setValues(emptyVendorForm(defaultType, initialName));
       setLogoUrl(null);
       setLogoPreview(null);
     }
     setLogoFile(null);
     setAddressTouched(false);
     setAddressKey((k) => k + 1);
-  }, [existingVendor, defaultType, isOpen]);
+  }, [existingVendor, defaultType, initialName, isOpen]);
 
   const change = (patch: Partial<VendorFormValues>) => setValues((v) => ({ ...v, ...patch }));
 
@@ -179,6 +185,11 @@ export function EditVendorModal({
         onSave(outcome.id);
       }
 
+      // The repair windows select a vendor they have just made (D26).
+      if (outcome.created) {
+        onCreated?.({ id: outcome.id, displayName: values.displayName });
+      }
+
       onClose();
     } catch (error) {
       console.error("Error saving vendor:", error);
@@ -220,7 +231,10 @@ export function EditVendorModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent
+          className={cn("max-h-[90vh] max-w-2xl overflow-y-auto", layerClassName)}
+          overlayClassName={layerClassName}
+        >
           <DialogHeader>
             <DialogTitle>{TITLES[mode]}</DialogTitle>
           </DialogHeader>

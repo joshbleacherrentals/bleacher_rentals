@@ -56,6 +56,21 @@ export type EditVendorModalProps = {
   existingVendor?: VendorRecord | null;
   /** A viewer: every field locked, only Close, no QuickBooks block (D16). */
   readOnly?: boolean;
+  /**
+   * The Display Name a new vendor starts with. The repair windows pass the text typed in the
+   * search of their Vendor select (docs/specs/vendors-page.md D27).
+   */
+  initialName?: string;
+  /**
+   * Called after a new vendor is created, with its id and name. The repair windows select it
+   * (D26). Not called for an edit.
+   */
+  onCreated?: (vendor: { id: string; displayName: string }) => void;
+  /**
+   * Classes for the window's layer, a `z-[...]` class, when it opens over another window: the
+   * repair windows pass theirs, so this one lies over them (D28).
+   */
+  layerClassName?: string;
 };
 
 export const VENDOR_TYPES: readonly VendorType[] = ["driver", "repairs"];
@@ -87,10 +102,10 @@ export type VendorFormValues = {
   notes: string;
 };
 
-/** D10: a new vendor starts on the given Type, or on none. */
-export function emptyVendorForm(defaultType?: VendorType): VendorFormValues {
+/** D10: a new vendor starts on the given Type, or on none; D27: and on the given name, or none. */
+export function emptyVendorForm(defaultType?: VendorType, displayName = ""): VendorFormValues {
   return {
-    displayName: "",
+    displayName,
     type: defaultType ?? "",
     status: "",
     qboConnectionUuid: null,

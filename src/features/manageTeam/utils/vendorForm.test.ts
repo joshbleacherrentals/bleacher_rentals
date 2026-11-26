@@ -70,6 +70,13 @@ describe("emptyVendorForm", () => {
     expect(emptyVendorForm("driver").type).toBe("driver");
   });
 
+  it("starts with the given Display Name, as the repair windows pass the text typed in the search", () => {
+    const f = emptyVendorForm("repairs", "Dallas Trailer");
+    expect(f.displayName).toBe("Dallas Trailer");
+    expect(f.type).toBe("repairs");
+    expect(emptyVendorForm("repairs").displayName).toBe("");
+  });
+
   it("starts with every text empty, every service off and no address", () => {
     const f = emptyVendorForm();
     expect(f).toMatchObject({

@@ -1492,6 +1492,17 @@ describe("Vendors", () => {
     expect(row?.description).toMatch(/Repairs for repair and parts companies/);
   });
 
+  // docs/specs/vendors-page.md §11 (D25): the repair windows' Vendor select can create a vendor, for
+  // the two roles that edit a repair.
+  it("tells an administrator and a maintainer they can create a vendor from the repair windows", () => {
+    for (const role of ["admin", "maintainer"] as const) {
+      expect(row?.roles[role].note, role).toMatch(
+        /Vendor select of the Edit repair and New repair windows/,
+      );
+      expect(row?.roles[role].note, role).toMatch(/\+ Create vendor/);
+    }
+  });
+
   it("is named in the descriptions of the maintainer and the accountant, so 'everything else is hidden' stays true", () => {
     expect(ROLE_DESCRIPTIONS.maintainer).toContain("Vendors page");
     expect(ROLE_DESCRIPTIONS.accountant).toContain("Vendors page");

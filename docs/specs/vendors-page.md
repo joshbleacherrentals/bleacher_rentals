@@ -555,3 +555,46 @@ SQL test green in a rolled-back transaction through the Docker `psql`; prettier 
 touched files only (`npm run format` rewrites unrelated files); `npm run test:e2e` marked SKIPPED
 with the reason (the user does not run Playwright locally). The migration is applied to the local
 database and is not deployed.
+
+## 11. Amendment 2026-11-26: "+ Create vendor" in the Vendor select of the repair windows
+
+**The request (user, 2026-11-26, translated).** In the Vendor select of the repair windows, choose a
+vendor, with the ability to create a new one through "+ Create vendor". Decisions, each an answer
+of the user to a question with neutral options:
+
+- **D25:** the Vendor list of the Edit repair and the New repair windows has a pinned last row,
+  "+ Create vendor". It stays there when the search finds nothing, and it opens the vendor window
+  for a new vendor. Only an administrator and a maintainer can edit a repair, so only they see it;
+  nothing changes in who may create a vendor (D5).
+- **D26:** the vendor window has one Save button, with no Save & Assign. Save creates the vendor
+  and the repair's Vendor field selects it at once. In New repair the currency still follows the
+  new vendor's country, as it does for any vendor picked there.
+- **D27:** the Display Name of the new vendor starts with the text typed in the list's search.
+- **D28:** the Type starts on Repairs and can be changed. The vendor window lies over the repair
+  window, on the same layer the repair windows use for their own dialogs.
+
+**Changes to what §4 locked.** Each is optional, so no existing caller changes.
+
+- `EditVendorModalProps` gets `initialName` (D27), `onCreated` (called with the new vendor's id and
+  name after a vendor is created, not after an edit; D26) and `layerClassName` (a `z-[...]` class
+  for the window and its overlay; D28).
+- `emptyVendorForm` gets a second parameter, the starting Display Name.
+- `SearchableSelect` gets `onOpenChange`, because its search box starts empty each time the list
+  opens, and the text kept for D27 must start empty with it.
+- `repairForm.ts` gets `CREATE_VENDOR_LABEL`, `vendorCreateFooter` and `withCreatedVendor`. The
+  last adds the new vendor to the select's options, so its name shows before the live list of
+  vendors has caught up with the write.
+- `RepairFormFields` gets the optional `onCreateVendor`. The hook `useCreateVendorWindow` holds
+  the state of the vendor window for both repair windows, which draw its `window` next to their
+  service windows. The other callers of the form show no such row.
+
+**Tests.** `repairForm.test.ts` (the row, the typed text, the added vendor), `vendorForm.test.ts`
+(the starting name), `permissionPageData.test.ts` (the two notes). End to end: S10 in
+`vendorsFromRepair.admin.spec.ts`, written, not run: the New repair window, the search text, the
+row, the window over the repair window on Repairs, one Save, the select showing the vendor.
+
+**The matrix.** The notes of the administrator and the maintainer on the row Vendors say they can
+also add a vendor from the Vendor select of the Edit repair and New repair windows.
+
+**Files.** 7 counted: `useCreateVendorWindow.tsx` (new), `RepairWindow.tsx`, `RepairForm.tsx`,
+`EditVendorModal.tsx`, `vendorForm.ts`, `repairForm.ts` and `SearchableSelect.tsx`.
