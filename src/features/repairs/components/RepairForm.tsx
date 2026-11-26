@@ -1,13 +1,14 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Dropdown } from "@/components/DropDown";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { REPAIR_POPOVER_CLASS } from "../utils/repairLayer";
 import { statusPill } from "../utils/repairFormat";
-import type {
-  RepairFormErrors,
-  RepairFormField,
-  RepairFormValues,
-  VendorSelectOption,
+import {
+  vendorCreateFooter,
+  type RepairFormErrors,
+  type RepairFormField,
+  type RepairFormValues,
+  type VendorSelectOption,
 } from "../utils/repairForm";
 import type { RepairCurrency, RepairStatus } from "../utils/repairRows";
 import { REPAIR_STATUSES } from "../utils/repairStatus";
@@ -47,6 +48,11 @@ export type RepairFormFieldsProps = {
   completedOn: string | null; // read-only
   disabled: boolean; // while Save runs
   onChange: <K extends RepairFormField>(field: K, value: RepairFormValues[K]) => void;
+  /**
+   * Opens the vendor window from the "+ Create vendor" row of the Vendor list, with the text typed
+   * in the list's search. Absent: the list has no such row (docs/specs/vendors-page.md D25).
+   */
+  onCreateVendor?: (typedName: string) => void;
 };
 
 /**
@@ -105,8 +111,11 @@ export function RepairFormFields({
   completedOn,
   disabled,
   onChange,
+  onCreateVendor,
 }: RepairFormFieldsProps) {
   const vendorOptions = [{ value: NO_VENDOR, label: "No vendor" }, ...vendors];
+  // What is typed in the Vendor list's search; it empties each time the list opens (D27).
+  const typedVendor = useRef("");
 
   return (
     <div className="grid grid-cols-2 gap-x-6 gap-y-[18px] sm:grid-cols-4">
@@ -119,6 +128,13 @@ export function RepairFormFields({
           placeholder="Select a vendor"
           searchPlaceholder="Search vendors..."
           disabled={disabled}
+          footerItem={vendorCreateFooter(onCreateVendor, () => typedVendor.current)}
+          onSearchChange={(query) => {
+            typedVendor.current = query;
+          }}
+          onOpenChange={(open) => {
+            if (open) typedVendor.current = "";
+          }}
         />
         {mode === "new" && (
           <p className="mt-1 text-[13px] leading-[18px] text-[#6b7280]">

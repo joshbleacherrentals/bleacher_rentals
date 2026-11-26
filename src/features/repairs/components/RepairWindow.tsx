@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useTeamPermissions } from "@/features/manageTeam/hooks/useTeamPermissions";
 import { useTimezoneStore } from "@/lib/useTimezoneStore";
 import { readVendorCountry } from "../db/repairWrite";
+import { useCreateVendorWindow } from "../hooks/useCreateVendorWindow";
 import { useVendorAddress } from "../hooks/useRepairDetails";
 import { repairLabel, reportsButtonLabel } from "../utils/repairDetails";
 import {
@@ -33,6 +34,7 @@ import {
   nextCurrencyForVendor,
   repairFormFromRow,
   vendorSelectOptions,
+  withCreatedVendor,
   type RepairFormErrors,
   type RepairFormField,
   type RepairFormValues,
@@ -788,10 +790,15 @@ function RepairEditBody({
   });
   const { dirty } = draft;
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
+  // "+ Create vendor" in the Vendor list: the new vendor is selected in the draft (spec vendors-page §11).
+  const createVendor = useCreateVendorWindow((vendor) => draft.change("vendorUuid", vendor.id));
   const vendorOptions = useMemo(
     () =>
-      vendorSelectOptions(editing.vendors, { uuid: initial.vendorUuid, name: repair.vendorName }),
-    [editing.vendors, initial.vendorUuid, repair.vendorName],
+      withCreatedVendor(
+        vendorSelectOptions(editing.vendors, { uuid: initial.vendorUuid, name: repair.vendorName }),
+        createVendor.created,
+      ),
+    [editing.vendors, initial.vendorUuid, repair.vendorName, createVendor.created],
   );
   // The window shows the repair with the services of the draft, and the draft's currency (D163).
   const lookups = useMemo(
@@ -837,6 +844,7 @@ function RepairEditBody({
             completedOn={repair.completedOn}
             disabled={draft.saving}
             onChange={draft.change}
+            onCreateVendor={createVendor.openCreate}
           />
         }
       />
@@ -862,6 +870,7 @@ function RepairEditBody({
         onOpenReports={editing.onOpenServiceReports}
         onClose={() => setServiceWindow(null)}
       />
+      {createVendor.window}
     </>
   );
 }
@@ -1052,13 +1061,22 @@ export function NewRepairWindow({
   });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [serviceWindow, setServiceWindow] = useState<DraftServiceWindowState>(start.serviceWindow);
+  // "+ Create vendor" in the Vendor list: the new vendor is selected in the draft (spec vendors-page §11).
+  const createVendor = useCreateVendorWindow((vendor) => draft.change("vendorUuid", vendor.id));
   const vendorOptions = useMemo(
-    () => vendorSelectOptions(vendors, { uuid: null, name: null }),
-    [vendors],
+    () =>
+      withCreatedVendor(
+        vendorSelectOptions(vendors, { uuid: null, name: null }),
+        createVendor.created,
+      ),
+    [vendors, createVendor.created],
   );
   const lookups = useMemo(() => serviceLookups(bleachers, categories), [bleachers, categories]);
   const vendorName =
-    vendors.find((vendor) => vendor.value === draft.values.vendorUuid)?.label ?? null;
+    vendors.find((vendor) => vendor.value === draft.values.vendorUuid)?.label ??
+    (createVendor.created?.id === draft.values.vendorUuid
+      ? createVendor.created.displayName
+      : null);
   const shown = useMemo(
     () => newRepairDisplayRow({ values: draft.values, vendorName, draft: draft.services, lookups }),
     [draft.values, vendorName, draft.services, lookups],
@@ -1096,6 +1114,7 @@ export function NewRepairWindow({
                 completedOn={null}
                 disabled={draft.saving}
                 onChange={draft.change}
+                onCreateVendor={createVendor.openCreate}
               />
             </div>
             <RepairServicesSection
@@ -1135,6 +1154,7 @@ export function NewRepairWindow({
         onOpenReports={() => {}}
         onClose={() => setServiceWindow(null)}
       />
+      {createVendor.window}
     </>
   );
 }

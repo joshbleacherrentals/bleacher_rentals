@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// docs/specs/accountant-team.md §5: an accountant may READ the list of QuickBooks connections (the
-// vendor modal needs it); creating, renaming, retargeting and deleting one stays admin-only.
+// docs/specs/accountant-team.md §5 and docs/specs/vendors-page.md D14: an accountant, an account
+// manager and a maintainer may READ the list of QuickBooks connections (the vendor window needs
+// it); creating, renaming, retargeting and deleting one stays admin-only.
 
 const requireAdmin = vi.fn(async () => "clerk_admin");
-const requireAdminOrAccountant = vi.fn(async () => "clerk_user");
+const requireQboConnectionsReader = vi.fn(async () => "clerk_user");
 
 vi.mock("@/features/userAccess/logic/requireAdmin", () => ({
   requireAdmin: (...args: unknown[]) => (requireAdmin as any)(...args),
 }));
-vi.mock("@/features/userAccess/logic/requireAdminOrAccountant", () => ({
-  requireAdminOrAccountant: (...args: unknown[]) => (requireAdminOrAccountant as any)(...args),
+vi.mock("@/features/userAccess/logic/requireQboConnectionsReader", () => ({
+  requireQboConnectionsReader: (...args: unknown[]) =>
+    (requireQboConnectionsReader as any)(...args),
 }));
 
 const getAllQboConnections = vi.fn(async () => [
@@ -55,20 +57,20 @@ describe("/api/quickbooks/connections", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireAdmin.mockImplementation(async () => "clerk_admin");
-    requireAdminOrAccountant.mockImplementation(async () => "clerk_user");
+    requireQboConnectionsReader.mockImplementation(async () => "clerk_user");
   });
 
-  it("GET is guarded for an admin or an accountant, not for an admin only", async () => {
+  it("GET is guarded for the readers of the connections, not for an admin only", async () => {
     const res = await GET();
 
     expect(res.status).toBe(200);
     expect((await res.json()).connections).toHaveLength(1);
-    expect(requireAdminOrAccountant).toHaveBeenCalledTimes(1);
+    expect(requireQboConnectionsReader).toHaveBeenCalledTimes(1);
     expect(requireAdmin).not.toHaveBeenCalled();
   });
 
-  it("GET answers 403 for a role that is neither, and reads nothing", async () => {
-    requireAdminOrAccountant.mockImplementation(async () => {
+  it("GET answers 403 for a role that may not read them, and reads nothing", async () => {
+    requireQboConnectionsReader.mockImplementation(async () => {
       throw forbidden();
     });
 
@@ -87,7 +89,7 @@ describe("/api/quickbooks/connections", () => {
 
     expect(res.status).toBe(403);
     expect(requireAdmin).toHaveBeenCalledTimes(1);
-    expect(requireAdminOrAccountant).not.toHaveBeenCalled();
+    expect(requireQboConnectionsReader).not.toHaveBeenCalled();
   });
 
   it("PATCH stays admin-only", async () => {
@@ -99,7 +101,7 @@ describe("/api/quickbooks/connections", () => {
 
     expect(res.status).toBe(403);
     expect(requireAdmin).toHaveBeenCalledTimes(1);
-    expect(requireAdminOrAccountant).not.toHaveBeenCalled();
+    expect(requireQboConnectionsReader).not.toHaveBeenCalled();
   });
 
   // docs/specs/qbo-invoice-03c-no-tax-code.md §4: the "no tax" code of a connection, saved by an
@@ -175,6 +177,6 @@ describe("/api/quickbooks/connections", () => {
 
     expect(res.status).toBe(403);
     expect(requireAdmin).toHaveBeenCalledTimes(1);
-    expect(requireAdminOrAccountant).not.toHaveBeenCalled();
+    expect(requireQboConnectionsReader).not.toHaveBeenCalled();
   });
 });

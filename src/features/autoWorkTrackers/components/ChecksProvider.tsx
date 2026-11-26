@@ -23,6 +23,11 @@ import type { DriverWorkload } from "@/features/scheduleValidator/utils/driverWo
 import type { DriverAvailability } from "@/features/scheduleValidator/utils/driverAvailability";
 import type { DriverData } from "@/features/scheduleValidator/utils/driverData";
 import { buildDeliveryList, type EventDeliveries } from "../utils/deliveryList";
+import { useDriverProofs } from "@/features/deliveryProof/hooks/useDriverProofs";
+import {
+  summarizeDeliveryProof,
+  type DriverProofs,
+} from "@/features/deliveryProof/logic/proofList";
 import { zoneWeekEvents } from "../utils/zoneEvents";
 import {
   summarizeDriverAvailability,
@@ -52,6 +57,7 @@ type Checks = {
   driverData: { drivers: DriverData[]; isLoading: boolean };
   eventData: { events: EventData[]; isLoading: boolean };
   bleacherData: { moves: BleacherMove[]; eventNames: Map<string, string>; isLoading: boolean };
+  deliveryProof: { drivers: DriverProofs[]; isLoading: boolean };
   /** Keyed by page slug; a page with no entry (the Dashboard) is a view, not a check. */
   statuses: Record<string, CheckStatus>;
 };
@@ -101,6 +107,7 @@ export function ChecksProvider({
   const workload = useDriverWorkload(zoneId, weekStart);
   const availability = useDriverAvailability(zoneId, weekStart);
   const driverData = useDriverData(zoneId);
+  const proofs = useDriverProofs(zoneId, weekStart);
 
   const value = useMemo<Checks>(() => {
     const requirementsLoading = !!zoneId && (logistics.isLoading || eventsBleachers.isLoading);
@@ -122,6 +129,7 @@ export function ChecksProvider({
         eventNames: bleacherMoves.eventNames,
         isLoading: bleacherMoves.isLoading,
       },
+      deliveryProof: { drivers: proofs.drivers, isLoading: proofs.isLoading },
       statuses: {
         "event-fulfilment": {
           isLoading: !!zoneId && logistics.isLoading,
@@ -157,6 +165,10 @@ export function ChecksProvider({
           isLoading: !!zoneId && driverData.isLoading,
           summary: zoneId ? summarizeDriverData(driverData.drivers) : null,
         },
+        "delivery-proof": {
+          isLoading: !!zoneId && proofs.isLoading,
+          summary: zoneId ? summarizeDeliveryProof(proofs.drivers) : null,
+        },
       },
     };
   }, [
@@ -181,12 +193,19 @@ export function ChecksProvider({
     bleacherMoves.moves,
     bleacherMoves.eventNames,
     bleacherMoves.isLoading,
+    proofs.drivers,
+    proofs.isLoading,
   ]);
 
   return <ChecksContext.Provider value={value}>{children}</ChecksContext.Provider>;
 }
 
 /** The checks run by the surrounding ChecksProvider (the Auto Work Trackers shell). */
+/** The checks, or null outside a ChecksProvider (Proof of Delivery runs none). */
+export function useChecksOrNull(): Checks | null {
+  return useContext(ChecksContext);
+}
+
 export function useChecks(): Checks {
   const checks = useContext(ChecksContext);
   if (!checks) throw new Error("useChecks must be used inside ChecksProvider");

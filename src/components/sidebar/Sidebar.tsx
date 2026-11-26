@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { SideNavButton } from "./SideNavButton";
 import { SideNavDropdown } from "./SideNavDropdown";
 import { useUserAccess } from "@/features/userAccess/client";
+import { pathMatches } from "@/features/userAccess/logic/pathMatches";
 import { useSidebarItems, type SidebarItemConfig } from "./useSidebarItems";
 import { useHasUnreadChangelog } from "@/features/changelog/hooks/useHasUnreadChangelog";
 import { useUnseenInspectionCount } from "@/features/annualInspections/db/annualInspections";
@@ -55,7 +56,7 @@ const SideNavSection = ({
   children: React.ReactNode;
 }) => {
   const hasActiveChild = item.children.some(
-    (child) => child.type === "button" && pathname.startsWith(child.href),
+    (child) => child.type === "button" && pathMatches(child.href, pathname),
   );
 
   const [isOpen, setIsOpen] = useState(hasActiveChild);

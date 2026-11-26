@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard &amp; Analytics - 2026</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+button{font-family:inherit}
+.da-h{font-size:12px;line-height:16px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#6b7280}
+.da-card{border:1px solid #e5e7eb;border-radius:10px;background:#ffffff}
+.da-row{display:grid;align-items:center;column-gap:16px;padding:10px 20px;border-top:1px solid #f3f4f6;font-size:14px;line-height:20px;color:#111827}
+.da-head{background:#f9fafb;border-top:0;border-bottom:1px solid #e5e7eb}
+.da-total{background:#f9fafb;border-top:1px solid #e5e7eb;font-weight:600}
+.da-n{text-align:right;font-variant-numeric:tabular-nums}
+.da-tbl{min-width:760px}
+.da-zones{grid-template-columns:minmax(0,1.6fr) repeat(5,minmax(0,1fr))}
+.da-models{grid-template-columns:72px minmax(0,1.6fr) repeat(4,minmax(0,1fr))}
+.da-cats{grid-template-columns:minmax(0,1.3fr) repeat(4,minmax(0,1fr)) minmax(0,1.8fr)}
+.da-vendors{grid-template-columns:minmax(0,2fr) repeat(5,minmax(0,1fr))}
+.da-yearbtn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;background:#ffffff;color:#10365a;font-size:14px;line-height:20px;font-weight:600;cursor:pointer}
+.da-yearbtn:hover{background:#f3f4f6}
+.da-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:36px;padding:0 12px;box-sizing:border-box;border:0;background:#ffffff;color:#111827;font-size:14px;line-height:20px;text-align:left;cursor:pointer}
+.da-opt:hover{background:#f3f4f6}
+</style>
+</helmet>
+<div style="max-width: 1440px; margin: 0 auto; padding: 24px; box-sizing: border-box; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; color: #111827; background: #ffffff; display: flex; flex-direction: column; gap: 24px;">
+
+<div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 16px;">
+<div>
+<h1 style="margin: 0; font-size: 24px; line-height: 32px; font-weight: 700; color: #10365a;">Dashboard &amp; Analytics</h1>
+<p style="margin: 0; font-size: 14px; line-height: 20px; color: #6b7280;">Maintenance spend, readiness and cost breakdowns across the bleachers</p>
+</div>
+<div style="position: relative;">
+<button type="button" class="da-yearbtn" aria-haspopup="listbox" aria-expanded="{{ yearOpen }}" aria-label="Period" onClick="{{ toggleYear }}">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path></svg>
+<span>{{ yearLabel }}</span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+<sc-if value="{{ yearOpen }}" hint-placeholder-val="{{ false }}">
+<div role="listbox" aria-label="Period" style="position: absolute; right: 0; top: 44px; z-index: 5; width: 180px; padding: 4px 0; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; box-shadow: 0 10px 24px rgba(16,54,90,.14);">
+<sc-for list="{{ yearOptions }}" as="opt" hint-placeholder-count="3">
+<button type="button" role="option" class="da-opt" aria-selected="{{ opt.checked }}" onClick="{{ opt.pick }}">
+<span>{{ opt.label }}</span>
+<sc-if value="{{ opt.checked }}" hint-placeholder-val="{{ false }}">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10365a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+</sc-if>
+</button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</div>
+
+<sc-if value="{{ showLoadingNote }}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: #4b5563;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.2-8.55"></path></svg>
+<span>Reading repairs and exchange rates</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ showCadNote }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: #4b5563;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+<span>{{ cadNoteText }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ showNoRate }}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; font-size: 13px; line-height: 18px; color: #92400e;">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 1px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+<span>{{ noRateText }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+<div aria-busy="true" style="display: flex; flex-direction: column; gap: 24px;">
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<sc-for list="{{ skeletonCards }}" as="s" hint-placeholder-count="5">
+<div class="da-card" style="flex: 1 1 230px; min-width: 0; padding: 16px 20px; box-sizing: border-box;">
+<div style="width: 60%; height: 12px; border-radius: 4px; background: #f3f4f6;"></div>
+<div style="width: 45%; height: 28px; margin-top: 12px; border-radius: 4px; background: #e5e7eb;"></div>
+<div style="width: 75%; height: 12px; margin-top: 12px; border-radius: 4px; background: #f3f4f6;"></div>
+</div>
+</sc-for>
+</div>
+<sc-for list="{{ skeletonBlocks }}" as="s" hint-placeholder-count="5">
+<div class="da-card" style="padding: 20px; box-sizing: border-box;">
+<div style="width: 320px; max-width: 70%; height: 16px; border-radius: 4px; background: #e5e7eb;"></div>
+<div style="height: 12px; margin-top: 20px; border-radius: 4px; background: #f3f4f6;"></div>
+<div style="height: 12px; margin-top: 14px; border-radius: 4px; background: #f3f4f6;"></div>
+<div style="height: 12px; margin-top: 14px; border-radius: 4px; background: #f3f4f6;"></div>
+<div style="width: 60%; height: 12px; margin-top: 14px; border-radius: 4px; background: #f3f4f6;"></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ notLoading }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 24px;">
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<div class="da-card" style="flex: 1 1 230px; min-width: 0; padding: 16px 20px; box-sizing: border-box;">
+<div class="da-h">Total Fleet Maintenance Spend</div>
+<div style="font-size: 28px; line-height: 36px; font-weight: 600; color: #10365a; font-variant-numeric: tabular-nums;">{{ cardTotal }}</div>
+<div style="font-size: 13px; line-height: 18px; color: #6b7280;">{{ cardTotalNote }}</div>
+</div>
+<div class="da-card" style="flex: 1 1 230px; min-width: 0; padding: 16px 20px; box-sizing: border-box;">
+<div class="da-h">Bleachers Ready</div>
+<div style="font-size: 28px; line-height: 36px; font-weight: 600; color: #10365a; font-variant-numeric: tabular-nums;">{{ cardReady }}</div>
+<div style="font-size: 13px; line-height: 18px; color: #6b7280;">{{ cardReadyNote }}</div>
+</div>
+<div class="da-card" style="flex: 1 1 230px; min-width: 0; padding: 16px 20px; box-sizing: border-box;">
+<div class="da-h">Avg Maint Spend / Bleacher</div>
+<div style="font-size: 28px; line-height: 36px; font-weight: 600; color: #10365a; font-variant-numeric: tabular-nums;">{{ cardAvg }}</div>
+<div style="font-size: 13px; line-height: 18px; color: #6b7280;">{{ cardAvgNote }}</div>
+</div>
+<div class="da-card" style="flex: 1 1 230px; min-width: 0; padding: 16px 20px; box-sizing: border-box;">
+<div class="da-h">Active Open Work Orders</div>
+<div style="font-size: 28px; line-height: 36px; font-weight: 600; color: #10365a; font-variant-numeric: tabular-nums;">{{ cardOpen }}</div>
+<div style="font-size: 13px; line-height: 18px; color: #6b7280;">{{ cardOpenNote }}</div>
+</div>
+<div class="da-card" style="flex: 1 1 230px; min-width: 0; padding: 16px 20px; box-sizing: border-box;">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+<div class="da-h">Annual Budget Utilization</div>
+<sc-if value="{{ budgetOver }}" hint-placeholder-val="{{ false }}">
+<span style="display: inline-block; padding: 1px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: 12px; line-height: 18px; font-weight: 600; white-space: nowrap;">Over budget</span>
+</sc-if>
+</div>
+<div style="font-size: 28px; line-height: 36px; font-weight: 600; color: {{ budgetValueColor }}; font-variant-numeric: tabular-nums;">{{ cardBudget }}</div>
+<div style="height: 6px; margin: 4px 0 8px; border-radius: 3px; background: #e5e7eb; overflow: hidden;"><div style="height: 100%; width: {{ budgetBarW }}; background: {{ budgetBarColor }};"></div></div>
+<div style="font-size: 13px; line-height: 18px; color: {{ budgetLineColor }};">{{ budgetLine1 }}</div>
+<div style="font-size: 13px; line-height: 18px; color: #6b7280;">{{ budgetLine2 }}</div>
+</div>
+</div>
+
+<section class="da-card" aria-labelledby="zones-h" style="overflow: hidden;">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding: 16px 20px;">
+<h2 id="zones-h" style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #10365a;">Operating Zone Cost &amp; Fleet Maintenance Cost</h2>
+<span style="font-size: 13px; line-height: 18px; color: #6b7280;">Repairs with no zone are counted in Unassigned</span>
+</div>
+<div style="overflow-x: auto;">
+<div role="table" aria-label="Maintenance cost by operating zone" class="da-tbl">
+<div role="row" class="da-row da-head da-zones">
+<div role="columnheader" class="da-h">Operating Zone</div>
+<div role="columnheader" class="da-h da-n">Assigned Units</div>
+<div role="columnheader" class="da-h da-n">Total Work Orders</div>
+<div role="columnheader" class="da-h da-n">Total Maintenance Cost</div>
+<div role="columnheader" class="da-h da-n">Average Cost / Unit</div>
+<div role="columnheader" class="da-h da-n">% of Total Spend</div>
+</div>
+<sc-for list="{{ zones }}" as="z" hint-placeholder-count="9">
+<div role="row" class="da-row da-zones">
+<div role="cell">{{ z.name }}</div>
+<div role="cell" class="da-n">{{ z.units }}</div>
+<div role="cell" class="da-n">{{ z.wo }}</div>
+<div role="cell" class="da-n">{{ z.cost }}</div>
+<div role="cell" class="da-n">{{ z.avg }}</div>
+<div role="cell" class="da-n">{{ z.pct }}</div>
+</div>
+</sc-for>
+<div role="row" class="da-row da-total da-zones">
+<div role="cell">Total / Fleet Summary</div>
+<div role="cell" class="da-n">{{ zonesTotal.units }}</div>
+<div role="cell" class="da-n">{{ zonesTotal.wo }}</div>
+<div role="cell" class="da-n">{{ zonesTotal.cost }}</div>
+<div role="cell" class="da-n">{{ zonesTotal.avg }}</div>
+<div role="cell" class="da-n">{{ zonesTotal.pct }}</div>
+</div>
+</div>
+</div>
+</section>
+
+<section class="da-card" aria-labelledby="models-h" style="overflow: hidden;">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding: 16px 20px;">
+<h2 id="models-h" style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #10365a;">Top High-Cost Models</h2>
+<span style="font-size: 13px; line-height: 18px; color: #6b7280;">The five models with the highest maintenance cost</span>
+</div>
+<sc-if value="{{ showModels }}" hint-placeholder-val="{{ true }}">
+<div style="overflow-x: auto;">
+<div role="table" aria-label="Top high-cost models" class="da-tbl">
+<div role="row" class="da-row da-head da-models">
+<div role="columnheader" class="da-h">Rank</div>
+<div role="columnheader" class="da-h">Model</div>
+<div role="columnheader" class="da-h da-n">Assigned Units</div>
+<div role="columnheader" class="da-h da-n">Avg Cost / Unit</div>
+<div role="columnheader" class="da-h da-n">Repairs</div>
+<div role="columnheader" class="da-h da-n">Cost</div>
+</div>
+<sc-for list="{{ models }}" as="m" hint-placeholder-count="5">
+<div role="row" class="da-row da-models">
+<div role="cell" style="color: #6b7280;">{{ m.rank }}</div>
+<div role="cell">{{ m.model }}</div>
+<div role="cell" class="da-n">{{ m.units }}</div>
+<div role="cell" class="da-n">{{ m.avg }}</div>
+<div role="cell" class="da-n">{{ m.rep }}</div>
+<div role="cell" class="da-n">{{ m.cost }}</div>
+</div>
+</sc-for>
+<div role="row" class="da-row da-total da-models">
+<div role="cell"></div>
+<div role="cell">Top 5 Models Total</div>
+<div role="cell" class="da-n">{{ modelsTotal.units }}</div>
+<div role="cell" class="da-n">{{ modelsTotal.avg }}</div>
+<div role="cell" class="da-n">{{ modelsTotal.rep }}</div>
+<div role="cell" class="da-n">{{ modelsTotal.cost }}</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ showModelsEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="padding: 28px 20px 32px; border-top: 1px solid #f3f4f6; text-align: center;">
+<div style="font-size: 15px; line-height: 22px; font-weight: 600; color: #374151;">{{ modelsEmptyTitle }}</div>
+<div style="margin-top: 4px; font-size: 13px; line-height: 18px; color: #6b7280;">{{ modelsEmptySub }}</div>
+</div>
+</sc-if>
+</section>
+
+<section class="da-card" aria-labelledby="cats-h" style="overflow: hidden;">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding: 16px 20px;">
+<h2 id="cats-h" style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #10365a;">Unit Damage Category &amp; Expense Breakdown</h2>
+<span style="font-size: 13px; line-height: 18px; color: #6b7280;">A repair with two categories counts in both</span>
+</div>
+<div style="overflow-x: auto;">
+<div role="table" aria-label="Expense by damage category" class="da-tbl">
+<div role="row" class="da-row da-head da-cats">
+<div role="columnheader" class="da-h">Failure Category</div>
+<div role="columnheader" class="da-h da-n">Number of Repairs</div>
+<div role="columnheader" class="da-h da-n">Total Expense</div>
+<div role="columnheader" class="da-h da-n">Avg Cost / Job</div>
+<div role="columnheader" class="da-h da-n">% Fleet Spend</div>
+<div role="columnheader" class="da-h">Largest Spend Vendor</div>
+</div>
+<sc-for list="{{ cats }}" as="c" hint-placeholder-count="9">
+<div role="row" class="da-row da-cats">
+<div role="cell">{{ c.name }}</div>
+<div role="cell" class="da-n">{{ c.n }}</div>
+<div role="cell" class="da-n">{{ c.expense }}</div>
+<div role="cell" class="da-n">{{ c.avg }}</div>
+<div role="cell" class="da-n">{{ c.pct }}</div>
+<div role="cell">{{ c.vendor }}</div>
+</div>
+</sc-for>
+<div role="row" class="da-row da-total da-cats">
+<div role="cell">Total Category Spend</div>
+<div role="cell" class="da-n">{{ catsTotal.n }}</div>
+<div role="cell" class="da-n">{{ catsTotal.expense }}</div>
+<div role="cell" class="da-n">{{ catsTotal.avg }}</div>
+<div role="cell" class="da-n">{{ catsTotal.pct }}</div>
+<div role="cell"></div>
+</div>
+</div>
+</div>
+</section>
+
+<section class="da-card" aria-labelledby="chart-h" style="overflow: hidden;">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding: 16px 20px;">
+<h2 id="chart-h" style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #10365a;">Maintenance Spend by Category</h2>
+<span style="font-size: 13px; line-height: 18px; color: #6b7280;">Total expense per damage category, USD</span>
+</div>
+<sc-if value="{{ showChart }}" hint-placeholder-val="{{ true }}">
+<div style="padding: 8px 20px 20px; overflow-x: auto;">
+<div style="min-width: 760px;">
+<div style="position: relative; height: 300px; margin-left: 56px;">
+<sc-for list="{{ ticks }}" as="t" hint-placeholder-count="4">
+<div style="position: absolute; left: 0; right: 0; bottom: {{ t.bottom }}; height: 0; border-top: 1px solid #e5e7eb;">
+<span style="position: absolute; left: -56px; top: -9px; width: 48px; text-align: right; font-size: 12px; line-height: 16px; color: #6b7280; font-variant-numeric: tabular-nums;">{{ t.label }}</span>
+</div>
+</sc-for>
+<div style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: flex-end; gap: 16px; padding: 0 8px; box-sizing: border-box;">
+<sc-for list="{{ bars }}" as="b" hint-placeholder-count="9">
+<div style="flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px;">
+<span style="font-size: 12px; line-height: 16px; color: #374151; font-variant-numeric: tabular-nums;">{{ b.value }}</span>
+<div style="width: 100%; max-width: 72px; height: {{ b.h }}; background: #10365a; border-radius: 4px 4px 0 0;"></div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; gap: 16px; padding: 8px 8px 0 64px; box-sizing: border-box;">
+<sc-for list="{{ bars }}" as="b" hint-placeholder-count="9">
+<div style="flex: 1 1 0; min-width: 0; text-align: center; font-size: 12px; line-height: 16px; color: #4b5563;">{{ b.name }}</div>
+</sc-for>
+</div>
+<div style="margin-top: 12px; text-align: center; font-size: 12px; line-height: 16px; letter-spacing: .05em; text-transform: uppercase; color: #6b7280;">Damage category</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ showChartEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="padding: 28px 20px 32px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 14px; line-height: 20px; color: #6b7280;">{{ chartEmptyText }}</div>
+</sc-if>
+</section>
+
+<section class="da-card" aria-labelledby="vendors-h" style="overflow: hidden;">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding: 16px 20px;">
+<h2 id="vendors-h" style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: #10365a;">Service Vendor Repair &amp; Parts Cost Breakdown</h2>
+<span style="font-size: 13px; line-height: 18px; color: #6b7280;">{{ vendorNote }}</span>
+</div>
+<sc-if value="{{ showVendors }}" hint-placeholder-val="{{ true }}">
+<div style="overflow-x: auto;">
+<div role="table" aria-label="Labor and parts cost by service vendor" class="da-tbl">
+<div role="row" class="da-row da-head da-vendors">
+<div role="columnheader" class="da-h">Service Vendor</div>
+<div role="columnheader" class="da-h da-n">Work Orders</div>
+<div role="columnheader" class="da-h da-n">Labor Cost</div>
+<div role="columnheader" class="da-h da-n">Parts Cost</div>
+<div role="columnheader" class="da-h da-n">Total Labor &amp; Parts Spend</div>
+<div role="columnheader" class="da-h da-n">% Labor &amp; Parts</div>
+</div>
+<sc-for list="{{ vendors }}" as="v" hint-placeholder-count="6">
+<div role="row" class="da-row da-vendors">
+<div role="cell">{{ v.name }}</div>
+<div role="cell" class="da-n">{{ v.wo }}</div>
+<div role="cell" class="da-n">{{ v.labor }}</div>
+<div role="cell" class="da-n">{{ v.parts }}</div>
+<div role="cell" class="da-n">{{ v.total }}</div>
+<div role="cell" class="da-n">{{ v.pct }}</div>
+</div>
+</sc-for>
+<div role="row" class="da-row da-total da-vendors">
+<div role="cell">{{ vendorsTotal.label }}</div>
+<div role="cell" class="da-n">{{ vendorsTotal.wo }}</div>
+<div role="cell" class="da-n">{{ vendorsTotal.labor }}</div>
+<div role="cell" class="da-n">{{ vendorsTotal.parts }}</div>
+<div role="cell" class="da-n">{{ vendorsTotal.total }}</div>
+<div role="cell" class="da-n">{{ vendorsTotal.pct }}</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ showVendorsEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="padding: 28px 20px 32px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 14px; line-height: 20px; color: #6b7280;">{{ vendorsEmptyText }}</div>
+</sc-if>
+</section>
+
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"period":{"editor":"enum","options":["2026","2025","all"],"default":"2026"},"budget":{"editor":"enum","options":["ok","over","none"],"default":"ok"},"models":{"editor":"enum","options":["filled","empty"],"default":"filled"},"notice":{"editor":"enum","options":["cad","norate","both","none"],"default":"cad"},"yearMenu":{"editor":"boolean","default":false},"empty":{"editor":"boolean","default":false},"loading":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":3000}}'>
+class Component extends DCLogic {
+  periodNow() {
+    const s = this.state || {};
+    return s.period !== undefined ? s.period : (this.props.period || '2026');
+  }
+  openNow() {
+    const s = this.state || {};
+    return s.yearOpen !== undefined ? s.yearOpen : this.props.yearMenu === true;
+  }
+  group(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+  money(c) {
+    const s = (Math.abs(c) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (c < 0 ? '-$' : '$') + s;
+  }
+  money0(c) {
+    return (c < 0 ? '-$' : '$') + this.group(Math.round(Math.abs(c) / 100));
+  }
+  pct(n, d) {
+    return d > 0 ? (Math.round((n / d) * 1000) / 10).toFixed(1) + '%' : '0.0%';
+  }
+  sum(list) {
+    return list.reduce((s, x) => s + x, 0);
+  }
+  renderVals() {
+    const period = this.periodNow();
+    const yearOpen = this.openNow();
+    const isEmpty = this.props.empty === true;
+    const loading = this.props.loading === true;
+    const budgetMode = this.props.budget || 'ok';
+    const modelsMode = this.props.models || 'filled';
+    const notice = this.props.notice === undefined ? 'cad' : this.props.notice;
+    const isAll = period === 'all';
+    const k = isEmpty ? 0 : (isAll ? 5 : (period === '2025' ? 3 : 1));
+    const yearLabel = isAll ? 'All time' : period;
+    const bleachers = 144;
+
+    const zonesBase = [
+      ['Zone 1', 62, 6, 941238], ['Zone 2', 39, 9, 1120860], ['Zone 3', 22, 5, 677495],
+      ['Zone 4', 4, 1, 120400], ['Zone 5', 4, 0, 0], ['Zone 6', 6, 2, 238640],
+      ['Zone 7', 5, 1, 56025], ['Zone 8', 0, 0, 0], ['Unassigned', 2, 3, 739954]
+    ];
+    const zr = zonesBase.map((z) => ({ name: z[0], units: z[1], wo: z[2] * k, cents: z[3] * k }));
+    const totalCents = this.sum(zr.map((z) => z.cents));
+    const totalWo = this.sum(zr.map((z) => z.wo));
+    const zones = zr.map((z) => ({
+      name: z.name,
+      units: String(z.units),
+      wo: String(z.wo),
+      cost: this.money(z.cents),
+      avg: this.money(z.units > 0 ? Math.round(z.cents / z.units) : 0),
+      pct: this.pct(z.cents, totalCents)
+    }));
+    const zonesTotal = {
+      units: String(bleachers),
+      wo: String(totalWo),
+      cost: this.money(totalCents),
+      avg: this.money(Math.round(totalCents / bleachers)),
+      pct: totalCents > 0 ? '100.0%' : '0.0%'
+    };
+
+    const catsBase = [
+      ['Tires', 3, 184530, 'Danielsville Tire and Automotive'],
+      ['Wiring', 2, 105288, 'Suncoast Fleet Services'],
+      ['Jacks', 4, 231045, 'Amazon'],
+      ['Hydraulics', 3, 396470, 'Jessie James Sales & Enterprises'],
+      ['Welding', 7, 1120635, 'Dallas Trailer Repair'],
+      ['Batteries', 3, 259012, 'Jessie James Sales & Enterprises'],
+      ['Seating', 3, 543380, 'Kaypark'],
+      ['Hauling', 2, 612000, 'Danielsville Tire and Automotive'],
+      ['Unassigned', 3, 442252, '—']
+    ];
+    const cr = catsBase.map((c) => ({ name: c[0], n: c[1] * k, cents: c[2] * k, vendor: c[3] }));
+    const catCents = this.sum(cr.map((c) => c.cents));
+    const catN = this.sum(cr.map((c) => c.n));
+    const cats = cr.map((c) => ({
+      name: c.name,
+      n: String(c.n),
+      expense: this.money(c.cents),
+      avg: this.money(c.n > 0 ? Math.round(c.cents / c.n) : 0),
+      pct: this.pct(c.cents, catCents),
+      vendor: c.n > 0 ? c.vendor : '—'
+    }));
+    const catsTotal = {
+      n: String(catN),
+      expense: this.money(catCents),
+      avg: this.money(catN > 0 ? Math.round(catCents / catN) : 0),
+      pct: catCents > 0 ? '100.0%' : '0.0%'
+    };
+
+    const modelsBase = [
+      ['TSP15-450', 27, 9, 987020], ['Speedy4510', 11, 4, 524080], ['BR10-285', 23, 3, 310200],
+      ['Speedy4010', 6, 2, 268845], ['TSP10-300C', 9, 2, 141410]
+    ];
+    const mr = modelsBase.map((m) => ({ model: m[0], units: m[1], rep: m[2] * k, cents: m[3] * k }));
+    const mCents = this.sum(mr.map((m) => m.cents));
+    const mUnits = this.sum(mr.map((m) => m.units));
+    const mRep = this.sum(mr.map((m) => m.rep));
+    const models = mr.map((m, i) => ({
+      rank: '#' + (i + 1),
+      model: m.model,
+      units: String(m.units),
+      avg: this.money(Math.round(m.cents / m.units)),
+      rep: String(m.rep),
+      cost: this.money(m.cents)
+    }));
+    const modelsTotal = {
+      units: String(mUnits),
+      avg: this.money(Math.round(mCents / mUnits)),
+      rep: String(mRep),
+      cost: this.money(mCents)
+    };
+    const noModelNumbers = modelsMode === 'empty';
+    const showModels = !noModelNumbers && !isEmpty;
+    const showModelsEmpty = !showModels;
+    const modelsEmptyTitle = noModelNumbers ? 'No model numbers yet' : 'No repairs in ' + yearLabel;
+    const modelsEmptySub = noModelNumbers
+      ? 'This block fills in once model numbers are set on the bleachers.'
+      : 'Models with maintenance cost will appear here.';
+
+    const vendorsBase = [
+      ['Dallas Trailer Repair', 4, 482000, 138640],
+      ['Outlaw Maintenance & Repair', 2, 255000, 14400],
+      ['Danielsville Tire and Automotive', 3, 88000, 394620],
+      ['Jessie James Sales & Enterprises', 5, 114000, 231055],
+      ['Kaypark', 3, 0, 300800],
+      ['Suncoast Fleet Services', 2, 196000, 41030],
+      ['Amazon', 3, 0, 121576],
+      ['BR Simcoe Shop', 1, 64000, 9650]
+    ];
+    const vr = vendorsBase
+      .map((v) => ({ name: v[0], wo: v[1] * k, labor: v[2] * k, parts: v[3] * k }))
+      .map((v) => ({ name: v.name, wo: v.wo, labor: v.labor, parts: v.parts, total: v.labor + v.parts }));
+    vr.sort((a, b) => b.total - a.total);
+    const vAllLabor = this.sum(vr.map((v) => v.labor));
+    const vAllParts = this.sum(vr.map((v) => v.parts));
+    const vAllTotal = vAllLabor + vAllParts;
+    const vAllWo = this.sum(vr.map((v) => v.wo));
+    const vendors = vr.slice(0, 6).map((v) => ({
+      name: v.name,
+      wo: String(v.wo),
+      labor: this.money(v.labor),
+      parts: this.money(v.parts),
+      total: this.money(v.total),
+      pct: this.pct(v.total, vAllTotal)
+    }));
+    const vendorsTotal = {
+      label: 'Total Labor & Parts Spend, all ' + vr.length + ' vendors',
+      wo: String(vAllWo),
+      labor: this.money(vAllLabor),
+      parts: this.money(vAllParts),
+      total: this.money(vAllTotal),
+      pct: vAllTotal > 0 ? '100.0%' : '0.0%'
+    };
+    const showVendors = !isEmpty;
+    const vendorNote = isEmpty
+      ? 'Top 6 vendors by Labor + Parts'
+      : 'Top 6 of ' + vr.length + ' vendors by Labor + Parts. Tax and freight are not included. Repairs with no vendor are not listed.';
+
+    const catValues = cr.map((c) => c.cents);
+    const maxCents = Math.max.apply(null, catValues.concat([0]));
+    const maxD = maxCents / 100;
+    const steps = [500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000];
+    let step = steps[steps.length - 1];
+    for (let i = 0; i < steps.length; i++) {
+      if (maxD / steps[i] <= 4) { step = steps[i]; break; }
+    }
+    const top = Math.max(step, Math.ceil(maxD / step) * step);
+    const ticks = [];
+    for (let v = 0; v <= top; v += step) {
+      ticks.push({
+        bottom: (100 * v / top) + '%',
+        label: v >= 1000 ? '$' + (v / 1000) + 'k' : '$' + v
+      });
+    }
+    const bars = cr.map((c) => ({
+      name: c.name,
+      value: this.money0(c.cents),
+      h: c.cents > 0 ? Math.max(0.6, 100 * (c.cents / 100) / top).toFixed(2) + '%' : '0%'
+    }));
+    const showChart = maxCents > 0;
+    const showChartEmpty = !showChart;
+    const chartEmptyText = 'No spend to show for ' + yearLabel + '.';
+    const showVendorsEmpty = !showVendors;
+    const vendorsEmptyText = 'No vendor spend in ' + yearLabel + '.';
+
+    const avgCents = Math.round(totalCents / bleachers);
+    const rangeMax = 312000 * k;
+    const openNames = ['Inbound', 'Triaged', 'Waiting repair', 'In repair', 'Confirm repair'];
+    const openBase = isAll ? [3, 1, 2, 2, 1] : (period === '2025' ? [0, 0, 1, 0, 0] : [2, 1, 1, 2, 1]);
+    const openCounts = isEmpty ? [0, 0, 0, 0, 0] : openBase;
+    const openTotal = this.sum(openCounts);
+    const openLine = openTotal === 0
+      ? 'No open repairs'
+      : openNames.map((n, i) => n + ' ' + openCounts[i]).join(' | ');
+
+    let budgetCents = null;
+    if (budgetMode !== 'none') {
+      const baseBudget = isAll ? 35000000 : (period === '2025' ? 15000000 : 20000000);
+      budgetCents = budgetMode === 'over'
+        ? Math.max(100000, Math.round(totalCents * 0.88 / 100000) * 100000)
+        : baseBudget;
+    }
+    const hasBudget = budgetCents !== null;
+    const budgetOver = hasBudget && totalCents > budgetCents;
+    const budgetPeriodWord = isAll ? 'all years' : period;
+    const cardBudget = hasBudget ? this.pct(totalCents, budgetCents) : '—';
+    const budgetBarW = hasBudget ? Math.min(100, 100 * totalCents / budgetCents).toFixed(1) + '%' : '0%';
+    const budgetLine1 = hasBudget
+      ? 'Spent: ' + this.money0(totalCents) + ' | Remaining: ' + this.money0(budgetCents - totalCents)
+      : 'Budget not set';
+    const budgetLine2 = hasBudget
+      ? (isAll ? 'Budgets of all years: ' : 'Budget ' + period + ': ') + this.money0(budgetCents)
+      : 'No budget is set for ' + budgetPeriodWord;
+
+    const cadCount = isAll ? 11 : (period === '2025' ? 7 : 4);
+    const showCadNote = !loading && !isEmpty && (notice === 'cad' || notice === 'both');
+    const showNoRate = !loading && (notice === 'norate' || notice === 'both');
+    const cadNoteText = cadCount + ' CAD repairs were converted to USD at the Frankfurter (ECB) rate of their Repair from day.';
+    const noRateText = '3 CAD repairs have no exchange rate yet and are not counted. Open the page again when you are online.';
+
+    const options = [['2026', '2026'], ['2025', '2025'], ['all', 'All time']];
+    const yearOptions = options.map((o) => ({
+      label: o[1],
+      checked: o[0] === period,
+      pick: () => this.setState({ period: o[0], yearOpen: false })
+    }));
+
+    return {
+      yearOpen: yearOpen,
+      yearLabel: yearLabel,
+      toggleYear: () => this.setState({ yearOpen: !yearOpen }),
+      yearOptions: yearOptions,
+      loading: loading,
+      notLoading: !loading,
+      showLoadingNote: loading,
+      showCadNote: showCadNote,
+      cadNoteText: cadNoteText,
+      showNoRate: showNoRate,
+      noRateText: noRateText,
+      skeletonCards: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+      skeletonBlocks: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+      cardTotal: this.money(totalCents),
+      cardTotalNote: (isAll ? 'All-time' : period) + ' spend across ' + bleachers + ' bleachers',
+      cardReady: this.pct(141, bleachers),
+      cardReadyNote: '141 of ' + bleachers + ' ready to go',
+      cardAvg: this.money(avgCents),
+      cardAvgNote: 'Range: $0 – ' + this.money0(rangeMax),
+      cardOpen: String(openTotal),
+      cardOpenNote: openLine,
+      cardBudget: cardBudget,
+      budgetOver: budgetOver,
+      budgetValueColor: budgetOver ? '#b91c1c' : '#10365a',
+      budgetBarW: budgetBarW,
+      budgetBarColor: budgetOver ? '#dc2626' : '#10365a',
+      budgetLineColor: budgetOver ? '#b91c1c' : '#6b7280',
+      budgetLine1: budgetLine1,
+      budgetLine2: budgetLine2,
+      zones: zones,
+      zonesTotal: zonesTotal,
+      showModels: showModels,
+      showModelsEmpty: showModelsEmpty,
+      modelsEmptyTitle: modelsEmptyTitle,
+      modelsEmptySub: modelsEmptySub,
+      models: models,
+      modelsTotal: modelsTotal,
+      cats: cats,
+      catsTotal: catsTotal,
+      showChart: showChart,
+      showChartEmpty: showChartEmpty,
+      chartEmptyText: chartEmptyText,
+      ticks: ticks,
+      bars: bars,
+      showVendors: showVendors,
+      showVendorsEmpty: showVendorsEmpty,
+      vendorsEmptyText: vendorsEmptyText,
+      vendorNote: vendorNote,
+      vendors: vendors,
+      vendorsTotal: vendorsTotal
+    };
+  }
+}
+</script>
+</body>
+</html>

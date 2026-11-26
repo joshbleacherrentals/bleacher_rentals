@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useZoneWeekParams } from "@/features/autoWorkTrackers/hooks/useZoneWeekParams";
-import { pageFromPathname } from "@/features/autoWorkTrackers/utils/pages";
+import { AREAS, locatePage } from "@/features/autoWorkTrackers/utils/pages";
 import { driverLinks } from "../utils/driverLinks";
 
 /**
@@ -29,7 +29,9 @@ export function DriverLinksMenu({
   driverName: string;
 }) {
   const { zoneId } = useZoneWeekParams();
-  const fromSlug = pageFromPathname(usePathname())?.slug;
+  const here = locatePage(usePathname());
+  const area = here?.area ?? AREAS.check;
+  const fromSlug = here?.page?.slug;
   if (!userUuid) return null;
   return (
     <DropdownMenu>
@@ -41,7 +43,7 @@ export function DriverLinksMenu({
         <EllipsisVertical className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {driverLinks({ userUuid, weekStart, zoneId, fromSlug }).map((link) => (
+        {driverLinks({ area, userUuid, weekStart, zoneId, fromSlug }).map((link) => (
           <DropdownMenuItem key={link.key} asChild>
             {link.newTab ? (
               <a href={link.href} target="_blank" rel="noopener noreferrer">

@@ -187,6 +187,37 @@ export function nextCurrencyForVendor(params: {
 
 export type VendorSelectOption = { value: string; label: string };
 
+/** The pinned last row of the Vendor list: it opens the vendor window (docs/specs/vendors-page.md D25). */
+export const CREATE_VENDOR_LABEL = "+ Create vendor";
+
+/**
+ * That row, or nothing when the window cannot create vendors. `typed` reads the text in the list's
+ * search box at the moment the row is chosen; it goes to the vendor window as its Display Name
+ * (D27), trimmed.
+ */
+export function vendorCreateFooter(
+  onCreate: ((typedName: string) => void) | undefined,
+  typed: () => string,
+): { label: string; onSelect: () => void } | undefined {
+  if (!onCreate) return undefined;
+  return { label: CREATE_VENDOR_LABEL, onSelect: () => onCreate(typed().trim()) };
+}
+
+/** The vendor the "+ Create vendor" window has just made. */
+export type CreatedVendor = { id: string; displayName: string };
+
+/**
+ * The options plus the vendor just created (D26), so its name shows in the select at once, before the
+ * live list of vendors has caught up with the write. Nothing is added once the list has it.
+ */
+export function withCreatedVendor(
+  options: readonly VendorSelectOption[],
+  created: CreatedVendor | null,
+): VendorSelectOption[] {
+  if (!created || options.some((option) => option.value === created.id)) return [...options];
+  return [...options, { value: created.id, label: created.displayName }];
+}
+
 /**
  * The active vendors, plus the repair's own vendor (`current`) even when inactive or not in the list
  * yet (then labelled with `current.name`); in the order of `vendors` (D131). "No vendor" is not an

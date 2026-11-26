@@ -34,9 +34,9 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   driver:
     "Access to the mobile driver app only. Cannot access the web dashboard at all, and has no permissions related to the web dashboard features.",
   maintainer:
-    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. No quotes, payments, or team management.",
+    "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. Also has the Vendors page, where they add and edit vendors. Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Also has the Vendors page, where they add, edit, delete and restore vendors. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -62,7 +62,7 @@ const custom = (note: string): PermissionAccess => ({ level: "custom", note });
 const none = (note?: string): PermissionAccess => ({ level: "none", note });
 
 const MAINTAINER_NO_ACCESS_NOTE =
-  "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard. Everything else in the web app is hidden from them entirely.";
+  "Maintainers look after the fleet: inspections, damage reports, repairs and bleachers, plus notes on the Dashboard and the Vendors page. Everything else in the web app is hidden from them entirely.";
 
 // docs/specs/accountant-role.md, accountant-work-trackers.md, accountant-quotes-02 and -04: the
 // Accountant has the Work Trackers pages, the driver payment window, the Accountant page and
@@ -70,7 +70,12 @@ const MAINTAINER_NO_ACCESS_NOTE =
 // docs/specs/accountant-team.md adds the Team page; docs/specs/accountant-audit-01-tab.md adds the
 // Audit tab of the Accountant page. It has nothing else.
 const ACCOUNTANT_NO_ACCESS_NOTE =
-  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
+  "The Accountant role covers the Work Trackers pages, driver payments, the Accountant page and Quotes & Bookings, read-only, plus Companies & Contacts, where it can add and edit, and the Team page, where it edits a driver's payment info and vendor, the Vendors page, and the Quote Types page under Configuration. Everything else on the web dashboard is hidden from it.";
+
+// docs/specs/dashboard-analytics-05-page.md §5: the same note for the three roles that open the
+// Dashboard & Analytics page.
+const DASHBOARD_ANALYTICS_READ_NOTE =
+  "Opens the page and reads every figure on it, vendors and budget included. Nothing on it can be changed.";
 
 // docs/specs/analytics-mcp.md §1 D2: the connector is open to every account that is not deactivated,
 // whatever its role, and it reads the whole database (no per-role or per-owner limit).
@@ -435,6 +440,35 @@ export const PERMISSIONS: PermissionEntry[] = [
       ),
     },
   },
+  // docs/specs/vendors-page.md §5: the Vendors page and the vendor window. Every role but the developer
+  // opens the page; admin, account manager, maintainer and accountant add, edit, delete and restore.
+  {
+    label: "Vendors",
+    description:
+      "This applies to the Vendors page, and to the vendor window, which also opens from a driver's profile on the Team page. The page lists every vendor company with its type (Driver for the companies that employ our drivers, Repairs for repair and parts companies), status, services, contact and location, with a search, a filter for the type, a filter for the status and a switch that shows the deleted vendors instead. A vendor's window holds its name, type, status, QuickBooks connection and vendor, address, contact, services, tax numbers, notes and logo. Delete only hides a vendor, and Restore brings it back; drivers keep the vendor they were given.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: full(
+        "Opens the page and reads every vendor. Adds a vendor, edits any field of it including its type, deletes it and restores a deleted one. Can also add a vendor from the Vendor select of the Edit repair and New repair windows (+ Create vendor), and the new vendor is selected at once.",
+      ),
+      account_manager: full(
+        "Adds, edits, deletes and restores any vendor, with its QuickBooks connection and vendor. Vendors do not belong to a zone, so this is not limited to the drivers an account manager looks after.",
+      ),
+      developer: none(
+        "The Vendors page is hidden from this role. Developers are limited to the product roadmap and the Dev Tools.",
+      ),
+      viewer: read(
+        "Opens the page, searches and filters it, can show the deleted vendors, and opens any vendor in a window that cannot be changed and has no QuickBooks section. Cannot add, edit, delete or restore: those buttons are hidden, and the database refuses a write from a viewer too.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: full(
+        "Adds, edits, deletes and restores any vendor, and can change the address of a vendor, which they otherwise could do only for the address of a repair. Reads the list of QuickBooks connections to link a vendor, but only an administrator can change a connection. Can also add a vendor from the Vendor select of the Edit repair and New repair windows (+ Create vendor), and the new vendor is selected at once.",
+      ),
+      accountant: full(
+        "Adds, edits, deletes and restores any vendor, with its QuickBooks connection and vendor. They also do this from a driver's profile on the Team page.",
+      ),
+    },
+  },
   {
     label: "Send Emails",
     description:
@@ -510,22 +544,45 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
-    label: "Auto Work Trackers",
+    label: "Verify & Auto Generate",
     description:
-      "The Auto Work Trackers page in the sidebar. Pick a zone and a week, and Create work trackers plans the trips the zone's bleachers need that week as draft Trip work trackers: a driver can do several trips a day, one bleacher at a time, up to 12 hours from leaving home to getting back (counting an hour for each setup and teardown), on days the bleacher is free and the driver is available, filling employees' days before contractors' (drivers paid through a vendor), then preferring the least driving. Each gets its driver, day, suggested times, road distances and drive times (Google, avoiding tolls), and Hauling, Setup and Teardown line items at the driver's rates. Running it again makes no duplicates. Advanced settings holds how it plans, for every zone: how strongly employees come before contractors, least distance or least drive time, the longest day, setup and teardown times, the hour the day starts, and the search time; each shows whether it is the default, and the next run uses them. The model's drafts for a zone and week can be deleted in one go; a tracker saved in the work tracker modal counts as hand-made and is kept. The other pages check the week before creating: the Dashboard (with a map of every driver's routes), event, bleacher and driver checks, and Driver Data, Event Data and Bleacher Data, where missing addresses can be fixed and a driver can be left out of the model. Every Create is recorded with what it planned (Model → Runs): who ran it, the version and settings, and for each trip whether it was kept, edited (and how) or deleted. Saving changes to, or deleting, a work tracker the model made asks why (optional), and so does deleting the model's drafts in bulk; the answers show on Runs. Apart from those fixes, the reasons and creating work trackers, the page only reads.",
+      "Two tabs of the Work Trackers page, beside Weeks: Verify and Auto Generate (they replace the old Auto Work Trackers page; its links still work). Verify shows how good a zone's week is, whoever made its work trackers, by hand or by the model: the Dashboard (with a map of every driver's routes), Event Fulfilment, Event Bleacher Requirements, Overbooked Bleachers, Driver Workload, Driver Availability and, after the week, Proof of Delivery (see GPS Proof of Delivery). Auto Generate is the AI planner: pick a zone and a week, and Generate work trackers plans the trips the zone's bleachers need that week as draft Trip work trackers: a driver can do several trips a day, one bleacher at a time, up to 12 hours from leaving home to getting back (counting an hour for each setup and teardown), on days the bleacher is free and the driver is available, filling employees' days before contractors' (drivers paid through a vendor), then preferring the least driving. Each gets its driver, day, suggested times, road distances and drive times (Google, avoiding tolls), and Hauling, Setup and Teardown line items at the driver's rates. Running it again makes no duplicates. Advanced settings holds how it plans, for every zone: how strongly employees come before contractors, least distance or least drive time, the longest day, setup and teardown times, the hour the day starts, and the search time; each shows whether it is the default, and the next run uses them. The model's drafts for a zone and week can be deleted in one go; a tracker saved in the work tracker modal counts as hand-made and is kept. It shows each step while it runs, then what it made, with links to Verify and the run. Auto Generate's panel holds what the model needs: Driver Data, Event Data and Bleacher Data (each trip's pickup and drop-off address), where missing addresses can be fixed and a driver can be left out of the model; Advanced settings; Runs; and the bulk delete of its drafts. Every Create is recorded with what it planned (Auto Generate → Runs): who ran it, the version and settings, and for each trip whether it was kept, edited (and how) or deleted. Saving changes to, or deleting, a work tracker the model made asks why (optional), and so does deleting the model's drafts in bulk; the answers show on Runs. Apart from those fixes, the reasons and creating work trackers, both tabs only read.",
     category: "Day to Day Operations",
     roles: {
       admin: full(
-        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it. Can delete the drafts the model made for the selected zone and week in one go. Can change the Advanced settings, or reset any of them to its default. Sees every run on Model → Runs; bulk deleting the model's drafts marks that zone and week's runs discarded. Can fix the home address of any driver on Driver Data, and remove any driver from the model or add them back. Can fix the address of any event on Event Data, and any pickup or drop-off address on Bleacher Data.",
+        "Has both tabs, picks any zone and week, sees every page and check, and generates the draft work trackers for it. Can delete the drafts the model made for the selected zone and week in one go. Can change the Advanced settings, or reset any of them to its default. Sees every run on Auto Generate → Runs; bulk deleting the model's drafts marks that zone and week's runs discarded. Can fix the home address of any driver on Driver Data, and remove any driver from the model or add them back. Can fix the address of any event on Event Data, and any pickup or drop-off address on Bleacher Data.",
       ),
       account_manager: custom(
-        "Can open the page, pick any zone and week, see every page and check, and create the draft work trackers for it. Sees how many of the week's work trackers the model made, but cannot delete the model's drafts in bulk (administrators only for now). Can read the Advanced settings but not change them. Sees every run on Model → Runs, and is asked why (optionally) when changing or deleting a model-made work tracker, like an administrator. On Driver Data they can fix a driver's home address, and remove a driver from the model or add them back, only in a zone they manage, the same drivers they can edit on the Team page; in other zones the drivers are shown but cannot be changed. On Event Data and Bleacher Data they can fix an address only in a zone they manage, including events another account manager created; in other zones the addresses are shown but cannot be clicked.",
+        "Has both tabs, picks any zone and week, sees every page and check, and generates the draft work trackers for it. Sees how many of the week's work trackers the model made, but cannot delete the model's drafts in bulk (administrators only for now). Can read the Advanced settings but not change them. Sees every run on Auto Generate → Runs, and is asked why (optionally) when changing or deleting a model-made work tracker, like an administrator. On Driver Data they can fix a driver's home address, and remove a driver from the model or add them back, only in a zone they manage, the same drivers they can edit on the Team page; in other zones the drivers are shown but cannot be changed. On Event Data and Bleacher Data they can fix an address only in a zone they manage, including events another account manager created; in other zones the addresses are shown but cannot be clicked.",
       ),
-      developer: none("Does not have this page."),
-      viewer: none("Does not have this page."),
+      developer: none("Does not have these tabs."),
+      viewer: none("Opens Work Trackers for Weeks only: no Verify or Auto Generate tab."),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
-      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+      accountant: none("Opens Work Trackers for Weeks only: no Verify or Auto Generate tab."),
+    },
+  },
+  {
+    label: "GPS Proof of Delivery",
+    description:
+      "Every day, each work tracker completed in the last week is checked against its bleacher's Linxup GPS: if the bleacher stood within 500 m of the drop-off after the driver tapped Complete (and before it was moved again), the work tracker's window shows 'Delivery confirmed by GPS' under its status, with when and how close. 'GPS did not see it at the drop-off' means the GPS reported from somewhere else; 'no data' means there was no GPS report to go on (no tracker on the bleacher, or none reported in time), which is not a failed delivery. Nobody enters or changes these: the daily check writes them. A driver's week on the Work Trackers page has a Proof of Delivery column, next to Pay: '✓ 120 m' when confirmed, '✗ 79 km · Main Yard' when GPS saw it elsewhere, or Waiting, No GPS, No location or Not checked yet, with the full line on hover. Verify → Proof of Delivery shows the selected zone and week as a grid, a row per driver and a column per day, each cell counting that day's trips by proof (for example 2 waiting, 1 no GPS, 1 verified); every trip counts: one not completed after its day shows as overdue, in red, one not due yet as not completed, and a cancelled, declined or abandoned one as cancelled. Its badge in the panel is verified out of the trips that are happening (cancelled ones left out). Each driver's menu opens their profile, week or schedule. Check now runs the same check at once instead of waiting for the next day.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: custom(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. Has Verify → Proof of Delivery and can press Check now.",
+      ),
+      account_manager: custom(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. Has Verify → Proof of Delivery and can press Check now.",
+      ),
+      developer: none("Does not open work trackers."),
+      viewer: read(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. No Verify, so no Proof of Delivery page.",
+      ),
+      driver: none("Not shown in the Driver Mobile App."),
+      maintainer: none("Does not open work trackers."),
+      accountant: read(
+        "Sees the proof on every work tracker they open and the Proof of Delivery column on a driver's week. No Verify, so no Proof of Delivery page.",
+      ),
     },
   },
   {
@@ -1025,7 +1082,7 @@ export const PERMISSIONS: PermissionEntry[] = [
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: custom(
-        "Sees every team member in the list but opens only drivers. On a driver they can change the payment info (currency, unit, tax, rates and tiers, deadhead, setup, teardown), the vendor company and the driver type, and can read the zones, phone, home address, vehicle and documents without changing them. They can also create, edit and delete vendor companies (a deleted vendor is hidden, not removed), including the QuickBooks connection and QuickBooks vendor it is linked to. They cannot change a driver's name, zones or roles, and cannot open anyone who is not a driver. Roles add up: someone who is also an account manager can also add a driver to their own zones.",
+        "Sees every team member in the list but opens only drivers. On a driver they can change the payment info (currency, unit, tax, rates and tiers, deadhead, setup, teardown), the vendor company and the driver type, and can read the zones, phone, home address, vehicle and documents without changing them. They can also create, edit and delete vendor companies (a deleted vendor is hidden, not removed), including the QuickBooks connection and QuickBooks vendor it is linked to. They cannot change a driver's name, zones or roles, and cannot open anyone who is not a driver. Roles add up: someone who is also an account manager can also add a driver to their own zones. The vendor window also holds a vendor's type, address, contact, services, status and notes, and the same vendors are managed on the Vendors page.",
       ),
     },
   },
@@ -1087,6 +1144,28 @@ export const PERMISSIONS: PermissionEntry[] = [
       viewer: read("Can view all driver scorecard data but cannot make any changes."),
       driver: none("Drivers only have access to the Driver Mobile App."),
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  // docs/specs/dashboard-analytics-02-access-shell.md §2.5 (D31): who opens /dashboard-analytics.
+  // docs/specs/dashboard-analytics-05-page.md §5: the description and the notes of the three roles
+  // that open it, written once the page shows figures.
+  {
+    label: "Dashboard & Analytics",
+    description:
+      "The Dashboard & Analytics page, in the Quality Assurance menu. It adds up what the fleet's repairs cost, in US dollars (a repair paid in Canadian dollars is converted at the exchange rate of the day it starts), for a year or for all time: the total spend, the share of bleachers that are not in an open repair, the average spend per bleacher, the open repairs by status and how much of the yearly budget is used; the cost by operating zone, by bleacher model and by damage category, with a chart; and the six vendors with the most labor and parts spend. Everything on the page is read only.",
+    category: "Scorecards",
+    roles: {
+      admin: read(DASHBOARD_ANALYTICS_READ_NOTE),
+      account_manager: none(
+        "Account managers do not have this page; it is hidden from them. They still read every repair on the Repairs page.",
+      ),
+      developer: none(
+        "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
+      ),
+      viewer: read(DASHBOARD_ANALYTICS_READ_NOTE),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: read(DASHBOARD_ANALYTICS_READ_NOTE),
       accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
     },
   },

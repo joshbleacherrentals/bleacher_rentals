@@ -9,11 +9,15 @@ vi.mock("@react-pdf/renderer", () => {
     const Box = ({ children }: { children?: ReactNode }) => createElement(tag, null, children);
     return Box;
   };
+  // A PDF Link carries its target in `src`; as markup that is an anchor's href.
+  const Link = ({ children, src }: { children?: ReactNode; src?: string }) =>
+    createElement("a", { href: src }, children);
   return {
     Document: box("div"),
     Page: box("div"),
     View: box("div"),
     Text: box("span"),
+    Link,
     StyleSheet: { create: <T,>(styles: T) => styles },
     Font: { register: () => undefined },
   };
@@ -56,5 +60,46 @@ describe("QuotePdfDocument header", () => {
   it("leaves the line out when the office has no phone", () => {
     const html = render(dataWithPhone(""));
     expect(html).not.toContain("P:");
+  });
+});
+
+describe("QuotePdfDocument Pay Invoice button", () => {
+  const sample = dataWithPhone("");
+  const customerPage = `https://app.example.com/quote/${sample.eventId}`;
+
+  /** Every anchor in the document, as [href, visible text]. */
+  const links = (html: string) =>
+    [...html.matchAll(/<a href="([^"]*)">(.*?)<\/a>/g)].map((m) => [
+      m[1],
+      m[2].replace(/<[^>]+>/g, ""),
+    ]);
+
+  it("links to the customer's quote page", () => {
+    const html = render({ ...sample, publicUrl: customerPage });
+    expect(links(html)).toEqual([[customerPage, "Pay Invoice"]]);
+  });
+
+  it("is on a quote and on an invoice alike", () => {
+    for (const status of ["quoted", "booked"]) {
+      const html = render({ ...sample, status, publicUrl: customerPage });
+      expect(links(html), `status ${status}`).toEqual([[customerPage, "Pay Invoice"]]);
+    }
+  });
+
+  it("is in French on a French document", () => {
+    const html = render({ ...dataWithPhone("", "fr"), publicUrl: customerPage });
+    expect(links(html)).toEqual([[customerPage, "Payer la facture"]]);
+  });
+
+  it("sits after the totals, so the customer reads the amount first", () => {
+    const html = render({ ...sample, publicUrl: customerPage });
+    expect(html.indexOf("TOTAL")).toBeLessThan(html.indexOf("Pay Invoice"));
+  });
+
+  it("is left out when the address is not a full web link", () => {
+    // A relative or empty link is dead inside a PDF; no button beats a button that does nothing.
+    for (const publicUrl of ["", `/quote/${sample.eventId}`]) {
+      expect(links(render({ ...sample, publicUrl })), `url "${publicUrl}"`).toEqual([]);
+    }
   });
 });

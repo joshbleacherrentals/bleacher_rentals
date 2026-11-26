@@ -56,6 +56,11 @@ type SearchableSelectProps = {
   fallbackLabel?: string | null;
   /** Fires on every keystroke in the search box — e.g. to pre-fill a "+ Add new" form's name field with whatever was typed. */
   onSearchChange?: (query: string) => void;
+  /**
+   * Fires when the list opens or closes. The search box starts empty each time the list opens, so a
+   * caller that keeps what was typed (see `onSearchChange`) clears it here.
+   */
+  onOpenChange?: (open: boolean) => void;
 };
 
 /**
@@ -77,6 +82,7 @@ export function SearchableSelect({
   footerItem,
   fallbackLabel = null,
   onSearchChange,
+  onOpenChange,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -89,6 +95,7 @@ export function SearchableSelect({
     // Found when the list opens, not on render: the dialog is an ancestor and does not change.
     if (next) setBoundary(dialogOf(triggerRef.current));
     setOpen(next);
+    onOpenChange?.(next);
   };
 
   const handleSelect = (value: string) => {

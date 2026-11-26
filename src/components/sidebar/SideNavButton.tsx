@@ -2,11 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CountBadge } from "@/components/CountBadge";
+import { pathMatches } from "@/features/userAccess/logic/pathMatches";
 
 type SideNavButtonProps = {
   label: string;
   href: string;
-  /** Other path prefixes that keep the button highlighted. */
+  /** Other paths that keep the button highlighted (an address under one of them counts). */
   activePrefixes?: string[];
   icon: React.ComponentType<any>;
   /** Renders an unread dot to the right of the label. */
@@ -28,7 +29,7 @@ export const SideNavButton = ({
   badge,
 }: SideNavButtonProps) => {
   const pathname = usePathname();
-  const isSelected = [href, ...activePrefixes].some((prefix) => pathname.startsWith(prefix));
+  const isSelected = [href, ...activePrefixes].some((prefix) => pathMatches(prefix, pathname));
 
   return (
     <Link

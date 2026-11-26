@@ -14,6 +14,10 @@ import { isCanadianAddress, isUsaAddress } from "../util/addressCountry";
 import WorkTrackerStatusBadge from "./WorkTrackerStatusBadge";
 import { useAttentionByTracker } from "../db/attentionTrackers";
 import { AttentionMark } from "./AttentionMark";
+import {
+  DeliveryProofCell,
+  useProofsByTracker,
+} from "@/features/deliveryProof/components/DeliveryProofCell";
 
 type Props = {
   userUuid: string;
@@ -24,6 +28,7 @@ type Props = {
 export function TripList({ userUuid, startDate, onSelectWorkTracker }: Props) {
   const { data, isLoading, error } = useWorkTrackersForWeek(userUuid, startDate);
   const attentionByTracker = useAttentionByTracker();
+  const proofsByTracker = useProofsByTracker(data?.workTrackers.map((r) => r.workTracker.id) ?? []);
   let financialTotals;
   let travelTotals;
   if (data) {
@@ -105,6 +110,12 @@ export function TripList({ userUuid, startDate, onSelectWorkTracker }: Props) {
             <th className={`w-[7%] ${className}`}>
               {row.workTracker.pay_cents ? `$${(row.workTracker.pay_cents / 100).toFixed(2)}` : ""}
             </th>
+            <th className={`w-[7%] ${className}`}>
+              <DeliveryProofCell
+                proof={proofsByTracker.get(row.workTracker.id)}
+                trackerStatus={row.workTracker.status}
+              />
+            </th>
             <th className={`w-[14%] ${className}`}>{row.workTracker.notes}</th>
           </tr>
         );
@@ -129,6 +140,7 @@ export function TripList({ userUuid, startDate, onSelectWorkTracker }: Props) {
         <th className={`w-[7%] ${className}`}>
           {financialTotals ? `$${(financialTotals.subtotal / 100).toFixed(2)}` : ""}
         </th>
+        <th className={`w-[7%] ${className}`}></th>
         <th className={`w-[14%] ${className}`}></th>
       </tr>
       <tr className="border-b h-12 border-gray-200 ">
@@ -147,6 +159,7 @@ export function TripList({ userUuid, startDate, onSelectWorkTracker }: Props) {
         <th className={`w-[7%] ${className}`}>
           {financialTotals ? `$${(financialTotals.tax / 100).toFixed(2)}` : ""}
         </th>
+        <th className={`w-[7%] ${className}`}></th>
         <th className={`w-[14%] ${className}`}></th>
       </tr>
       <tr className="border-b h-12 border-gray-200 ">
@@ -165,6 +178,7 @@ export function TripList({ userUuid, startDate, onSelectWorkTracker }: Props) {
         <th className={`w-[7%] ${className}`}>
           {financialTotals ? `$${(financialTotals.total / 100).toFixed(2)}` : ""}
         </th>
+        <th className={`w-[7%] ${className}`}></th>
         <th className={`w-[14%] ${className}`}></th>
       </tr>
     </tbody>

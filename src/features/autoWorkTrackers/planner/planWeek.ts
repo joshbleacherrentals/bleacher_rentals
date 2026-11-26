@@ -23,6 +23,10 @@ import { runStatements } from "./runLog";
 import { resolveSettings, type PlannerSettings, type SettingsRow } from "./settings";
 import { settingsQuery } from "../db/settings";
 
+/** planWeek's steps, in order: for the progress display while it runs. */
+export const PLAN_STEPS = ["reading", "roads", "solving", "writing"] as const;
+export type PlanStep = (typeof PLAN_STEPS)[number];
+
 export type PlanWeekResult = {
   created: number;
   driverDays: number;
@@ -119,16 +123,21 @@ export async function planWeek(input: {
   supabase: SupabaseClient<Database>;
   /** Who pressed Create (Users.id), recorded on the run. */
   userUuid: string | null;
+  /** Told as each step begins, for a progress display. */
+  onStep?: (step: PlanStep) => void;
 }): Promise<PlanWeekResult> {
   if (running) throw new Error("Work trackers are already being created.");
   running = true;
+  const step = (s: PlanStep) => input.onStep?.(s);
   try {
+    step("reading");
     const [inputs, settingsRows] = await Promise.all([
       loadPlanningInputs(input.zoneId, input.weekStart),
       typedGetAll(settingsQuery(), expect<SettingsRow>()),
     ]);
     const settings = resolveSettings(settingsRows[0] ?? null);
     const pairs = pairsToLookUp(inputs.drivers, inputs.trips);
+    step("roads");
     const road = await fetchRoadTimes(pairs);
     const answered = pairs.filter(([a, b]) => road.legs.get(pairKey(a, b))?.found).length;
 
@@ -140,12 +149,14 @@ export async function planWeek(input: {
       roadLegs: road.legs,
       settings,
     });
+    step("solving");
     const response: SolveResponse =
       built.request.trips.length > 0
         ? await callSolve(built.request)
         : { routes: [], unplaced: [] };
     const read = readSolve(built, response, input.tz);
     const { keep, skipped } = withoutDuplicates(read.planned, inputs.existing);
+    step("writing");
 
     const { pay, siteRates } = await loadPay(
       [...new Set(keep.map((p) => p.driverUuid))],
