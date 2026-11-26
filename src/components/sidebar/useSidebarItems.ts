@@ -32,7 +32,7 @@ import {
   MailX,
   Tags,
   Terminal,
-  CalendarClock,
+  Store,
 } from "lucide-react";
 import { QuickBooksIcon } from "@/components/Icons";
 import type { WebRole } from "@/features/userAccess/logic/determineAccess";
@@ -120,6 +120,13 @@ const ALL_ITEMS: SidebarItemConfig[] = [
       // inspections list; an account manager owns everything here except the annual inspections.
       // Without per-child roles the dropdown is all-or-nothing, and both would
       // be shown links that bounce them straight back out.
+      // Dashboard & Analytics comes first: the maintenance figures of the whole fleet, for the
+      // roles that read them (docs/specs/dashboard-analytics-02-access-shell.md D3, D29).
+      {
+        label: "Dashboard & Analytics",
+        href: "/dashboard-analytics",
+        roles: ["admin", "viewer", "maintainer"],
+      },
       {
         label: "Damage Reports",
         href: "/damage-reports",
@@ -151,13 +158,6 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     label: "Work Trackers",
     href: "/work-trackers",
     icon: ClipboardList,
-  },
-  {
-    type: "button",
-    key: "auto-work-trackers",
-    label: "Auto Work Trackers",
-    href: "/auto-work-trackers",
-    icon: CalendarClock,
   },
   {
     type: "dropdown",
@@ -203,6 +203,15 @@ const ALL_ITEMS: SidebarItemConfig[] = [
     href: "/contacts",
     activePrefixes: ["/companies"],
     icon: BookUser,
+  },
+  // docs/specs/vendors-page.md D8: the Vendors page, right after Companies & Contacts. Every role
+  // that opens it lists the key below; a developer does not.
+  {
+    type: "button",
+    key: "vendors",
+    label: "Vendors",
+    href: "/vendors",
+    icon: Store,
   },
   {
     type: "button",
@@ -386,6 +395,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "vendors",
     "blocked-emails",
     "sales-offices",
     "team",
@@ -393,7 +403,6 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quality-assurance",
     "accountant",
     "work-trackers",
-    "auto-work-trackers",
     "scorecard",
     "leaderboard",
     "driver-calendar",
@@ -405,13 +414,13 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "quotes-bookings",
     "messages",
     "companies-contacts",
+    "vendors",
     "blocked-emails",
     "sales-offices",
     "team",
     "assets",
     "quality-assurance",
     "work-trackers",
-    "auto-work-trackers",
     "scorecard",
     "leaderboard",
     "driver-calendar",
@@ -421,6 +430,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
   viewer: [
     "dashboard",
     "quotes-bookings",
+    "vendors",
     "blocked-emails",
     "sales-offices",
     "team",
@@ -433,7 +443,14 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "documentation",
   ],
   driver: [],
-  maintainer: ["dashboard", "quality-assurance", "documentation", "assets", "blocked-emails"],
+  maintainer: [
+    "dashboard",
+    "quality-assurance",
+    "documentation",
+    "assets",
+    "vendors",
+    "blocked-emails",
+  ],
   // docs/specs/accountant-address-book.md: Companies & Contacts, after Messages (ALL_ITEMS sets the order).
   // docs/specs/accountant-team.md: Team, after Quotes & Bookings.
   // docs/specs/qbo-invoice-12a-quote-types-page.md: Configuration, which holds only Quote Types for them.
@@ -444,6 +461,7 @@ const ROLE_SIDEBAR_KEYS: Record<WebRole, string[]> = {
     "work-trackers",
     "messages",
     "companies-contacts",
+    "vendors",
     "blocked-emails",
     "configuration",
     "documentation",

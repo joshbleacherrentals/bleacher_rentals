@@ -656,6 +656,31 @@ const AutoWorkTrackerFeedback = new Table(AutoWorkTrackerFeedbackCols, {
   indexes: { run_uuid: ["run_uuid"] },
 });
 
+// GPS proof of delivery per completed work tracker; written by the daily cron, read-only in the app.
+const DeliveryProofsCols = {
+  work_tracker_uuid: column.text,
+  status: column.text,
+  final: column.integer,
+  checked_at: column.text,
+  attempts: column.integer,
+  bleacher_uuid: column.text,
+  imei: column.text,
+  dropoff_latitude: column.real,
+  dropoff_longitude: column.real,
+  evidence_kind: column.text,
+  evidence_at: column.text,
+  evidence_latitude: column.real,
+  evidence_longitude: column.real,
+  distance_meters: column.integer,
+  evidence_place: column.text,
+  evidence_until: column.text,
+  gps_last_report_at: column.text,
+  window_end: column.text,
+} satisfies PowerSyncColsFor<"DeliveryProofs">;
+const DeliveryProofs = new Table(DeliveryProofsCols, {
+  indexes: { work_tracker_uuid: ["work_tracker_uuid"] },
+});
+
 const VendorsCols = {
   created_at: column.text,
   qbo_vendor_id: column.text,
@@ -675,6 +700,7 @@ const VendorsCols = {
   is_parts_supplier: column.integer,
   status: column.text,
   notes: column.text,
+  type: column.text,
 } satisfies PowerSyncColsFor<"Vendors">;
 const Vendors = new Table(VendorsCols, { indexes: { address_uuid: ["address_uuid"] } });
 
@@ -1553,6 +1579,7 @@ export const AppSchema = new Schema({
   AutoWorkTrackerRuns,
   AutoWorkTrackerRunTrips,
   AutoWorkTrackerFeedback,
+  DeliveryProofs,
   Venues,
   AccountManagers,
   AccountManagerZones,

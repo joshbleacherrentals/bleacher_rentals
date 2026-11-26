@@ -4,6 +4,7 @@ import { useState } from "react";
 import { VendorCard } from "../util/VendorCard";
 import { useVendors } from "../../hooks/useVendors";
 import { EditVendorModal } from "../EditVendorModal";
+import { driverVendorChoices, type VendorOption } from "../../utils/vendorForm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -25,32 +26,17 @@ export function VendorSelection({ value, onChange, driverType }: VendorSelection
   const [isVendorDropdownOpen, setIsVendorDropdownOpen] = useState(false);
   const [vendorSearch, setVendorSearch] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingVendor, setEditingVendor] = useState<{
-    id: string;
-    displayName: string;
-    logoUrl: string | null;
-    qboVendorId: string | null;
-    qboConnectionUuid: string | null;
-    ein: string | null;
-    hst: string | null;
-  } | null>(null);
+  const [editingVendor, setEditingVendor] = useState<VendorOption | null>(null);
 
-  // Get vendors data
+  // Get vendors data. The selected card is looked up among all active vendors, so a driver whose
+  // vendor was switched to Repairs still sees it (docs/specs/vendors-page.md D11).
   const { data: vendors = [] } = useVendors();
   const selectedVendor = vendors.find((v) => v.id === value);
 
   // Handle vendor edit
-  const handleVendorEdit = (e: React.MouseEvent, vendor: any) => {
+  const handleVendorEdit = (e: React.MouseEvent, vendor: VendorOption) => {
     e.stopPropagation();
-    setEditingVendor({
-      id: vendor.id,
-      displayName: vendor.displayName,
-      logoUrl: vendor.logoUrl,
-      qboVendorId: vendor.qboVendorId,
-      qboConnectionUuid: vendor.qboConnectionUuid ?? null,
-      ein: vendor.ein,
-      hst: vendor.hst,
-    });
+    setEditingVendor(vendor);
     setIsEditModalOpen(true);
     setIsVendorDropdownOpen(false);
   };
@@ -62,10 +48,8 @@ export function VendorSelection({ value, onChange, driverType }: VendorSelection
     setIsVendorDropdownOpen(false);
   };
 
-  // Filter vendors by search
-  const filteredVendors = vendors.filter((vendor) =>
-    vendor.displayName.toLowerCase().includes(vendorSearch.toLowerCase()),
-  );
+  // The list to choose from: Driver vendors only, filtered by search (D11).
+  const filteredVendors = driverVendorChoices(vendors, vendorSearch);
 
   // Vendor dropdown content (reused in both ghost and actual card)
   const vendorDropdownContent = (
@@ -166,6 +150,7 @@ export function VendorSelection({ value, onChange, driverType }: VendorSelection
           setIsEditModalOpen(false);
         }}
         existingVendor={editingVendor}
+        defaultType="driver"
       />
     </>
   );

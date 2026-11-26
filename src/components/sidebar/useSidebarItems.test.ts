@@ -34,8 +34,50 @@ describe("useSidebarItems", () => {
         expect.objectContaining({ key: "blocked-emails", href: "/blocked-emails" }),
       );
     }
+    // Vendors sits between them (docs/specs/vendors-page.md D8), so Blocked Emails follows Vendors.
     const keys = useSidebarItems(["admin"]).map((i) => i.key);
-    expect(keys.indexOf("blocked-emails")).toBe(keys.indexOf("companies-contacts") + 1);
+    expect(keys.indexOf("blocked-emails")).toBe(keys.indexOf("vendors") + 1);
+  });
+
+  // ═══ Vendors (docs/specs/vendors-page.md D4, D8) ═══
+
+  it("every role but the developer and the driver finds Vendors as a top-level button", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "maintainer",
+      "accountant",
+    ] as const) {
+      expect(useSidebarItems([role]), role).toContainEqual(
+        expect.objectContaining({
+          type: "button",
+          key: "vendors",
+          label: "Vendors",
+          href: "/vendors",
+        }),
+      );
+    }
+  });
+
+  it("a developer or a driver does not see Vendors", () => {
+    for (const role of ["developer", "driver"] as const) {
+      expect(
+        useSidebarItems([role]).map((i) => i.key),
+        role,
+      ).not.toContain("vendors");
+    }
+  });
+
+  it("a developer who is also an accountant sees Vendors", () => {
+    expect(useSidebarItems(["developer", "accountant"]).map((i) => i.key)).toContain("vendors");
+  });
+
+  it("Vendors comes right after Companies & Contacts", () => {
+    for (const role of ["admin", "account_manager", "accountant"] as const) {
+      const keys = useSidebarItems([role]).map((i) => i.key);
+      expect(keys.indexOf("vendors"), role).toBe(keys.indexOf("companies-contacts") + 1);
+    }
   });
 
   it("no one else gets the configuration section", () => {
@@ -49,10 +91,19 @@ describe("useSidebarItems", () => {
     expect(keys.indexOf("accountant")).toBe(keys.indexOf("work-trackers") - 1);
   });
 
-  it("admin and account manager see Auto Work Trackers right after Work Trackers", () => {
-    for (const role of ["admin", "account_manager"] as const) {
-      const keys = useSidebarItems([role]).map((i) => i.key);
-      expect(keys.indexOf("auto-work-trackers"), role).toBe(keys.indexOf("work-trackers") + 1);
+  it("nobody sees Auto Work Trackers: it lives in Work Trackers' tabs now", () => {
+    for (const role of [
+      "admin",
+      "account_manager",
+      "viewer",
+      "developer",
+      "maintainer",
+      "accountant",
+    ] as const) {
+      expect(
+        useSidebarItems([role]).map((i) => i.key),
+        role,
+      ).not.toContain("auto-work-trackers");
     }
   });
 
@@ -69,15 +120,6 @@ describe("useSidebarItems", () => {
         useSidebarItems([role]).map((i) => i.key),
         role,
       ).not.toContain("schedule-validator");
-    }
-  });
-
-  it("no other role sees Auto Work Trackers", () => {
-    for (const role of ["viewer", "developer", "maintainer", "accountant"] as const) {
-      expect(
-        useSidebarItems([role]).map((i) => i.key),
-        role,
-      ).not.toContain("auto-work-trackers");
     }
   });
 
@@ -154,6 +196,7 @@ describe("useSidebarItems", () => {
     expect(qa!.type).toBe("dropdown");
     const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
     expect(children.map((c) => c.href)).toEqual([
+      "/dashboard-analytics",
       "/damage-reports",
       "/annual-inspections",
       "/repairs",
@@ -181,6 +224,7 @@ describe("useSidebarItems", () => {
       const qa = useSidebarItems([role]).find((i) => i.key === "quality-assurance");
       const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
       expect(children.map((c) => c.href)).toEqual([
+        "/dashboard-analytics",
         "/damage-reports",
         "/inspections",
         "/annual-inspections",
@@ -195,6 +239,7 @@ describe("useSidebarItems", () => {
     );
     const children = (qa as Extract<typeof qa, { type: "dropdown" }>).children;
     expect(children.map((c) => c.href)).toEqual([
+      "/dashboard-analytics",
       "/damage-reports",
       "/inspections",
       "/annual-inspections",
@@ -202,9 +247,52 @@ describe("useSidebarItems", () => {
     ]);
   });
 
+  // ═══ Dashboard & Analytics (docs/specs/dashboard-analytics-02-access-shell.md §2.3, D3, D29) ═══
+
+  const qualityAssuranceChildren = (roles: Parameters<typeof useSidebarItems>[0]) => {
+    const qa = useSidebarItems(roles).find((i) => i.key === "quality-assurance");
+    if (!qa || qa.type !== "dropdown") return undefined;
+    return qa.children;
+  };
+
+  it("the first child of Quality Assurance is Dashboard & Analytics for an administrator, a viewer and a maintainer", () => {
+    for (const role of ["admin", "viewer", "maintainer"] as const) {
+      const first = qualityAssuranceChildren([role])![0];
+      expect(first, role).toEqual({
+        label: "Dashboard & Analytics",
+        href: "/dashboard-analytics",
+        roles: ["admin", "viewer", "maintainer"],
+      });
+    }
+  });
+
+  it("an account manager's Quality Assurance does not contain Dashboard & Analytics", () => {
+    const children = qualityAssuranceChildren(["account_manager"])!;
+    expect(children.map((c) => c.label)).not.toContain("Dashboard & Analytics");
+    expect(children.map((c) => c.href)).not.toContain("/dashboard-analytics");
+  });
+
+  it("an administrator's Quality Assurance reads: Dashboard & Analytics, Damage Reports, Inspections, Annual Inspections, Repairs", () => {
+    expect(qualityAssuranceChildren(["admin"])!.map((c) => c.label)).toEqual([
+      "Dashboard & Analytics",
+      "Damage Reports",
+      "Inspections",
+      "Annual Inspections",
+      "Repairs",
+    ]);
+  });
+
+  it("no other role is offered Dashboard & Analytics, and no other part of the sidebar has it", () => {
+    for (const role of ["developer", "accountant", "driver"] as const) {
+      expect(JSON.stringify(useSidebarItems([role])), role).not.toContain("/dashboard-analytics");
+    }
+    const keys = useSidebarItems(["admin"]).map((i) => i.key);
+    expect(keys).not.toContain("dashboard-analytics");
+  });
+
   // ═══ Accountant (Stage 2: Work Trackers) ═══
 
-  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, Blocked Emails, the Configuration section and the Documentation section, nothing else", () => {
+  it("accountant sees Quotes & Bookings, Team, Accountant, Work Trackers, Messages, Companies & Contacts, Vendors, Blocked Emails, the Configuration section and the Documentation section, nothing else", () => {
     const items = useSidebarItems(["accountant"]);
     expect(items.map((i) => i.key)).toEqual([
       "quotes-bookings",
@@ -213,6 +301,7 @@ describe("useSidebarItems", () => {
       "work-trackers",
       "messages",
       "companies-contacts",
+      "vendors",
       "blocked-emails",
       "configuration",
       "documentation",
@@ -253,11 +342,17 @@ describe("useSidebarItems", () => {
       "/companies",
     ]);
 
+    // docs/specs/vendors-page.md D8: Vendors, right after Companies & Contacts.
+    const vendors = items[6];
+    expect(vendors.type).toBe("button");
+    expect("label" in vendors && vendors.label).toBe("Vendors");
+    expect("href" in vendors && vendors.href).toBe("/vendors");
+
     // docs/specs/qbo-invoice-12a-quote-types-page.md §4: Configuration, with Quote Types only.
-    const configuration = items[7];
+    const configuration = items[8];
     expect(configuration.type).toBe("section");
 
-    const docs = items[8];
+    const docs = items[9];
     expect(docs.type).toBe("section");
     const hrefs = (docs as Extract<typeof docs, { type: "section" }>).children.map((c) =>
       "href" in c ? c.href : "",

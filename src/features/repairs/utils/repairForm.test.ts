@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CREATE_VENDOR_LABEL,
   REPAIR_EVENT_NAME,
   REPAIR_FORM_MESSAGES,
   changedRepairFields,
@@ -13,7 +14,9 @@ import {
   normalizeNotes,
   repairFormFromRow,
   validateRepairForm,
+  vendorCreateFooter,
   vendorSelectOptions,
+  withCreatedVendor,
   type RepairFormValues,
 } from "./repairForm";
 import type { FilterOption } from "./repairFilters";
@@ -332,5 +335,65 @@ describe("clearedRepairFormErrors (D138)", () => {
     }
     const onlyServices = { services: "x" };
     expect(clearedRepairFormErrors(onlyServices, "invoiceNumber")).toBe(onlyServices);
+  });
+});
+
+// docs/specs/vendors-page.md §11 (D25 to D28): the "+ Create vendor" row of the Vendor select and the
+// vendor it has just made.
+describe("vendorCreateFooter (D25)", () => {
+  it("is the pinned row '+ Create vendor'", () => {
+    expect(CREATE_VENDOR_LABEL).toBe("+ Create vendor");
+    expect(
+      vendorCreateFooter(
+        () => {},
+        () => "",
+      )?.label,
+    ).toBe("+ Create vendor");
+  });
+
+  it("is absent when the window cannot create vendors", () => {
+    expect(vendorCreateFooter(undefined, () => "x")).toBeUndefined();
+  });
+
+  it("hands the text typed in the search to the window, trimmed (D27)", () => {
+    const seen: string[] = [];
+    let typed = "  Dallas Trailer ";
+    const footer = vendorCreateFooter(
+      (name) => seen.push(name),
+      () => typed,
+    );
+    footer?.onSelect();
+    typed = "";
+    footer?.onSelect();
+    expect(seen).toEqual(["Dallas Trailer", ""]);
+  });
+});
+
+describe("withCreatedVendor (D26)", () => {
+  const options = [
+    { value: "v1", label: "Alpha Welding" },
+    { value: "v3", label: "Gamma Trailer" },
+  ];
+
+  it("changes nothing when no vendor was created", () => {
+    expect(withCreatedVendor(options, null)).toEqual(options);
+  });
+
+  it("adds the new vendor, so its name shows before the list has caught up", () => {
+    expect(withCreatedVendor(options, { id: "v9", displayName: "Fresh Co" })).toEqual([
+      ...options,
+      { value: "v9", label: "Fresh Co" },
+    ]);
+  });
+
+  it("does not add it twice once the list has it", () => {
+    const list = [...options, { value: "v9", label: "Fresh Co" }];
+    expect(withCreatedVendor(list, { id: "v9", displayName: "Fresh Co" })).toEqual(list);
+  });
+
+  it("does not change the list it was given", () => {
+    const input = [...options];
+    withCreatedVendor(input, { id: "v9", displayName: "Fresh Co" });
+    expect(input).toEqual(options);
   });
 });

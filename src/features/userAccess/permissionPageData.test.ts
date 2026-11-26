@@ -29,7 +29,7 @@ describe("permission matrix", () => {
     const accountant = (label: string) =>
       PERMISSIONS.find((p) => p.label === label)?.roles.accountant;
 
-    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Blocked Emails, Edit Team Members, and Quote Types", () => {
+    it("is only granted Work Trackers, the driver payment rows, Accounts Receivable, Quotes & Bookings, payments, the QuickBooks invoice and its alerts, the internal chat, Companies & Contacts, Vendors, Blocked Emails, Edit Team Members, and Quote Types", () => {
       const granted = PERMISSIONS.filter((p) => p.roles.accountant.level !== "none").map(
         (p) => p.label,
       );
@@ -45,6 +45,7 @@ describe("permission matrix", () => {
         "Edit Team Members",
         "Event Chat",
         "Events",
+        "GPS Proof of Delivery", // shown read-only on the work trackers they open
         "Payment History",
         "Pull Emails from Gmail",
         "QuickBooks Invoice (create and update)",
@@ -54,6 +55,7 @@ describe("permission matrix", () => {
         "Quote Types",
         "Record a Payment",
         "Send Emails",
+        "Vendors",
         "Work Trackers",
       ]);
     });
@@ -1385,5 +1387,134 @@ describe("the Dashboard uses the repair window (spec 11)", () => {
     expect(reports?.roles.account_manager.level).toBe("custom");
     expect(reports?.roles.viewer.level).toBe("read");
     expect(reports?.roles.maintainer.level).toBe("full");
+  });
+});
+
+// docs/specs/dashboard-analytics-02-access-shell.md §2.5 and §5 (D31): the row of the Dashboard &
+// Analytics page, in the group Scorecards, read for the three roles that open it. Spec 05 §5
+// rewrites its description and the notes of the three roles now that the page shows figures.
+describe("the Dashboard & Analytics row (dashboard-analytics specs 02 and 05)", () => {
+  const row = PERMISSIONS.find((p) => p.label === "Dashboard & Analytics");
+
+  it("exists, once, in the group Scorecards, right after Driver Scorecard", () => {
+    expect(PERMISSIONS.filter((p) => p.label === "Dashboard & Analytics")).toHaveLength(1);
+    expect(row?.category).toBe("Scorecards");
+    const index = PERMISSIONS.findIndex((p) => p.label === "Dashboard & Analytics");
+    expect(PERMISSIONS[index - 1]?.label).toBe("Driver Scorecard");
+  });
+
+  it("describes the page, in US dollars, as read-only", () => {
+    expect(row?.description).toBe(
+      "The Dashboard & Analytics page, in the Quality Assurance menu. It adds up what the fleet's repairs cost, in US dollars (a repair paid in Canadian dollars is converted at the exchange rate of the day it starts), for a year or for all time: the total spend, the share of bleachers that are not in an open repair, the average spend per bleacher, the open repairs by status and how much of the yearly budget is used; the cost by operating zone, by bleacher model and by damage category, with a chart; and the six vendors with the most labor and parts spend. Everything on the page is read only.",
+    );
+  });
+
+  it("names every block of the page and says it is read only", () => {
+    const description = row?.description ?? "";
+    for (const part of [
+      "in US dollars",
+      "converted at the exchange rate",
+      "total spend",
+      "average spend per bleacher",
+      "open repairs by status",
+      "yearly budget",
+      "operating zone",
+      "bleacher model",
+      "damage category",
+      "with a chart",
+      "six vendors",
+      "labor and parts",
+      "read only",
+    ]) {
+      expect(description, part).toContain(part);
+    }
+  });
+
+  it("is read for an administrator, a viewer and a maintainer, with the same note", () => {
+    expect(row?.roles.admin.level).toBe("read");
+    expect(row?.roles.viewer.level).toBe("read");
+    expect(row?.roles.maintainer.level).toBe("read");
+    const note =
+      "Opens the page and reads every figure on it, vendors and budget included. Nothing on it can be changed.";
+    expect(row?.roles.admin.note).toBe(note);
+    expect(row?.roles.viewer.note).toBe(note);
+    expect(row?.roles.maintainer.note).toBe(note);
+  });
+
+  it("is none for an account manager, a developer, a driver and an accountant", () => {
+    for (const role of ["account_manager", "developer", "driver", "accountant"] as const) {
+      expect(row?.roles[role].level, role).toBe("none");
+    }
+    expect(row?.roles.account_manager.note).toBe(
+      "Account managers do not have this page; it is hidden from them. They still read every repair on the Repairs page.",
+    );
+    expect(row?.roles.developer.note).toBe(
+      "Developers do not have access to repairs or maintenance data. This role is limited to the product roadmap.",
+    );
+    expect(row?.roles.driver.note).toBe("Drivers only have access to the Driver Mobile App.");
+    expect(row?.roles.accountant.note).toContain("Everything else on the web dashboard is hidden");
+  });
+
+  it("is in the maintainer's role description, before the line about quotes", () => {
+    expect(ROLE_DESCRIPTIONS.maintainer).toContain(
+      "Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
+    );
+  });
+});
+
+// docs/specs/vendors-page.md §5 (D4, D5, D6): the Vendors page is open to every role but a developer;
+// admin, account manager, maintainer and accountant add, edit, delete and restore; a viewer reads.
+describe("Vendors", () => {
+  const row = PERMISSIONS.find((p) => p.label === "Vendors");
+
+  it("is a row that answers for every role", () => {
+    expect(row).toBeDefined();
+    expect(Object.keys(row!.roles).sort()).toEqual(Object.keys(ROLE_LABELS).sort());
+  });
+
+  it("is full for the four roles that manage vendors", () => {
+    for (const role of ["admin", "account_manager", "maintainer", "accountant"] as const) {
+      expect(row?.roles[role].level, role).toBe("full");
+    }
+  });
+
+  it("is read for a viewer, who opens a window that cannot be changed", () => {
+    expect(row?.roles.viewer.level).toBe("read");
+    expect(row?.roles.viewer.note).toMatch(/cannot be changed/i);
+  });
+
+  it("is hidden from a developer and a driver", () => {
+    expect(row?.roles.developer.level).toBe("none");
+    expect(row?.roles.driver.level).toBe("none");
+  });
+
+  it("names the vendor type in words an account manager can read", () => {
+    expect(row?.description).toMatch(/Driver for the companies that employ our drivers/);
+    expect(row?.description).toMatch(/Repairs for repair and parts companies/);
+  });
+
+  // docs/specs/vendors-page.md §11 (D25): the repair windows' Vendor select can create a vendor, for
+  // the two roles that edit a repair.
+  it("tells an administrator and a maintainer they can create a vendor from the repair windows", () => {
+    for (const role of ["admin", "maintainer"] as const) {
+      expect(row?.roles[role].note, role).toMatch(
+        /Vendor select of the Edit repair and New repair windows/,
+      );
+      expect(row?.roles[role].note, role).toMatch(/\+ Create vendor/);
+    }
+  });
+
+  it("is named in the descriptions of the maintainer and the accountant, so 'everything else is hidden' stays true", () => {
+    expect(ROLE_DESCRIPTIONS.maintainer).toContain("Vendors page");
+    expect(ROLE_DESCRIPTIONS.accountant).toContain("Vendors page");
+    const costs = PERMISSIONS.find((p) => p.label === "Dashboard & Analytics");
+    expect(costs?.roles.maintainer.level).toBe("read");
+  });
+
+  it("is said in the accountant's note on Edit Team Members, which still manages vendors from a driver", () => {
+    const team = PERMISSIONS.find((p) => p.label === "Edit Team Members");
+    expect(team?.roles.accountant.note).toContain(
+      "the same vendors are managed on the Vendors page",
+    );
   });
 });
