@@ -70,12 +70,17 @@ continue to the next hop, and do not leave the PR merged half-way.
 **4. Merge.**
 
 ```bash
-gh pr merge <number> --squash
+gh pr merge <number> --merge --admin
 ```
 
-The ruleset requires an approving review; Josh is a bypass actor, so his own
-promotions go through. If the merge is refused for any other reason, stop and
-report it — never reach for `--admin` or `--force` to get past a rule.
+Use `--merge`, not `--squash`: develop, staging and main share their commits, and a
+squash would make them drift apart.
+
+The ruleset requires one approving review, and Josh is its bypass actor; `--admin`
+is how his bypass is used from `gh`. Because `--admin` also skips required checks,
+it is allowed **only** after you listed every check on the PR's head commit and
+each one is `success`. Never use it, or `--force`, to get past a failing or missing
+check. If the merge is refused for any other reason, stop and report it.
 
 **5. Confirm the merge landed** before starting the next hop, and check that the
 deploy workflow for that branch (`develop.yaml`, `staging.yaml`,
