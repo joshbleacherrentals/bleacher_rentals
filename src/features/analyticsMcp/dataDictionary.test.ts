@@ -38,6 +38,26 @@ describe("BUSINESS_RULES", () => {
     }
   });
 
+  // docs/specs/accountant-kpi.md §5: staff ask Claude about the KPI tab's numbers.
+  it("explains the Days to collect KPI: what counts, the day, the range and the rounding", () => {
+    const rule = BUSINESS_RULES.find((r) => r.topic === "Days to collect (KPI)");
+    expect(rule).toBeDefined();
+    for (const part of [
+      "Days to collect Deposit",
+      "Days to collect Final Payment",
+      "event_status = 'booked'",
+      "paid in full",
+      "America/Toronto",
+      "negative days",
+      "rounded UP",
+      "no PaymentInstallments",
+    ]) {
+      expect(rule!.rule, part).toContain(part);
+    }
+    expect(rule!.source).toContain("src/features/accountantKpi/utils/collectionDays.ts");
+    expect(rule!.source).toContain("src/features/accountantKpi/utils/kpiAverages.ts");
+  });
+
   it("has unique topics", () => {
     const topics = BUSINESS_RULES.map((r) => r.topic);
     expect(new Set(topics).size).toBe(topics.length);

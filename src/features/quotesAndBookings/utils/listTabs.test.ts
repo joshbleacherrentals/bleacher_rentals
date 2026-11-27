@@ -30,13 +30,15 @@ describe("the /quotes-bookings declaration", () => {
 
 describe("the /accountant declaration", () => {
   // docs/specs/accountant-collections-07-collections-list.md §3.
-  // docs/specs/accountant-audit-01-tab.md §5: Audit is the fourth and last tab.
-  it("has Collections first, then AR Deposits, Need attention and Audit; opens on Collections; writes the tab to the URL", () => {
+  // docs/specs/accountant-audit-01-tab.md §5: Audit is the fourth tab.
+  // docs/specs/accountant-kpi.md §2.2 (D15): KPI is the fifth and last.
+  it("has Collections first, then AR Deposits, Need attention, Audit and KPI; opens on Collections; writes the tab to the URL", () => {
     expect(ACCOUNTANT_TABS.tabs.map((tab) => tab.id)).toEqual([
       "collections",
       "ar_deposits",
       "need_attention",
       "audit",
+      "kpi",
     ]);
     expect(ACCOUNTANT_TABS.openingTab).toBe("collections");
     expect(ACCOUNTANT_TABS.writeTabToUrl).toBe(true);
@@ -49,6 +51,15 @@ describe("the /accountant declaration", () => {
 
   it("gives Audit the default sort, which it never uses (it keeps its own order)", () => {
     expect(defaultSortForTab("audit", ACCOUNTANT_TABS)).toEqual(DEFAULT_SORT);
+  });
+
+  it("reads ?tab=kpi back, and offers no Status filter on KPI", () => {
+    expect(parseListTab("kpi", ACCOUNTANT_TABS)).toBe("kpi");
+    expect(tabUsesStatusFilter("kpi", ACCOUNTANT_TABS)).toBe(false);
+  });
+
+  it("gives KPI the default sort, which it never uses (it has no list to sort)", () => {
+    expect(defaultSortForTab("kpi", ACCOUNTANT_TABS)).toEqual(DEFAULT_SORT);
   });
 
   it("gives Collections the default sort (it owns its own order) and no Status filter", () => {

@@ -37,6 +37,7 @@ describe("permission matrix", () => {
         "Accounts Receivable",
         "Ask Claude About Our Data", // docs/specs/analytics-mcp.md D2: open to every active account
         "Blocked Customer Emails",
+        "Collection KPIs", // docs/specs/accountant-kpi.md: the KPI tab of the Accountant page
         "Collections",
         "Companies & Contacts",
         "Driver Audit",
@@ -499,6 +500,79 @@ describe("permission matrix", () => {
         expect(ROLE_DESCRIPTIONS.admin).toBe(
           "Full access to all features, settings, and team management.",
         );
+      });
+    });
+
+    // docs/specs/accountant-kpi.md §5: the KPI tab of the Accountant page.
+    describe("Collection KPIs", () => {
+      const row = PERMISSIONS.find((p) => p.label === "Collection KPIs");
+
+      it("sits in Day to Day Operations, right after Driver Audit", () => {
+        const index = PERMISSIONS.findIndex((p) => p.label === "Collection KPIs");
+        expect(PERMISSIONS[index - 1]?.label).toBe("Driver Audit");
+        expect(row?.category).toBe("Day to Day Operations");
+      });
+
+      it("is read for an admin and an accountant, and none for the other five roles", () => {
+        const levels = Object.fromEntries(
+          Object.entries(row?.roles ?? {}).map(([role, access]) => [role, access.level]),
+        );
+        expect(levels).toEqual({
+          admin: "read",
+          accountant: "read",
+          account_manager: "none",
+          viewer: "none",
+          developer: "none",
+          driver: "none",
+          maintainer: "none",
+        });
+      });
+
+      it("answers for all seven roles, with a note for each", () => {
+        expect(Object.keys(row?.roles ?? {}).sort()).toEqual(Object.keys(ROLE_LABELS).sort());
+        for (const [role, access] of Object.entries(row?.roles ?? {})) {
+          expect(access.note, role).toBeTruthy();
+        }
+      });
+
+      it("describes the two numbers, the range, what counts, that a schedule change moves them, and that it is read-only", () => {
+        expect(row?.description).toBe(
+          "The KPI tab of the Accountant page. Two cards, Days to collect Deposit and Days to collect Final Payment: for a date range the user chooses (a preset such as This month, or any From and To dates), the average number of days between the day a payment of a booking's payment schedule was due and the day it was paid in full. Only payments paid in full count, in the range that holds the day they were paid in full; a payment paid before its due date is not counted. The numbers follow the payment schedules and payments as they are now, so editing a schedule changes them. Read-only.",
+        );
+      });
+
+      it("tells an admin and an accountant what they can read, and that Export to CSV is off here", () => {
+        const note =
+          "Can open the KPI tab and read both numbers for any date range. Nothing on the tab changes a payment or a payment schedule. Export to CSV in the page header is disabled on this tab.";
+        expect(row?.roles.admin.note).toBe(note);
+        expect(row?.roles.accountant.note).toBe(note);
+      });
+
+      it("tells an account manager and a viewer where they still see a booking's payments", () => {
+        expect(row?.roles.account_manager.note).toBe(
+          "The Accountant page is for accountants and administrators. An account manager still sees a booking's payments on the Billing tab of the quote.",
+        );
+        expect(row?.roles.viewer.note).toBe(
+          "The Accountant page is for accountants and administrators. A viewer still sees a booking's payments on the Billing tab of the quote.",
+        );
+      });
+
+      it("keeps the notes of the developer, driver and maintainer in the wording of the neighbouring rows", () => {
+        const audit = PERMISSIONS.find((p) => p.label === "Driver Audit");
+        expect(row?.roles.developer.note).toBe(audit?.roles.developer.note);
+        expect(row?.roles.driver.note).toBe(audit?.roles.driver.note);
+        expect(row?.roles.maintainer.note).toBe(audit?.roles.maintainer.note);
+      });
+
+      it("is named in the accountant's role description, before the line about what is hidden", () => {
+        expect(ROLE_DESCRIPTIONS.accountant).toContain(
+          "Also has the KPI tab of the Accountant page, where they see the average number of days it takes to collect a booking's Deposit and Final Payment for a date range.",
+        );
+        expect(
+          ROLE_DESCRIPTIONS.accountant.endsWith(
+            "Everything else on the web dashboard is hidden from this role.",
+          ),
+        ).toBe(true);
       });
     });
 

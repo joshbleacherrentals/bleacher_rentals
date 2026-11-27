@@ -36,7 +36,7 @@ export const ROLE_DESCRIPTIONS: Record<WebRole, string> = {
   maintainer:
     "Looks after the condition of the fleet. Owns the Annual Inspections queue, and has full access to Damage Reports and Repairs. Can add and edit bleachers and the driver-app documents on the Assets page, and write notes in Dashboard cells, editing only the ones they wrote themselves. Can read the events and work trackers the Dashboard shows but cannot change them. Also has the Vendors page, where they add and edit vendors. Reads the Dashboard & Analytics page of maintenance figures. No quotes, payments, or team management.",
   accountant:
-    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Also has the Vendors page, where they add, edit, delete and restore vendors. Everything else on the web dashboard is hidden from this role.",
+    "For the people who handle finances. Sees every week and every driver on the Work Trackers pages, with each work tracker open for reading only, marks a driver's week Ready for Payment, creates its QuickBooks bill, and records it as Paid or Unpaid. Also has the Accountant page, which lists what each booking still owes on its AR Deposits tab, and Quotes & Bookings, read-only: the list and any quote or booking, plus its Files. On a quote or booking they can change the QuickBooks Invoice Flag, and they can record, edit and delete manual payments, and create or update a quote's QuickBooks invoice. Also has the internal chat: they join, read and post, but cannot add anyone to a chat or remove anyone from one. Also has Companies & Contacts, where they create, edit and delete companies, contacts and venues. Also has the Team page: they see every team member, edit a driver's payment info and vendor, and manage the vendor companies. Cannot create, edit, delete or release work trackers. Also has the Quote Types page under Configuration, where they choose the QuickBooks Product/Service of each quote type. Also has the Collections tab and the invoice page behind it, where they follow up overdue payments with tasks. Also has the Audit tab of the Accountant page, where they see each driver's totals for a date range and open a driver to read that driver's work trackers with their Paid or Not paid status. Also has the KPI tab of the Accountant page, where they see the average number of days it takes to collect a booking's Deposit and Final Payment for a date range. Also has the Vendors page, where they add, edit, delete and restore vendors. Everything else on the web dashboard is hidden from this role.",
 };
 
 export const ROLE_ORDER: WebRole[] = [
@@ -298,6 +298,32 @@ export const PERMISSIONS: PermissionEntry[] = [
       maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
       accountant: read(
         "Can open the Audit tab and read the totals and the work trackers of any driver, including drivers who are no longer active. Marking a week Paid stays on the Work Trackers pages. Export to CSV in the page header downloads the drivers table for the range and search chosen, or, on a driver's page, all of that driver's work trackers in the range, not just the page on screen.",
+      ),
+    },
+  },
+  // docs/specs/accountant-kpi.md: the KPI tab of the Accountant page.
+  {
+    label: "Collection KPIs",
+    description:
+      "The KPI tab of the Accountant page. Two cards, Days to collect Deposit and Days to collect Final Payment: for a date range the user chooses (a preset such as This month, or any From and To dates), the average number of days between the day a payment of a booking's payment schedule was due and the day it was paid in full. Only payments paid in full count, in the range that holds the day they were paid in full; a payment paid before its due date is not counted. The numbers follow the payment schedules and payments as they are now, so editing a schedule changes them. Read-only.",
+    category: "Day to Day Operations",
+    roles: {
+      admin: read(
+        "Can open the KPI tab and read both numbers for any date range. Nothing on the tab changes a payment or a payment schedule. Export to CSV in the page header is disabled on this tab.",
+      ),
+      account_manager: none(
+        "The Accountant page is for accountants and administrators. An account manager still sees a booking's payments on the Billing tab of the quote.",
+      ),
+      developer: none(
+        "Developer is only meant to work on the developer roadmap and the Dev Tools pages.",
+      ),
+      viewer: none(
+        "The Accountant page is for accountants and administrators. A viewer still sees a booking's payments on the Billing tab of the quote.",
+      ),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: read(
+        "Can open the KPI tab and read both numbers for any date range. Nothing on the tab changes a payment or a payment schedule. Export to CSV in the page header is disabled on this tab.",
       ),
     },
   },

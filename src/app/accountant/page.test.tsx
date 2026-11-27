@@ -79,6 +79,10 @@ vi.mock("@/features/accountantCollections/components/CollectionsTab", () => ({
 vi.mock("@/features/accountantAudit/components/AuditTab", () => ({
   AuditTab: () => <div data-testid="audit-tab" />,
 }));
+// The KPI tab has its own tests too (docs/specs/accountant-kpi.md §5).
+vi.mock("@/features/accountantKpi/components/KpiTab", () => ({
+  KpiTab: () => <div data-testid="kpi-tab" />,
+}));
 vi.mock("@/features/quotesAndBookings/hooks/useUserNames", () => ({
   useUserNames: () => new Map([["am-1", "Dana Whitfield"]]),
 }));
@@ -190,17 +194,20 @@ describe("/accountant", () => {
 });
 
 describe("/accountant tabs", () => {
-  // docs/specs/accountant-audit-01-tab.md §5: Audit is the last tab.
-  it("offers Collections, AR Deposits, Need attention and Audit, in that order, and nothing else", () => {
+  // docs/specs/accountant-audit-01-tab.md §5: Audit is the fourth tab.
+  // docs/specs/accountant-kpi.md §2.2 (D15): KPI is the fifth and last.
+  it("offers Collections, AR Deposits, Need attention, Audit and KPI, in that order, and nothing else", () => {
     const html = renderAt("");
-    expect(html.match(/role="tab"/g)).toHaveLength(4);
+    expect(html.match(/role="tab"/g)).toHaveLength(5);
     expect(html).toContain(">Collections<");
     expect(html).toContain(">AR Deposits<");
     expect(html).toContain(">Need attention<");
     expect(html).toContain(">Audit<");
+    expect(html).toContain(">KPI<");
     expect(html.indexOf(">Collections<")).toBeLessThan(html.indexOf(">AR Deposits<"));
     expect(html.indexOf(">AR Deposits<")).toBeLessThan(html.indexOf(">Need attention<"));
     expect(html.indexOf(">Need attention<")).toBeLessThan(html.indexOf(">Audit<"));
+    expect(html.indexOf(">Audit<")).toBeLessThan(html.indexOf(">KPI<"));
     expect(html).not.toContain(">All Events<");
   });
 
@@ -295,6 +302,61 @@ describe("/accountant Audit tab", () => {
 
   it("offers no Status filter on any tab, Audit included, and ignores a status in the URL", () => {
     renderAt("tab=audit&statuses=quoted");
+    expect(lastListFilters().statuses).toEqual([]);
+  });
+});
+
+// docs/specs/accountant-kpi.md §2.4 and §5 (D14, D15).
+describe("/accountant KPI tab", () => {
+  it("is the last tab, after Audit", () => {
+    const html = renderAt("tab=kpi");
+    const labels = [...html.matchAll(/role="tab"[^>]*>([^<]*)</g)].map((m) => m[1].trim());
+    expect(labels).toEqual(["Collections", "AR Deposits", "Need attention", "Audit", "KPI"]);
+  });
+
+  it("opens from ?tab=kpi, and only then", () => {
+    expect(renderAt("tab=kpi")).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>KPI</);
+    expect(renderAt("")).not.toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>KPI</);
+    expect(renderAt("tab=audit")).not.toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>KPI</);
+  });
+
+  it("draws the KPI body and none of the other bodies", () => {
+    const html = renderAt("tab=kpi");
+    expect(html).toContain('data-testid="kpi-tab"');
+    expect(html).not.toContain('data-testid="collections-tab"');
+    expect(html).not.toContain('data-testid="audit-tab"');
+    expect(html).not.toContain("Event Name (1)");
+    expect(html).not.toContain("No invoice needs attention");
+  });
+
+  it("hides the filter sidebar, the Filter button, the search box, Show Deleted and the chips", () => {
+    const html = renderAt("tab=kpi&q=acme&am=am-1&showDeleted=1");
+    expect(mockFilterPanel).not.toHaveBeenCalled();
+    expect(html).not.toContain("Search by name, invoice #");
+    expect(html).not.toContain("Show Deleted");
+    expect(html).not.toContain("Clear all filters");
+    expect(html).not.toContain("Filter");
+  });
+
+  it("does not draw the KPI body on any other tab", () => {
+    for (const query of [
+      "",
+      "tab=collections",
+      "tab=ar_deposits",
+      "tab=need_attention",
+      "tab=audit",
+    ]) {
+      expect(renderAt(query), query).not.toContain('data-testid="kpi-tab"');
+    }
+  });
+
+  it("keeps the Export to CSV button in the header, disabled: the tab registers no file (D14)", () => {
+    const html = renderAt("tab=kpi");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>[^]*?Export to CSV/);
+  });
+
+  it("offers no Status filter, and ignores a status in the URL", () => {
+    renderAt("tab=kpi&statuses=quoted");
     expect(lastListFilters().statuses).toEqual([]);
   });
 });
@@ -553,7 +615,7 @@ describe("/accountant Need attention count", () => {
   it("leaves the tab names as they were", () => {
     const html = renderAt("tab=ar_deposits");
 
-    expect(html.match(/role="tab"/g)).toHaveLength(4);
+    expect(html.match(/role="tab"/g)).toHaveLength(5);
     expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>AR Deposits</);
     expect(renderAt("tab=need_attention")).toMatch(
       /role="tab"[^>]*aria-selected="true"[^>]*>Need attention</,

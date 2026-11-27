@@ -105,6 +105,13 @@ export const BUSINESS_RULES: BusinessRule[] = [
       "supabase/migrations/20261030130000_ar_amount_due.sql, supabase/migrations/20261111140000_ar_no_schedule_due_on_start_day.sql, supabase/migrations/20261128120000_payment_first_installment_on_signing.sql, src/features/accountantCollections/utils/collectionsBalances.ts",
   },
 
+  {
+    topic: "Days to collect (KPI)",
+    rule: "The KPI tab of the Accountant page shows two averages, 'Days to collect Deposit' and 'Days to collect Final Payment': whole days from a scheduled payment's due date (PaymentInstallments.due_date) to the day that payment was paid in full. Only events with event_status = 'booked' and deleted = false count. Deposit is the first row of the event's schedule (the due_on_signing row, then by due_date) and counts only when the schedule has two or more rows; Final Payment is the last row (latest due_date), and also the only row of a one-row schedule. An event with no PaymentInstallments counts as one row for the whole event total, due on the Toronto day of its first ContractSignatures.signed_at (any status), else of Events.booked_at; with neither it is skipped. A row counts only when it is paid in full: money fills the rows the way the Billing tab does (PaymentHistory with deleted_at IS NULL, status = 'succeeded', the event's currency; refunds are negative rows), so several payments can add up, and a partial payment does not count. The payment day is the America/Toronto day of the paid_at (else created_at) of the payment after which the row became full for the last time. Days = payment day minus due date in calendar days; a payment made before its due date (negative days) is left out, one on the due day is 0 and counts. A date range filters by the payment day, both ends included. Average = sum of days / number of payments, rounded UP to a whole number. A row not paid yet is in neither the average nor the count. Nothing is stored: editing a schedule or a payment changes past numbers at once.",
+    source:
+      "src/features/accountantKpi/utils/collectionDays.ts, src/features/accountantKpi/utils/kpiAverages.ts",
+  },
+
   // --- Drivers ---
   {
     topic: "Trip (work tracker) status",

@@ -256,6 +256,45 @@ describe("tab in the URL — /accountant (always written)", () => {
     expect(attention.get("sort")).toBeNull();
   });
 
+  // docs/specs/accountant-kpi.md §2.4: the KPI tab keeps its own range in `kfrom` and `kto`, which
+  // the page's URL code does not own, so it keeps them (and the Audit tab's `from` and `to`).
+  it("writes ?tab=kpi and keeps kfrom, kto and the Audit tab's from and to", () => {
+    const params = filtersToSearchParams(
+      { ...emptyState, tab: "kpi" },
+      ACCT,
+      new URLSearchParams({
+        kfrom: "2026-11-01",
+        kto: "2026-11-30",
+        from: "2026-01-01",
+        to: "2026-01-31",
+      }),
+    );
+    expect(params.get("tab")).toBe("kpi");
+    expect(params.get("kfrom")).toBe("2026-11-01");
+    expect(params.get("kto")).toBe("2026-11-30");
+    expect(params.get("from")).toBe("2026-01-01");
+    expect(params.get("to")).toBe("2026-01-31");
+  });
+
+  it("keeps an empty kfrom and kto (All time) too", () => {
+    const params = filtersToSearchParams(
+      { ...emptyState, tab: "kpi" },
+      ACCT,
+      new URLSearchParams("kfrom=&kto="),
+    );
+    expect(params.has("kfrom")).toBe(true);
+    expect(params.has("kto")).toBe(true);
+  });
+
+  it("opens KPI from ?tab=kpi and never gives it a status filter", () => {
+    const parsed = searchParamsToFilters(
+      new URLSearchParams({ tab: "kpi", statuses: "quoted" }),
+      ACCT,
+    );
+    expect(parsed.tab).toBe("kpi");
+    expect(parsed.filters.statuses).toEqual([]);
+  });
+
   it("round-trips the AR Deposits tab", () => {
     const parsed = searchParamsToFilters(filtersToSearchParams(depositsState, ACCT), ACCT);
     expect(parsed).toEqual(depositsState);

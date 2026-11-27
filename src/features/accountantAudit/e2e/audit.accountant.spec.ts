@@ -19,7 +19,7 @@ const expectNoReceivablesChrome = async (page: Page) => {
 };
 
 test.describe("Audit tab (accountant)", () => {
-  test("S1: /accountant lists Collections, AR Deposits, Need attention, Audit, and opens on Collections", async ({
+  test("S1: /accountant lists Collections, AR Deposits, Need attention, Audit, KPI, and opens on Collections", async ({
     page,
   }) => {
     await page.goto("/accountant");
@@ -29,7 +29,13 @@ test.describe("Audit tab (accountant)", () => {
       "true",
       { timeout: 60_000 },
     );
-    expect(await tabNames(page)).toEqual(["Collections", "AR Deposits", "Need attention", "Audit"]);
+    expect(await tabNames(page)).toEqual([
+      "Collections",
+      "AR Deposits",
+      "Need attention",
+      "Audit",
+      "KPI", // docs/specs/accountant-kpi.md D15: the last tab
+    ]);
   });
 
   test("S2: clicking Audit puts tab=audit in the URL, shows the drivers list and hides the receivables controls", async ({

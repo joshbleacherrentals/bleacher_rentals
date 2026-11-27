@@ -54,10 +54,15 @@ export const QUOTES_BOOKINGS_TABS: ListTabDeclaration = {
  * `cnotdue`), so the `startingSort` here, which sorts events, is never used.
  * Spec: docs/specs/accountant-collections-07-collections-list.md §3
  *
- * Audit is the last tab: a driver's work trackers with their Paid / Not paid status, read-only. Like
+ * Audit is the fourth tab: a driver's work trackers with their Paid / Not paid status, read-only. Like
  * Collections it shows none of the receivables chrome and has an order of its own, so the
  * `startingSort` here, which sorts events, is never used.
  * Spec: docs/specs/accountant-audit-01-tab.md §3
+ *
+ * KPI is the last tab: the average days to collect the Deposit and the Final Payment, two cards
+ * and a date range. It has no list, so it shows no receivables chrome, offers no Status filter,
+ * and its `startingSort` is never used either.
+ * Spec: docs/specs/accountant-kpi.md §2.2 (D15)
  */
 export const ACCOUNTANT_TABS: ListTabDeclaration = {
   tabs: [
@@ -73,6 +78,7 @@ export const ACCOUNTANT_TABS: ListTabDeclaration = {
       offersStatus: false,
     },
     { id: "audit", startingSort: DEFAULT_SORT, offersStatus: false },
+    { id: "kpi", startingSort: DEFAULT_SORT, offersStatus: false },
   ],
   openingTab: "collections",
   writeTabToUrl: true,

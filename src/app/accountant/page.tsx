@@ -11,6 +11,7 @@ import { Pagination } from "@/components/Pagination";
 import { useLayoutContext } from "@/contexts/LayoutContexts";
 import { AuditTab } from "@/features/accountantAudit/components/AuditTab";
 import { CollectionsTab } from "@/features/accountantCollections/components/CollectionsTab";
+import { KpiTab } from "@/features/accountantKpi/components/KpiTab";
 import { FilterButton } from "@/features/quotesAndBookings/components/FilterButton";
 import {
   FilterSidebar,
@@ -41,14 +42,15 @@ import { nextSort, type SortKey } from "@/features/quotesAndBookings/utils/sortE
  * The Accountant page: the AR Deposits tab, taken out of /quotes-bookings, and Collections, the tab
  * it opens on. The AR tab is gone (Collections replaced it); its logic is kept, see `ACCOUNTANT_TABS`.
  * The filter sidebar, the Filter button, search, Show Deleted and the filter chips belong to the
- * receivables tabs and are not drawn on Collections or on Audit, the last tab.
+ * receivables tabs and are not drawn on Collections, Audit or KPI, the last tab.
  * docs/specs/accountant-quotes-02-accountant-page.md
  * docs/specs/accountant-collections-09-design.md
  * docs/specs/accountant-audit-01-tab.md
+ * docs/specs/accountant-kpi.md
  *
  * Export to CSV in the header is on every tab: the table that is open registers its own rows with
  * it (`useRegisterCsvExport`), so the file is whatever that tab shows with its filters, search and
- * sort applied.
+ * sort applied. The KPI tab has no table and registers nothing, so the button is disabled there.
  */
 export default function AccountantPage() {
   return (
@@ -105,11 +107,12 @@ function AccountantPageBody() {
     return () => observer.disconnect();
   }, [scrollRef]);
 
-  // Collections and Audit are not receivables lists: the page's filter sidebar, Filter button, Show
-  // Deleted, search box and filter chips are not drawn on them.
+  // Collections, Audit and KPI are not receivables lists: the page's filter sidebar, Filter button,
+  // Show Deleted, search box and filter chips are not drawn on them.
   const onCollections = activeTab === "collections";
   const onAudit = activeTab === "audit";
-  const hideReceivablesChrome = onCollections || onAudit;
+  const onKpi = activeTab === "kpi";
+  const hideReceivablesChrome = onCollections || onAudit || onKpi;
 
   const { data, isLoading, error } = useQuotesAndBookingsData(filters, showDeleted);
 
@@ -281,6 +284,7 @@ function AccountantPageBody() {
                 />
               </TabsTrigger>
               <TabsTrigger value="audit">Audit</TabsTrigger>
+              <TabsTrigger value="kpi">KPI</TabsTrigger>
             </TabsList>
             {!hideReceivablesChrome && (
               <ActiveFilterChips
@@ -300,6 +304,10 @@ function AccountantPageBody() {
 
           <TabsContent value="audit">
             <AuditTab />
+          </TabsContent>
+
+          <TabsContent value="kpi">
+            <KpiTab />
           </TabsContent>
 
           {/* Always mounted: the payment queries and the allocation run once for both tabs. */}
