@@ -103,9 +103,121 @@ describe("createQuoteEvent — the payment schedule", () => {
 
     expect(syncPaymentInstallments).toHaveBeenCalledWith(
       expect.any(String),
-      [{ id: "inst-1", dueDate: "", percentageBps: 10000, dueOnSigning: true }],
+      [{ id: expect.any(String), dueDate: "", percentageBps: 10000, dueOnSigning: true }],
       "USD",
     );
+  });
+});
+
+// A saved draft (`create-quote-draft` in localStorage) carries its installment ids. Two tabs can
+// load the same draft, so the second Save met the ids the first one had taken and failed on the
+// unique key of PaymentInstallments — after the Events row was already written.
+describe("createQuoteEvent — a stale draft", () => {
+  const twoInstallments = {
+    ...baseState,
+    paymentInstallments: [
+      { id: "draft-inst-1", dueDate: "", percentageBps: 5000, dueOnSigning: true },
+      { id: "draft-inst-2", dueDate: "2026-09-01", percentageBps: 5000 },
+    ],
+  } as never;
+
+  it("gives every installment a fresh id, keeping everything else the draft says", async () => {
+    await createQuoteEvent(twoInstallments, supabase, "user-1");
+
+    const written = vi.mocked(syncPaymentInstallments).mock.calls[0][1];
+    expect(written.map((i) => i.id)).not.toContain("draft-inst-1");
+    expect(written.map((i) => i.id)).not.toContain("draft-inst-2");
+    expect(new Set(written.map((i) => i.id)).size).toBe(2);
+    expect(written.map(({ id: _id, ...rest }) => rest)).toEqual([
+      { dueDate: "", percentageBps: 5000, dueOnSigning: true },
+      { dueDate: "2026-09-01", percentageBps: 5000 },
+    ]);
+  });
+
+  it("uses different ids each time the same draft is saved", async () => {
+    await createQuoteEvent(twoInstallments, supabase, "user-1");
+    await createQuoteEvent(twoInstallments, supabase, "user-1");
+
+    const [first, second] = vi.mocked(syncPaymentInstallments).mock.calls.map((c) => c[1]);
+    const firstIds = new Set(first.map((i) => i.id));
+    expect(second.some((i) => firstIds.has(i.id))).toBe(false);
+  });
+
+  it("does not change the draft it was given", async () => {
+    await createQuoteEvent(twoInstallments, supabase, "user-1");
+
+    expect(
+      (twoInstallments as unknown as typeof baseState).paymentInstallments.map((i) => i.id),
+    ).toEqual(["draft-inst-1", "draft-inst-2"]);
+  });
+});
+
+// If anything after the Events insert fails, the row exists. The screen has to know its id, or
+// every further Save inserts another quote.
+describe("createQuoteEvent — telling the screen the event exists", () => {
+  it("reports the new event id right after the Events row is inserted, before anything else", async () => {
+    const order: string[] = [];
+    const onEventInserted = vi.fn((_eventId: string) => {
+      order.push("reported");
+    });
+    vi.mocked(syncPaymentInstallments).mockImplementationOnce(async () => {
+      order.push("installments");
+    });
+    const withLineItem = {
+      ...baseState,
+      lineItems: [
+        {
+          id: "li-1",
+          category: "custom",
+          label: "Delivery",
+          qty: 1,
+          unitPriceCents: 1000,
+          lineTotalCents: 1000,
+        },
+      ],
+    } as never;
+
+    const eventId = await createQuoteEvent(withLineItem, supabase, "user-1", onEventInserted);
+
+    expect(onEventInserted).toHaveBeenCalledTimes(1);
+    expect(onEventInserted).toHaveBeenCalledWith(eventId);
+    const eventsInsert = executed.findIndex((q) => q.sql.startsWith('insert into "Events"'));
+    const lineItemInsert = executed.findIndex((q) =>
+      q.sql.startsWith('insert into "EventLineItems"'),
+    );
+    expect(eventsInsert).toBeGreaterThanOrEqual(0);
+    expect(lineItemInsert).toBeGreaterThan(eventsInsert);
+    expect(order).toEqual(["reported", "installments"]);
+  });
+
+  it("has already reported the id when a later step fails", async () => {
+    const onEventInserted = vi.fn();
+    vi.mocked(syncPaymentInstallments).mockRejectedValueOnce(new Error("UNIQUE constraint failed"));
+
+    await expect(createQuoteEvent(state, supabase, "user-1", onEventInserted)).rejects.toThrow(
+      "UNIQUE constraint failed",
+    );
+
+    expect(onEventInserted).toHaveBeenCalledTimes(1);
+    const insertedId = (
+      executed.find((q) => q.sql.startsWith('insert into "Events"'))!.parameters as unknown[]
+    )[0];
+    expect(onEventInserted).toHaveBeenCalledWith(insertedId);
+  });
+
+  it("does not report anything when the event row itself is never written", async () => {
+    const onEventInserted = vi.fn();
+    const noSchedule = { ...baseState, paymentInstallments: [] } as never;
+
+    await expect(
+      createQuoteEvent(noSchedule, supabase, "user-1", onEventInserted),
+    ).rejects.toThrow();
+
+    expect(onEventInserted).not.toHaveBeenCalled();
+  });
+
+  it("still works when the caller passes no callback", async () => {
+    await expect(createQuoteEvent(state, supabase, "user-1")).resolves.toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 

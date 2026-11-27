@@ -12,10 +12,18 @@ import { toEventLineItemValues } from "./toEventLineItemValues";
 import { postFinanceBookedNotice, shouldNotifyFinanceBooked } from "../utils/notifyFinanceBooked";
 import { taxOverrideFlag } from "../utils/taxOverride";
 
+/**
+ * Insert a new quote. Returns the id of the Events row.
+ *
+ * `onEventInserted` is called with that id as soon as the Events row is written, before the line
+ * items and installments. If a later step throws, the row already exists, so the caller needs the
+ * id to switch the form to editing — otherwise every retry would insert one more quote.
+ */
 export async function createQuoteEvent(
   state: CreateQuoteState,
   supabase: SupabaseClient<Database>,
   currentUserUuid?: string | null,
+  onEventInserted?: (eventId: string) => void,
 ): Promise<string> {
   const scheduleError = state.scheduleError ?? validatePaymentSchedule(state.paymentInstallments);
   if (scheduleError) throw new Error(scheduleError);
@@ -91,6 +99,7 @@ export async function createQuoteEvent(
       } as any)
       .compile(),
   );
+  onEventInserted?.(eventUuid);
 
   // The owner's chat subscription is NOT created here. `events_auto_subscribe_owner`
   // (20260709120000) does it server-side on this INSERT, with
@@ -126,7 +135,15 @@ export async function createQuoteEvent(
     }
   }
 
-  await syncPaymentInstallments(eventUuid, state.paymentInstallments, state.currency);
+  // The installment ids held by the form are NOT reused. A saved draft (`create-quote-draft` in
+  // localStorage) keeps them, and a second tab loads the same draft: once the first tab has saved,
+  // those ids are taken, and this insert would fail on the unique key of PaymentInstallments with
+  // the Events row already written. A new quote has no installments to keep the ids of.
+  const freshInstallments = state.paymentInstallments.map((installment) => ({
+    ...installment,
+    id: crypto.randomUUID(),
+  }));
+  await syncPaymentInstallments(eventUuid, freshInstallments, state.currency);
 
   // 5. Log creation via PowerSync local (not Supabase) so it uploads
   //    in the same batch as the Event — avoids FK violation on event_uuid.

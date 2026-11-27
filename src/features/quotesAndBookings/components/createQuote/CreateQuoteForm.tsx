@@ -7,6 +7,7 @@ import {
   useCreateQuoteStore,
   hasUnsavedChanges,
   captureQuoteBaseline,
+  type CreateQuoteState,
 } from "../../state/useCreateQuoteStore";
 import { QuoteDetailsSection } from "./sections/QuoteDetailsSection";
 import { ClientInfoSection } from "./sections/ClientInfoSection";
@@ -119,6 +120,16 @@ export function CreateQuoteForm() {
   };
 
   /**
+   * Insert a new quote. The form switches to editing the moment the Events row exists — not when
+   * the whole create returns. If a later step (line items, installments) fails, the quote is
+   * already saved, and the next Save must UPDATE it instead of inserting another one.
+   */
+  const createQuote = (state: CreateQuoteState) =>
+    createQuoteEvent(state, supabase, currentUserUuid ?? perms.userId, (eventId) =>
+      useCreateQuoteStore.getState().setField("editingEventId", eventId),
+    );
+
+  /**
    * Persist the quote without navigating — a draft has no required fields,
    * so this always succeeds unless the write itself fails. Returns the event
    * id on success (used by the Save button and the unsaved-changes guard),
@@ -139,7 +150,7 @@ export function CreateQuoteForm() {
         await updateQuoteEvent(editingEventId, state, supabase, currentUserUuid ?? perms.userId);
         eventId = editingEventId;
       } else {
-        eventId = await createQuoteEvent(state, supabase, currentUserUuid ?? perms.userId);
+        eventId = await createQuote(state);
       }
       void triage("Events", { id: eventId }, supabase);
       createSuccessToast([isEditing ? "Quote updated." : "Quote draft saved."]);
@@ -187,15 +198,12 @@ export function CreateQuoteForm() {
         await updateQuoteEvent(editingEventId, state, supabase, currentUserUuid ?? perms.userId);
         eventId = editingEventId;
       } else {
-        eventId = await createQuoteEvent(state, supabase, currentUserUuid ?? perms.userId);
+        // createQuote also sets editingEventId, so later saves UPDATE this quote, not INSERT.
+        eventId = await createQuote(state);
       }
       void triage("Events", { id: eventId }, supabase);
       // Open preview in new tab, keep form open
       window.open(`/quotes-bookings/${eventId}/preview`, "_blank");
-      if (!isEditing) {
-        // Update store so subsequent saves do UPDATE not INSERT
-        useCreateQuoteStore.getState().setField("editingEventId", eventId);
-      }
     } catch (error) {
       createErrorToastNoThrow([
         (error as Error).message || "Could not save the quote. Your draft has been retained.",
@@ -225,9 +233,8 @@ export function CreateQuoteForm() {
         await updateQuoteEvent(editingEventId, state, supabase, currentUserUuid ?? perms.userId);
         eventId = editingEventId;
       } else {
-        eventId = await createQuoteEvent(state, supabase, currentUserUuid ?? perms.userId);
-        // Later saves must UPDATE this quote, not insert another.
-        useCreateQuoteStore.getState().setField("editingEventId", eventId);
+        // createQuote also sets editingEventId, so later saves UPDATE this quote, not INSERT.
+        eventId = await createQuote(state);
       }
       void triage("Events", { id: eventId }, supabase);
       setSendTarget({ eventId, recipients });
