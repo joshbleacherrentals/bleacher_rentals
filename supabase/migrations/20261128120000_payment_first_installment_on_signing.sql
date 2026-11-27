@@ -8,6 +8,13 @@
 -- afterwards. A signed event gets the day of its FIRST signature, a hand-booked one the day of
 -- its `booked_at`, both in the Toronto time zone like the Collections functions.
 --
+-- Old events (spec D5, narrowed by D6), by status and `event_end`, the Toronto day the migration
+-- runs being today: booked / unsigned_changes and not finished (event_end after today) KEEP their
+-- date; booked / unsigned_changes and finished (event_end today or earlier) are RE-DATED to the
+-- first-booked day; draft, quoted and lost are CLEARED, whatever their dates. All of them get the
+-- mark. The rule lives in backfill_first_installment_on_signing(), which the seed and the SQL
+-- test call too.
+--
 -- Why the hash changes: the due date was contract material, so writing it after the client signed
 -- would move contract_hash and invalidate the signature just made. For the marked row the hash now
 -- carries the text `on signing` instead of the date; its percentage stays contract material.
@@ -15,8 +22,8 @@
 -- the hash do not depend on that date either (a 50 / 50 split of an odd number of cents).
 --
 -- Order below: column, functions, the two replaced functions, the invalidation trigger off, the
--- one-time marking and dating (spec D5), the triggers, a recompute of every schedule's hash, the
--- active signatures re-anchored (D5 question D: they stay valid), the invalidation trigger on.
+-- one-time marking and dating (spec D5 and D6), the triggers, a recompute of every schedule's hash,
+-- the active signatures re-anchored (D5 question D: they stay valid), the invalidation trigger on.
 -- Precedent: 20260903120000_payment_state_out_of_quote_hashes.sql. A migration file is a batch under
 -- the Supabase CLI, so nothing here needs BEGIN and COMMIT. It can run twice: the column is added
 -- IF NOT EXISTS, the functions are replaced, an event that already has a marked row is skipped.
@@ -219,28 +226,66 @@ BEGIN
 END;
 $$;
 
--- ── 5. The one-time marking and dating (spec D5) ─────────────────────────────
+-- ── 5. The one-time marking and dating (spec D5, narrowed by D6) ─────────────
+-- Marks the first row of every event that has a schedule and no marked row yet: the row the
+-- schedule pays first (earliest due date, then created_at, then id). Its date, by the event's
+-- status and its end, with today the Toronto day:
+--   booked / unsigned_changes, event_end after today  -> Keep: the date it has
+--   booked / unsigned_changes, event_end today or before -> Re-date: first_booked_day (the earliest
+--                                                        signature, else booked_at, else now())
+--   any other status (draft, quoted, lost)             -> Clear: NULL, "On signing"
+-- Idempotent: an event that has a marked row is skipped, so a second call returns 0. Returns the
+-- number of events marked. The seed and the SQL test call it too.
+CREATE OR REPLACE FUNCTION public.backfill_first_installment_on_signing()
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_today  date := (now() AT TIME ZONE 'America/Toronto')::date;
+  v_marked integer;
+BEGIN
+  WITH first_row AS (
+    SELECT x.id,
+           x.event_uuid,
+           row_number() OVER (PARTITION BY x.event_uuid
+                              ORDER BY x.due_date NULLS LAST, x.created_at, x.id) AS rn
+    FROM public."PaymentInstallments" x
+    WHERE NOT EXISTS (SELECT 1 FROM public."PaymentInstallments" m
+                      WHERE m.event_uuid = x.event_uuid AND m.due_on_signing)
+  ), marked AS (
+    UPDATE public."PaymentInstallments" pi
+    SET due_on_signing = true,
+        due_date = CASE
+          WHEN e.event_status IN ('booked', 'unsigned_changes') AND e.event_end > v_today
+            THEN pi.due_date
+          WHEN e.event_status IN ('booked', 'unsigned_changes')
+            THEN public.first_booked_day(e.id)
+          ELSE NULL
+        END
+    FROM first_row f
+    JOIN public."Events" e ON e.id = f.event_uuid
+    WHERE pi.id = f.id AND f.rn = 1
+    RETURNING pi.id
+  )
+  SELECT count(*) INTO v_marked FROM marked;
+  RETURN v_marked;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.backfill_first_installment_on_signing()
+  FROM PUBLIC, anon, authenticated;
+
 -- The invalidation trigger is off while the hashes move: the formula changed for every event with a
--- schedule, and the 16 active signatures stay valid (re-anchored below).
+-- schedule, and the active signatures stay valid (re-anchored below).
 ALTER TABLE public."Events" DISABLE TRIGGER invalidate_signature_on_contract_change;
 
--- The first row of every event that has no marked row yet: the row the schedule pays first
--- (earliest due date, then created_at, then id). Its date is the day of the first booking when the
--- event has ever been booked (any signature: the first signature; booked by hand: booked_at), and
--- empty when it never was (quoted, draft, lost).
-UPDATE public."PaymentInstallments" pi
-SET due_on_signing = true,
-    due_date = CASE WHEN public.event_has_been_booked(pi.event_uuid)
-                    THEN public.first_booked_day(pi.event_uuid) END
-FROM (
-  SELECT x.id,
-         row_number() OVER (PARTITION BY x.event_uuid
-                            ORDER BY x.due_date NULLS LAST, x.created_at, x.id) AS rn
-  FROM public."PaymentInstallments" x
-  WHERE NOT EXISTS (SELECT 1 FROM public."PaymentInstallments" m
-                    WHERE m.event_uuid = x.event_uuid AND m.due_on_signing)
-) first_row
-WHERE pi.id = first_row.id AND first_row.rn = 1;
+DO $$
+DECLARE
+  v_marked integer;
+BEGIN
+  v_marked := public.backfill_first_installment_on_signing();
+  RAISE NOTICE 'first installment backfill: % events marked', v_marked;
+END
+$$;
 
 -- ── 6. The two triggers ──────────────────────────────────────────────────────
 -- On Events: the first time the event is booked, whichever way it got there (the status button, the

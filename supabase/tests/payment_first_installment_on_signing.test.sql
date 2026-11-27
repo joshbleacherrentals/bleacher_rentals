@@ -13,6 +13,10 @@
 --     cent and the second row is dated earlier; the percentage and the other rows' dates stay
 --     contract material
 --   * every event with a schedule has exactly one marked row, the first one
+--   * the one-time backfill (D6), on rows made to look like the old data: a booked or signed
+--     event that is not finished keeps its date, a finished one gets its first-booked day (the
+--     first signature, else booked_at), an event ending today is finished, draft / quoted / lost
+--     events are cleared whatever their dates, and a second call changes nothing
 -- ============================================================================
 
 \set ON_ERROR_STOP on
@@ -38,6 +42,14 @@ DECLARE
   v_content    TEXT;
   v_content2   TEXT;
   v_count      INT;
+  v_today      DATE := (now() AT TIME ZONE 'America/Toronto')::date;
+  v_pass       INT;
+  v_n          INT;
+  v_marked_n   INT;
+  v_first      RECORD;
+  v_second     RECORD;
+  r            RECORD;
+  c            RECORD;
 BEGIN
   INSERT INTO "TermsAndConditions" (id, name, html_content)
   VALUES (gen_random_uuid(), 'First installment T&C', '<p>terms</p>')
@@ -215,6 +227,82 @@ BEGIN
   UPDATE "Events" SET event_name = 'FirstInstallment lost 2' WHERE id = v_event;
   SELECT due_date INTO v_day FROM "PaymentInstallments" WHERE id = v_marked;
   ASSERT v_day IS NULL, 'a lost event that was never booked keeps an empty date';
+
+  -- ── The one-time backfill (D6) on rows made to look like the old data ─────────────────
+  -- Old rows: no row is marked, the first row has a date. today = the Toronto day.
+  CREATE TEMP TABLE bf_case (label TEXT, event_id UUID, expected DATE, first_due DATE)
+    ON COMMIT DROP;
+
+  FOR r IN
+    SELECT * FROM (
+      SELECT * FROM (VALUES
+        ('keep: booked, ends tomorrow', 'booked', v_today - 1, v_today + 1,
+         '2026-10-01 15:00:00+00'::timestamptz, NULL::timestamptz, v_today + 30, v_today + 30),
+        ('keep: unsigned_changes, in progress', 'unsigned_changes', v_today - 1, v_today + 2,
+         '2026-10-01 15:00:00+00', '2026-10-02 15:00:00+00', v_today + 5, v_today + 5),
+        ('re-date: finished, signed', 'booked', v_today - 4, v_today - 3,
+         '2026-10-20 15:00:00+00', '2026-10-10 20:00:00+00', DATE '2026-12-31',
+         DATE '2026-10-10'),
+        ('re-date: finished, hand-booked', 'booked', v_today - 4, v_today - 3,
+         '2026-10-20 03:00:00+00', NULL, DATE '2026-12-01', DATE '2026-10-19'),
+        ('re-date: ends today', 'booked', v_today - 1, v_today,
+         '2026-11-23 17:00:00+00', NULL, v_today + 26, DATE '2026-11-23')
+      ) AS t(label, status, ev_start, ev_end, booked_at, signed_at, first_due, expected)
+      UNION ALL
+      SELECT 'clear: ' || s || ', ends ' || o::text, s, v_today + o - 1, v_today + o,
+             NULL::timestamptz, NULL::timestamptz, v_today + 5, NULL::date
+      FROM unnest(ARRAY['draft', 'quoted', 'lost']) AS s,
+           unnest(ARRAY[-10, 0, 10]) AS o
+    ) cases
+  LOOP
+    INSERT INTO "Events" (id, event_name, event_start, event_end, lenient, must_be_clean,
+                          event_status, booked_at, tax_percent, tax_amount_cents,
+                          terms_and_conditions_uuid)
+    VALUES (gen_random_uuid(), 'Backfill ' || r.label, r.ev_start, r.ev_end, false, false,
+            r.status::event_status, r.booked_at, 0, 0, v_terms)
+    RETURNING id INTO v_event;
+    INSERT INTO "EventLineItems" (id, event_uuid, header, quantity, value_cents, currency,
+                                  is_template, deleted)
+    VALUES (gen_random_uuid(), v_event, 'Item', 1, 10000, 'USD', false, false);
+    -- 60 % first (dated first_due), 40 % second (dated 30 days later), neither marked.
+    INSERT INTO "PaymentInstallments" (id, event_uuid, due_date, percentage_bps, currency,
+                                       due_on_signing)
+    VALUES (gen_random_uuid(), v_event, r.first_due, 6000, 'USD', false),
+           (gen_random_uuid(), v_event, r.first_due + 30, 4000, 'USD', false);
+    IF r.signed_at IS NOT NULL THEN
+      SELECT contract_hash INTO v_hash FROM "Events" WHERE id = v_event;
+      INSERT INTO "ContractSignatures" (id, event_uuid, terms_and_conditions_uuid, signer_name,
+                                        signed_at, status, signed_contract_hash)
+      VALUES (gen_random_uuid(), v_event, v_terms, 'Jordan Ellis', r.signed_at, 'active', v_hash);
+    END IF;
+    INSERT INTO bf_case VALUES (r.label, v_event, r.expected, r.first_due);
+  END LOOP;
+
+  FOR v_pass IN 1..2 LOOP
+    v_n := public.backfill_first_installment_on_signing();
+    IF v_pass = 1 THEN
+      ASSERT v_n >= 14, format('the first call marks the old events: %s', v_n);
+    ELSE
+      ASSERT v_n = 0, format('a second call changes nothing: %s', v_n);
+    END IF;
+
+    FOR c IN SELECT * FROM bf_case LOOP
+      SELECT count(*) FILTER (WHERE due_on_signing) INTO v_marked_n
+      FROM "PaymentInstallments" WHERE event_uuid = c.event_id;
+      ASSERT v_marked_n = 1, format('%s: exactly one marked row, got %s', c.label, v_marked_n);
+
+      SELECT due_on_signing, due_date INTO v_first
+      FROM "PaymentInstallments" WHERE event_uuid = c.event_id AND percentage_bps = 6000;
+      ASSERT v_first.due_on_signing, format('%s: the first row is the marked one', c.label);
+      ASSERT v_first.due_date IS NOT DISTINCT FROM c.expected,
+        format('%s: first date %s, expected %s', c.label, v_first.due_date, c.expected);
+
+      SELECT due_on_signing, due_date INTO v_second
+      FROM "PaymentInstallments" WHERE event_uuid = c.event_id AND percentage_bps = 4000;
+      ASSERT NOT v_second.due_on_signing AND v_second.due_date = c.first_due + 30,
+        format('%s: the second row is not touched', c.label);
+    END LOOP;
+  END LOOP;
 
   -- ── Every event with a schedule has exactly one marked row, and it is first ──────────
   SELECT count(*) INTO v_count

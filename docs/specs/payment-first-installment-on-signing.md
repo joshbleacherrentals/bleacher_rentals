@@ -1,7 +1,10 @@
 # Payment schedule: the first installment is due the day the quote is first booked
 
-Status: **Approved** 2026-11-27 and **implemented** the same day, uncommitted (§9 lists what
-the build found and changed against the approved text). 0 open decisions (all answered, §1).
+Status: **Approved** 2026-11-27 and **implemented** the same day, committed `c1dff795` (not
+pushed; §9 lists what the build found and changed against the approved text). **Amended
+2026-11-27 by D6** (which old events the migration re-dates): **Approved and implemented** the
+same day, uncommitted; the migration is edited in place because nobody has applied it in
+production (§9.1). 0 open decisions (all answered, §1).
 Branch: `q4-sprint4-maintenance-dashboard`.
 Amends: [payment-does-not-invalidate-signature.md](payment-does-not-invalidate-signature.md) D1
 (§3.3). Builds on: [percentage-payment-schedules.md](percentage-payment-schedules.md).
@@ -52,6 +55,10 @@ is added.
 
 **D5. Old events, one time, by a migration.**
 
+Amended by D6 (2026-11-27): the answers to A, B and C below now apply only to the events D6
+names. The counts in A, B and C are the counts of 2026-11-26 for the original answer; the counts
+for the amended rule are in D6. Question D stands.
+
 - Question A (76 events that have a signature and a schedule): fix the first payment date?
 - User's answer: **fix all 76**, to the day of the first signature. Of them 18 already match, 40
   move later, 18 move earlier. In 14 the first payment stood in the future and becomes due now:
@@ -70,6 +77,52 @@ is added.
 - User's answer: **yes, they stay valid.** No client is asked to sign again.
 
 All counts are from read-only queries of production on 2026-11-26.
+
+**D6. Which old events the migration re-dates (amends D5, 2026-11-27).**
+
+The author's words (translated): "Change the logic so that all events that are not yet finished
+and are signed or booked do not change the date of the first installment. So the date changes
+for past events that have already finished. The date changes for events with the other
+statuses, draft, quoted, lost, whether they are in the past, present or future." And: "You can
+change this migration, nobody has applied it in production yet."
+
+- Question: does an event that ends on the day the migration runs count as finished?
+- User's answer: **yes: finished means `event_end` is today or earlier** (today = the Toronto
+  day the migration runs).
+- Question: the note under the first row's date, "Set when the quote was first booked", is not
+  exact for old live events whose date was set earlier. What happens to the text?
+- User's answer: **keep the text as it is.**
+
+The rule, by status and `event_end`, applied once to every event that has a schedule and no
+marked row:
+
+- **Keep.** Status `booked` or `unsigned_changes` and `event_end` after today. The first row is
+  marked "due on signing" and keeps the date it has. Nothing moves.
+- **Re-date.** Status `booked` or `unsigned_changes` and `event_end` today or earlier. The date
+  is set as D5 questions A and B say: the day of the first signature if the event has one,
+  else the day of `booked_at`.
+- **Clear.** Status `draft`, `quoted` or `lost`, whatever `event_end` is. The date is cleared,
+  "On signing", as D5 question C says.
+
+Counts from read-only queries of production on 2026-11-27 (events with a schedule, deleted
+events included; they change until the day of the deploy):
+
+- 632 events: keep 79, re-date 50 (49 finished and 1 ending today), clear 503 (232 quoted, 197
+  lost, 74 draft).
+- Of the 50 re-dated: 17 already have that day, 22 move later, 11 move earlier.
+- Under the original D5 the 79 kept events would have moved too: 12 already had the day, 36
+  moved later, 31 earlier, and 19 of them went from the future to due now. Now none moves.
+- Collections: 4 of the 50 re-dated events have the first payment in the future today and it
+  becomes due now (the original D5 had 23). 2 of the 4 have payments recorded (a single
+  payment of 100%); 2 have nothing paid (their events ended on Nov 23 and Nov 27) and they
+  enter Collections.
+- `event_end` is `NOT NULL`, and no event has an empty `event_status` today. An event with a
+  status outside the first two groups would fall in "Clear".
+- Two events have a signature and a status of draft, quoted or lost. Neither has a schedule, so
+  the migration does not touch them.
+
+D4 and §3.3 apply to a kept row as to any marked row: its date cannot be typed and the hash
+carries `on signing` instead of it.
 
 ## 2. Research findings
 
@@ -181,28 +234,41 @@ In this order, in one run (the file itself is the reference; §9 lists how it di
 first plan):
 
 1. `ALTER COLUMN due_date DROP NOT NULL`, then `ADD COLUMN due_on_signing`.
-2. Mark the first row of every event that has a schedule: the row with
-   `row_number() = 1` over `due_date NULLS LAST, created_at, id` (the order the schedule
-   allocates payments in). Done once; afterwards the mark is the identity.
-3. `ALTER TABLE "Events" DISABLE TRIGGER invalidate_signature_on_contract_change`.
-4. Set the date of every marked row (D5):
-   - the event has any signature: the day of the earliest signature;
-   - else its status is `booked` or `unsigned_changes`: the day of `booked_at` (or of
-     `now()` if empty);
-   - else: `NULL`.
-5. Create the two functions and the two triggers; replace the hash function.
-6. Recompute the hashes of every event that has a schedule.
-7. Re-anchor: `UPDATE "ContractSignatures" SET signed_contract_hash = e.contract_hash` for
-   active signatures of those events (D5 question D: the 16 stay valid).
-8. `ALTER TABLE "Events" ENABLE TRIGGER invalidate_signature_on_contract_change`.
+2. `ALTER TABLE "Events" DISABLE TRIGGER invalidate_signature_on_contract_change`.
+3. Create `public.backfill_first_installment_on_signing()` and call it once (D5, narrowed by
+   D6). For every event that has a schedule and no marked row it marks the first row: the row
+   with `row_number() = 1` over `due_date NULLS LAST, created_at, id` (the order the schedule
+   allocates payments in); afterwards the mark is the identity. It sets that row's date by the
+   status of the event and its `event_end`, with today = the Toronto day:
+   - status `booked` or `unsigned_changes` and `event_end` after today: the date is left as it
+     is (Keep);
+   - status `booked` or `unsigned_changes` and `event_end` today or earlier: the day of the
+     earliest signature if there is one, else the day of `booked_at`, else the day of `now()`
+     (Re-date, `first_booked_day`);
+   - any other status: `NULL` (Clear).
+
+   The function returns the number of events it marked, is idempotent (an event that has a marked
+   row is skipped, so a second call returns 0), `SECURITY DEFINER`,
+   `SET search_path = public`, EXECUTE revoked from the app roles. It stays in the schema so the
+   seed and the SQL test call the same code as the migration.
+
+4. Create the two trigger functions and the two triggers; replace the hash function (the
+   hash and resolver functions are replaced before step 3 in the file, so the hashes already
+   follow the new formula when the rows move).
+5. Recompute the hashes of every event that has a schedule.
+6. Re-anchor: `UPDATE "ContractSignatures" SET signed_contract_hash = e.contract_hash` for
+   active signatures of those events (D5 question D: the active signatures stay valid).
+7. `ALTER TABLE "Events" ENABLE TRIGGER invalidate_signature_on_contract_change`.
 
 The migration can run twice: the column is added `IF NOT EXISTS`, the functions are replaced,
-the second marking changes nothing, and the second date pass touches only what step 4 sets.
-The hashes of the touched events move once, so a public page open at deploy time shows "quote
+and the second call of the backfill finds every event marked and changes nothing. The hashes of
+all events with a schedule move once (the formula changed, also for the kept events, whose
+signatures are re-anchored in step 6), so a public page open at deploy time shows "quote
 updated" once (as in `20260903120000`). The deferred Collections triggers fire at commit.
 
-`supabase/seed.sql` gets one block at the end with steps 2 and 4 (the seed runs with triggers
-off). Dry-run it in a rolled-back transaction before it is saved.
+`supabase/seed.sql` gets one block at the end that calls the backfill function, recomputes the
+hashes and re-anchors the active signatures (the seed runs with triggers off). Dry-run it in a
+rolled-back transaction before it is saved.
 
 ### 3.6 The application
 
@@ -283,14 +349,22 @@ SQL test, `supabase/tests/payment_first_installment_on_signing.test.sql`, run th
 - a schedule inserted for an already booked event is filled at once;
 - the fill moves neither hash and invalidates no active signature;
 - the hash is the same for the same terms whatever the marked row's date;
-- the migration on a copy: counts of D5 (marked rows, dates set, dates cleared, 16 signatures
-  still active).
+- the backfill, on rows made to look like the old data (not marked, with a date), one event per
+  case: Keep, a booked event that ends tomorrow, and an `unsigned_changes` event in progress, each
+  keeps its date and gets the mark; Re-date, a signed event gets the day of its first
+  signature, a hand-booked one the day of `booked_at`, and an event ending today is re-dated;
+  Clear, draft, quoted and lost events, ending in the past, today and the future, have an empty
+  date; every one of them has exactly one marked row; a second call changes nothing;
+- the migration on a copy of the local data in a rolled-back transaction: the counts of the
+  three groups equal a direct count by status and `event_end`, and the active signatures are
+  still active.
 
 ## 6. Files
 
 Counted (17, over the cap of 10 because the rule is one logic, as agreed for earlier specs):
 
-- `supabase/migrations/20261128120000_payment_first_installment_on_signing.sql`
+- `supabase/migrations/20261128120000_payment_first_installment_on_signing.sql` (edited in
+  place by D6: the backfill function and its call replace the one-time `UPDATE`)
 - `types/quoteTypes.ts`, `utils/buildDefaultPaymentSchedule.ts`,
   `utils/resolvePaymentSchedule.ts`, `utils/scheduleDiff.ts`, `utils/formatInstallmentDue.ts`
   (new)
@@ -328,8 +402,12 @@ helper `e2e/helpers/quoteTestData.ts` (its installments get the mark on the firs
 - **An event without a schedule** is not touched, booked or not (658 booked events).
 - **The email token `{{dueDate}}`** stays empty for an unbooked quote paid before signing; it
   was a date before. Out of scope.
-- **Migration on production.** Tasks open in Collections for the events of D5 that become due
-  now; the numbers are in D5.
+- **Migration on production.** Tasks open in Collections for the re-dated events of D6 that
+  become due now; the numbers are in D6 (4 today). The kept events move no payment.
+- **An event ending on the day of the deploy** is finished (D6). Whether an event is kept or
+  re-dated depends on the day the migration runs, so the counts of D6 are of 2026-11-27.
+- **A kept row** has a date no booking wrote. It is locked and carries `on signing` in the hash
+  like any marked row; the text under it is the same as for the others (D6).
 
 ## 8. Out of scope
 
@@ -368,3 +446,41 @@ a choice the author made):
 - **The seed** (`supabase/seed.sql`) was already modified in the working tree before this work
   (an uncommitted re-dump); the block was appended at its end, between a header comment and
   `RESET ALL`.
+
+### 9.1 Amendment of 2026-11-27 (D6): what changes and what does not
+
+The author asked that old events that are not finished and are signed or booked keep the date of
+their first installment, and allowed the migration to be edited because nobody had applied it in
+production (it exists only in the unpushed commit `c1dff795` and in the local checkout).
+
+- **Changes.** The migration: the one-time `UPDATE` becomes `backfill_first_installment_on_signing()`
+  and one call, with the three groups of D6. The seed block calls the same function instead of
+  carrying a copy of the `UPDATE`. The SQL test calls it on old-looking rows. The data
+  dictionary rule for the first installment gets one sentence on the old events (kept, re-dated,
+  cleared), because staff reading `due_date` must know that a kept event's date is not its
+  signing day. The two Events sentences of the `/permissions` matrix get a short clause that
+  events booked before the rule and not yet finished keep the date they had (nobody gains or
+  loses a right). Spec: D5 note, D6, §3.5, §5, §6, §7.
+- **Does not change.** The column, `first_booked_day`, `event_has_been_booked`, the two triggers,
+  the hash formula and the resolver tie-break, the re-anchoring of active signatures, the
+  application code, the PDF strings and the editor text (D6: kept as it is).
+- **Not touched by the amendment:** the live behaviour. A quote that has not been booked yet is
+  still dated by its first booking, once; D6 only decides what the migration does to the data that existed.
+
+**What the build of the amendment found (2026-11-27).**
+
+- **The local database already has the old migration applied** (`20261128120000` is recorded in
+  `supabase_migrations.schema_migrations`, 555 events marked by the old rule). Editing the file does
+  not re-run it there: `npx supabase db reset` runs the new migration and then the seed.
+- **The function returns the number of events it marked** (`integer`), so the migration can log it
+  and the test can assert that a second call returns 0.
+- **Dry run of the rule on the local data** (555 events with a schedule, rolled back, rows made to
+  look like the old data): 68 kept with their date unchanged, 45 re-dated to `first_booked_day`,
+  438 cleared; every event has exactly one marked row; a second call marks 0; the seed block leaves
+  the 12 active signatures active and matching their hash. In 4 events the first row picked was
+  the other row of the pair, because the old migration had already put both rows on the same day and
+  the tie goes to `created_at`, `id`; with the original dates, as in production, the order is the
+  one the schedule always used.
+- **SQL tests:** the new cases fail on four deliberate breaks of the rule (Keep removed, an event
+  ending today kept, Clear removed, Re-date removed) and pass on the migration; the 20 older SQL
+  tests that touch schedules, hashes, signatures and Collections pass with the new migration.
