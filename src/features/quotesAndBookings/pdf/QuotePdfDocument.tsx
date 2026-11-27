@@ -399,7 +399,7 @@ export function QuotePdfDocument({ data }: { data: QuoteDocumentData }) {
         {/^https?:\/\//.test(data.publicUrl) ? (
           <View style={styles.payButtonWrap} wrap={false}>
             <Link src={data.publicUrl} style={styles.payButton}>
-              <Text style={styles.payButtonText}>{s.payInvoiceCta}</Text>
+              <Text style={styles.payButtonText}>{s.payNowCta}</Text>
             </Link>
           </View>
         ) : null}

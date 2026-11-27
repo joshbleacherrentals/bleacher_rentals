@@ -63,7 +63,7 @@ describe("QuotePdfDocument header", () => {
   });
 });
 
-describe("QuotePdfDocument Pay Invoice button", () => {
+describe("QuotePdfDocument Pay now button", () => {
   const sample = dataWithPhone("");
   const customerPage = `https://app.example.com/quote/${sample.eventId}`;
 
@@ -76,24 +76,24 @@ describe("QuotePdfDocument Pay Invoice button", () => {
 
   it("links to the customer's quote page", () => {
     const html = render({ ...sample, publicUrl: customerPage });
-    expect(links(html)).toEqual([[customerPage, "Pay Invoice"]]);
+    expect(links(html)).toEqual([[customerPage, "Pay now"]]);
   });
 
   it("is on a quote and on an invoice alike", () => {
     for (const status of ["quoted", "booked"]) {
       const html = render({ ...sample, status, publicUrl: customerPage });
-      expect(links(html), `status ${status}`).toEqual([[customerPage, "Pay Invoice"]]);
+      expect(links(html), `status ${status}`).toEqual([[customerPage, "Pay now"]]);
     }
   });
 
   it("is in French on a French document", () => {
     const html = render({ ...dataWithPhone("", "fr"), publicUrl: customerPage });
-    expect(links(html)).toEqual([[customerPage, "Payer la facture"]]);
+    expect(links(html)).toEqual([[customerPage, "Payer maintenant"]]);
   });
 
   it("sits after the totals, so the customer reads the amount first", () => {
     const html = render({ ...sample, publicUrl: customerPage });
-    expect(html.indexOf("TOTAL")).toBeLessThan(html.indexOf("Pay Invoice"));
+    expect(html.indexOf("TOTAL")).toBeLessThan(html.indexOf("Pay now"));
   });
 
   it("is left out when the address is not a full web link", () => {

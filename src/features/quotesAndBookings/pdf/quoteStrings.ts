@@ -40,6 +40,8 @@ export const quoteStrings = {
   // ── Next-step buttons (Quote tab, and after signing) ─────────────────
   approveQuoteCta: { en: "Approve Quote", fr: "Approuver le devis" },
   payInvoiceCta: { en: "Pay Invoice", fr: "Payer la facture" },
+  // The button on the PDF sent to the customer (the web page keeps payInvoiceCta).
+  payNowCta: { en: "Pay now", fr: "Payer maintenant" },
   continueToPayment: { en: "Continue to Payment", fr: "Passer au paiement" },
   contractSignedNextStep: {
     en: "Thank you, your contract is signed. The next step is payment.",
