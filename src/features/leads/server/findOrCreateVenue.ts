@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../database.types";
 import { venueAddressKey } from "@/features/venues/logic/venueAddressKey";
 import type { ParsedLead } from "../logic/parseWpformsLead";
+import { geocodeAddress } from "@/lib/geocoding/geocode";
 
 type AdminClient = SupabaseClient<Database>;
 
@@ -60,14 +61,17 @@ export async function findOrCreateVenue(
     if (venue) return venue.id;
   }
 
+  const text = {
+    street: lead.street,
+    city: lead.city,
+    state_province: lead.stateProvince,
+    zip_postal: lead.zipPostal,
+  };
+  // Geocoded here: nobody picks this address from the address field, so without it the venue and
+  // every quote at it would have no map position. Best effort.
   const { data: address, error: newAddressError } = await supabase
     .from("Addresses")
-    .insert({
-      street: lead.street,
-      city: lead.city,
-      state_province: lead.stateProvince,
-      zip_postal: lead.zipPostal,
-    })
+    .insert({ ...text, ...(await geocodeAddress(text)) })
     .select("id")
     .single();
   if (newAddressError) throw new Error(`Could not create the address: ${newAddressError.message}`);

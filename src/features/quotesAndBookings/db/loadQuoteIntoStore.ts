@@ -12,6 +12,60 @@ import { taxOverrideFromSaved } from "../utils/taxOverride";
  * Fetches an event by ID (via PowerSync) and loads its data into useCreateQuoteStore for editing.
  * Returns the event ID on success, null on failure.
  */
+type AddressGeoRow = {
+  latitude: number | null;
+  longitude: number | null;
+  place_id: string | null;
+  country: string | null;
+};
+
+/** The event's address' map position, place id and country, as the quote form keeps them. */
+export async function fetchEventAddressGeo(
+  eventId: string,
+): Promise<{ lat?: number; lng?: number; placeId?: string; country?: string }> {
+  try {
+    return toAddressGeo(await readEventAddressGeo(eventId));
+  } catch (e) {
+    // The quote still opens; its address then saves without these, as it did before.
+    console.error("Failed to read the event address' map position:", e);
+    return {};
+  }
+}
+
+async function readEventAddressGeo(eventId: string): Promise<AddressGeoRow | undefined> {
+  const rows = await typedGetAll(
+    db
+      .selectFrom("Events as e")
+      .innerJoin("Addresses as a", "a.id", "e.address_uuid")
+      .select([
+        "a.latitude as latitude",
+        "a.longitude as longitude",
+        "a.place_id as place_id",
+        "a.country as country",
+      ])
+      .where("e.id", "=", eventId)
+      .limit(1)
+      .compile(),
+    expect<AddressGeoRow>(),
+  );
+  return rows[0];
+}
+
+/** An Addresses row's geocoding as the quote form's AddressFields extras; absent fields are left out. */
+export function toAddressGeo(row: AddressGeoRow | undefined): {
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  country?: string;
+} {
+  return {
+    ...(row?.latitude != null ? { lat: row.latitude } : {}),
+    ...(row?.longitude != null ? { lng: row.longitude } : {}),
+    ...(row?.place_id ? { placeId: row.place_id } : {}),
+    ...(row?.country ? { country: row.country } : {}),
+  };
+}
+
 export async function loadQuoteIntoStore(eventId: string): Promise<string | null> {
   const data = await fetchQuoteDetail(eventId);
 
@@ -77,12 +131,16 @@ export async function loadQuoteIntoStore(eventId: string): Promise<string | null
   }
 
   if (data.address) {
+    // The map position, country and place id travel with the address: saving the quote writes the
+    // whole address back, so leaving them out here would erase them from the row on every save.
+    const geo = await fetchEventAddressGeo(eventId);
     store.setField("eventAddress", data.address.street);
     store.setField("eventAddressData", {
       street: data.address.street,
       city: data.address.city,
       stateProvince: data.address.stateProvince,
       zipPostal: data.address.zipPostal ?? "",
+      ...geo,
     });
   }
 
