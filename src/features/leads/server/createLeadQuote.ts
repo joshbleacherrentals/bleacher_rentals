@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../../../../database.types";
 import type { ParsedLead } from "../logic/parseWpformsLead";
+import { geocodeAddress } from "@/lib/geocoding/geocode";
 import { findOrCreateVenue } from "./findOrCreateVenue";
 
 type AdminClient = SupabaseClient<Database>;
@@ -45,14 +46,17 @@ async function findOrCreateContact(
 async function createAddress(supabase: AdminClient, lead: ParsedLead): Promise<string | null> {
   if (!lead.street && !lead.city && !lead.stateProvince && !lead.zipPostal) return null;
 
+  const text = {
+    street: lead.street,
+    city: lead.city,
+    state_province: lead.stateProvince,
+    zip_postal: lead.zipPostal,
+  };
+  // Geocoded here: nobody picks this address from the address field, so without it the quote
+  // would have no map position (no tax region, no route, no GPS proof). Best effort.
   const { data, error } = await supabase
     .from("Addresses")
-    .insert({
-      street: lead.street,
-      city: lead.city,
-      state_province: lead.stateProvince,
-      zip_postal: lead.zipPostal,
-    })
+    .insert({ ...text, ...(await geocodeAddress(text)) })
     .select("id")
     .single();
   if (error) throw new Error(`Could not create the address: ${error.message}`);

@@ -89,6 +89,7 @@ import {
 import { WorkTrackerTabsHeader } from "./WorkTrackerTabsHeader";
 import { WorkTrackerTimeField } from "./WorkTrackerTimeField";
 import { DeliveryProofLine } from "@/features/deliveryProof/components/DeliveryProofLine";
+import { fetchAddressData } from "../db/fetchAddressData";
 import { ModelFeedbackDialog } from "@/features/autoWorkTrackers/components/ModelFeedbackDialog";
 import { useModelRunTrip } from "@/features/autoWorkTrackers/hooks/useModelRunTrip";
 import { feedbackStatement } from "@/features/autoWorkTrackers/db/runFeedback";
@@ -372,13 +373,18 @@ export default function WorkTrackerModal({
     });
 
     if (resolved) {
-      setPickUpAddress({
-        addressUuid: resolved.addressUuid,
-        address: resolved.street,
-        city: resolved.city,
-        state: resolved.state,
-        postalCode: resolved.postalCode,
-      });
+      // Copy the whole address (map position, country, place id too), not just its text: a
+      // text-only copy is saved without a map position.
+      const full = resolved.addressUuid ? await fetchAddressData(resolved.addressUuid) : null;
+      setPickUpAddress(
+        full ?? {
+          addressUuid: resolved.addressUuid,
+          address: resolved.street,
+          city: resolved.city,
+          state: resolved.state,
+          postalCode: resolved.postalCode,
+        },
+      );
     }
   };
 
@@ -393,13 +399,18 @@ export default function WorkTrackerModal({
     });
 
     if (resolved) {
-      setDropOffAddress({
-        addressUuid: resolved.addressUuid,
-        address: resolved.street,
-        city: resolved.city,
-        state: resolved.state,
-        postalCode: resolved.postalCode,
-      });
+      // Copy the whole address (map position, country, place id too), not just its text: a
+      // text-only copy is saved without a map position.
+      const full = resolved.addressUuid ? await fetchAddressData(resolved.addressUuid) : null;
+      setDropOffAddress(
+        full ?? {
+          addressUuid: resolved.addressUuid,
+          address: resolved.street,
+          city: resolved.city,
+          state: resolved.state,
+          postalCode: resolved.postalCode,
+        },
+      );
     }
   };
 

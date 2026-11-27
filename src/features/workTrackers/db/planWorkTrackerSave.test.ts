@@ -152,6 +152,49 @@ describe("planWorkTrackerSave", () => {
     expect(plan.statements[0].parameters).toContain("addr-9");
   });
 
+  it("gives the tracker its own new row instead of editing an address something else uses", () => {
+    // e.g. the auto planner put the event's own address on the tracker: editing it in place
+    // would move the event, its venue and every event at that venue.
+    const plan = planWorkTrackerSave(
+      input({
+        workTracker: tracker({ pickup_address_uuid: "event-addr" }),
+        pickUpAddress: address({ addressUuid: "event-addr", lat: 43.1, lng: -80.2 }),
+        sharedAddressUuids: new Set(["event-addr"]),
+      }),
+    );
+
+    expect(plan.pickupAddressUuid).toBe("generated-1");
+    expect(plan.statements.some((s) => s.sql.includes('update "Addresses"'))).toBe(false);
+    expect(plan.statements[0].sql).toContain('insert into "Addresses"');
+    expect(plan.statements[0].parameters).toContain(43.1);
+    expect(plan.statements.flatMap((s) => s.parameters)).not.toContain("event-addr");
+  });
+
+  it("does not edit a row the tracker's pickup and drop-off share with each other", () => {
+    const plan = planWorkTrackerSave(
+      input({
+        workTracker: tracker({ pickup_address_uuid: "same", dropoff_address_uuid: "same" }),
+        pickUpAddress: address({ addressUuid: "same", address: "2 New Rd" }),
+      }),
+    );
+
+    expect(plan.pickupAddressUuid).not.toBe("same");
+    expect(plan.dropoffAddressUuid).toBe("same");
+    expect(plan.statements.some((s) => s.sql.includes('update "Addresses"'))).toBe(false);
+  });
+
+  it("saves the map position, country and place id with the address", () => {
+    const plan = planWorkTrackerSave(
+      input({
+        pickUpAddress: address({ lat: 43.1, lng: -80.2, country: "CA", placeId: "ChIJx" }),
+      }),
+    );
+
+    expect(plan.statements[0].parameters).toEqual(
+      expect.arrayContaining([43.1, -80.2, "CA", "ChIJx"]),
+    );
+  });
+
   it("keeps the stored address uuid when no address was supplied", () => {
     const plan = planWorkTrackerSave(
       input({ workTracker: tracker({ pickup_address_uuid: "addr-9" }), pickUpAddress: null }),
