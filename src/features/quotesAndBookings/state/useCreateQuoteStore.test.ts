@@ -79,6 +79,8 @@ describe("automatic payment schedules", () => {
     useCreateQuoteStore.getState().resetForm();
     const before = useCreateQuoteStore.getState().paymentInstallments;
     expect(before.map((i) => i.percentageBps)).toEqual([5000, 5000]);
+    expect(before.map((i) => i.dueOnSigning)).toEqual([true, false]);
+    expect(before[0].dueDate).toBe("");
     useCreateQuoteStore.getState().resetForm();
     expect(useCreateQuoteStore.getState().paymentInstallments[0].id).not.toBe(before[0].id);
   });
@@ -86,6 +88,11 @@ describe("automatic payment schedules", () => {
     useCreateQuoteStore.getState().resetForm();
     useCreateQuoteStore.getState().setField("eventStart", "2099-08-01");
     expect(useCreateQuoteStore.getState().paymentInstallments[1].dueDate).toBe("2099-07-25");
+    // Only the second date follows the event; the first row stays due on signing, with no date.
+    expect(useCreateQuoteStore.getState().paymentInstallments[0]).toMatchObject({
+      dueDate: "",
+      dueOnSigning: true,
+    });
     useCreateQuoteStore
       .getState()
       .setPaymentInstallments([{ id: "custom", dueDate: "2099-07-01", percentageBps: 10000 }]);
@@ -110,12 +117,31 @@ describe("saved draft upgrade", () => {
       paymentInstallments: [{ id: "saved", dueDate: "2099-01-01", amountCents: 100000 }],
     };
     const result = await migrate(old, 0);
+    // The converter keeps ids and shares; the version-2 step then makes the first row due on signing.
     expect(result.paymentInstallments).toEqual([
-      { id: "saved", dueDate: "2099-01-01", percentageBps: 10000 },
+      { id: "saved", dueDate: "", percentageBps: 10000, dueOnSigning: true },
     ]);
     expect(JSON.parse(mem.get("create-quote-draft-before-percentages")!)).toEqual(
       JSON.parse(JSON.stringify(old)),
     );
+  });
+  it("makes the first row of a version-1 draft due on signing and clears its date", async () => {
+    const migrate = useCreateQuoteStore.persist.getOptions().migrate!;
+    const old = {
+      ...useCreateQuoteStore.getState(),
+      paymentInstallments: [
+        { id: "a", dueDate: "2099-01-01", percentageBps: 6000 },
+        { id: "b", dueDate: "2099-02-01", percentageBps: 4000 },
+      ],
+    };
+    const result = await migrate(old, 1);
+    expect(result.paymentInstallments).toEqual([
+      { id: "a", dueDate: "", percentageBps: 6000, dueOnSigning: true },
+      { id: "b", dueDate: "2099-02-01", percentageBps: 4000, dueOnSigning: false },
+    ]);
+  });
+  it("is at version 2, so version-1 drafts are upgraded", () => {
+    expect(useCreateQuoteStore.persist.getOptions().version).toBe(2);
   });
   it("preserves an unconvertible draft backup and blocks saving", async () => {
     const migrate = useCreateQuoteStore.persist.getOptions().migrate!;

@@ -108,6 +108,8 @@ export const quoteStrings = {
 
   // ── Payment schedule labels (shared by quote tab, pay tab and PDF) ───
   dueNow: { en: "Due Now", fr: "À payer maintenant" },
+  // The first installment has no date until the event is first booked.
+  onSigning: { en: "On signing", fr: "À la signature" },
   dueOn: {
     en: (date: string) => `Due on ${date}`,
     fr: (date: string) => `Échéance le ${date}`,

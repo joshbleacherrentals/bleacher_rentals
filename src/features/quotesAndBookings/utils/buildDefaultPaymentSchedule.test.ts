@@ -15,16 +15,28 @@ describe("addDaysISO", () => {
 });
 
 describe("buildDefaultPaymentSchedule", () => {
-  it("splits 50/50 with signing today and remaining 7 days before a far-out event", () => {
+  it("splits 50/50: the first row is due on signing (no date), the rest 7 days before the event", () => {
     const s = buildDefaultPaymentSchedule("2026-08-01", today, idFn);
     expect(s).toHaveLength(2);
-    expect(s[0]).toMatchObject({ dueDate: today, percentageBps: 5000 });
-    expect(s[1]).toMatchObject({ dueDate: "2026-07-25", percentageBps: 5000 });
+    expect(s[0]).toMatchObject({ dueDate: "", dueOnSigning: true, percentageBps: 5000 });
+    expect(s[1]).toMatchObject({
+      dueDate: "2026-07-25",
+      dueOnSigning: false,
+      percentageBps: 5000,
+    });
+  });
+
+  it("marks exactly one row, the first, whatever the event date", () => {
+    for (const start of ["2026-08-01", "2026-06-01", null, ""]) {
+      const s = buildDefaultPaymentSchedule(start, today, idFn);
+      expect(s.map((i) => i.dueOnSigning)).toEqual([true, false]);
+      expect(s[0].dueDate).toBe("");
+    }
   });
 
   it("clamps the second installment to today when the event is <7 days out", () => {
     const s = buildDefaultPaymentSchedule("2026-06-26", today, idFn); // 3 days out
-    expect(s[0].dueDate).toBe(today);
+    expect(s[0].dueDate).toBe("");
     expect(s[1].dueDate).toBe(today);
   });
 

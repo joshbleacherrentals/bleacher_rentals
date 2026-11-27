@@ -87,8 +87,19 @@ describe("updateQuoteEvent: the payment schedule", () => {
     expect(mocks.syncPaymentInstallments).not.toHaveBeenCalled();
   });
 
+  it("refuses a schedule whose first installment is not due on signing, and writes nothing", async () => {
+    const dated = [{ id: "inst-1", dueDate: "2026-09-01", percentageBps: 10000 }];
+
+    await expect(save(stateWith("quoted", dated))).rejects.toThrow(
+      "The first installment is always due on signing.",
+    );
+
+    expect(mocks.typedExecute).not.toHaveBeenCalled();
+    expect(mocks.syncPaymentInstallments).not.toHaveBeenCalled();
+  });
+
   it("saves a quote whose schedule is a single full payment", async () => {
-    const full = [{ id: "inst-1", dueDate: "2026-09-01", percentageBps: 10000 }];
+    const full = [{ id: "inst-1", dueDate: "", percentageBps: 10000, dueOnSigning: true }];
 
     await save(stateWith("quoted", full));
 

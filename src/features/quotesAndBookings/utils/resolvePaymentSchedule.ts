@@ -40,9 +40,14 @@ export function resolvePaymentSchedule(
   return installments.map((i, index) => ({ ...i, amountCents: cents[index] }));
 }
 
+/** The error for a schedule whose first row is not the one due on signing. */
+export const FIRST_INSTALLMENT_ERROR = "The first installment is always due on signing.";
+
 /**
  * Null when the schedule can be saved. A quote always has one: a full payment is a single
  * installment of 100%, so an empty schedule is refused rather than meaning "no schedule".
+ * The first row, and only the first, is due on signing: it needs no date (the database writes it
+ * when the event is first booked); every other row needs one.
  */
 export function validatePaymentSchedule(
   installments: readonly PaymentInstallment[],
@@ -57,16 +62,34 @@ export function validatePaymentSchedule(
     return "Percentages must be between 0 and 100 with at most two decimal places.";
   if (installments.reduce((sum, i) => sum + i.percentageBps, 0) !== 10000)
     return "Payment schedule percentages must total 100%.";
+  if (!installments[0].dueOnSigning || installments.slice(1).some((i) => i.dueOnSigning))
+    return FIRST_INSTALLMENT_ERROR;
   if (
     installments.some(
       (i) =>
-        !/^\d{4}-\d{2}-\d{2}$/.test(i.dueDate) ||
-        !Number.isFinite(Date.parse(i.dueDate)) ||
-        new Date(i.dueDate).toISOString().slice(0, 10) !== i.dueDate,
+        !(i.dueOnSigning && i.dueDate === "") &&
+        (!/^\d{4}-\d{2}-\d{2}$/.test(i.dueDate) ||
+          !Number.isFinite(Date.parse(i.dueDate)) ||
+          new Date(i.dueDate).toISOString().slice(0, 10) !== i.dueDate),
     )
   )
     return "All installments need a valid due date.";
   return null;
+}
+
+/**
+ * Makes the first row the one due on signing and clears its date; every other row keeps its date
+ * and loses any mark. Used when an old browser draft is upgraded: the first booking, not the
+ * draft, decides that day.
+ */
+export function markFirstInstallmentOnSigning(
+  installments: readonly PaymentInstallment[],
+): PaymentInstallment[] {
+  return installments.map((i, index) => ({
+    ...i,
+    dueDate: index === 0 ? "" : i.dueDate,
+    dueOnSigning: index === 0,
+  }));
 }
 
 /** Upgrade old drafts with the same rules as the SQL backfill. Never normalize an imbalance. */

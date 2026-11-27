@@ -15,8 +15,10 @@ import { PaymentInstallment } from "../../../types/quoteTypes";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { calculateTotals } from "../../../utils/calculateTotals";
 import { buildDefaultPaymentSchedule } from "../../../utils/buildDefaultPaymentSchedule";
+import { formatInstallmentDue } from "../../../utils/formatInstallmentDue";
 
 import {
+  markFirstInstallmentOnSigning,
   resolvePaymentSchedule,
   validatePaymentSchedule,
 } from "../../../utils/resolvePaymentSchedule";
@@ -25,6 +27,48 @@ type DraftRow = PaymentInstallment & {
   /** Display string for the % input — kept separate so typing "33.3" doesn't jump. */
   pctDisplay: string;
 };
+
+/**
+ * The due-date cell of one row. The first installment is due on signing: it has no date input,
+ * only the text "On signing", or the day the database wrote when the event was first booked.
+ * Every other row has a date input.
+ */
+export function InstallmentDateCell({
+  index,
+  installment,
+  onChange,
+}: {
+  index: number;
+  installment: DraftRow;
+  onChange: (value: string) => void;
+}) {
+  if (installment.dueOnSigning) {
+    return (
+      <div className="flex-1 min-w-0 px-2 py-1.5 text-sm">
+        <span className="font-medium text-gray-700">
+          {formatInstallmentDue(installment.dueDate)}
+        </span>
+        {installment.dueDate && (
+          <span className="block text-xs text-gray-400">Set when the quote was first booked</span>
+        )}
+      </div>
+    );
+  }
+  return (
+    <input
+      type="date"
+      aria-label={`Installment ${index + 1} due date`}
+      value={installment.dueDate}
+      onChange={(e) => onChange(e.target.value)}
+      className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-greenAccent flex-1"
+    />
+  );
+}
+
+/** The first installment is never removed, and a schedule keeps at least one row. */
+export function canRemoveInstallment(draft: readonly DraftRow[], installment: DraftRow): boolean {
+  return draft.length > 1 && !installment.dueOnSigning;
+}
 
 export function EditPaymentScheduleModal() {
   const isOpen = useCreateQuoteStore((s) => s.isEditPaymentScheduleModalOpen);
@@ -48,9 +92,11 @@ export function EditPaymentScheduleModal() {
   // Initialize only when opened. Price changes recalculate amounts, never reset edits.
   useEffect(() => {
     if (!isOpen) return;
-    const seed = storeInstallments.length
-      ? storeInstallments
-      : buildDefaultPaymentSchedule(eventStart);
+    const seed = !storeInstallments.length
+      ? buildDefaultPaymentSchedule(eventStart)
+      : storeInstallments[0].dueOnSigning
+        ? storeInstallments
+        : markFirstInstallmentOnSigning(storeInstallments);
     setDraft(seed.map((i) => ({ ...i, pctDisplay: String(i.percentageBps / 100) })));
   }, [isOpen, storeInstallments, eventStart]);
 
@@ -60,7 +106,7 @@ export function EditPaymentScheduleModal() {
   const isBalanced = remaining === 0;
   // An empty draft is only the instant before the editor seeds its rows; it is not an error.
   const validationError = draft.length ? validatePaymentSchedule(draft) : null;
-  const hasMissingDates = draft.some((i) => !i.dueDate);
+  const hasMissingDates = draft.some((i) => !i.dueOnSigning && !i.dueDate);
   const canSave = draft.length > 0 && !validationError;
   const resolved = resolvePaymentSchedule(
     draft.map((i) => ({
@@ -80,6 +126,7 @@ export function EditPaymentScheduleModal() {
       {
         id: crypto.randomUUID(),
         dueDate: "",
+        dueOnSigning: false,
         percentageBps: share,
         pctDisplay: String(share / 100),
       },
@@ -87,11 +134,14 @@ export function EditPaymentScheduleModal() {
   };
 
   const handleRemove = (id: string) => {
-    setDraft((prev) => prev.filter((i) => i.id !== id));
+    setDraft((prev) => prev.filter((i) => i.id !== id || !canRemoveInstallment(prev, i)));
   };
 
   const handleDateChange = (id: string, value: string) => {
-    setDraft((prev) => prev.map((i) => (i.id === id ? { ...i, dueDate: value } : i)));
+    // The installment due on signing is dated by the database when the event is first booked.
+    setDraft((prev) =>
+      prev.map((i) => (i.id === id && !i.dueOnSigning ? { ...i, dueDate: value } : i)),
+    );
   };
 
   const handlePctChange = (id: string, raw: string) => {
@@ -148,12 +198,10 @@ export function EditPaymentScheduleModal() {
                 <span className="text-xs text-gray-400 w-5 shrink-0">#{idx + 1}</span>
 
                 {/* Date */}
-                <input
-                  type="date"
-                  aria-label={`Installment ${idx + 1} due date`}
-                  value={inst.dueDate}
-                  onChange={(e) => handleDateChange(inst.id, e.target.value)}
-                  className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-greenAccent flex-1"
+                <InstallmentDateCell
+                  index={idx}
+                  installment={inst}
+                  onChange={(value) => handleDateChange(inst.id, value)}
                 />
 
                 {/* Percentage */}
@@ -185,7 +233,7 @@ export function EditPaymentScheduleModal() {
                   type="button"
                   aria-label={`Remove installment ${idx + 1}`}
                   onClick={() => handleRemove(inst.id)}
-                  disabled={draft.length <= 1}
+                  disabled={!canRemoveInstallment(draft, inst)}
                   className="p-1 text-gray-400 hover:text-red-500 transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />

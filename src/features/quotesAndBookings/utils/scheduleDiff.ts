@@ -16,6 +16,7 @@ export type ExistingInstallment = {
   dueDate: string;
   percentageBps: number;
   currency: string | null;
+  dueOnSigning: boolean;
 };
 
 export type ReferencingPayment = {
@@ -55,9 +56,12 @@ export function diffSchedule(
     if (!before) {
       toInsert.push(row);
     } else if (
-      before.dueDate !== row.dueDate ||
+      // The date of the installment due on signing is written by the database alone, so it is
+      // never a change (a stale editor holding an empty date must not overwrite the day).
+      (!row.dueOnSigning && before.dueDate !== row.dueDate) ||
       before.percentageBps !== row.percentageBps ||
-      before.currency !== currency
+      before.currency !== currency ||
+      before.dueOnSigning !== !!row.dueOnSigning
     ) {
       toUpdate.push(row);
     }
@@ -72,6 +76,7 @@ export function diffSchedule(
 }
 
 function formatDueDate(dueDate: string): string {
+  if (!dueDate) return "On signing";
   const dt = DateTime.fromISO(dueDate);
   return dt.isValid ? dt.toFormat("MMM d, yyyy") : dueDate;
 }

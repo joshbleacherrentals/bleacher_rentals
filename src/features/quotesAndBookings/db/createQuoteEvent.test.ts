@@ -53,7 +53,7 @@ const baseState = {
   taxPercent: 0,
   taxOverrideCents: null,
   scheduleError: null,
-  paymentInstallments: [{ id: "inst-1", dueDate: "2026-09-01", percentageBps: 10000 }],
+  paymentInstallments: [{ id: "inst-1", dueDate: "", percentageBps: 10000, dueOnSigning: true }],
   currency: "USD",
   venueId: null,
   eventAddressData: null,
@@ -84,12 +84,26 @@ describe("createQuoteEvent — the payment schedule", () => {
     expect(syncPaymentInstallments).not.toHaveBeenCalled();
   });
 
+  it("refuses a schedule whose first installment is not due on signing, and writes nothing", async () => {
+    const dated = {
+      ...baseState,
+      paymentInstallments: [{ id: "inst-1", dueDate: "2026-09-01", percentageBps: 10000 }],
+    } as never;
+
+    await expect(createQuoteEvent(dated, supabase, "user-1")).rejects.toThrow(
+      "The first installment is always due on signing.",
+    );
+
+    expect(executed).toHaveLength(0);
+    expect(syncPaymentInstallments).not.toHaveBeenCalled();
+  });
+
   it("saves a quote whose schedule is a single full payment", async () => {
     await createQuoteEvent(state, supabase, "user-1");
 
     expect(syncPaymentInstallments).toHaveBeenCalledWith(
       expect.any(String),
-      [{ id: "inst-1", dueDate: "2026-09-01", percentageBps: 10000 }],
+      [{ id: "inst-1", dueDate: "", percentageBps: 10000, dueOnSigning: true }],
       "USD",
     );
   });

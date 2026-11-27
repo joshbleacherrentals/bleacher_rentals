@@ -65,8 +65,15 @@ export type QuoteContact = {
  */
 export type PaymentInstallment = {
   id: string;
-  dueDate: string; // YYYY-MM-DD
+  /** YYYY-MM-DD. Empty for the installment due on signing until the event is first booked. */
+  dueDate: string;
   percentageBps: number; // 100 basis points = 1%
+  /**
+   * The first row of a schedule: due the day the event is first booked. Its date is empty until
+   * then, and only the database writes it (docs/specs/payment-first-installment-on-signing.md).
+   * Absent means false.
+   */
+  dueOnSigning?: boolean;
 };
 
 export type DiscountTemplate = {

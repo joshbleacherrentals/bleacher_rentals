@@ -15,6 +15,7 @@ type StoredInstallmentRow = {
   due_date: string | null;
   percentage_bps: number | null;
   currency: string | null;
+  due_on_signing: number | null;
 };
 
 type StoredPaymentRow = {
@@ -27,7 +28,7 @@ async function loadExisting(eventUuid: string): Promise<ExistingInstallment[]> {
   const rows = await typedGetAll(
     db
       .selectFrom("PaymentInstallments")
-      .select(["id", "due_date", "percentage_bps", "currency"])
+      .select(["id", "due_date", "percentage_bps", "currency", "due_on_signing"])
       .where("event_uuid", "=", eventUuid)
       .compile(),
     expect<StoredInstallmentRow>(),
@@ -38,6 +39,7 @@ async function loadExisting(eventUuid: string): Promise<ExistingInstallment[]> {
     dueDate: r.due_date ?? "",
     percentageBps: r.percentage_bps ?? 0,
     currency: r.currency,
+    dueOnSigning: !!r.due_on_signing,
   }));
 }
 
@@ -97,9 +99,11 @@ export async function syncPaymentInstallments(
       db
         .updateTable("PaymentInstallments")
         .set({
-          due_date: inst.dueDate || null,
+          // The date of the installment due on signing is the database's to write.
+          ...(inst.dueOnSigning ? {} : { due_date: inst.dueDate || null }),
           percentage_bps: inst.percentageBps,
           currency: currency,
+          due_on_signing: inst.dueOnSigning ? 1 : 0,
         })
         .where("id", "=", inst.id)
         .compile(),
@@ -116,6 +120,7 @@ export async function syncPaymentInstallments(
           due_date: inst.dueDate || null,
           percentage_bps: inst.percentageBps,
           currency: currency,
+          due_on_signing: inst.dueOnSigning ? 1 : 0,
           created_at: new Date().toISOString(),
         })
         .compile(),
@@ -127,6 +132,7 @@ type InstallmentRow = {
   id: string;
   due_date: string | null;
   percentage_bps: number | null;
+  due_on_signing: number | null;
 };
 
 /**
@@ -135,8 +141,9 @@ type InstallmentRow = {
 export async function fetchPaymentInstallments(eventUuid: string): Promise<PaymentInstallment[]> {
   const compiled = db
     .selectFrom("PaymentInstallments")
-    .select(["id", "due_date", "percentage_bps"])
+    .select(["id", "due_date", "percentage_bps", "due_on_signing"])
     .where("event_uuid", "=", eventUuid)
+    .orderBy("due_on_signing", "desc")
     .orderBy("due_date", "asc")
     .compile();
 
@@ -146,5 +153,6 @@ export async function fetchPaymentInstallments(eventUuid: string): Promise<Payme
     id: r.id,
     dueDate: r.due_date ?? "",
     percentageBps: r.percentage_bps ?? 0,
+    dueOnSigning: !!r.due_on_signing,
   }));
 }

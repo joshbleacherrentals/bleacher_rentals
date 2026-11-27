@@ -1262,6 +1262,7 @@ const PaymentInstallmentsCols = {
   created_at: column.text,
   currency: column.text,
   due_date: column.text,
+  due_on_signing: column.integer,
   event_uuid: column.text,
 } satisfies PowerSyncColsFor<"PaymentInstallments">;
 const PaymentInstallments = new Table(PaymentInstallmentsCols, {

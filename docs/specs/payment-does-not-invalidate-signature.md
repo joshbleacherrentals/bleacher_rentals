@@ -63,6 +63,10 @@ fingerprint**. Suppressing the write alone would leave the trap armed for the ne
 - **D1 — What re-signs.** Installment **`amount_cents`** and **`due_date`** are
   contract-material: changing either, or adding/removing an installment row, invalidates
   the signature. Payment state (`status`, `paid_at`) is not, and never invalidates.
+- **Amendment 2026-11-27.** The date of the installment due on signing is no longer contract
+  material: the hash carries the text `on signing` for that row, and the database writes its day
+  when the event is first booked. Its percentage still is. See
+  [payment-first-installment-on-signing.md](./payment-first-installment-on-signing.md) §3.3.
 - **D2 — Payment does not make a quote stale either.** `status` leaves `content_hash` as
   well as `contract_hash`. The Pay tab recomputes paid/due from `PaymentHistory` on every
   render, so the client sees the new numbers without a "refresh me" modal.

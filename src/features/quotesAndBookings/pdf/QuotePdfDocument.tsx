@@ -369,7 +369,7 @@ export function QuotePdfDocument({ data }: { data: QuoteDocumentData }) {
             <Text style={styles.sectionTitle}>{s.paymentSchedule}</Text>
             {data.paymentSchedule.map((p, i) => (
               <View key={i} style={[styles.tableRow, { paddingHorizontal: 0 }]}>
-                <Text style={{ flex: 1 }}>{formatDate(p.dueDate)}</Text>
+                <Text style={{ flex: 1 }}>{p.dueDate ? formatDate(p.dueDate) : s.onSigning}</Text>
                 <Text style={{ width: 80, textAlign: "right" }}>{formatMoney(p.amountCents)}</Text>
                 <Text
                   style={{

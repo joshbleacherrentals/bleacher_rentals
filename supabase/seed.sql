@@ -90754,3 +90754,37 @@ FROM given
 HAVING count(*) > 0;
 
 RESET ALL;
+
+
+-- The first installment is due the day the event is first booked
+-- (docs/specs/payment-first-installment-on-signing.md). The seed loads PaymentInstallments with the
+-- column's default (false) and with triggers off, so the migration's one-time marking and dating is
+-- repeated here, with triggers off again, then the hashes move to the new formula and the active
+-- signatures are re-anchored as the migration does.
+SET session_replication_role = replica;
+
+UPDATE public."PaymentInstallments" pi
+SET due_on_signing = true,
+    due_date = CASE WHEN public.event_has_been_booked(pi.event_uuid)
+                    THEN public.first_booked_day(pi.event_uuid) END
+FROM (
+  SELECT x.id,
+         row_number() OVER (PARTITION BY x.event_uuid
+                            ORDER BY x.due_date NULLS LAST, x.created_at, x.id) AS rn
+  FROM public."PaymentInstallments" x
+  WHERE NOT EXISTS (SELECT 1 FROM public."PaymentInstallments" m
+                    WHERE m.event_uuid = x.event_uuid AND m.due_on_signing)
+) first_row
+WHERE pi.id = first_row.id AND first_row.rn = 1;
+
+SELECT public.recompute_quote_hashes(event_uuid)
+FROM (SELECT DISTINCT event_uuid FROM public."PaymentInstallments") s;
+
+UPDATE public."ContractSignatures" s
+SET signed_contract_hash = e.contract_hash
+FROM public."Events" e
+WHERE e.id = s.event_uuid
+  AND s.status = 'active'
+  AND EXISTS (SELECT 1 FROM public."PaymentInstallments" pi WHERE pi.event_uuid = e.id);
+
+RESET ALL;

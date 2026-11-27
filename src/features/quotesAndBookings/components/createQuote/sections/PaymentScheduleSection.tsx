@@ -11,7 +11,8 @@ import {
 } from "../../../utils/resolvePaymentSchedule";
 
 function formatDueDate(dueDate: string | null | undefined): string {
-  if (!dueDate) return "No date";
+  // The first installment is due on signing and has no date until the event is first booked.
+  if (!dueDate) return "On signing";
   return new Date(dueDate + "T00:00:00").toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

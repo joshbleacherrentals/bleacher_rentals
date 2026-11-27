@@ -17,6 +17,7 @@ import { isDeletedPayment, withoutDeleted } from "../../../utils/deletedPayments
 import { formatMoney } from "../../../utils/formatMoney";
 import { Currency } from "../../../types/quoteTypes";
 import { formatDate, formatDateTime, formatTime } from "../../../utils/formatDate";
+import { formatInstallmentDue, installmentDueLabel } from "../../../utils/formatInstallmentDue";
 import { describeAppliedTo } from "../../../utils/describeAppliedTo";
 import { paymentMethodLabel } from "../../../types/paymentTypes";
 import { useUserNames } from "../../../hooks/useUserNames";
@@ -83,7 +84,7 @@ function PaymentScheduleTable({
           {allocation.installments.map((inst, i) => (
             <tr key={inst.installmentId} className="border-b">
               <td className="py-2 text-gray-400">{i + 1}</td>
-              <td className="py-2">{formatDate(inst.dueDate)}</td>
+              <td className="py-2">{formatInstallmentDue(inst.dueDate)}</td>
               <td className="py-2 text-right font-medium">
                 {formatMoney(inst.amountCents, currency)}
               </td>
@@ -170,7 +171,7 @@ function AppliedToCell({
   const lines: { key: string; label: string; cents: number | null; muted: boolean }[] =
     applied.parts.map((part) => ({
       key: part.installmentId,
-      label: `Due ${formatDate(part.dueDate)}`,
+      label: installmentDueLabel(part.dueDate),
       cents: applied.showAmounts ? part.cents : null,
       muted: false,
     }));

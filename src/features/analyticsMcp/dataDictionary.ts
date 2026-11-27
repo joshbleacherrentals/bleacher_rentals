@@ -100,9 +100,9 @@ export const BUSINESS_RULES: BusinessRule[] = [
   // --- Accounts receivable ---
   {
     topic: "Paid, balance and amount due",
-    rule: "Event total for AR = sum of non-deleted line items (value_cents × coalesce(quantity,1)) + coalesce(tax_amount_cents, round(lines × tax_percent/100)); if the event has no lines, contract_revenue_cents. Received = sum PaymentHistory.amount_cents where deleted_at IS NULL, status = 'succeeded' and currency = the event's currency (negative rows are refunds). Balance = max(total − received, 0). The schedule is PaymentInstallments: each is floor(total × percentage_bps / 10000) due on due_date (amount_cents is a deprecated old column). An event with no schedule is due in full on event_start. Amount due = unpaid installments due on or before today (Toronto).",
+    rule: "Event total for AR = sum of non-deleted line items (value_cents × coalesce(quantity,1)) + coalesce(tax_amount_cents, round(lines × tax_percent/100)); if the event has no lines, contract_revenue_cents. Received = sum PaymentHistory.amount_cents where deleted_at IS NULL, status = 'succeeded' and currency = the event's currency (negative rows are refunds). Balance = max(total − received, 0). The schedule is PaymentInstallments: each is floor(total × percentage_bps / 10000) due on due_date (amount_cents is a deprecated old column). The first installment of a schedule (due_on_signing = true) is due the day the event is first booked: its due_date is empty until the event has been booked, then it is the Toronto day of the event's first signature (any status), or of booked_at if the event was booked by hand and never signed, and nothing moves it afterwards. An event with no schedule is due in full on event_start. Amount due = unpaid installments due on or before today (Toronto).",
     source:
-      "supabase/migrations/20261030130000_ar_amount_due.sql, supabase/migrations/20261111140000_ar_no_schedule_due_on_start_day.sql, src/features/accountantCollections/utils/collectionsBalances.ts",
+      "supabase/migrations/20261030130000_ar_amount_due.sql, supabase/migrations/20261111140000_ar_no_schedule_due_on_start_day.sql, supabase/migrations/20261128120000_payment_first_installment_on_signing.sql, src/features/accountantCollections/utils/collectionsBalances.ts",
   },
 
   // --- Drivers ---
@@ -292,6 +292,10 @@ export const DATA_DICTIONARY: DataDictionary = {
     purpose: "An event's payment schedule.",
     columns: {
       percentage_bps: "Share of the event total, basis points (10000 = 100%).",
+      due_date:
+        "Day the installment is due. Empty only for the installment due on signing of an event that has never been booked.",
+      due_on_signing:
+        "True for the first installment of a schedule: due the day the event is first booked. Its due_date is written once by the database (first signature, else booked_at) and never moves.",
       amount_cents: "Deprecated; null on new rows. Use percentage_bps.",
       currency: "The event's currency.",
     },

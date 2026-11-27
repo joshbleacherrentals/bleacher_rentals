@@ -154,10 +154,81 @@ export async function recordSignature(
 export async function addPaymentSchedule(eventId: string): Promise<void> {
   const db = admin();
   const { error } = await db.from("PaymentInstallments").insert([
-    { event_uuid: eventId, due_date: "2026-09-01", percentage_bps: 6000, currency: "USD" },
+    {
+      event_uuid: eventId,
+      due_date: "2026-09-01",
+      percentage_bps: 6000,
+      currency: "USD",
+      due_on_signing: true,
+    },
     { event_uuid: eventId, due_date: "2026-09-20", percentage_bps: 4000, currency: "USD" },
   ]);
   if (error) throw new Error(`addPaymentSchedule: insert failed: ${error.message}`);
+}
+
+/**
+ * A two-part schedule the way a new quote has it: the first row is due on signing and has no date
+ * yet, the second has one. The database writes the first row's day when the event is first booked
+ * (docs/specs/payment-first-installment-on-signing.md).
+ */
+export async function addOnSigningSchedule(eventId: string): Promise<void> {
+  const { error } = await admin()
+    .from("PaymentInstallments")
+    .insert([
+      {
+        event_uuid: eventId,
+        due_date: null,
+        percentage_bps: 5000,
+        currency: "USD",
+        due_on_signing: true,
+      },
+      { event_uuid: eventId, due_date: "2026-12-20", percentage_bps: 5000, currency: "USD" },
+    ]);
+  if (error) throw new Error(`addOnSigningSchedule: insert failed: ${error.message}`);
+}
+
+/** The date of the installment due on signing, as the database holds it (null until booked). */
+export async function getFirstInstallmentDate(eventId: string): Promise<string | null> {
+  const { data, error } = await admin()
+    .from("PaymentInstallments")
+    .select("due_date")
+    .eq("event_uuid", eventId)
+    .eq("due_on_signing", true)
+    .single();
+  if (error) throw new Error(`getFirstInstallmentDate: ${error.message}`);
+  return (data?.due_date as string | null) ?? null;
+}
+
+/** Put the first installment on an earlier day, as if the event had been first booked then. */
+export async function setFirstInstallmentDate(eventId: string, day: string): Promise<void> {
+  const { error } = await admin()
+    .from("PaymentInstallments")
+    .update({ due_date: day })
+    .eq("event_uuid", eventId)
+    .eq("due_on_signing", true);
+  if (error) throw new Error(`setFirstInstallmentDate: ${error.message}`);
+}
+
+/** Mark the event booked straight in the database, without a signature (as a manager can). */
+export async function bookWithoutSignature(eventId: string): Promise<void> {
+  const { error } = await admin()
+    .from("Events")
+    .update({ event_status: "booked" })
+    .eq("id", eventId);
+  if (error) throw new Error(`bookWithoutSignature: ${error.message}`);
+}
+
+/** Today's date in Toronto: YYYY-MM-DD, and as the Billing tab writes it (Nov 27, 2026). */
+export function torontoToday(): { iso: string; label: string } {
+  const now = new Date();
+  const iso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto" }).format(now);
+  const label = now.toLocaleDateString("en-US", {
+    timeZone: "America/Toronto",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return { iso, label };
 }
 
 /** Count active signatures for an event (asserting the guard created none). */

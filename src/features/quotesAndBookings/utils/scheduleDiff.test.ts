@@ -2,23 +2,74 @@ import { describe, it, expect } from "vitest";
 import { diffSchedule, describeBlockedRemovals } from "./scheduleDiff";
 import type { PaymentInstallment } from "../types/quoteTypes";
 
-const inst = (id: string, dueDate: string, percentageBps: number): PaymentInstallment => ({
+const inst = (
+  id: string,
+  dueDate: string,
+  percentageBps: number,
+  dueOnSigning = false,
+): PaymentInstallment => ({
   id,
   dueDate,
   percentageBps,
+  dueOnSigning,
 });
 
-const existing = (id: string, dueDate: string, percentageBps: number, currency = "USD") => ({
+const existing = (
+  id: string,
+  dueDate: string,
+  percentageBps: number,
+  currency = "USD",
+  dueOnSigning = false,
+) => ({
   id,
   dueDate,
   percentageBps,
   currency,
+  dueOnSigning,
 });
 
 const paid = (installmentId: string, amountCents: number, status = "succeeded") => ({
   installmentId,
   amountCents,
   status,
+});
+
+describe("diffSchedule: the installment that is due on signing", () => {
+  const marked = (dueDate: string, bps = 5000) => existing("a", dueDate, bps, "USD", true);
+
+  it("leaves an unchanged marked row alone", () => {
+    const diff = diffSchedule([marked("2026-11-26")], [inst("a", "2026-11-26", 5000, true)], "USD");
+    expect(diff).toEqual({ toInsert: [], toUpdate: [], toDelete: [] });
+  });
+
+  it("never counts the date of a marked row as a change: only the database writes it", () => {
+    // A stale editor holds an empty date; the database already wrote the day.
+    expect(diffSchedule([marked("2026-11-26")], [inst("a", "", 5000, true)], "USD")).toEqual({
+      toInsert: [],
+      toUpdate: [],
+      toDelete: [],
+    });
+    expect(
+      diffSchedule([marked("")], [inst("a", "2026-11-26", 5000, true)], "USD").toUpdate,
+    ).toEqual([]);
+  });
+
+  it("updates a marked row whose percentage changed", () => {
+    const next = [inst("a", "2026-11-26", 6000, true)];
+    expect(diffSchedule([marked("2026-11-26")], next, "USD").toUpdate).toEqual(next);
+  });
+
+  it("updates a row whose mark changed, in either direction", () => {
+    const set = [inst("a", "", 5000, true)];
+    expect(diffSchedule([existing("a", "2026-10-01", 5000)], set, "USD").toUpdate).toEqual(set);
+    const cleared = [inst("a", "2026-10-01", 5000, false)];
+    expect(diffSchedule([marked("")], cleared, "USD").toUpdate).toEqual(cleared);
+  });
+
+  it("inserts a new marked row", () => {
+    const next = [inst("a", "", 10000, true)];
+    expect(diffSchedule([], next, "USD").toInsert).toEqual(next);
+  });
 });
 
 describe("diffSchedule", () => {

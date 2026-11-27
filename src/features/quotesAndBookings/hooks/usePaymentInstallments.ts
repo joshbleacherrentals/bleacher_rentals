@@ -9,6 +9,7 @@ type Row = {
   due_date: string | null;
   percentage_bps: number | null;
   currency: string | null;
+  due_on_signing: number | null;
 };
 
 /**
@@ -21,6 +22,8 @@ export type PaymentInstallmentRow = {
   dueDate: string;
   percentageBps: number;
   currency: string;
+  /** The first row: due the day the event is first booked; its date is empty until then. */
+  dueOnSigning: boolean;
 };
 
 export function usePaymentInstallments(eventId: string | null) {
@@ -28,8 +31,9 @@ export function usePaymentInstallments(eventId: string | null) {
     () =>
       db
         .selectFrom("PaymentInstallments")
-        .select(["id", "due_date", "percentage_bps", "currency"])
+        .select(["id", "due_date", "percentage_bps", "currency", "due_on_signing"])
         .where("event_uuid", "=", eventId ?? "")
+        .orderBy("due_on_signing", "desc")
         .orderBy("due_date", "asc")
         .compile(),
     [eventId],
@@ -44,6 +48,7 @@ export function usePaymentInstallments(eventId: string | null) {
         dueDate: r.due_date ?? "",
         percentageBps: r.percentage_bps ?? 0,
         currency: r.currency ?? "USD",
+        dueOnSigning: !!r.due_on_signing,
       })),
     [data],
   );

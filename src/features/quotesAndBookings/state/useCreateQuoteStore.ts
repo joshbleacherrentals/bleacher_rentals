@@ -11,7 +11,10 @@ import {
   QuoteStatus,
 } from "../types/quoteTypes";
 import { buildDefaultPaymentSchedule } from "../utils/buildDefaultPaymentSchedule";
-import { convertLegacySchedule } from "../utils/resolvePaymentSchedule";
+import {
+  convertLegacySchedule,
+  markFirstInstallmentOnSigning,
+} from "../utils/resolvePaymentSchedule";
 import { calculateTotals } from "../utils/calculateTotals";
 import type { LostReason } from "../utils/lostReason";
 
@@ -233,11 +236,21 @@ export const useCreateQuoteStore = create<CreateQuoteState & CreateQuoteActions>
     {
       name: "create-quote-draft",
       storage: throttledStorage(1000),
-      version: 1,
-      migrate: (persisted) => {
+      version: 2,
+      migrate: (persisted, version) => {
         const old = persisted as CreateQuoteState & {
           paymentInstallments: { id: string; dueDate: string; amountCents: number }[];
         };
+        // Version 1 drafts already hold percentages. Only the first row changes: it is due on
+        // signing, so it loses its date (docs/specs/payment-first-installment-on-signing.md).
+        if (version >= 1) {
+          return {
+            ...(persisted as CreateQuoteState),
+            paymentInstallments: markFirstInstallmentOnSigning(
+              (persisted as CreateQuoteState).paymentInstallments ?? [],
+            ),
+          };
+        }
         // Keep an exact recovery copy before upgrading legacy drafts, including failures.
         if (typeof localStorage !== "undefined")
           localStorage.setItem("create-quote-draft-before-percentages", JSON.stringify(persisted));
@@ -250,9 +263,11 @@ export const useCreateQuoteStore = create<CreateQuoteState & CreateQuoteActions>
             ...old,
             scheduleDatesAutomatic: false,
             scheduleError: null,
-            paymentInstallments: convertLegacySchedule(
-              old.paymentInstallments ?? [],
-              subtotal + discountTotal + (old.taxOverrideCents ?? Math.round(taxAmount)),
+            paymentInstallments: markFirstInstallmentOnSigning(
+              convertLegacySchedule(
+                old.paymentInstallments ?? [],
+                subtotal + discountTotal + (old.taxOverrideCents ?? Math.round(taxAmount)),
+              ),
             ),
           };
         } catch (error) {

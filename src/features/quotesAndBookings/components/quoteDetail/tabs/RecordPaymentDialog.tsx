@@ -13,7 +13,7 @@ import { createErrorToast } from "@/components/toasts/ErrorToast";
 import { Currency } from "../../../types/quoteTypes";
 import { MANUAL_PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "../../../types/paymentTypes";
 import { formatMoney } from "../../../utils/formatMoney";
-import { formatDate } from "../../../utils/formatDate";
+import { installmentDueLabel } from "../../../utils/formatInstallmentDue";
 import {
   draftFromPayment,
   emptyDraft,
@@ -124,7 +124,7 @@ export function RecordPaymentDialog({
         if (!id) return "Not applied";
         const found = installments.find((i) => i.installmentId === id);
         return found
-          ? `Due ${formatDate(found.dueDate)}`
+          ? installmentDueLabel(found.dueDate)
           : "An installment no longer on the schedule";
       };
 
@@ -271,7 +271,7 @@ export function RecordPaymentDialog({
               <option value="">Not applied to an installment</option>
               {installments.map((i) => (
                 <option key={i.installmentId} value={i.installmentId}>
-                  Due {formatDate(i.dueDate)} — {formatMoney(i.amountCents, currency)} (
+                  {installmentDueLabel(i.dueDate)} — {formatMoney(i.amountCents, currency)} (
                   {formatMoney(Math.max(0, i.amountCents - i.allocatedCents), currency)} remaining)
                 </option>
               ))}

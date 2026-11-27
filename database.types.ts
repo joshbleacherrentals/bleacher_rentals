@@ -1847,14 +1847,14 @@ isOneToOne: false
                   ]
                 },"PaymentInstallments": {
                   Row: {
-                    "amount_cents": number | null,"created_at": string,"currency": Database["public"]['Enums']["currency"],"due_date": string,"event_uuid": string,"id": string,"percentage_bps": number
+                    "amount_cents": number | null,"created_at": string,"currency": Database["public"]['Enums']["currency"],"due_date": string | null,"due_on_signing": boolean,"event_uuid": string,"id": string,"percentage_bps": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_cents"?: number | null,"created_at"?: string,"currency": Database["public"]['Enums']["currency"],"due_date": string,"event_uuid": string,"id"?: string,"percentage_bps": number
+                    "amount_cents"?: number | null,"created_at"?: string,"currency": Database["public"]['Enums']["currency"],"due_date"?: string | null,"due_on_signing"?: boolean,"event_uuid": string,"id"?: string,"percentage_bps": number
                   }
                   Update: {
-                    "amount_cents"?: number | null,"created_at"?: string,"currency"?: Database["public"]['Enums']["currency"],"due_date"?: string,"event_uuid"?: string,"id"?: string,"percentage_bps"?: number
+                    "amount_cents"?: number | null,"created_at"?: string,"currency"?: Database["public"]['Enums']["currency"],"due_date"?: string | null,"due_on_signing"?: boolean,"event_uuid"?: string,"id"?: string,"percentage_bps"?: number
                   }
                   Relationships: [
                     {

@@ -14,13 +14,13 @@ export function addDaysISO(iso: string, days: number): string {
 
 /**
  * Builds the default payment schedule for a quote:
- *   - 50% due on signing (defaults to `today`, since the real signing date
- *     isn't known in advance — the manager can change it).
+ *   - 50% due on signing: the first row has no date until the event is first booked, when the
+ *     database writes that day onto it (nobody sets it by hand).
  *   - remaining 50% due 7 days before `eventStart`.
  *
  * Edge cases:
  *   - If the event is less than 7 days out (or in the past), the second
- *     installment is clamped to `today` so it never falls before signing.
+ *     installment is clamped to `today`.
  *   - If `eventStart` is not set yet, the second installment also defaults
  *     to `today`.
  *
@@ -38,7 +38,7 @@ export function buildDefaultPaymentSchedule(
   }
 
   return [
-    { id: idFn(), dueDate: today, percentageBps: 5000 },
-    { id: idFn(), dueDate: secondDate, percentageBps: 5000 },
+    { id: idFn(), dueDate: "", percentageBps: 5000, dueOnSigning: true },
+    { id: idFn(), dueDate: secondDate, percentageBps: 5000, dueOnSigning: false },
   ];
 }

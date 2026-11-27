@@ -670,6 +670,7 @@ PaymentInstallments.amount_cents
 PaymentInstallments.created_at
 PaymentInstallments.currency
 PaymentInstallments.due_date
+PaymentInstallments.due_on_signing
 PaymentInstallments.event_uuid
 PaymentInstallments.id
 PaymentInstallments.percentage_bps

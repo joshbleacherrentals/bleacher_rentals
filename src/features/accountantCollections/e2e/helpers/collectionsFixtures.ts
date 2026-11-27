@@ -238,11 +238,14 @@ export async function addInstallments(
   const { error } = await admin()
     .from("PaymentInstallments")
     .insert(
-      installments.map((i) => ({
+      installments.map((i, index) => ({
         event_uuid: eventId,
         due_date: officeIsoDate(i.dueInDays),
         currency: "USD" as const,
         percentage_bps: i.percentageBps,
+        // The first installment is the one due on signing; its date is already set, so the
+        // database leaves it alone (docs/specs/payment-first-installment-on-signing.md).
+        due_on_signing: index === 0,
       })),
     );
   if (error) throw new Error(`addInstallments: ${error.message}`);

@@ -12,7 +12,8 @@ import { PaymentHistoryRow } from "../../../hooks/usePaymentHistory";
 import type { Allocation } from "../../../utils/allocatePayments";
 import { describeAppliedTo, describeOriginalTarget } from "../../../utils/describeAppliedTo";
 import { formatMoney } from "../../../utils/formatMoney";
-import { formatDate, formatDateTime } from "../../../utils/formatDate";
+import { formatDateTime } from "../../../utils/formatDate";
+import { installmentDueLabel, installmentDueWords } from "../../../utils/formatInstallmentDue";
 import { isDeletedPayment } from "../../../utils/deletedPayments";
 import {
   REFERENCE_LABELS,
@@ -166,7 +167,7 @@ export function PaymentDetailDialog({
               <>
                 {applied.parts.map((part) => (
                   <div key={part.installmentId} className="flex justify-between px-3 py-2 text-sm">
-                    <span className="text-gray-600">Due {formatDate(part.dueDate)}</span>
+                    <span className="text-gray-600">{installmentDueLabel(part.dueDate)}</span>
                     <span className="font-medium tabular-nums">
                       {formatMoney(part.cents, currency)}
                     </span>
@@ -189,7 +190,7 @@ export function PaymentDetailDialog({
           {originalTarget && (
             <p className="mt-2 text-xs text-gray-500">
               {originalTarget.stillOnSchedule
-                ? `Originally recorded against the installment due ${formatDate(originalTarget.dueDate)}.`
+                ? `Originally recorded against the installment ${installmentDueWords(originalTarget.dueDate)}.`
                 : "Originally recorded against an installment that is no longer on the schedule."}
             </p>
           )}
