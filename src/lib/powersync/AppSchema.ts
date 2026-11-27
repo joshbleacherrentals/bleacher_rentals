@@ -681,6 +681,23 @@ const DeliveryProofs = new Table(DeliveryProofsCols, {
   indexes: { work_tracker_uuid: ["work_tracker_uuid"] },
 });
 
+// Address Backfill change log (admins): before/after of each address the backfill wrote, to revert a run.
+const AddressBackfillChangesCols = {
+  created_at: column.text,
+  created_by_user_uuid: column.text,
+  run_uuid: column.text,
+  address_uuid: column.text,
+  source: column.text,
+  google_answer: column.text,
+  before: column.text,
+  after: column.text,
+  reverted_at: column.text,
+  reverted_by_user_uuid: column.text,
+} satisfies PowerSyncColsFor<"AddressBackfillChanges">;
+const AddressBackfillChanges = new Table(AddressBackfillChangesCols, {
+  indexes: { run_uuid: ["run_uuid"], address_uuid: ["address_uuid"] },
+});
+
 const VendorsCols = {
   created_at: column.text,
   qbo_vendor_id: column.text,
@@ -1580,6 +1597,7 @@ export const AppSchema = new Schema({
   AutoWorkTrackerRunTrips,
   AutoWorkTrackerFeedback,
   DeliveryProofs,
+  AddressBackfillChanges,
   Venues,
   AccountManagers,
   AccountManagerZones,

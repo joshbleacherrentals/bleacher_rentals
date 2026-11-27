@@ -26,6 +26,7 @@ import { usePsAddresses } from "@/features/dashboard/db/hooks/powersync/usePsAdd
 import { typedExecute, typedExecuteBatch, typedGetAll, expect } from "@/lib/powersync/typedQuery";
 import { startTrace } from "@/lib/perf/perfTrace";
 import { planWorkTrackerSave } from "@/features/workTrackers/db/planWorkTrackerSave";
+import { fetchSharedAddressUuids } from "@/features/workTrackers/db/sharedAddresses";
 import { scheduleTriage } from "@/features/alerts/scheduleTriage";
 import { triage } from "@/features/alerts/triage";
 import { usePermissionsStore } from "@/features/userAccess/state/usePermissionsStore";
@@ -185,10 +186,18 @@ export async function saveWorkTracker(
   // every watched query on the tables it touched. They are one transaction now;
   // `planWorkTrackerSave` explains why generating the ids up front is what made
   // that possible.
+  // Addresses this tracker shares with an event, a venue or another tracker are copied, not edited.
+  const sharedAddressUuids = wasInsert
+    ? new Set<string>()
+    : await fetchSharedAddressUuids(
+        [workTracker.pickup_address_uuid, workTracker.dropoff_address_uuid],
+        workTracker.id,
+      );
   const plan = planWorkTrackerSave({
     workTracker,
     pickUpAddress,
     dropOffAddress,
+    sharedAddressUuids,
     effectiveStatus,
     createdByUserUuid:
       workTracker.created_by_user_uuid ?? usePermissionsStore.getState().userId ?? null,

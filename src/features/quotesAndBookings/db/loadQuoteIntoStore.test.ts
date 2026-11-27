@@ -10,6 +10,12 @@ vi.mock("./fetchLineItems", () => ({ fetchLineItemsForEvent: vi.fn().mockResolve
 vi.mock("./paymentInstallments", () => ({
   fetchPaymentInstallments: vi.fn().mockResolvedValue([]),
 }));
+// The event address' map position is read straight from the local database.
+const typedGetAllMock = vi.fn(async (): Promise<unknown[]> => []);
+vi.mock("@/lib/powersync/typedQuery", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/powersync/typedQuery")>()),
+  typedGetAll: () => typedGetAllMock(),
+}));
 
 import { loadQuoteIntoStore } from "./loadQuoteIntoStore";
 import { useCreateQuoteStore } from "../state/useCreateQuoteStore";
@@ -58,10 +64,45 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
 
 beforeEach(() => {
   fetchQuoteDetailMock.mockReset();
+  typedGetAllMock.mockReset().mockResolvedValue([]);
   useCreateQuoteStore.getState().resetForm();
 });
 
 describe("loadQuoteIntoStore", () => {
+  it("keeps the address' map position, country and place id, so saving does not erase them", async () => {
+    fetchQuoteDetailMock.mockResolvedValue(makeQuoteDetail());
+    typedGetAllMock.mockResolvedValue([
+      { latitude: 39.78, longitude: -89.65, place_id: "ChIJspr", country: "US" },
+    ]);
+
+    await loadQuoteIntoStore("event-1");
+
+    expect(useCreateQuoteStore.getState().eventAddressData).toEqual({
+      street: "123 Main St",
+      city: "Springfield",
+      stateProvince: "IL",
+      zipPostal: "",
+      lat: 39.78,
+      lng: -89.65,
+      placeId: "ChIJspr",
+      country: "US",
+    });
+  });
+
+  it("still opens the quote when the map position cannot be read", async () => {
+    fetchQuoteDetailMock.mockResolvedValue(makeQuoteDetail());
+    typedGetAllMock.mockRejectedValue(new Error("offline"));
+
+    await loadQuoteIntoStore("event-1");
+
+    expect(useCreateQuoteStore.getState().eventAddressData).toEqual({
+      street: "123 Main St",
+      city: "Springfield",
+      stateProvince: "IL",
+      zipPostal: "",
+    });
+  });
+
   it("loads a linked venue's id and name into the store", async () => {
     fetchQuoteDetailMock.mockResolvedValue(
       makeQuoteDetail({ venue: { id: "venue-1", name: "Lincoln High School Stadium" } }),
