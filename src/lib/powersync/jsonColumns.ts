@@ -7,6 +7,7 @@
 export const JSON_COLUMNS: Record<string, readonly string[]> = {
   AutoWorkTrackerRuns: ["settings", "result"],
   AutoWorkTrackerRunTrips: ["snapshot"],
+  AddressBackfillChanges: ["before", "after"],
 };
 
 /** An upload's data with the table's JSON columns parsed. Text that is not valid JSON is left as is. */
