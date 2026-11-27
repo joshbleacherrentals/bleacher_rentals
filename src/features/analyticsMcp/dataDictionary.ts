@@ -271,8 +271,27 @@ export const DATA_DICTIONARY: DataDictionary = {
   Companies: { purpose: "Customer organisations." },
   Venues: { purpose: "Named event locations; picking one copies its address onto the event." },
   Addresses: {
-    purpose: "Postal addresses with coordinates, shared by events, venues, offices, drivers.",
-    columns: { state_province: "Full name or code; decides an event's zone." },
+    purpose:
+      "Postal addresses with coordinates. An event linked to a venue shares the venue's row on purpose; anything else should have its own (a work tracker editing a shared one gets a copy).",
+    columns: {
+      state_province: "Full name or code; decides an event's zone.",
+      latitude:
+        "Null = never geocoded (most rows before 2026-11 had none). Set by the address field, by geocoding website leads on the server, or by the Address Backfill. Exclude nulls from anything distance-based.",
+      country: "ISO-2 code (US, CA) when set.",
+    },
+  },
+  AddressBackfillChanges: {
+    purpose:
+      "Log of the Address Backfill (Dev Tools): one row per address it gave a map position, so a run can be reverted. Not business data.",
+    columns: {
+      run_uuid: "One press of Run; every change of that run shares it.",
+      source: "twin = copied from an identical address; google = Google's confident answer.",
+      before:
+        "JSON { latitude, longitude, place_id, country } before the change (usually all null).",
+      after: "JSON of what the backfill wrote.",
+      reverted_at:
+        "Set when the change was reverted; the address then holds `before` again, unless someone had edited it since.",
+    },
   },
   SalesOffices: {
     purpose:

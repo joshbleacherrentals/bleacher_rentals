@@ -35,6 +35,11 @@ export type WorkTrackerSaveInput = {
   notification: DriverNotificationPreview | null;
   /** Null when the driver has no linked user; the notification is then dropped. */
   notificationUserUuid: string | null;
+  /**
+   * The tracker's stored addresses that something else also uses (fetchSharedAddressUuids). Such
+   * an address is never edited in place: the tracker gets its own new row instead.
+   */
+  sharedAddressUuids?: ReadonlySet<string>;
   newId: () => string;
 };
 
@@ -68,15 +73,20 @@ type PlannedAddress = { uuid: string | null; statement: CompiledQuery<any> | nul
 /**
  * An address with no data at all leaves the stored uuid alone — a save that did
  * not touch the address must not clear the tracker's reference to it.
+ *
+ * The tracker's own address row is updated in place. One that is shared (with an event, a venue,
+ * another tracker…) is not: editing it would move every one of them, so the tracker gets a new row
+ * of its own and the shared row is left exactly as it was.
  */
 function planAddress(
   address: AddressData | null,
   storedUuid: string | null,
   newId: () => string,
+  shared: boolean,
 ): PlannedAddress {
   if (!address) return { uuid: storedUuid, statement: null };
 
-  if (storedUuid) {
+  if (storedUuid && !shared) {
     return {
       uuid: storedUuid,
       statement: db
@@ -100,8 +110,23 @@ function planAddress(
 export function planWorkTrackerSave(input: WorkTrackerSaveInput): WorkTrackerSavePlan {
   const { workTracker, effectiveStatus, newId } = input;
 
-  const pickup = planAddress(input.pickUpAddress, workTracker.pickup_address_uuid, newId);
-  const dropoff = planAddress(input.dropOffAddress, workTracker.dropoff_address_uuid, newId);
+  const shared = input.sharedAddressUuids ?? new Set<string>();
+  const storedPickup = workTracker.pickup_address_uuid;
+  const storedDropoff = workTracker.dropoff_address_uuid;
+  // Pickup and drop-off on the same row share it with each other: editing one must not move the other.
+  const sameRow = !!storedPickup && storedPickup === storedDropoff;
+  const pickup = planAddress(
+    input.pickUpAddress,
+    storedPickup,
+    newId,
+    sameRow || (!!storedPickup && shared.has(storedPickup)),
+  );
+  const dropoff = planAddress(
+    input.dropOffAddress,
+    storedDropoff,
+    newId,
+    sameRow || (!!storedDropoff && shared.has(storedDropoff)),
+  );
 
   const statements: CompiledQuery<any>[] = [];
   if (pickup.statement) statements.push(pickup.statement);

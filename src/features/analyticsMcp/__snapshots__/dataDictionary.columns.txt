@@ -12,6 +12,17 @@ Accountants.created_at
 Accountants.id
 Accountants.is_active
 Accountants.user_uuid
+AddressBackfillChanges.address_uuid
+AddressBackfillChanges.after
+AddressBackfillChanges.before
+AddressBackfillChanges.created_at
+AddressBackfillChanges.created_by_user_uuid
+AddressBackfillChanges.google_answer
+AddressBackfillChanges.id
+AddressBackfillChanges.reverted_at
+AddressBackfillChanges.reverted_by_user_uuid
+AddressBackfillChanges.run_uuid
+AddressBackfillChanges.source
 Addresses.city
 Addresses.country
 Addresses.created_at

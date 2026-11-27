@@ -77,6 +77,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"AddressBackfillChanges": {
+                  Row: {
+                    "address_uuid": string,"after": NonNullable<Json>,"before": NonNullable<Json>,"created_at": string,"created_by_user_uuid": string | null,"google_answer": string | null,"id": string,"reverted_at": string | null,"reverted_by_user_uuid": string | null,"run_uuid": string,"source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "address_uuid": string,"after": NonNullable<Json>,"before": NonNullable<Json>,"created_at"?: string,"created_by_user_uuid"?: string | null,"google_answer"?: string | null,"id"?: string,"reverted_at"?: string | null,"reverted_by_user_uuid"?: string | null,"run_uuid": string,"source": string
+                  }
+                  Update: {
+                    "address_uuid"?: string,"after"?: NonNullable<Json>,"before"?: NonNullable<Json>,"created_at"?: string,"created_by_user_uuid"?: string | null,"google_answer"?: string | null,"id"?: string,"reverted_at"?: string | null,"reverted_by_user_uuid"?: string | null,"run_uuid"?: string,"source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "AddressBackfillChanges_address_uuid_fkey"
+      columns: ["address_uuid"]
+isOneToOne: false
+      referencedRelation: "Addresses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AddressBackfillChanges_created_by_user_uuid_fkey"
+      columns: ["created_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "AddressBackfillChanges_reverted_by_user_uuid_fkey"
+      columns: ["reverted_by_user_uuid"]
+isOneToOne: false
+      referencedRelation: "Users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"Addresses": {
                   Row: {
                     "city": string,"country": string | null,"created_at": string,"id": string,"latitude": number | null,"longitude": number | null,"place_id": string | null,"state_province": string,"street": string,"zip_postal": string | null

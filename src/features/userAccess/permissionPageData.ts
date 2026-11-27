@@ -1279,6 +1279,23 @@ export const PERMISSIONS: PermissionEntry[] = [
     },
   },
   {
+    label: "Address Backfill",
+    description:
+      "The Address Backfill page under Dev Tools (/dev-tools/address-backfill, opened by its link). It fills in the map position of addresses saved without one, from the administrator's own browser with the app's Google Maps key: first from an identical address that has a position, then from Google, but only when Google found that exact building, street number or named place in the row's state or province. Town centres, road centres, partial matches and addresses with no province are left alone and listed to fix by hand. It writes only the position, the place id and a blank country, never street text. Preview 20 shows what it would do and writes nothing. Every run is logged address by address, listed under Runs, and can be reverted: Revert puts back only the addresses that still hold exactly what the run wrote, so a fix someone made since is kept.",
+    category: "Dev Tools",
+    roles: {
+      admin: full("Opens the page by its link, previews, runs the backfill and reverts a run."),
+      account_manager: none("Administrators only: it changes every address and uses Google quota."),
+      developer: none(
+        "Can open the page with the rest of Dev Tools, but it says administrators only, and the database refuses its change log to anyone else.",
+      ),
+      viewer: none("Administrators only: it changes every address and uses Google quota."),
+      driver: none("Drivers only have access to the Driver Mobile App."),
+      maintainer: none(MAINTAINER_NO_ACCESS_NOTE),
+      accountant: none(ACCOUNTANT_NO_ACCESS_NOTE),
+    },
+  },
+  {
     label: "Development Email Allowlist",
     description:
       "The Allowed Emails page under Dev Tools: the addresses the development environment is allowed to email. It has no effect in production or staging.",
